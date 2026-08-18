@@ -45,6 +45,19 @@ HEADLESS=false node scripts/session/session-reuse.mjs "https://页面URL"
 ```
 输出在 `scripts/session/out/`（HTML / PNG / api-*.json）。
 
+### 第三步：抓驾驶舱群对话，直接入库到 job_messages
+用你自己的登录态抓飞书驾驶舱群对话，复用 brainx 的 `ingestMessages`（幂等去重 + 职位归因 + 可见性 + 游标）：
+```bash
+# 先干跑看抓到什么（不入库）
+DRY_RUN=true HEADLESS=false node scripts/session/capture-cockpit-chat.mjs "<驾驶舱群会话URL>" oc_群id felix
+
+# 确认无误后正式入库
+node scripts/session/capture-cockpit-chat.mjs "<驾驶舱群会话URL>" oc_群id felix
+```
+- 若抓不到消息：`HEADLESS=false` 打开，用 DevTools Network 看消息接口真实 URL 片段，用 `MSG_API_HINT="/该片段"` 指定。
+- `SCROLL_ROUNDS` 控制向上加载多少轮历史（默认 6）。
+- 抓到的消息会转成 brainx 消息契约后写入 `job_messages`，驾驶舱链路（`bridge.js` 的活跃度统计等）自动可用。
+
 ## 安全须知
 - `.state.enc` 是**你的登录态密文**，`out/` 可能含**你账号可见的敏感数据**——两者都不进 git（见 .gitignore）。
 - 密钥丢了就解不开，重跑 login-capture 即可。

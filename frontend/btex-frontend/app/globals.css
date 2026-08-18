@@ -702,3 +702,14 @@ html,body,.btex-app{background:var(--bg)}
 .btex-app .assistant-trigger,.btex-app .profile-trigger{color:#176B58;border-color:rgba(23,107,88,.3)}
 .btex-app .assistant-trigger:hover,.btex-app .assistant-trigger.active,.btex-app .profile-trigger:hover,.btex-app .profile-trigger.active{background:#176B58;border-color:#176B58;color:#fff}
 .btex-app .assistant-message.user p{background:#176B58;color:#fff}
+
+/* —— 卡片内联「暂不考虑」反馈条（取代原生 window.prompt 弹窗）—— */
+.pick-card-feedback.active{background:#176B58;border-color:#176B58;color:#fff;transform:rotate(90deg)}
+.pick-card.feedback-open{box-shadow:0 10px 30px rgba(23,107,88,.14);border-color:rgba(23,107,88,.32)}
+.pick-feedback{margin-top:12px;padding:12px 13px;border-radius:12px;background:linear-gradient(180deg,#f3fbf7,#eefaf4);border:1px solid rgba(23,107,88,.16);animation:pick-feedback-in .22s cubic-bezier(.2,.8,.3,1)}
+@keyframes pick-feedback-in{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+.pick-feedback-q{display:block;font-size:12px;font-weight:600;color:#176B58;margin-bottom:9px}
+.pick-feedback-chips{display:flex;flex-wrap:wrap;gap:7px}
+.pick-feedback-chip{border:1px solid rgba(23,107,88,.28);background:#fff;color:#215a4c;border-radius:999px;padding:6px 12px;font-size:12px;line-height:1;cursor:pointer;transition:.16s ease}
+.pick-feedback-chip:hover{background:#176B58;border-color:#176B58;color:#fff;transform:translateY(-1px)}
+.pick-feedback-chip:active{transform:translateY(0)}

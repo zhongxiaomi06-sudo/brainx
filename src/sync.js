@@ -21,6 +21,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { now, uuid } from './db.js';
 import { BITABLE_BASE, BITABLE_TABLE, flatLark, parseBitableRecord } from './bitable.js';
+import { splitFixtureJob } from './fixture_split.js';
 import { larkProfileArgs } from './env.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -69,15 +70,21 @@ const hashInput = (jobs) => {
 export function runSync(db, { source = 'fixture', consultant_id = 'felix', dry_run = false, payload = null } = {}) {
   const t0 = now();
   const loaded = payload ?? (source === 'feishu' ? fetchFeishuJobs() : loadFixture());
-  const { as_of, jobs } = loaded;
+  const { as_of } = loaded;
+  const jobs = loaded.jobs.flatMap(splitFixtureJob);
   const writeRels = !loaded.consultant_owner || loaded.consultant_owner === consultant_id;
   const errors = [];
+  const warnings = [];
   const valid = [];
   const seen = new Set();
   for (const j of jobs) {
     if (!j.project_id) { errors.push(`缺 project_id：${j.company}/${j.role}`); continue; }
     if (!j.company || !j.role) { errors.push(`缺客户或职位名：${j.project_id}`); continue; }
-    if (seen.has(j.project_id)) { errors.push(`输入内重复 project_id：${j.project_id}`); continue; }
+    // 输入内重复 project_id：同一职位被源端重复投递（TTC 云有时同一职位返回两次，
+    // 或桥接跨顾问团队池合并时偶发碰撞）。UPSERT 本就会按 project_id 主键合并，
+    // 故这里「保留首条、丢弃冗余副本」而非整体判废——避免个别脏行拖垮整批同步、
+    // 进而触发前端「本次同步不完整」阻断全部推荐。
+    if (seen.has(j.project_id)) { warnings.push(`输入内重复 project_id（已去重保留首条）：${j.project_id}`); continue; }
     seen.add(j.project_id);
     valid.push(j);
   }
@@ -87,7 +94,7 @@ export function runSync(db, { source = 'fixture', consultant_id = 'felix', dry_r
 
   if (dry_run) {
     return { sync_id: '(dry-run)', source, rows_expected: jobs.length, rows_read: valid.length,
-             complete: !!complete, errors, input_hash, would_upsert: valid.length };
+             complete: !!complete, errors, warnings, input_hash, would_upsert: valid.length };
   }
 
   db.exec('BEGIN');
@@ -148,7 +155,7 @@ export function runSync(db, { source = 'fixture', consultant_id = 'felix', dry_r
     throw e;
   }
   return { sync_id, consultant_id, source, as_of, rows_expected: jobs.length,
-           rows_read: valid.length, complete: !!complete, errors, input_hash,
+           rows_read: valid.length, complete: !!complete, errors, warnings, input_hash,
            started_at: t0, completed_at: now() };
 }
 

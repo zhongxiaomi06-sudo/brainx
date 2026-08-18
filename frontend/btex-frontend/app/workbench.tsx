@@ -424,12 +424,13 @@ function FolderStrip({folder,jobs,open,onRemove}:{folder:PickFolder;jobs:Decisio
 
 function DecisionZone({tone,title,subtitle,jobs,isContext,completed,engagement,open,onAction,onFeedback,tray,onToggleTray,folderMode,folders,onAssignFolder}:{tone:"accepted"|"pending";title:string;subtitle:string;jobs:DecisionJob[];isContext:boolean;completed:string[];engagement:Record<string,EngagementState>;open:(job:DecisionJob,tab?:"judgement"|"engagement"|"trail"|"replay")=>void;onAction:(job:DecisionJob,action:DecisionAction)=>void;onFeedback:(job:DecisionJob)=>void;tray:string[];onToggleTray:(id:string)=>void;folderMode:boolean;folders:PickFolder[];onAssignFolder:(jobId:string,folderId:string)=>void}){return <section className={`decision-zone ${tone}${isContext?" is-context":""}`}><div className="decision-group-head"><div><span className="decision-zone-kicker">{tone==="accepted"?"TODAY'S COMMITMENTS":"NOT YET ACCEPTED"}</span><h2>{title}</h2></div><span>{isContext?`当前查看 · ${jobs.length}`:`${jobs.length} 个`}</span></div><div className="pick-grid">{jobs.map((job,index)=><DecisionCard key={job.id} job={{...job,rank:index+1}} completed={completed} engagement={engagement[job.id]||"NEW"} open={open} onAction={onAction} onFeedback={onFeedback} inTray={tray.includes(job.id)} onToggleTray={onToggleTray} folderMode={folderMode} folders={folders} onAssignFolder={onAssignFolder}/>)}</div></section>}
 
-function DecisionCard({job,completed,engagement,open,onAction,onFeedback,inTray,onToggleTray,folderMode,folders,onAssignFolder}:{job:DecisionJob;completed:string[];engagement:EngagementState;open:(job:DecisionJob,tab?:"judgement"|"engagement"|"trail"|"replay")=>void;onAction:(job:DecisionJob,action:DecisionAction)=>void;onFeedback:(job:DecisionJob)=>void;inTray:boolean;onToggleTray:(id:string)=>void;folderMode:boolean;folders:PickFolder[];onAssignFolder:(jobId:string,folderId:string)=>void}){
+function DecisionCard({job,completed,engagement,open,onAction,onFeedback,inTray,onToggleTray,folderMode,folders,onAssignFolder}:{job:DecisionJob;completed:string[];engagement:EngagementState;open:(job:DecisionJob,tab?:"judgement"|"engagement"|"trail"|"replay")=>void;onAction:(job:DecisionJob,action:DecisionAction)=>void;onFeedback:(job:DecisionJob,reason:string)=>void;inTray:boolean;onToggleTray:(id:string)=>void;folderMode:boolean;folders:PickFolder[];onAssignFolder:(jobId:string,folderId:string)=>void}){
  const action=job.actions.find(item=>!completed.includes(`${job.id}:${item.id}`))||job.actions[0];
  const actionComplete=completed.includes(`${job.id}:${action.id}`);
- return <article className={`pick-card${inTray?" in-tray":""}`} onClick={()=>open(job)}>
+ const [feedbackOpen,setFeedbackOpen]=useState(false);
+ return <article className={`pick-card${inTray?" in-tray":""}${feedbackOpen?" feedback-open":""}`} onClick={()=>{if(feedbackOpen){setFeedbackOpen(false);return}open(job)}}>
   <button className="pick-add" onClick={e=>{e.stopPropagation();onToggleTray(job.id)}} aria-label={inTray?"移出精选盘":"收藏到精选盘"} title={inTray?"移出精选盘":"收藏到精选盘"}>{inTray?<Check/>:<Star/>}</button>
-  <button className="pick-card-feedback" onClick={e=>{e.stopPropagation();onFeedback(job)}} aria-label="不感兴趣" title="不感兴趣">×</button>
+  <button className={`pick-card-feedback${feedbackOpen?" active":""}`} onClick={e=>{e.stopPropagation();setFeedbackOpen(v=>!v)}} aria-label="不感兴趣" title="不感兴趣" aria-expanded={feedbackOpen}>×</button>
   <div className="pick-card-rank">No.{String(job.rank).padStart(2,"0")}</div>
   <div className="pick-card-title"><b>{job.company}</b><span>{job.role}</span></div>
   <div className="pick-card-tags"><em>{decisionGroupMeta[job.group].title}</em><em>{job.facts["职位关系"]}</em><em>{job.sourceMode==="COCKPIT_CONTEXT"?"驾驶舱上下文":"职位市场"}</em><em>{stateLabel[engagement]}</em></div>
@@ -437,6 +438,10 @@ function DecisionCard({job,completed,engagement,open,onAction,onFeedback,inTray,
   <div className="pick-card-scores"><DecisionMetric label="推进" value={job.globalScore}/><DecisionMetric label="探索" value={job.explorationScore}/><DecisionMetric label="个人" value={job.personalScore}/><DecisionMetric label="最终" value={job.finalScore} emphasis="final"/></div>
   {folderMode&&<div className="pick-card-folder" onClick={e=>e.stopPropagation()}><FolderPlus/><select className="field" value="" onChange={e=>{if(e.target.value)onAssignFolder(job.id,e.target.value)}} aria-label={`将 ${job.company} 放入文件夹`}><option value="">放入文件夹…</option>{folders.map(f=><option key={f.id} value={f.id}>{f.name}</option>)}</select></div>}
   <div className="pick-card-foot"><small>{job.recentSignal}</small><span className="pick-card-actions"><button className={`pick-card-action${actionComplete?" complete":""}`} onClick={e=>{e.stopPropagation();onAction(job,action)}} disabled={actionComplete}>{actionComplete?"已记录":action.label}<ChevronRight/></button></span></div>
+  {feedbackOpen&&<div className="pick-feedback" onClick={e=>e.stopPropagation()}>
+    <span className="pick-feedback-q">为什么暂不考虑？</span>
+    <div className="pick-feedback-chips">{DISMISS_REASON_CHIPS.map(r=><button key={r} type="button" className="pick-feedback-chip" onClick={()=>{setFeedbackOpen(false);onFeedback(job,r)}}>{r}</button>)}</div>
+  </div>}
  </article>
 }
 

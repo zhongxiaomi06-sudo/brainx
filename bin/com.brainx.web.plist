@@ -20,6 +20,9 @@
     <string>http://127.0.0.1:3100</string>
     <key>BRAINX_BRIDGE_INTERVAL_MS</key>
     <string>180000</string>
+    <!-- spawn npm 启动 btex-frontend 需要 Homebrew PATH（launchd 默认 PATH 无 /opt/homebrew/bin → spawn npm ENOENT） -->
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
     <!-- 重大变化自动推卡默认关；要开启把下一行取消注释（仅推顾问本人，绝不推群） -->
     <!-- <key>BRAINX_PUSH_AUTO</key><string>1</string> -->
   </dict>

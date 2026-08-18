@@ -11,8 +11,8 @@
   "exported_at": "2026-08-07T08:40:00+08:00",
   "jobs": [
     {
-      "project_id": "P-FIX-90B6D47F",
-      "company": "雨林时代/sigmaz/科漫",
+      "project_id": "P-FIX-4FF9CAC4",
+      "company": "雨林时代",
       "role": "增长负责人",
       "city": "北京",
       "pipeline": "Felix 我当前主做，约面1人",
@@ -25,8 +25,50 @@
       "historical": false
     },
     {
-      "project_id": "P-FIX-CF5C0978",
-      "company": "presence/蝴蝶梦境",
+      "project_id": "P-FIX-A008A0B6",
+      "company": "sigmaz",
+      "role": "增长负责人",
+      "city": "北京",
+      "pipeline": "Felix 我当前主做，约面1人",
+      "hc": null,
+      "active_state": "OPEN",
+      "source_url": "feishu://chat/oc_667758eb50ad4b1af86ae99d79859870",
+      "relation": "MY_JOB",
+      "relation_note": "Felix 我当前主做，约面1人",
+      "captured_at": "2026-08-07T08:40:00+08:00",
+      "historical": false
+    },
+    {
+      "project_id": "P-FIX-E2DF76EC",
+      "company": "科漫",
+      "role": "增长负责人",
+      "city": "北京",
+      "pipeline": "Felix 我当前主做，约面1人",
+      "hc": null,
+      "active_state": "OPEN",
+      "source_url": "feishu://chat/oc_667758eb50ad4b1af86ae99d79859870",
+      "relation": "MY_JOB",
+      "relation_note": "Felix 我当前主做，约面1人",
+      "captured_at": "2026-08-07T08:40:00+08:00",
+      "historical": false
+    },
+    {
+      "project_id": "P-FIX-B70CB992",
+      "company": "presence",
+      "role": "千万级消耗投放",
+      "city": "北京",
+      "pipeline": "长期mapping搭建",
+      "hc": null,
+      "active_state": "OPEN",
+      "source_url": "feishu://chat/oc_667758eb50ad4b1af86ae99d79859870",
+      "relation": "MY_JOB",
+      "relation_note": "长期mapping搭建",
+      "captured_at": "2026-08-07T08:40:00+08:00",
+      "historical": false
+    },
+    {
+      "project_id": "P-FIX-27CE8EF7",
+      "company": "蝴蝶梦境",
       "role": "千万级消耗投放",
       "city": "北京",
       "pipeline": "长期mapping搭建",

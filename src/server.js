@@ -4,8 +4,8 @@
 import './env.js';
 import http from 'node:http';
 import { spawn } from 'node:child_process';
-import { readFileSync, existsSync, statSync } from 'node:fs';
-import { extname, join, normalize, dirname, sep } from 'node:path';
+import { existsSync } from 'node:fs';
+import { join, normalize, dirname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openDb } from './db.js';
 import { runSync, latestSync, latestCompleteSnapshot } from './sync.js';
@@ -33,10 +33,6 @@ import { chatStream, isLlmConfigured } from './llm.js';
 import { pickTray, nextBatch, feedback as recommendationFeedback } from './recommendation-batch.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const PUBLIC = join(ROOT, 'public');
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
-               '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8',
-               '.svg': 'image/svg+xml', '.png': 'image/png' };
 const FRONTEND_DIR = join(ROOT, 'frontend', 'btex-frontend');
 const FRONTEND_HOST = process.env.BRAINX_FRONTEND_HOST || '127.0.0.1';
 const FRONTEND_PORT = Number(process.env.BRAINX_FRONTEND_PORT || 4321);
@@ -539,19 +535,7 @@ export function createServer(db = openDb(), deps = {}) {
     if (deps.frontendTarget && !path.startsWith('/api/')) {
       return proxyFrontend(req, res, deps.frontendTarget);
     }
-    // 静态文件（public/），/ → index.html，/login → login.html
-    if (req.method === 'GET') {
-      if (path === '/') path = '/index.html';
-      if (path === '/login') path = '/login.html';
-      const fp = normalize(join(PUBLIC, path));
-      if (isPathInside(PUBLIC, fp) && existsSync(fp) && statSync(fp).isFile()) {
-        // no-cache：零构建前端没有指纹文件名，不加缓存头时旧 tab 会长期显示旧界面
-        //（2026-08-11 实锤：部署新代码后用户浏览器仍渲染重启前加载的旧 JS）
-        res.writeHead(200, { 'Content-Type': MIME[extname(fp)] || 'application/octet-stream',
-                             'Cache-Control': 'no-cache, must-revalidate' });
-        return res.end(readFileSync(fp));
-      }
-    }
+    // 单一前端：非 API 请求由 btex-frontend 代理；未启用前端时直接 404
     err(res, 404, 'NOT_FOUND', `${req.method} ${path}`);
   });
   server.bus = bus; // 主块/测试用来广播桥接事件
@@ -581,7 +565,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     });
     console.log(`前端服务: http://${FRONTEND_HOST}:${FRONTEND_PORT}（由 Brain X 代理）`);
   } else if (frontendTarget) {
-    console.warn(`[frontend] 未找到 ${FRONTEND_DIR}，回退到 public/`);
+    console.error(`[frontend] 未找到 ${FRONTEND_DIR}，请安装前端依赖：cd frontend/btex-frontend && npm install && npm run build`);
   }
   const shutdown = () => {
     if (frontendProcess && !frontendProcess.killed) frontendProcess.kill('SIGTERM');

@@ -4,6 +4,10 @@ nohup.out
 .DS_Store
 .env
 logs/
+<<<<<<< HEAD
 # 登录态密文 + 抓取输出（含你账号可见的敏感数据，绝不入库）
 scripts/session/.state.enc
 scripts/session/out/
+=======
+.workbuddy/
+>>>>>>> 2300c1e1273ed177cda7768b09a3a47eff70ff66

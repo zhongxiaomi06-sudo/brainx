@@ -74,12 +74,10 @@ src/                  后端核心（21 文件，~2700 行）
   adapter.js          【1.2】CSV->标准库格式 LLM 适配器：两份脏 CSV -> job_facts/cockpit_facts/job_classifications/job_occupancy
 migrations/           8 个迁移：init / push_log / consultants / bridge / per_user / framework
                       / bitable_fields（扩列+退役+污染清理）/ agent12（1.2：cockpit_facts+job_classifications+job_occupancy）
-public/               前端（12 文件，1032 行，无构建 ES-module）
-  index.html login.html styles.css
-  js/main.js          页面编排 + SSE 客户端（1s 去抖刷新）
-  js/api-client.js    fetch 封装
-  js/components/      WorkbenchHeader / DecisionQueue / OpportunityRow / OpportunityDrawer
-                      / CommitmentSummary / ReplayPanel
+frontend/btex-frontend/  单一前端（React 19 + Vinext + TS；server.js 代理非 API 请求到此）
+  app/                页面路由 + BrainX API adapter（connected 模式调真实接口，含 showcase）
+  DELIVERY.md         交付说明与原型边界（demo 表面显式标记）
+_archive/             归档：decision-workbench（早期 mock 原型，零引用）+ public（旧零依赖前端）+ 早期设计文档
 mcp/server.mjs        MCP stdio 服务器（11 工具，三端注册；与 HTTP 同一套领域函数与可见性）
 bin/                  CLI：sync/adapter/recommend/replay/roster/push/web + install-launchd.sh
                       + com.brainx.web.plist（macOS）+ brainx.service（systemd，含 HOME 修复）
@@ -156,11 +154,14 @@ node bin/brainx-adapter.mjs              # 正式落库：UPSERT job_facts + 三
 
 ### 5. 启动
 
+> 走单一前端（btex-frontend）：首次运行需先装前端依赖（只一次）：
+> `cd frontend/btex-frontend && npm install && cd ../..`
+
 ```bash
 node src/server.js          # 启动，浏览器打开 http://127.0.0.1:3000
 ```
 
-浏览器打开 -> 飞书授权登录 -> 进自己的工作台。数据库 `data/brainx.db` 首次运行自动建表，不用手动建。
+浏览器打开 -> 飞书授权登录 -> 进自己的工作台。数据库 `data/brainx.db` 首次运行自动建表，不用手动建。server.js 会自动拉起 btex-frontend（vinext）并代理非 API 请求；前端没装依赖时会打印明确错误而非回退旧界面。
 
 > 桥接器（每 3 分钟拉飞书新数据）依赖 `lark-cli`。没装也能跑，只是日志会报 sync_error、
 > 拉不到飞书新数据，页面本身正常。彻底关掉桥接：`BRAINX_BRIDGE_OFF=1 node src/server.js`。

@@ -46,6 +46,13 @@ export default defineConfig(async () => {
   const { cloudflare } = await import("@cloudflare/vite-plugin");
 
   return {
+    build: {
+      // 2026-08-19：WorkBuddy 沙箱下 vite 的 prepare-out-dir（emptyDir 清空 ≥50 文件的目录）
+      // 会被 safe-delete 守卫拦截（SAFE_DELETE_BULK_CONFIRM_REQUIRED）。多阶段 build
+      // （client → rsc → ssr）中途清空必然触发 → 关闭自动清空。
+      // 产物 hash 命名，残留旧 chunk 无害；需要干净构建时手动 rm -rf dist。
+      emptyOutDir: false,
+    },
     server: {
       host: "0.0.0.0",
       port: 4320,

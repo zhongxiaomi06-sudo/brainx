@@ -704,12 +704,18 @@ html,body,.btex-app{background:var(--bg)}
 .btex-app .assistant-message.user p{background:#176B58;color:#fff}
 
 /* —— 卡片内联「暂不考虑」反馈条（取代原生 window.prompt 弹窗）—— */
-.pick-card-feedback.active{background:#176B58;border-color:#176B58;color:#fff;transform:rotate(90deg)}
-.pick-card.feedback-open{box-shadow:0 10px 30px rgba(23,107,88,.14);border-color:rgba(23,107,88,.32)}
-.pick-feedback{margin-top:12px;padding:12px 13px;border-radius:12px;background:linear-gradient(180deg,#f3fbf7,#eefaf4);border:1px solid rgba(23,107,88,.16);animation:pick-feedback-in .22s cubic-bezier(.2,.8,.3,1)}
-@keyframes pick-feedback-in{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
-.pick-feedback-q{display:block;font-size:12px;font-weight:600;color:#176B58;margin-bottom:9px}
-.pick-feedback-chips{display:flex;flex-wrap:wrap;gap:7px}
-.pick-feedback-chip{border:1px solid rgba(23,107,88,.28);background:#fff;color:#215a4c;border-radius:999px;padding:6px 12px;font-size:12px;line-height:1;cursor:pointer;transition:.16s ease}
-.pick-feedback-chip:hover{background:#176B58;border-color:#176B58;color:#fff;transform:translateY(-1px)}
-.pick-feedback-chip:active{transform:translateY(0)}
+
+/* 不感兴趣 toast（小红书/B站式：直接隐藏 + 可撤销） */
+.toast{display:flex;align-items:center;gap:6px}
+.toast-action{margin-left:8px;border:0;background:transparent;color:#2FD3A7;font-weight:600;font-size:12px;cursor:pointer;padding:3px 8px;border-radius:6px;letter-spacing:.02em}
+.toast-action:hover{background:rgba(47,211,167,.18)}
+.toast-action:active{transform:scale(.96)}
+
+/* 不感兴趣 toast 输入态（补充原因） */
+.toast-text{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:46vw}
+.toast-input{border:1px solid rgba(255,255,255,.28);background:rgba(255,255,255,.12);color:#fff;border-radius:7px;padding:6px 10px;font-size:12px;min-width:220px;outline:none}
+.toast-input::placeholder{color:rgba(255,255,255,.55)}
+.toast-input:focus{border-color:#2FD3A7;background:rgba(255,255,255,.18)}
+.toast-close{border:0;background:transparent;color:rgba(255,255,255,.7);font-size:16px;line-height:1;cursor:pointer;padding:2px 4px;border-radius:5px}
+.toast-close:hover{color:#fff;background:rgba(255,255,255,.14)}
+@media (max-width:640px){.toast{left:16px;right:16px;flex-wrap:wrap}.toast-text{max-width:100%}.toast-input{flex:1;min-width:0}}

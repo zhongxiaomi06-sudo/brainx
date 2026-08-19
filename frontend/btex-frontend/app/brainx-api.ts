@@ -581,6 +581,13 @@ export async function sendRecommendationFeedback(projectId: string, reason: stri
   });
 }
 
+// 撤销"不感兴趣"反馈（小红书/B站式 toast 撤销按钮的后端对应）
+export async function undoRecommendationFeedback(projectId: string): Promise<{ ok: boolean; removed?: boolean }> {
+  return brainxFetch<{ ok: boolean; removed?: boolean }>("/api/v1/recommendations/feedback/undo", {
+    method: "POST", body: { project_id: projectId },
+  });
+}
+
 export type ManualFactUpdate = {
   changes?: Partial<Record<ManualFactField, string | number>>;
   clear_fields?: ManualFactField[];

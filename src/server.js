@@ -31,7 +31,7 @@ import { syncTalentsFromCsv, listTalents as listTalentsRepo, getTalent, talentBa
 import { talentSupplyForJob, talentSupplyEnabled } from './talent-supply.js';
 import { effectiveJob, effectiveFactPayload, updateFactOverrides } from './facts.js';
 import { chatStream, isLlmConfigured } from './llm.js';
-import { pickTray, nextBatch, feedback as recommendationFeedback } from './recommendation-batch.js';
+import { pickTray, nextBatch, feedback as recommendationFeedback, undoFeedback as recommendationUndoFeedback } from './recommendation-batch.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const FRONTEND_DIR = join(ROOT, 'frontend', 'btex-frontend');
@@ -332,6 +332,10 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
     },
     'POST /api/v1/recommendations/feedback': async (req, res, cid) => {
       const out = recommendationFeedback(db, cid, await body(req));
+      json(res, out.ok ? 200 : out.status || 422, out);
+    },
+    'POST /api/v1/recommendations/feedback/undo': async (req, res, cid) => {
+      const out = recommendationUndoFeedback(db, cid, await body(req));
       json(res, out.ok ? 200 : out.status || 422, out);
     },
     'POST /api/v1/recommendations/next-batch': async (req, res, cid) => {

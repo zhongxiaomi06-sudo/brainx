@@ -1,1 +1,45 @@
-/* tech-stack 页面样式（eazo 同步时缺失，暂用空文件保证 build；如需自定义样式在此补充） */
+/* tech-stack.css —— 占位补全（远程提交 4d146ec 漏传本文件，导致 vinext build UNRESOLVED_IMPORT）。
+   2026-08-19 由 AI 补最小可用样式，保持页面可读；视觉精修待原作者（eazo）回传正式版后替换。 */
+
+.ts-root { min-height: 100vh; background: #f5faf8; color: #1c2b26; font-family: "PingFang SC", "Noto Sans CJK SC", "Helvetica Neue", Arial, sans-serif; }
+.ts-wrap { max-width: 1080px; margin: 0 auto; padding: 48px 24px 80px; }
+
+.ts-hero { margin-bottom: 40px; }
+.ts-kicker { display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: .12em; color: #176B58; margin-bottom: 10px; }
+.ts-hero h1 { margin: 0 0 10px; font-size: clamp(28px, 3.4vw, 38px); letter-spacing: -.03em; }
+.ts-sub { margin: 0; font-size: 14px; color: #5e7168; line-height: 1.7; max-width: 60ch; }
+.ts-meta { display: flex; align-items: center; gap: 14px; margin-top: 16px; font-size: 11px; color: #71807a; font-variant-numeric: tabular-nums; }
+.ts-print { border: 1px solid rgba(47, 211, 167, .42); background: #fff; color: #176B58; border-radius: 999px; padding: 6px 13px; font-size: 12px; cursor: pointer; transition: .16s ease; }
+.ts-print:hover { background: #2FD3A7; color: #123d34; border-color: #2FD3A7; }
+
+.ts-layer { margin-bottom: 36px; }
+.ts-layer-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+.ts-layer-no { font: 600 11px/1 ui-monospace, "SF Mono", Menlo, monospace; color: #176B58; letter-spacing: .08em; }
+.ts-layer-head h2 { margin: 0; font-size: 18px; letter-spacing: -.02em; }
+
+.ts-table-scroll { overflow-x: auto; border: 1px solid rgba(28, 43, 38, .1); border-radius: 12px; background: #fff; }
+.ts-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.ts-table th, .ts-table td { padding: 11px 13px; text-align: left; border-bottom: 1px solid rgba(28, 43, 38, .08); vertical-align: top; line-height: 1.55; }
+.ts-table th { font-size: 11px; color: #5e7168; font-weight: 600; background: #effbf7; white-space: nowrap; }
+.ts-table tr:last-child td { border-bottom: 0; }
+.ts-dim { color: #71807a; font-size: 11px; }
+
+.ts-pick-badge { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .06em; color: #123d34; background: #2FD3A7; border-radius: 999px; padding: 2px 8px; margin-left: 6px; }
+.ts-redline { color: #b4534a; font-weight: 600; }
+
+.ts-conclusion { margin-top: 44px; }
+.ts-conc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-top: 14px; }
+.ts-conc-card { border: 1px solid rgba(28, 43, 38, .1); border-radius: 12px; background: #fff; padding: 16px; }
+.ts-conc-layer { display: block; font: 600 10px/1 ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: .1em; color: #71807a; margin-bottom: 8px; }
+.ts-conc-pick { font-size: 14px; font-weight: 650; letter-spacing: -.01em; margin-bottom: 6px; }
+
+.ts-advice { margin-top: 18px; border: 1px solid rgba(47, 211, 167, .35); border-radius: 12px; background: rgba(47, 211, 167, .08); padding: 14px 16px; font-size: 13px; line-height: 1.7; }
+.ts-advice-tag { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .08em; color: #176B58; margin-bottom: 4px; }
+
+.ts-foot { margin-top: 48px; padding-top: 18px; border-top: 1px solid rgba(28, 43, 38, .1); font-size: 11px; color: #8a94a0; }
+
+@media print {
+  .ts-print { display: none; }
+  .ts-root { background: #fff; }
+  .ts-wrap { padding: 0; }
+}

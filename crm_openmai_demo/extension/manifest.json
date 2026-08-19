@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "BrainX TTC 凭证自动同步",
+  "version": "0.1.0",
+  "description": "顾问扫码登录 TTC（app.ttcadvisory.com）后，自动把 JWT 同步到本地 BrainX 凭证中心，免去手动粘贴。",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://app.ttcadvisory.com/*",
+    "https://*.ttcadvisory.com/*",
+    "http://127.0.0.1/*",
+    "http://localhost/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://app.ttcadvisory.com/*", "https://*.ttcadvisory.com/*"],
+      "js": ["content-ttc.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "BrainX TTC 凭证同步"
+  }
+}

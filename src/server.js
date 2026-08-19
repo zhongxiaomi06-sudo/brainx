@@ -459,6 +459,40 @@ export function createServer(db = openDb(), deps = {}) {
       db.prepare('DELETE FROM ttc_tokens WHERE consultant_id=?').run(cid);
       json(res, 200, { ok: true, connected: false });
     },
+    // —— 浏览器扩展自动同步（顾问扫码 TTC 后扩展自动 POST，无需粘贴/登录）——
+    // 与 PUT /ttc/connect 同一验证链（validateJwt + quota 活验证），但免登录：
+    // 扩展无法持有 brainx session，凭「来源校验（扩展/本地） + JWT 本身有效」落库。
+    // 状态查询（安全视图，绝不出 JWT 本体）：凭证中心/扩展 popup 展示用。
+    'GET /api/v1/ttc/status': (req, res, cid, q) => {
+      const consultantId = q.get('consultant_id') || 'felix';
+      if (!loadConsultants(db).some((c) => c.consultant_id === consultantId))
+        return err(res, 404, 'NOT_FOUND', '顾问不存在');
+      json(res, 200, ttcAuthStatus(db, consultantId));
+    },
+    'POST /api/v1/ttc/ext-sync': async (req, res) => {
+      const origin = String(req.headers.origin || '');
+      const referer = String(req.headers.referer || '');
+      const fromExtension = origin.startsWith('chrome-extension://') || referer.startsWith('chrome-extension://');
+      const fromLocal = /^https?:\/\/(127\.0\.0\.1|localhost):/.test(origin) || /^https?:\/\/(127\.0\.0\.1|localhost):/.test(referer);
+      if (!fromExtension && !fromLocal) return err(res, 403, 'FORBIDDEN', '仅接受浏览器扩展或本地来源');
+      const b = await body(req);
+      const jwt = String(b?.jwt || '').trim();
+      const consultantId = String(b?.consultant_id || b?.consultantId || 'felix').trim();
+      if (!jwt) return err(res, 400, 'EMPTY', '没收到 JWT');
+      if (jwt.length > 8192) return err(res, 400, 'TOO_LONG', '长度异常，确认只发送了 token 值');
+      if (!loadConsultants(db).some((c) => c.consultant_id === consultantId))
+        return err(res, 422, 'BAD_CONSULTANT', '顾问不存在，请在扩展里选择正确的顾问');
+      let meta;
+      try { meta = validateJwt(jwt); } catch (e) { return err(res, 422, 'BAD_JWT', e.message); }
+      try { await ttcQuota(jwt); } catch (e) {
+        if (e instanceof TtcApiError && e.authInvalid) {
+          return err(res, 401, 'TTC_AUTH_INVALID', 'JWT 无效或已失效——回 TTC 系统重新登录后扩展会自动重试');
+        }
+        return err(res, 502, 'TTC_UNREACHABLE', '连不上 TTC 接口，稍后再试');
+      }
+      saveTtcToken(db, consultantId, jwt, meta);
+      json(res, 200, { ok: true, consultant_id: consultantId, ...ttcAuthStatus(db, consultantId) });
+    },
 
     // SSE：桥接器有变化时推 sync/recommend/sync_error；25s 心跳保活
     'GET /api/v1/events': (req, res, cid) => {
@@ -522,6 +556,8 @@ export function createServer(db = openDb(), deps = {}) {
     if (handler) {
       const open = ['GET /api/v1/consultants', 'POST /api/v1/session', 'DELETE /api/v1/session',
                     'GET /api/v1/oauth/status', 'GET /api/v1/oauth/authorize', 'GET /api/v1/oauth/callback',
+                    // 扩展自动同步 TTC JWT：免登录（扩展无 brainx session），凭来源校验 + JWT 活验证兜底
+                    'POST /api/v1/ttc/ext-sync', 'GET /api/v1/ttc/status',
                     // 人才库健康探测：纯状态（后端类型/连通性/建表），不含任何用户数据或密码，
                     // 允许未登录访问，以便数据源页无论登录与否都能显示真库连接状态。
                     'GET /api/v1/talent/health', 'GET /api/v1/talent/status'];

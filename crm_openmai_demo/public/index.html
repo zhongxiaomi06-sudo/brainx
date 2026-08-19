@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CRM → OpenMai Demo</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #172034;
+        --muted: #6c768c;
+        --line: rgba(31, 49, 83, 0.12);
+        --brand: #4b61e8;
+        --brand-dark: #3449c7;
+        --success: #1e9366;
+        --danger: #c64b59;
+        --surface: rgba(255, 255, 255, 0.9);
+        font-family: Inter, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 8% 2%, rgba(115, 136, 255, 0.2), transparent 31rem),
+          radial-gradient(circle at 92% 15%, rgba(99, 211, 182, 0.16), transparent 28rem),
+          #f5f7fb;
+      }
+      button, input { font: inherit; }
+      .page { width: min(1120px, calc(100% - 32px)); margin: 0 auto; padding: 42px 0 64px; }
+      .hero { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 28px; }
+      .eyebrow { margin: 0 0 10px; color: var(--brand); font-size: 12px; font-weight: 750; letter-spacing: 0.14em; text-transform: uppercase; }
+      h1 { margin: 0; font-size: clamp(30px, 4vw, 48px); line-height: 1.08; letter-spacing: -0.04em; }
+      .subtitle { max-width: 680px; margin: 14px 0 0; color: var(--muted); line-height: 1.7; }
+      .env { flex: 0 0 auto; padding: 8px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--muted); font-size: 12px; box-shadow: 0 8px 24px rgba(28, 42, 73, 0.06); }
+      .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
+      .step { display: flex; gap: 12px; align-items: center; padding: 15px 16px; border: 1px solid var(--line); border-radius: 16px; background: rgba(255,255,255,0.6); color: var(--muted); }
+      .step span { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 9px; background: #e8ebf8; color: var(--brand); font-weight: 750; }
+      .layout { display: grid; grid-template-columns: minmax(0, 0.88fr) minmax(0, 1.35fr); gap: 20px; align-items: start; }
+      .card { border: 1px solid var(--line); border-radius: 22px; background: var(--surface); box-shadow: 0 18px 60px rgba(28, 42, 73, 0.08); overflow: hidden; }
+      .card-head { padding: 22px 24px 16px; border-bottom: 1px solid var(--line); }
+      .card-head h2 { margin: 0; font-size: 17px; }
+      .card-head p { margin: 8px 0 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
+      .card-body { padding: 22px 24px 24px; }
+      .auth-state { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; color: var(--muted); font-size: 13px; }
+      .dot { width: 9px; height: 9px; border-radius: 50%; background: #aab1c0; box-shadow: 0 0 0 5px rgba(170,177,192,0.14); }
+      .dot.online { background: var(--success); box-shadow: 0 0 0 5px rgba(30,147,102,0.13); }
+      .button-row { display: flex; flex-wrap: wrap; gap: 10px; }
+      button { border: 0; border-radius: 12px; padding: 11px 16px; cursor: pointer; transition: 160ms ease; }
+      button:disabled { cursor: not-allowed; opacity: 0.48; }
+      .primary { background: var(--brand); color: #fff; box-shadow: 0 8px 20px rgba(75,97,232,0.23); }
+      .primary:hover:not(:disabled) { background: var(--brand-dark); transform: translateY(-1px); }
+      .secondary { background: #edf0f7; color: #4d5870; }
+      .secondary:hover:not(:disabled) { background: #e2e6f1; }
+      label { display: block; margin: 24px 0 8px; font-size: 13px; font-weight: 700; }
+      .input-row { display: flex; gap: 10px; }
+      input { min-width: 0; flex: 1; border: 1px solid var(--line); border-radius: 12px; padding: 12px 13px; outline: none; color: var(--ink); background: #fff; }
+      input:focus { border-color: rgba(75,97,232,0.55); box-shadow: 0 0 0 4px rgba(75,97,232,0.1); }
+      .hint { margin: 10px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+      .job-preview { display: none; margin-top: 18px; padding: 15px; border-radius: 14px; background: #f5f7fc; }
+      .job-preview.visible { display: block; }
+      .job-title { font-weight: 750; }
+      .job-meta { margin-top: 7px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+      .result-card { min-height: 560px; }
+      .result-tools { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+      .status { display: flex; align-items: center; gap: 9px; color: var(--muted); font-size: 13px; }
+      .spinner { display: none; width: 15px; height: 15px; border: 2px solid #d9deec; border-top-color: var(--brand); border-radius: 50%; animation: spin 0.8s linear infinite; }
+      .spinner.visible { display: inline-block; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      .result { min-height: 410px; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; color: #263047; font: 14px/1.78 Inter, "PingFang SC", sans-serif; }
+      .result.empty { display: grid; place-items: center; color: #9aa2b2; text-align: center; }
+      .error { display: none; margin-top: 14px; padding: 12px 14px; border: 1px solid rgba(198,75,89,0.18); border-radius: 12px; background: rgba(198,75,89,0.07); color: var(--danger); font-size: 13px; line-height: 1.55; }
+      .error.visible { display: block; }
+      .session { margin-top: 16px; color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+      @media (max-width: 820px) {
+        .page { padding-top: 28px; }
+        .hero { display: block; }
+        .env { display: inline-block; margin-top: 16px; }
+        .steps, .layout { grid-template-columns: 1fr; }
+        .result-card { min-height: auto; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Hackathon Integration Demo</p>
+          <h1>从 CRM 职位到 OpenMai 结果</h1>
+          <p class="subtitle">使用顾问现有的飞书统一登录凭证，读取一个有权限的 CRM 职位，并在当前页面等待、展示 OpenMai 会话结果。</p>
+        </div>
+        <div class="env" id="environment">正在读取环境…</div>
+      </header>
+
+      <section class="steps" aria-label="执行步骤">
+        <div class="step"><span>1</span>飞书统一登录</div>
+        <div class="step"><span>2</span>输入 CRM job_id</div>
+        <div class="step"><span>3</span>展示 OpenMai 结果</div>
+      </section>
+
+      <section class="card" style="margin-bottom:20px">
+        <div class="card-head">
+          <h2>凭证中心</h2>
+          <p>多端凭证状态：飞书登录态（抓驾驶舱群用）+ TTC JWT（抓岗位/找人用，浏览器扩展扫码自动同步）</p>
+        </div>
+        <div class="card-body">
+          <div class="auth-state"><span class="dot" id="feishu-dot"></span><span id="feishu-text">飞书登录态：读取中…</span></div>
+          <div class="auth-state"><span class="dot" id="ttc-dot"></span><span id="ttc-text">TTC 凭证：读取中…</span></div>
+          <p class="hint">TTC 凭证免粘贴：安装 <b>BrainX TTC 凭证自动同步</b> 扩展 → 打开 app.ttcadvisory.com 扫码登录（飞书）→ 扩展自动把 JWT 同步到本地凭证中心。飞书登录态：<code>node scripts/session/login-capture.mjs</code> 扫码一次生成。</p>
+        </div>
+      </section>
+
+      <section class="layout">
+        <article class="card">
+          <div class="card-head">
+            <h2>登录与职位</h2>
+            <p>Token 仅保存在当前浏览器会话，不会写入本地文件或服务端存储。</p>
+          </div>
+          <div class="card-body">
+            <div class="auth-state"><span class="dot" id="auth-dot"></span><span id="auth-text">尚未登录</span></div>
+            <div class="button-row">
+              <button class="primary" id="login-button">飞书扫码 / 登录</button>
+              <button class="secondary" id="logout-button" disabled>清除本地登录</button>
+            </div>
+
+            <label for="job-id">CRM job_id</label>
+            <div class="input-row">
+              <input id="job-id" autocomplete="off" placeholder="例如：CRM 职位 Unique ID" />
+              <button class="primary" id="run-button" disabled>开始找人</button>
+            </div>
+            <p class="hint">当前账号必须能在 CRM 中查看该职位，并拥有 OpenMai 普通会话权限。关闭页面后，本次等待立即停止。</p>
+            <div class="job-preview" id="job-preview">
+              <div class="job-title" id="job-title"></div>
+              <div class="job-meta" id="job-meta"></div>
+            </div>
+            <div class="error" id="error"></div>
+          </div>
+        </article>
+
+        <article class="card result-card">
+          <div class="card-head result-tools">
+            <div>
+              <h2>OpenMai 会话结果</h2>
+              <p class="status"><span class="spinner" id="spinner"></span><span id="status">等待开始</span></p>
+            </div>
+            <button class="secondary" id="copy-button" disabled>复制结果</button>
+          </div>
+          <div class="card-body">
+            <pre class="result empty" id="result">登录后输入一个 CRM job_id，结果会在这里实时出现。</pre>
+            <div class="session" id="session"></div>
+          </div>
+        </article>
+      </section>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>

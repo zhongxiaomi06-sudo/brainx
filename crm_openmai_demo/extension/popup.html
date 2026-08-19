@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      :root {
+        --ink: #172034; --muted: #6c768c; --line: rgba(31,49,83,.12);
+        --brand: #4b61e8; --success: #1e9366; --danger: #c64b59;
+        font-family: Inter, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+      }
+      * { box-sizing: border-box; margin: 0; }
+      body { width: 320px; padding: 16px; color: var(--ink); background: #f5f7fb; }
+      h1 { font-size: 14px; margin-bottom: 4px; }
+      .sub { color: var(--muted); font-size: 12px; margin-bottom: 14px; }
+      .row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 13px; }
+      .dot { width: 9px; height: 9px; border-radius: 50%; background: #aab1c0; }
+      .dot.on { background: var(--success); }
+      .dot.off { background: var(--danger); }
+      label { display: block; font-size: 12px; font-weight: 700; margin-bottom: 5px; }
+      select, input {
+        width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px;
+        font: inherit; font-size: 13px; background: #fff; color: var(--ink);
+      }
+      .block { margin-bottom: 12px; }
+      .status-box {
+        padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px;
+        background: #fff; font-size: 12px; line-height: 1.7; margin-bottom: 12px;
+      }
+      .status-box b { color: var(--ink); }
+      .status-box.ok { border-color: rgba(30,147,102,.3); background: rgba(30,147,102,.06); }
+      .status-box.err { border-color: rgba(198,75,89,.3); background: rgba(198,75,89,.06); }
+      button {
+        width: 100%; border: 0; border-radius: 10px; padding: 10px; cursor: pointer;
+        font: inherit; font-size: 13px; font-weight: 700; background: var(--brand); color: #fff;
+      }
+      button:disabled { opacity: .5; cursor: not-allowed; }
+      .hint { margin-top: 10px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+    </style>
+  </head>
+  <body>
+    <h1>BrainX · TTC 凭证自动同步</h1>
+    <p class="sub">扫码登录 TTC 后自动把 JWT 同步到本地凭证中心</p>
+
+    <div class="row"><span class="dot" id="local-dot"></span><span id="local-text">检查本地服务…</span></div>
+
+    <div class="block">
+      <label for="consultant">顾问</label>
+      <select id="consultant"><option value="felix">felix</option></select>
+    </div>
+
+    <div class="block">
+      <label for="local-url">本地 BrainX 地址</label>
+      <input id="local-url" type="text" value="http://127.0.0.1:3100" spellcheck="false" />
+    </div>
+
+    <div class="status-box" id="status-box"><b>状态</b>：读取中…</div>
+
+    <button id="refresh">刷新状态</button>
+
+    <p class="hint">使用：打开 app.ttcadvisory.com → 扫码登录（飞书）→ 扩展自动探测并同步 JWT。若未自动同步，点「刷新状态」或重载 TTC 页面。JWT 只发往本地 127.0.0.1，AES-GCM 加密入库。</p>
+    <script src="popup.js"></script>
+  </body>
+</html>

@@ -268,7 +268,7 @@ html,body,.btex-app{background:var(--bg)}
 .supply-count strong{font-size:26px;letter-spacing:-.03em;color:#1d1d1f;font-variant-numeric:tabular-nums}
 .supply-count span{font-size:11px;color:#6e6e73}
 .supply-badge{font-size:11px;padding:4px 9px;border-radius:999px;font-weight:600}
-.supply-badge.ok{background:rgba(48,164,108,.14);color:#1f7a4d}
+.supply-badge.ok{background:rgba(47,211,167,.16);color:#127a5c}
 .supply-badge.warn{background:rgba(214,150,20,.16);color:#8a5a08}
 .supply-badge.risk{background:rgba(214,64,80,.14);color:#a1323f}
 .supply-reactivate{font-size:11px;color:#0066cc;margin-left:auto}

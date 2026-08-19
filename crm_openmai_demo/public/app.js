@@ -12,6 +12,7 @@
   let config = null
   let running = false
   let runController = null
+  let autoRunPending = false // ?job_id=xxx 打开时，登录完成后自动触发找人
 
   function tokenExpiresAt(token) {
     try {
@@ -58,6 +59,10 @@
     elements['logout-button'].disabled = !loggedIn || running
     elements['run-button'].disabled = !loggedIn || running
     elements['login-button'].disabled = running
+    if (autoRunPending && loggedIn && !running) {
+      autoRunPending = false
+      run()
+    }
   }
 
   function randomState() {
@@ -267,6 +272,13 @@
     handleRedirectCallback()
     renderAuth()
     loadCredentialStatus()
+    // ?job_id=xxx：自动填入并（已登录时）立即自动开始找人；未登录则登录完成后自动触发
+    const autoJobId = new URLSearchParams(window.location.search).get('job_id')
+    if (autoJobId) {
+      elements['job-id'].value = autoJobId
+      if (getToken()) run()
+      else autoRunPending = true
+    }
   }
 
   elements['login-button'].addEventListener('click', () => { showError(); popupLogin() })

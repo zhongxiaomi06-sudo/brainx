@@ -99,7 +99,9 @@ page.on('response', async (res) => {
 });
 
 console.log(`[cockpit] 打开会话页：${pageUrl}`);
-await page.goto(pageUrl, { waitUntil: 'networkidle', timeout: 60000 });
+// SPA 页面（飞书 messenger）长轮询不断，networkidle 永不满足会 60s 超时 → 用 domcontentloaded + 等 SPA 初始化
+await page.goto(pageUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+await page.waitForTimeout(5000);
 
 // 向上滚动触发历史消息接口，逐轮加载
 for (let i = 0; i < SCROLL_ROUNDS; i++) {

@@ -17,6 +17,8 @@
     "start:frontend-only": "cd frontend/btex-frontend && WRANGLER_LOG_PATH=.wrangler/wrangler.log ./node_modules/.bin/vinext start --host 0.0.0.0 --port 3000",
     "frontend:install": "npm --prefix frontend/btex-frontend install",
     "sync": "node bin/brainx-sync.mjs",
+    "ttc-sync": "node bin/brainx-ttc-sync.mjs",
+    "openmai": "node bin/brainx-openmai.mjs",
     "adapter": "node bin/brainx-adapter.mjs",
     "recommend": "node bin/brainx-recommend.mjs",
     "replay": "node bin/brainx-replay.mjs",

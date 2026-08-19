@@ -28,7 +28,9 @@ function splitRoles(role) {
   return parts.length > 1 ? parts : [cleaned];
 }
 
-/** 把一条 fixture job 展开成 1..n 条单公司×单职能行。 */
+/** 把一条 fixture job 展开成 1..n 条单公司×单职能行。
+ * project_id：已有真实 ID（非 P-FIX 占位，如 TTC unique_id / bridge 源）保留；
+ * 否则复用 bitable.js 的 deriveProjectId 重算（与 Bitable 源同一展开纪律）。 */
 export function splitFixtureJob(job) {
   if (!job || !job.company) return job ? [job] : [];
   const companies = splitCompanies(job.company);
@@ -36,7 +38,8 @@ export function splitFixtureJob(job) {
   const out = [];
   for (const company of companies) {
     for (const role of roles) {
-      out.push({ ...job, company, role, project_id: deriveProjectId(company, role) });
+      const hasRealId = job.project_id && !String(job.project_id).startsWith('P-FIX-');
+      out.push({ ...job, company, role, project_id: hasRealId ? job.project_id : deriveProjectId(company, role) });
     }
   }
   return out;

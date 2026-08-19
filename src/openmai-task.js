@@ -166,7 +166,12 @@ export function startOpenmaiTask(db, bus, consultant_id, project_id, { force = f
   (async () => {
     let status = 'failed';
     try {
-      const job = await fetchCrmJob(jwt, project_id);
+      // P-FIX 占位职位（CSV/Bitable 源）：source_url 记录了 TTC 真身（ttc://job/<unique_id>）→ 用真身查 CRM；
+      // 无真身的纯占位（feishu://base 源）TTC 查无 → 报"职位不存在"属预期（历史数据无 ATS 映射）
+      const row = db.prepare('SELECT source_url FROM job_facts WHERE project_id=?').get(project_id);
+      const realId = row?.source_url && String(row.source_url).startsWith('ttc://job/')
+        ? String(row.source_url).slice('ttc://job/'.length).trim() : project_id;
+      const job = await fetchCrmJob(jwt, realId);
       const result = await callOpenmai(jwt, job);
       db.prepare(`UPDATE openmai_results SET status='done', result_text=?, finished_at=? WHERE project_id=? AND consultant_id=?`)
         .run(result, now(), project_id, consultant_id);

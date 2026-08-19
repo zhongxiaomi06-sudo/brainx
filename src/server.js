@@ -25,6 +25,7 @@ import { relationOf } from './relations.js';
 import { validateJwt, saveTtcToken, ttcAuthStatus } from './ttcsdk/auth.js';
 import { quota as ttcQuota } from './ttcsdk/user.js';
 import { TtcApiError } from './ttcsdk/http.js';
+import { startOpenmaiTask, getOpenmaiResult } from './openmai-task.js';
 import { radarRows, clientRows } from './radar.js';
 import { syncTalentsFromCsv, listTalents as listTalentsRepo, getTalent, talentBackendStatus, ingestResume, syncTalentsFromResumes, listResumes, talentHealth } from './talent.js';
 import { talentSupplyForJob, talentSupplyEnabled } from './talent-supply.js';
@@ -352,12 +353,15 @@ export function createServer(db = openDb(), deps = {}) {
         ORDER BY created_at DESC LIMIT 1`).get(id, cid);
       const outs = db.prepare(`SELECT stage, value_json, observed_at FROM job_outcomes
         WHERE project_id=? AND consultant_id=? ORDER BY observed_at`).all(id, cid);
+      // 接单自动找人（0015）：本人接单过才带出状态/结果，其余 null（fail-closed，不泄露存在性）
+      const openmai = ['ACCEPTED', 'COMPLETED'].includes(eng.state) ? getOpenmaiResult(db, cid, id) : null;
       json(res, 200, {
         job: { ...effective, raw_json: undefined, relation: rel },
         fact_updates: effectiveFactPayload(db, cid, id),
         relation: { relation: rel, source: relRow?.source || null, valid_from: relRow?.valid_from || null },
         engagement_state: eng.state, legal_actions: legalActions(db, cid, id),
         events, outcomes: outs.map((o) => ({ ...o, value: JSON.parse(o.value_json) })),
+        openmai,
         latest_recommendation: rec ? { decision_id: rec.decision_id, score: rec.score,
           action: rec.action, confidence_band: rec.confidence_band,
           evidence_coverage: rec.evidence_coverage,
@@ -397,7 +401,28 @@ export function createServer(db = openDb(), deps = {}) {
       const b = await body(req);
       if (!b) return err(res, 400, 'BAD_JSON', '请求体不是合法 JSON');
       const out = engage(db, cid, id, b.action, b);
+      // 接单自动触发 OpenMai 找人（接单 → 异步找人 → SSE 定向回传；防重/费用控制在任务模块内）
+      if (out.ok && out.state === 'ACCEPTED' && b?.action === 'ACCEPT') {
+        try { out.openmai = startOpenmaiTask(db, bus, cid, id); }
+        catch (e) { out.openmai = { status: 'error', message: String(e.message).slice(0, 200) }; }
+      }
       json(res, out.ok ? 200 : (out.status || 409), out);
+    },
+
+    // —— 接单自动找人：状态/结果查询（fail-closed：只许本人接单过的职位）——
+    'GET /api/v1/opportunities/:id/openmai': (req, res, cid, q, id) => {
+      const st = currentState(db, cid, id)?.state;
+      if (!['ACCEPTED', 'COMPLETED'].includes(st)) return err(res, 404, 'NOT_FOUND', '职位不存在或未接单');
+      json(res, 200, getOpenmaiResult(db, cid, id));
+    },
+    // 显式重新找人（防重复费用：running 拒绝；done/failed 才可重跑）
+    'POST /api/v1/opportunities/:id/openmai/rerun': (req, res, cid, q, id) => {
+      const st = currentState(db, cid, id)?.state;
+      if (!['ACCEPTED', 'COMPLETED'].includes(st)) return err(res, 404, 'NOT_FOUND', '职位不存在或未接单');
+      const cur = getOpenmaiResult(db, cid, id);
+      if (cur.status === 'running') return err(res, 409, 'RUNNING', '找人在进行中，请等待完成后再试');
+      const out = startOpenmaiTask(db, bus, cid, id, { force: true });
+      json(res, 200, { ok: true, openmai: out });
     },
 
     'GET /api/v1/decisions/:id/replay': (req, res, cid, q, id) => {

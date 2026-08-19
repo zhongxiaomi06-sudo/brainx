@@ -751,6 +751,21 @@ export async function getSnapshot(): Promise<BrainxSnapshot> {
   };
 }
 
+/** 接单自动找人结果（/api/v1/opportunities/:id 响应内嵌 openmai 字段）。 */
+export type OpenmaiResult = {
+  status: "none" | "running" | "done" | "failed";
+  result_text?: string | null;
+  error?: string | null;
+  task_id?: string | null;
+  started_at?: string | null;
+  finished_at?: string | null;
+};
+
+/** 重新找人（显式触发，running 中后端会 409）。 */
+export async function rerunOpenmai(jobId: string): Promise<{ ok: boolean }> {
+  return brainxFetch(`/api/v1/opportunities/${encodeURIComponent(jobId)}/openmai/rerun`, { method: "POST" });
+}
+
 /** 重取单个职位详情（承接动作/结果回写成功后刷新本地视图）。 */
 export async function fetchJobDetail(id: string): Promise<{
   engagementState: EngagementState;
@@ -758,6 +773,7 @@ export async function fetchJobDetail(id: string): Promise<{
   events: DecisionEvent[];
   outcomes: Outcome[];
   decisionId: string | null;
+  openmai: OpenmaiResult | null;
 }> {
   const d = await brainxFetch<BackendOpportunity>(`/api/v1/opportunities/${encodeURIComponent(id)}`);
   return {
@@ -766,6 +782,7 @@ export async function fetchJobDetail(id: string): Promise<{
     events: mapEvents(d.events),
     outcomes: mapOutcomes(d.outcomes),
     decisionId: d.latest_recommendation?.decision_id || null,
+    openmai: (d as { openmai?: OpenmaiResult | null }).openmai ?? null,
   };
 }
 

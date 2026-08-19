@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Geist_Mono } from "next/font/google";
-import Script from "next/script";
 import "./globals.css";
 
 const mono = Geist_Mono({ variable: "--font-mono", subsets: ["latin"] });
@@ -16,12 +15,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="zh-CN">
       <body className={mono.variable}>
         {children}
-        <Script
-          defer
-          strategy="afterInteractive"
-          src="https://cdn.eazo.ai/branding/eazo-brand-banner.js"
-          data-eazo-app-id="iV1ADpn7uxkl4kFC"
-        />
       </body>
     </html>
   );

@@ -12,3 +12,8 @@ frontend/**/.next
 data/*.db
 data/*.sqlite
 *.pdf
+# 收敛后旧前端与归档，不进镜像（减小体积）
+frontend/decision-workbench
+_archive
+scripts/session/.state.enc
+scripts/session/out

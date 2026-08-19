@@ -719,3 +719,12 @@ html,body,.btex-app{background:var(--bg)}
 .toast-close{border:0;background:transparent;color:rgba(255,255,255,.7);font-size:16px;line-height:1;cursor:pointer;padding:2px 4px;border-radius:5px}
 .toast-close:hover{color:#fff;background:rgba(255,255,255,.14)}
 @media (max-width:640px){.toast{left:16px;right:16px;flex-wrap:wrap}.toast-text{max-width:100%}.toast-input{flex:1;min-width:0}}
+
+/* toast 白底版（2026-08-19 用户要求：深色底换白底，与整体浅色界面统一） */
+.toast{background:#fff;color:#1c2b26;border:1px solid rgba(28,43,38,.12);box-shadow:0 12px 32px rgba(21,31,36,.14)}
+.toast>svg{color:#176B58;flex:none}
+.toast-input{border:1px solid rgba(28,43,38,.16);background:#f5faf8;color:#1c2b26}
+.toast-input::placeholder{color:#9aa5b0}
+.toast-input:focus{border-color:#2FD3A7;background:#fff;box-shadow:0 0 0 3px rgba(47,211,167,.14)}
+.toast-close{color:#71807a}
+.toast-close:hover{color:#1c2b26;background:rgba(47,211,167,.12)}

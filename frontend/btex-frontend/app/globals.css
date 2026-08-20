@@ -442,7 +442,7 @@ html,body,.btex-app{background:var(--bg)}
 
 /* ── 顶栏与内容：呼吸感 ── */
 .btex-app .topbar{background:rgba(255,255,255,.86);backdrop-filter:blur(16px);border-bottom:1px solid var(--line);height:66px;padding:0 34px}
-.btex-app .content{padding:44px 52px 90px}
+.btex-app .content{padding:44px 52px 90px 72px}
 .headline{margin-bottom:34px}
 .headline h1,.decision-heading h1,.drawer h2,.decision-group-head h2{font-family:var(--font-display);letter-spacing:.01em}
 .decision-heading{margin-bottom:34px}

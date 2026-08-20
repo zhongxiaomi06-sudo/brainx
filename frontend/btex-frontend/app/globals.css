@@ -519,6 +519,7 @@ html,body,.btex-app{background:var(--bg)}
 .pick-card-accept:disabled{cursor:not-allowed;background:#e6ece9;color:#9aa8a2;box-shadow:none}
 .pick-card-accept.accepted{background:transparent;color:var(--mint-ink);box-shadow:none;border:1px solid rgba(23,107,88,.4);cursor:default}
 .pick-card-accept.accepted:disabled{background:transparent;color:var(--mint-ink)}
+.pick-card-actions{display:inline-flex;align-items:center;gap:12px;flex-shrink:0}
 
 /* ── 文件夹模式：横向滑动（pointer 拖拽 + scroll-snap）── */
 .folder-create{display:flex;align-items:center;gap:10px;margin:14px 0 4px}

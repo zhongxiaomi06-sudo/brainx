@@ -436,7 +436,7 @@ function DecisionZone({tone,title,subtitle,jobs,isContext,completed,engagement,o
 
 function DecisionCard({job,completed,engagement,open,onAction,onCommand,onFeedback,inTray,onToggleTray,folderMode,folders,onAssignFolder}:{job:DecisionJob;completed:string[];engagement:EngagementState;open:(job:DecisionJob,tab?:"judgement"|"engagement"|"trail"|"replay")=>void;onAction:(job:DecisionJob,action:DecisionAction)=>void;onCommand:(job:DecisionJob,command:EngagementCommand)=>void;onFeedback:(job:DecisionJob,reason?:string)=>void;inTray:boolean;onToggleTray:(id:string)=>void;folderMode:boolean;folders:PickFolder[];onAssignFolder:(jobId:string,folderId:string)=>void}){
  const action=job.actions.find(item=>!completed.includes(`${job.id}:${item.id}`))||job.actions[0];
- const actionComplete=completed.includes(`${job.id}:${action.id}`);
+ const actionComplete=completed.includes(`${job.id}:${action.id}`);const isAccepted=engagement==="ACCEPTED";const canAccept=legalActions(job,engagement).includes("ACCEPT");const acceptHint=isAccepted?"已接单，进入交付列表":canAccept?"直接接单并自动找人":"需先确认项目归属或补齐关键事实后才能接单";
  return <article className={`pick-card${inTray?" in-tray":""}`} onClick={()=>open(job)}>
   <button className="pick-add" onClick={e=>{e.stopPropagation();onToggleTray(job.id)}} aria-label={inTray?"移出精选盘":"收藏到精选盘"} title={inTray?"移出精选盘":"收藏到精选盘"}>{inTray?<Check/>:<Star/>}</button>
   <button className="pick-card-feedback" onClick={e=>{e.stopPropagation();onFeedback(job)}} aria-label="不感兴趣" title="不感兴趣">×</button>

@@ -525,6 +525,7 @@ function engagementStateMessage(state:EngagementState){
 
 function engagementCommandLabel(command:EngagementCommand,state:EngagementState){
  if(command==="WATCH"&&(state==="RELEASED"||state==="DISMISSED"))return "重新关注";
+ if(command==="RELEASE"&&state==="ACCEPTED")return "退出承接";
  return actionLabel[command];
 }
 

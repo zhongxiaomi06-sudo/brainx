@@ -1022,7 +1022,6 @@ body.btex-document{background:#fff;color:var(--reference-ink)}
 .concept-shell .pick-card-tags em{padding:3px 7px;border-color:#e9efed;background:#fbfcfc;color:#73817d;font-size:10px}
 .concept-shell .pick-card-reco{font-size:11px;color:#73817d}
 .concept-shell .pick-card-rail{gap:9px;padding-left:20px;border-left:1px solid var(--reference-line)}
-.concept-shell .pick-card-publish{height:18px;color:#87948f;font-size:10px}
 .concept-shell .pick-card-scores{padding:11px 0;border-top:1px solid var(--reference-line)}
 .concept-shell .pick-card-scores .decision-metric small{color:#8b9793;font-size:10px}
 .concept-shell .pick-card-scores .decision-metric b{color:#0b725d;font-size:17px}
@@ -1037,7 +1036,7 @@ body.btex-document{background:#fff;color:var(--reference-ink)}
 .concept-shell .assistant-drawer>header{min-height:62px;padding:0 0 12px;border-bottom:1px solid var(--reference-line)}
 .concept-shell .assistant-heading-icon{width:28px;height:28px;background:#eafaf4;color:#0b725d}.concept-shell .assistant-kicker{display:none}
 .concept-shell .assistant-drawer h2{margin:0;font-size:16px;font-weight:650}
-.concept-shell .assistant-tabs{margin:0;background:#fff}.concept-shell .assistant-tabs button{padding:14px 8px 12px;font-size:12px}.concept-shell .assistant-tabs button.active{border-bottom-color:var(--reference-mint)}
+.concept-shell .assistant-tabs{position:relative;z-index:2;margin:0;background:#fff}.concept-shell .assistant-tabs button{position:relative;z-index:1;padding:14px 8px 12px;font-size:12px;touch-action:manipulation}.concept-shell .assistant-tabs button.active{border-bottom-color:var(--reference-mint)}
 .concept-shell .assistant-insight{padding-top:0}.concept-shell .assistant-insight h3{font-size:13px;color:var(--reference-ink)}
 .concept-shell .assistant-context-card{margin:12px 0;padding:14px;border-color:#dff0eb;background:#f8fdfb;box-shadow:none}.concept-shell .assistant-context-card strong{font-size:13px}
 .concept-shell .assistant-ai-insights{padding-top:12px}.concept-shell .assistant-ai-insights li{font-size:11px;color:#65746f}
@@ -1063,6 +1062,11 @@ body.btex-document{background:#fff;color:var(--reference-ink)}
   .concept-shell .rail-nav{width:auto;padding:22px 14px 16px}
   .concept-shell .rail-brand{height:52px;margin:0 0 20px;padding:0 12px}.concept-shell .rail-brand-logo{width:118px}
   .concept-shell .rail-blocks>button{height:48px;padding:0 13px;gap:12px;border-radius:9px}.concept-shell .rail-label{font-size:13px}
+  .concept-shell .topbar{gap:8px;min-width:0;overflow:hidden}
+  .concept-shell .btex-person{min-width:0}.concept-shell .btex-person span:last-child{min-width:0}.concept-shell .btex-person b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .concept-shell .sync-trigger{display:none}
+  .concept-shell .profile-trigger{flex:0 0 38px;width:38px;min-width:38px;margin-left:auto;padding:0;font-size:0}.concept-shell .profile-trigger svg{width:17px;height:17px}
+  .concept-shell.assistant-open .assistant-trigger{display:none}
   .concept-shell.assistant-open .assistant-drawer{position:fixed;z-index:32;top:0;right:0;width:min(356px,88vw);height:100dvh;padding:16px 20px 18px;border-left:1px solid var(--reference-line);border-radius:0;box-shadow:-20px 0 50px rgba(19,34,29,.13)}
   .concept-shell.assistant-open .assistant-backdrop{display:block;background:rgba(22,31,29,.18)}
 }

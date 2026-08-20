@@ -20,11 +20,15 @@ test("uses the reference three-column shell and a single-column opportunity work
   assert.match(workbench, /function DecisionZone/);
   assert.match(workbench, /type OpportunityRowModel/);
   assert.match(workbench, /function OpportunityRow/);
+  assert.doesNotMatch(workbench, /<div className="pick-card-rail"><div className="pick-card-publish"/);
+  assert.match(workbench, /onClick=\{\(\)=>setTab\("market"\)\}/);
   assert.match(workbench, /title="未接单"/);
   assert.match(workbench, /aria-label="精选盘"/);
   assert.match(css, /\.pick-tray/);
   assert.match(css, /grid-template-columns:164px minmax\(640px,1fr\) 356px/);
   assert.match(css, /rail-brand-logo\{width:118px/);
+  assert.match(css, /touch-action:manipulation/);
+  assert.match(css, /assistant-open \.assistant-trigger\{display:none\}/);
   assert.match(css, /\.btex-app\.panel-motion-open \.decision-drawer\{filter:none;transition:transform \.30s/);
   assert.match(css, /\.btex-app\.decision-panel-open/);
 });

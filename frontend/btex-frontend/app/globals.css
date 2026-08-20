@@ -512,6 +512,13 @@ html,body,.btex-app{background:var(--bg)}
 .pick-card-action{display:inline-flex;align-items:center;gap:3px;border:0;background:transparent;color:var(--mint-ink);font-size:12px;font-weight:600;cursor:pointer;padding:4px 0}
 .pick-card-action.complete{color:var(--muted);text-decoration:line-through}
 .pick-card-action svg{width:13px;height:13px}
+.pick-card-accept{display:inline-flex;align-items:center;gap:4px;border:0;border-radius:999px;background:var(--mint-ink);color:#fff;font-size:12px;font-weight:700;cursor:pointer;padding:6px 14px;box-shadow:0 2px 8px rgba(23,107,88,.22);transition:filter .14s,transform .06s}
+.pick-card-accept:hover:not(:disabled){filter:brightness(1.08)}
+.pick-card-accept:active:not(:disabled){transform:translateY(1px)}
+.pick-card-accept svg{width:14px;height:14px}
+.pick-card-accept:disabled{cursor:not-allowed;background:#e6ece9;color:#9aa8a2;box-shadow:none}
+.pick-card-accept.accepted{background:transparent;color:var(--mint-ink);box-shadow:none;border:1px solid rgba(23,107,88,.4);cursor:default}
+.pick-card-accept.accepted:disabled{background:transparent;color:var(--mint-ink)}
 
 /* ── 文件夹模式：横向滑动（pointer 拖拽 + scroll-snap）── */
 .folder-create{display:flex;align-items:center;gap:10px;margin:14px 0 4px}

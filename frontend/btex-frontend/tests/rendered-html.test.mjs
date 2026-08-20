@@ -5,7 +5,7 @@ import test from "node:test";
 const root = new URL("../", import.meta.url);
 const source = (name) => readFile(new URL(name, root), "utf8");
 
-test("keeps the supplied workbench shell and presents two balanced decision zones", async () => {
+test("uses the reference three-column shell and a single-column opportunity workspace", async () => {
   const [page, workbench, css] = await Promise.all([
     source("app/page.tsx"),
     source("app/workbench.tsx"),
@@ -14,13 +14,17 @@ test("keeps the supplied workbench shell and presents two balanced decision zone
 
   assert.match(page, /import DecisionWorkbench from "\.\/workbench"/);
   assert.match(workbench, /type DecisionDirection = "paid"\|"growth"\|"marketing"/);
-  assert.match(workbench, /\["today","精选",Sparkles\]/);
+  assert.match(workbench, /\["today","工作台",Sparkles\]/);
   assert.match(workbench, /精选盘/);
   assert.match(workbench, /function PickTray/);
   assert.match(workbench, /function DecisionZone/);
+  assert.match(workbench, /type OpportunityRowModel/);
+  assert.match(workbench, /function OpportunityRow/);
   assert.match(workbench, /title="未接单"/);
   assert.match(workbench, /aria-label="精选盘"/);
   assert.match(css, /\.pick-tray/);
+  assert.match(css, /grid-template-columns:164px minmax\(640px,1fr\) 356px/);
+  assert.match(css, /rail-brand-logo\{width:118px/);
   assert.match(css, /\.btex-app\.panel-motion-open \.decision-drawer\{filter:none;transition:transform \.30s/);
   assert.match(css, /\.btex-app\.decision-panel-open/);
 });
@@ -45,16 +49,18 @@ test("splits candidates by their live engagement state and keeps verification jo
   assert.match(workbench, /"剩余 HC":"UNKNOWN"/);
 });
 
-test("shows source context, three layers, final score, reasons and risks", async () => {
+test("shows source context, row-level scores, detailed layers, reasons and risks", async () => {
   const workbench = await source("app/workbench.tsx");
 
   assert.match(workbench, /type SourceMode = "COCKPIT_CONTEXT"\|"MARKET_ONLY"/);
   assert.match(workbench, /sourceMode:"COCKPIT_CONTEXT"/);
   assert.match(workbench, /sourceMode:"MARKET_ONLY"/);
-  assert.match(workbench, /label="推进" value=\{job\.globalScore\}/);
-  assert.match(workbench, /label="探索" value=\{job\.explorationScore\}/);
-  assert.match(workbench, /label="个人" value=\{job\.personalScore\}/);
-  assert.match(workbench, /label="最终" value=\{job\.finalScore\}/);
+  assert.match(workbench, /label="AI 匹配分" value=\{row\.score\}/);
+  assert.match(workbench, /label="证据覆盖" value=\{row\.coverage===null\?"—":`\$\{row\.coverage\}%`\}/);
+  assert.match(workbench, /label="项目推进" value=\{job\.globalScore\}/);
+  assert.match(workbench, /label="探索机会" value=\{job\.explorationScore\}/);
+  assert.match(workbench, /label="个人适配" value=\{job\.personalScore\}/);
+  assert.match(workbench, /label="最终得分" value=\{job\.finalScore\}/);
   assert.match(workbench, /DrawerSection title="风险与缺失"/);
   assert.match(workbench, /DrawerSection title="证据来源"/);
   assert.match(workbench, /brainx:edit-facts/);
@@ -82,16 +88,16 @@ test("preserves engagement, result recording, replay, sync and notifications", a
   assert.match(demo, /export type EngagementState = "NEW"\|"RECOMMENDED"\|"VIEWED"\|"WATCHED"\|"ACCEPTED"/);
 });
 
-test("keeps my commitments in the left workspace and removes the bottom duplicate", async () => {
+test("keeps the navigation permanently compact and retains the commitments panel", async () => {
   const [workbench, css] = await Promise.all([
     source("app/workbench.tsx"),
     source("app/globals.css"),
   ]);
 
-  assert.match(workbench, /const \[navOpen,setNavOpen\]=useState\(false\)/);
+  assert.doesNotMatch(workbench, /navOpen|sidebarWidth|sidebarResize/);
   assert.match(workbench, /\{kind:"commitments"\}/);
   assert.match(workbench, /function CommitmentsPanel/);
-  assert.match(workbench, /className="mobile-commitment-trigger"/);
+  assert.doesNotMatch(workbench, /mobile-commitment-trigger/);
   assert.doesNotMatch(workbench, /<section className="commitments">/);
   assert.match(css, /\.mobile-commitment-trigger\{display:none\}/);
 });

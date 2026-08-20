@@ -1,0 +1,13 @@
+<svg width="244" height="72" viewBox="0 0 244 72" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">B-tex BrainX</title>
+  <desc id="desc">B-tex BrainX logo</desc>
+  <g fill="#2FD3A7">
+    <path d="M18 9.5c4.2-4.2 11-4.2 15.2 0l9.5 9.5-9.5 9.5L18 13.6a2.9 2.9 0 0 1 0-4.1Z"/>
+    <path d="M18 62.5c4.2 4.2 11 4.2 15.2 0l9.5-9.5-9.5-9.5-15.2 14.9a2.9 2.9 0 0 0 0 4.1Z"/>
+    <path d="M62 9.5c-4.2-4.2-11-4.2-15.2 0l-9.5 9.5 9.5 9.5L62 13.6a2.9 2.9 0 0 0 0-4.1Z" opacity=".78"/>
+    <path d="M62 62.5c-4.2 4.2-11 4.2-15.2 0l-9.5-9.5 9.5-9.5L62 58.4a2.9 2.9 0 0 1 0 4.1Z" opacity=".78"/>
+  </g>
+  <path d="M36.2 30.1 40 34l3.8-3.9-3.8-3.8-3.8 3.8Z" fill="#B6F2DF"/>
+  <text x="82" y="34" fill="#17231F" font-family="PingFang SC, Arial, sans-serif" font-size="29" font-weight="700" letter-spacing="-.9">B-tex</text>
+  <text x="83" y="55" fill="#5E6D67" font-family="PingFang SC, Arial, sans-serif" font-size="15" font-weight="600" letter-spacing=".3">BrainX</text>
+</svg>

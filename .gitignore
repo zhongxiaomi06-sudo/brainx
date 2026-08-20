@@ -8,3 +8,16 @@ logs/
 scripts/session/.state.enc
 scripts/session/out/
 .workbuddy/
+
+# 构建产物（部署时由 npm run build 生成，不入库）
+dist/
+build/
+
+# 调试/一次性脚本与备份（不入库）
+*.bak
+*.bak.*
+.env.bak*
+diag_*.mjs
+check_om.mjs
+fix_zombie.mjs
+test_rerun.mjs

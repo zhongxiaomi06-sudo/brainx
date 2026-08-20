@@ -105,14 +105,18 @@ const TOOLS = {
     run: ({ consultant_id: cid, project_id: pid, action, ...rest }) => engage(db, cid, pid, action, rest),
   },
   brainx_replay: {
-    description: '决策回放：冻结推荐 + 当轮 run + 事件 + 结果（job_now 仅对照）',
-    inputSchema: { type: 'object', required: ['decision_id'], properties: {
+    description: '决策回放：冻结推荐 + 当轮 run + 事件 + 结果（job_now 仅对照）；consultant_id 必填且须与推荐归属一致',
+    inputSchema: { type: 'object', required: ['decision_id', 'consultant_id'], properties: {
       decision_id: { type: 'string' }, consultant_id: { type: 'string' } } },
     run: ({ decision_id, consultant_id: cid }) => {
-      // 与 HTTP 一致：只能回放自己名下的推荐（consultant_id 缺失时按声明身份兜底）
+      // 与 HTTP 一致：只能回放自己名下的推荐。consultant_id 必填（roster 校验），
+      // 不再提供"缺失时按声明身份兜底"的放行路径（2026-08-20 信任对齐收紧）。
+      if (!cid || !loadConsultants(db).some((c) => c.consultant_id === cid)) {
+        return { error: 'UNKNOWN_CONSULTANT', consultant_id: cid };
+      }
       const owner = db.prepare('SELECT consultant_id FROM recommendations WHERE decision_id=?').get(decision_id);
       if (!owner) return { error: 'NOT_FOUND', decision_id };
-      if (cid && owner.consultant_id !== cid) return { error: 'NOT_FOUND', decision_id };
+      if (owner.consultant_id !== cid) return { error: 'NOT_FOUND', decision_id };
       return replay(db, decision_id);
     },
   },

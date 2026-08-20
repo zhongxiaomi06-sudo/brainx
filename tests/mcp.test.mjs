@@ -94,3 +94,21 @@ test('MCP：engage 写入路径（隔离库）+ 幂等', async () => {
     c.close();
   }
 });
+
+test('MCP：brainx_replay 信任收紧——consultant_id 缺失/未知均拒绝', async () => {
+  const c = mcpClient();
+  try {
+    await c.call('initialize', {});
+    // 缺失 consultant_id：不再按声明身份兜底放行
+    const noCid = await c.call('tools/call', { name: 'brainx_replay', arguments: { decision_id: 'D-ANY' } });
+    assert.equal(JSON.parse(noCid.result.content[0].text).error, 'UNKNOWN_CONSULTANT');
+    // 未知 consultant_id：roster 校验拒绝
+    const badCid = await c.call('tools/call', { name: 'brainx_replay', arguments: { decision_id: 'D-ANY', consultant_id: 'intruder' } });
+    assert.equal(JSON.parse(badCid.result.content[0].text).error, 'UNKNOWN_CONSULTANT');
+    // 花名册内身份：进入归属校验（空库返回 NOT_FOUND 而非越权数据）
+    const goodCid = await c.call('tools/call', { name: 'brainx_replay', arguments: { decision_id: 'D-ANY', consultant_id: 'felix' } });
+    assert.equal(JSON.parse(goodCid.result.content[0].text).error, 'NOT_FOUND');
+  } finally {
+    c.close();
+  }
+});

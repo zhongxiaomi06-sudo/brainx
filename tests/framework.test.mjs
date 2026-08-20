@@ -28,6 +28,7 @@ import { pushCard } from '../src/push.js';
 import { tokenize, scoreJob } from '../src/scorer.js';
 import { isPathInside } from '../src/server.js';
 import { deriveProjectId, flatLark, flatApi, mapPriority, parseBitableRecord } from '../src/bitable.js';
+import { splitFixtureJob } from '../src/fixture_split.js';
 
 let db;
 before(() => { db = openDb(':memory:'); });
@@ -76,7 +77,10 @@ test('ACCEPT 守卫：OTHER_CONSULTANT 职位 409，只可机会发现', () => {
 
 /* ④ 状态机：VIEWED 真正可达；查看 WATCHED 职位不降级；UNWATCH note 落 reason */
 test('状态机：VIEW 后状态为 VIEWED（不再回落 RECOMMENDED）', () => {
-  const pid = fixtureJob('TEAM_SHARED').project_id;
+  // fixture 拆分（fixture_split.js）会按公司×职能重算 project_id，
+  // 必须用拆分后真正入库的 pid，而非 fixture 原始复合行的占位 pid
+  const pid = splitFixtureJob(fixtureJob('TEAM_SHARED'))[0].project_id;
+  assert.ok(db.prepare('SELECT 1 FROM job_facts WHERE project_id=?').get(pid), '拆分后 pid 应已入库');
   const r = engage(db, 'mia', pid, 'VIEW', { idempotency_key: 'fw:mia:view1' });
   assert.equal(r.state, 'VIEWED');
   assert.equal(currentState(db, 'mia', pid).state, 'VIEWED'); // 修正前视图不含 VIEWED
@@ -158,7 +162,8 @@ test('migrations：schema_migrations 逐文件记账，重开不重跑', () => {
                           '0004_bridge.sql', '0005_per_user.sql', '0006_framework.sql',
                           '0007_bitable_fields.sql', '0008_agent12.sql', '0009_switch_app.sql',
                           '0010_ttc_tokens.sql', '0011_ttc_owner.sql', '0012_drop_placeholder.sql',
-                          '0012_manual_fact_overrides.sql', '0013_chat_activity.sql', '0014_recommendation_pick_tray.sql']);
+                          '0013_chat_activity.sql', '0014_recommendation_pick_tray.sql',
+                          '0015_openmai_results.sql', '0016_manual_fact_overrides.sql']);
 });
 
 const TMPDB = join(tmpdir(), `brainx-fw-${process.pid}.db`);
@@ -175,7 +180,7 @@ test('migrations：旧库 user_version=2 兼容——前 2 个文件标记已应
   legacy.close();
   const reopened = openDb(TMPDB);
   const rows = reopened.prepare('SELECT name FROM schema_migrations ORDER BY name').all().map((r) => r.name);
-  assert.equal(rows.length, 15); // 全部记账
+  assert.equal(rows.length, 16); // 全部记账
   const view = reopened.prepare(`SELECT sql FROM sqlite_master WHERE type='view' AND name='current_engagement'`).get();
   assert.match(view.sql, /VIEWED/); // 0006 新视图已应用（含 VIEWED 推导）
   // 0007 扩列已生效

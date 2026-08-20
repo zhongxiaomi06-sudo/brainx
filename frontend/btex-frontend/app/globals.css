@@ -733,6 +733,6 @@ html,body,.btex-app{background:var(--bg)}
 
 /* 桌面工作台保持左侧呼吸感，同时让主内容充分利用可用宽度。 */
 @media (min-width:721px){
-  .btex-app .content{padding-right:24px}
+  .btex-app .content{padding-left:20px;padding-right:20px}
   .decision-home{max-width:1360px}
 }

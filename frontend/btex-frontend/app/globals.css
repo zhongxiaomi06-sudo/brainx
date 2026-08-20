@@ -707,7 +707,7 @@ html,body,.btex-app{background:var(--bg)}
 
 /* 不感兴趣 toast（小红书/B站式：直接隐藏 + 可撤销） */
 .toast{display:flex;align-items:center;gap:6px}
-.toast-action{margin-left:8px;border:0;background:transparent;color:#2FD3A7;font-weight:600;font-size:12px;cursor:pointer;padding:3px 8px;border-radius:6px;letter-spacing:.02em}
+.toast-action{margin-left:8px;border:0;background:transparent;color:#176B58;font-weight:600;font-size:12px;cursor:pointer;padding:3px 8px;border-radius:6px;letter-spacing:.02em}
 .toast-action:hover{background:rgba(47,211,167,.18)}
 .toast-action:active{transform:scale(.96)}
 

@@ -730,3 +730,9 @@ html,body,.btex-app{background:var(--bg)}
 .toast-input:focus{border-color:#2FD3A7;background:#fff;box-shadow:0 0 0 3px rgba(47,211,167,.14)}
 .toast-close{color:#71807a}
 .toast-close:hover{color:#1c2b26;background:rgba(47,211,167,.12)}
+
+/* 桌面工作台保持左侧呼吸感，同时让主内容充分利用可用宽度。 */
+@media (min-width:721px){
+  .btex-app .content{padding-right:24px}
+  .decision-home{max-width:1360px}
+}

@@ -409,7 +409,7 @@ function PickTray({trayJobs,allJobs,folderMode,onFolderMode,folders,onRemoveTray
   <div className="folder-strips">{folders.map(f=><FolderStrip key={f.id} folder={f} jobs={allJobs.filter(j=>f.jobIds.includes(j.id))} open={open} onRemove={jobId=>onAssignFolder(jobId,"")}/>)}</div>
  </section>;
  return <section className="pick-tray" aria-label="精选盘">
-  <div className="pick-tray-head"><div className="pick-tray-title"><span className="decision-zone-kicker">MY PICK TRAY</span><b>精选盘</b><em>{trayJobs.length} 盘</em></div><div className="pick-tray-actions"><button className="btn quiet" onClick={onFolderMode}><FolderOpen/>文件夹模式</button><button className="btn primary" onClick={onConfirmTray} disabled={trayJobs.length===0}><Check/>确定</button></div></div>
+  <div className="pick-tray-head"><div className="pick-tray-title"><span className="decision-zone-kicker">MY PICK TRAY</span><b>精选盘</b><em>{trayJobs.length} 盘</em></div><div className="pick-tray-actions"><button className="btn quiet" onClick={onFolderMode}><FolderOpen/>文件夹模式</button><button className="btn primary" onClick={onConfirmTray} disabled={trayJobs.length===0}><Check/>确定接单</button></div></div>
   {trayJobs.length>0&&<div className="pick-tray-plates">{trayJobs.map(job=><PlateChip key={job.id} job={job} open={open} onRemove={onRemoveTray}/>)}</div>}
  </section>
 }

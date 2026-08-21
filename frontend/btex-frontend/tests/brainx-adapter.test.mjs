@@ -13,6 +13,7 @@ import {
   mapRecommendation,
   mapReplayData,
   mapSyncStatus,
+  getSnapshot,
   BrainxApiError,
 } from "../app/brainx-api.ts";
 
@@ -53,6 +54,29 @@ const sampleRec = {
     relation: "PRIMARY_PM",
   },
 };
+
+test("loads persisted workbench preferences into snapshot", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (path) => {
+    const payloads = {
+      "/api/v1/workbench": { consultant_id: "felix", sync: { state: "READY" }, today_top3: [], commitments: [], run_id: null },
+      "/api/v1/recommendations?limit=20": { blocked: false, items: [], snapshot_id: "snap-1", policy_version: "baseline-1.0" },
+      "/api/v1/profile": { consultant_id: "felix", display_name: "Felix", profile_keywords: [], profile_note: "", feishu_auth: { authorized: true, needs_reauth: false } },
+      "/api/v1/dismiss-reasons": { items: ["其他"] },
+      "/api/v1/workbench/preferences": { tray: ["P-1"], folders: [{ id: "f-1", name: "重点", jobIds: ["P-1"] }], folderMode: true, updatedAt: "2026-08-21T08:00:00.000Z" },
+    };
+    if (!(path in payloads)) throw new Error(`unexpected fetch ${path}`);
+    return { ok: true, status: 200, json: async () => payloads[path] };
+  };
+  try {
+    const snapshot = await getSnapshot();
+    assert.deepEqual(snapshot.preferences.tray, ["P-1"]);
+    assert.equal(snapshot.preferences.folders[0].name, "重点");
+    assert.equal(snapshot.preferences.folderMode, true);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
 
 test("maps a backend recommendation into a workbench decision job", () => {
   const job = mapRecommendation(sampleRec);
@@ -96,14 +120,15 @@ test("derives observe/verify for low-coverage recommendations", () => {
   assert.equal(job.actions[0].kind, "verify");
 });
 
-test("blocks engagement for jobs owned by another consultant", () => {
+test("allows engagement for jobs owned by another consultant", () => {
   const rec = {
     ...sampleRec,
     job: { ...sampleRec.job, hc: 1, relation: "OTHER_CONSULTANT" },
   };
   const job = mapRecommendation(rec);
-  assert.equal(job.eligibility, "VERIFY_REQUIRED");
+  assert.equal(job.eligibility, "ELIGIBLE");
   assert.equal(job.actions[0].id, "ownership");
+  assert.equal(eligibilityOf("RECOMMEND_ACCEPT", "OTHER_CONSULTANT", 1, "OPEN"), "ELIGIBLE");
   assert.equal(eligibilityOf("RECOMMEND_ACCEPT", "NOT_JOINED", 1, "OPEN"), "VERIFY_REQUIRED");
 });
 

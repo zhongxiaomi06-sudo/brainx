@@ -82,11 +82,6 @@ export function engage(db, consultant_id, project_id, action,
   if (t.reason && !reason) return { ok: false, status: 422, error: '暂不考虑必须选择原因' };
   if (t.reason && !DISMISS_REASONS.includes(reason)) return { ok: false, status: 422, error: '原因不在枚举内' };
 
-  // 接单守卫：其他顾问主做的职位只能机会发现（推导关系单一权威 = relations.js）
-  if (action === 'ACCEPT' && relationOf(db, consultant_id, project_id) === 'OTHER_CONSULTANT') {
-    return { ok: false, status: 409, error: '其他顾问主做职位：只能机会发现，不可直接接单（先沟通认领）' };
-  }
-
   if (action === 'WATCH') {
     const cd = inCooldown(db, consultant_id, project_id);
     if (cd) return { ok: false, status: 409, error: `冷却期至 ${cd.slice(0, 10)}，暂不可关注` };

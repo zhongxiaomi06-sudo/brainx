@@ -60,13 +60,37 @@ const STATIC_MIME = {
 
 /** 目录穿越判定：必须带分隔符前缀——裸 startsWith(base) 会把兄弟目录
  * （public-x/… 前缀同为 /…/public）误判为内部（2026-08-10 框架修正）。 */
-export const isPathInside = (base, fp) => fp === base || fp.startsWith(base + sep);
+export const isPathInside = (base, fp) => {
+  const normalizedBase = normalize(base);
+  const normalizedPath = normalize(fp);
+  const baseWithSep = normalizedBase.endsWith(sep) ? normalizedBase : normalizedBase + sep;
+  return normalizedPath === normalizedBase || normalizedPath.startsWith(baseWithSep);
+};
 
 const json = (res, code, obj) => {
   res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
   res.end(JSON.stringify(obj));
 };
 const err = (res, code, codeStr, message) => json(res, code, { error: { code: codeStr, message } });
+const safeJsonArray = (value, fallback = []) => {
+  try {
+    const parsed = JSON.parse(value || '[]');
+    return Array.isArray(parsed) ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+};
+const normalizeWorkbenchPreferences = (input = {}) => {
+  const cleanId = (value) => String(value || '').trim().slice(0, 120);
+  const tray = Array.isArray(input.tray) ? Array.from(new Set(input.tray.map(cleanId).filter(Boolean))).slice(0, 100) : [];
+  const folders = Array.isArray(input.folders) ? input.folders.slice(0, 50).map((folder, index) => {
+    const id = cleanId(folder?.id) || `folder-${index + 1}`;
+    const name = String(folder?.name || '').trim().slice(0, 80) || '未命名文件夹';
+    const jobIds = Array.isArray(folder?.jobIds) ? Array.from(new Set(folder.jobIds.map(cleanId).filter(Boolean))).slice(0, 200) : [];
+    return { id, name, jobIds };
+  }) : [];
+  return { tray, folders, folderMode: !!input.folderMode };
+};
 
 const proxyFrontend = (req, res, target) => {
   const targetPath = req.url === '/login' || req.url?.startsWith('/login?')
@@ -329,6 +353,33 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
         today_top3: run ? run.items.slice(0, 3) : [],
         run_id: run?.run?.run_id || null,
       });
+    },
+
+    'GET /api/v1/workbench/preferences': (req, res, cid) => {
+      const row = db.prepare('SELECT tray_json, folders_json, folder_mode, updated_at FROM workbench_preferences WHERE consultant_id=?').get(cid);
+      json(res, 200, row ? {
+        tray: safeJsonArray(row.tray_json),
+        folders: safeJsonArray(row.folders_json),
+        folderMode: !!row.folder_mode,
+        updatedAt: row.updated_at,
+      } : { tray: [], folders: [], folderMode: false, updatedAt: null });
+    },
+
+    'PUT /api/v1/workbench/preferences': async (req, res, cid) => {
+      const b = await body(req);
+      if (!b) return err(res, 400, 'BAD_JSON', '请求体不是合法 JSON');
+      const prefs = normalizeWorkbenchPreferences(b);
+      const updatedAt = new Date().toISOString();
+      db.prepare(`INSERT INTO workbench_preferences (consultant_id, tray_json, folders_json, folder_mode, updated_at)
+        VALUES (?,?,?,?,?)
+        ON CONFLICT(consultant_id) DO UPDATE SET
+          tray_json=excluded.tray_json,
+          folders_json=excluded.folders_json,
+          folder_mode=excluded.folder_mode,
+          updated_at=excluded.updated_at`).run(
+        cid, JSON.stringify(prefs.tray), JSON.stringify(prefs.folders), prefs.folderMode ? 1 : 0, updatedAt,
+      );
+      json(res, 200, { ok: true, ...prefs, updatedAt });
     },
 
     'GET /api/v1/recommendations': (req, res, cid, q) => {

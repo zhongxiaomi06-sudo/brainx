@@ -33,6 +33,7 @@ import { effectiveJob, effectiveFactPayload, updateFactOverrides } from './facts
 import { chatStream, isLlmConfigured } from './llm.js';
 import { pickTray, nextBatch, feedback as recommendationFeedback, undoFeedback as recommendationUndoFeedback } from './recommendation-batch.js';
 import { verifySnapshotKey, jobSnapshot } from './snapshot.js';
+import { createGuard } from './guard.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const FRONTEND_DIR = join(ROOT, 'frontend', 'btex-frontend');
@@ -123,6 +124,8 @@ async function body(req) {
 export function createServer(db = openDb(), deps = {}) {
   const exchange = deps.exchangeCode || exchangeCode;
   const devAuth = process.env.BRAINX_DEV_AUTH === '1';
+  // 请求指标（预测告警装置数据源）：仅聚合数字，无业务数据，经 /api/v1/meta/guard 暴露
+  const guard = createGuard();
   const auth = (req, res) => {
     const s = verifySession(cookieOf(req));
     if (!s) err(res, 401, 'UNAUTHORIZED', '未登录或会话已过期');
@@ -632,6 +635,9 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       json(res, 200, out);
     },
 
+    // 请求指标（预测告警装置数据源）：聚合计数/字节量，无敏感数据，供看门狗轮询
+    'GET /api/v1/meta/guard': (req, res) => json(res, 200, guard.snapshot()),
+
     // SSE：桥接器有变化时推 sync/recommend/sync_error；25s 心跳保活
     'GET /api/v1/events': (req, res, cid) => {
       res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8',
@@ -677,6 +683,7 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
   };
 
   const server = http.createServer(async (req, res) => {
+    guard.record(req, res);
     const u = new URL(req.url, 'http://x');
     let path = u.pathname;
     // 动态段匹配：/api/v1/opportunities/:id/engagement 等
@@ -702,7 +709,7 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
                     'GET /api/v1/talent/health', 'GET /api/v1/talent/status',
                     // 职位快照：外部系统（York AI worker 等）无 brainx session，凭 API Key 读取；
                     // 鉴权在 handler 内自校验（verifySnapshotKey），未配置 key 时 fail-closed 全拒。
-                    'GET /api/v1/jobs/snapshot'];
+                    'GET /api/v1/jobs/snapshot', 'GET /api/v1/meta/guard'];
       const cid = open.includes(`${req.method} ${path}`) ? null : auth(req, res);
       if (open.includes(`${req.method} ${path}`) || cid) {
         try { return await handler(req, res, cid, u.searchParams, dynId); }
@@ -728,6 +735,7 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
     err(res, 404, 'NOT_FOUND', `${req.method} ${path}`);
   });
   server.bus = bus; // 主块/测试用来广播桥接事件
+  server.guard = guard; // 看门狗/测试可直读指标
   server.frontendTarget = deps.frontendTarget || null;
   return server;
 }

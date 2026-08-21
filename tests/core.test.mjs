@@ -144,8 +144,7 @@ test('DISMISS 必须原因 + 冷却期阻断再关注', () => {
   assert.match(r.error, /冷却期|状态冲突/);
 });
 
-// KNOWN-FAILING: 关注榜上限逻辑依赖 DB 状态，待查（与 P-FIX 治理后数据不一致）。修复后改回 test()
-test.todo('关注榜上限 10：满员拒绝且禁止静默替换', () => {
+test('关注榜上限 10：满员拒绝且禁止静默替换', () => {
   const run = latestRun(db, CID);
   const others = db.prepare(`SELECT project_id FROM job_facts
     WHERE active_state='OPEN' LIMIT 40`).all().map((r) => r.project_id);
@@ -157,7 +156,11 @@ test.todo('关注榜上限 10：满员拒绝且禁止静默替换', () => {
     if (r.ok) watched++;
   }
   assert.equal(watched, 10);
-  const extra = others.find((p) => currentState(db, CID, p).state !== 'WATCHED');
+  // 找一个没被 DISMISS 过（无冷却期）也没被 WATCH 的 pid
+  const extra = others.find((p) => {
+    const s = currentState(db, CID, p);
+    return !s.state || s.state === 'RECOMMENDED' || s.state === 'VIEWED';
+  });
   const r = engage(db, CID, extra, 'WATCH', { idempotency_key: `t4:extra:${extra}` });
   assert.equal(r.ok, false);
   assert.match(r.error, /关注榜已满/);

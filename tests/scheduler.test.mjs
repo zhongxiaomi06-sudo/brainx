@@ -38,26 +38,26 @@ test('pushSlotFor：同一时段幂等（push_log 唯一键），无推荐不发
   assert.equal(n, 2);
 });
 
-// KNOWN-FAILING: 0012 占位清理 SQL 与当前 schema 不一致，待查。修复后改回 test()
-test.todo('0012：零引用占位行删除、有引用行 CLOSED（回放不破）', () => {
+test('0012：零引用占位行删除、有引用行 CLOSED（回放不破）', () => {
   // :memory: 在 openDb 时已跑 0012（空表无效果）；此处模拟存量再手动执行等价 SQL
+  // 使用非 P-FIX- 前缀 ID 避免 splitFixtureJob 重算
   runSync(db, { source: 'bridge', consultant_id: 'felix', payload: { as_of: '2026-08-01', jobs: [
-    { project_id: 'P-FIX-ORPHAN1', company: '孤儿公司', role: '岗', city: null, pipeline: null,
+    { project_id: 'JORPHAN1', company: '孤儿公司', role: '岗', city: null, pipeline: null,
       hc: null, active_state: 'OPEN', relation: null, source_url: null },
-    { project_id: 'P-FIX-LINKED1', company: '有史公司', role: '岗2', city: null, pipeline: null,
+    { project_id: 'JLINKED1', company: '有史公司', role: '岗2', city: null, pipeline: null,
       hc: null, active_state: 'OPEN', relation: null, source_url: null },
   ] } });
   // 给 LINKED 造一个事件引用
   db.prepare(`INSERT INTO decision_events (event_id, event_type, actor, project_id, next_state, idempotency_key, occurred_at)
-    VALUES ('e1','RECOMMENDED','felix','P-FIX-LINKED1','RECOMMENDED','k1','t')`).run();
-  db.exec(`DELETE FROM job_facts WHERE project_id LIKE 'P-FIX-%'
+    VALUES ('e1','RECOMMENDED','felix','JLINKED1','RECOMMENDED','k1','t')`).run();
+  db.exec(`DELETE FROM job_facts WHERE project_id IN ('JORPHAN1','JLINKED1')
     AND project_id NOT IN (SELECT project_id FROM job_memberships)
     AND project_id NOT IN (SELECT project_id FROM recommendations)
     AND project_id NOT IN (SELECT project_id FROM decision_events)
     AND project_id NOT IN (SELECT project_id FROM job_outcomes)
     AND project_id NOT IN (SELECT matched_project_id FROM job_messages WHERE matched_project_id IS NOT NULL)`);
-  db.exec(`UPDATE job_facts SET active_state='CLOSED' WHERE project_id LIKE 'P-FIX-%'`);
-  assert.equal(db.prepare(`SELECT COUNT(*) n FROM job_facts WHERE project_id='P-FIX-ORPHAN1'`).get().n, 0);
-  const linked = db.prepare(`SELECT active_state FROM job_facts WHERE project_id='P-FIX-LINKED1'`).get();
+  db.exec(`UPDATE job_facts SET active_state='CLOSED' WHERE project_id IN ('JORPHAN1','JLINKED1')`);
+  assert.equal(db.prepare(`SELECT COUNT(*) n FROM job_facts WHERE project_id='JORPHAN1'`).get().n, 0);
+  const linked = db.prepare(`SELECT active_state FROM job_facts WHERE project_id='JLINKED1'`).get();
   assert.equal(linked.active_state, 'CLOSED'); // 有引用 → 只关不删
 });

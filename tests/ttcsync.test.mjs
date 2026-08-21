@@ -82,33 +82,32 @@ test('bridgeOnce：TTC 段按人拉取合并入池；无凭据者跳过；失效
   assert.ok(db.prepare(`SELECT COUNT(*) n FROM job_facts WHERE project_id IN ('JRW5YJJ','JX2')`).get().n === 2);
 });
 
-// KNOWN-FAILING: remap FK 约束失败（applyRemap 引用搬移/删除），待修 remap 逻辑或测试数据。修复后改回 test()
-test.todo('remap：规范化/确定映射/歧义/事务执行', () => {
+test('remap：规范化/确定映射/歧义/事务执行', () => {
   assert.equal(normalizeCompany('天壹紫腾资产管理（宁波）有限公司'), '天壹紫腾资产管理');
-  // 造数据：旧占位行 + 真 ID 行
+  // 造数据：旧占位行 + 真 ID 行（用非 P-FIX- 前缀避免 splitFixtureJob 重算）
   runSync(db, { source: 'bridge', consultant_id: 'felix', payload: { as_of: '2026-08-01', jobs: [
-    { project_id: 'P-FIX-AAAA1111', company: '天壹紫腾', role: 'TMT投资', city: null, pipeline: null,
+    { project_id: 'JOLD-AAAA1111', company: '天壹紫腾', role: 'TMT投资', city: null, pipeline: null,
       hc: null, active_state: 'OPEN', relation: null, source_url: null },
   ] } });
   const plan = planRemap(
-    [{ project_id: 'P-FIX-AAAA1111', company: '天壹紫腾', role: 'TMT投资' },
-     { project_id: 'P-FIX-NOPE999', company: '不存在的公司', role: 'x' }],
+    [{ project_id: 'JOLD-AAAA1111', company: '天壹紫腾', role: 'TMT投资' },
+     { project_id: 'JOLD-NOPE999', company: '不存在的公司', role: 'x' }],
     [{ project_id: 'JRW5YJJ', company: '天壹紫腾资产管理（宁波）有限公司', role: 'AI产业链投资岗TMT组' }]);
   assert.equal(plan.confident.length, 1);
   assert.equal(plan.confident[0].to, 'JRW5YJJ');
   assert.equal(plan.unmatched.length, 1);
   // 歧义：同公司两真行
-  const amb = planRemap([{ project_id: 'P-FIX-AAAA1111', company: '天壹紫腾', role: '无关角色' }],
+  const amb = planRemap([{ project_id: 'JOLD-AAAA1111', company: '天壹紫腾', role: '无关角色' }],
     [{ project_id: 'J1', company: '天壹紫腾资产管理', role: '甲' }, { project_id: 'J2', company: '天壹紫腾', role: '乙' }]);
   assert.equal(amb.ambiguous.length, 1);
   // 执行：引用搬移 + 旧行删除（先造一条推荐引用）
   db.prepare(`INSERT INTO decision_runs (run_id, consultant_id, snapshot_id, policy_version, candidate_count, created_at)
     VALUES ('r1','felix','s1','p',1,'t')`).run();
   db.prepare(`INSERT INTO recommendations (decision_id, run_id, consultant_id, project_id, action, score, confidence_band, evidence_coverage, reasons_json, risks_json, evidence_refs_json, breakdown_json, policy_version, rank, created_at)
-    VALUES ('d1','r1','felix','P-FIX-AAAA1111','OBSERVE',50,'LOW',0.5,'[]','[]','[]','[]','p',1,'t')`).run();
+    VALUES ('d1','r1','felix','JOLD-AAAA1111','OBSERVE',50,'LOW',0.5,'[]','[]','[]','[]','p',1,'t')`).run();
   applyRemap(db, plan.confident);
   assert.equal(db.prepare(`SELECT project_id FROM recommendations WHERE decision_id='d1'`).get().project_id, 'JRW5YJJ');
-  assert.equal(db.prepare(`SELECT COUNT(*) n FROM job_facts WHERE project_id='P-FIX-AAAA1111'`).get().n, 0);
+  assert.equal(db.prepare(`SELECT COUNT(*) n FROM job_facts WHERE project_id='JOLD-AAAA1111'`).get().n, 0);
 });
 
 /* ⑫ 0013 群活跃：精确归因 + 活跃基底参与评分 */

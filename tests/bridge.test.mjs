@@ -62,35 +62,36 @@ test('deriveProjectId 与 fixture 同一推导（同源公司合并）', () => {
   assert.equal(deriveProjectId('Rockflow', '产品、工程、运营增长（多岗）'), 'P-FIX-E5FC611B');
 });
 
-// KNOWN-FAILING: bridge 同步 relation 守卫 / fixture 变化，待查。修复后改回 test()
-test.todo('桥接 payload 同步：relation=null 不动既有关系（Felix 的 PRIMARY_PM 不被冲掉）', () => {
+test('桥接 payload 同步：relation=null 不动既有关系（Felix 的 PRIMARY_PM 不被冲掉）', () => {
   runSync(db, { source: 'fixture', consultant_id: 'felix' }); // 种子（含策展关系）
+  const PID = 'P-FIX-6FFEA4D1'; // 拆分后 Rockflow×产品
   const before = db.prepare(`SELECT relation FROM job_memberships
-    WHERE consultant_id='felix' AND project_id='P-FIX-E5FC611B' AND valid_to IS NULL`).get();
+    WHERE consultant_id='felix' AND project_id=? AND valid_to IS NULL`).get(PID);
   assert.equal(before.relation, 'PRIMARY_PM');
 
-  const { as_of, jobs } = loadFixture();
-  const payload = { as_of, jobs: jobs.map((j) => ({ ...j, relation: null,
-    city: j.project_id === 'P-FIX-E5FC611B' ? '北京·望京' : j.city })) };
+  // 桥接 payload 直接用拆分后的单职能行（bridge 源不经 splitFixtureJob 再拆）
+  const payload = { as_of: '2026-08-10T00:00:00Z', jobs: [
+    { project_id: PID, company: 'Rockflow', role: '产品', city: '北京·望京',
+      pipeline: null, hc: null, active_state: 'OPEN', relation: null, source_url: null },
+  ] };
   const out = runSync(db, { source: 'bridge', consultant_id: 'felix', payload });
   assert.equal(out.complete, true);
 
   const rel = db.prepare(`SELECT relation FROM job_memberships
-    WHERE consultant_id='felix' AND project_id='P-FIX-E5FC611B' AND valid_to IS NULL`).get();
+    WHERE consultant_id='felix' AND project_id=? AND valid_to IS NULL`).get(PID);
   assert.equal(rel.relation, 'PRIMARY_PM'); // 关系没动
-  const job = db.prepare(`SELECT city FROM job_facts WHERE project_id='P-FIX-E5FC611B'`).get();
+  const job = db.prepare(`SELECT city FROM job_facts WHERE project_id=?`).get(PID);
   assert.equal(job.city, '北京·望京');      // 事实刷新了
 });
 
-// KNOWN-FAILING: 消息去重 / 公司词典匹配 fixture 变化，待查。修复后改回 test()
-test.todo('消息入库：message_id 去重 + 公司词典命中 + 游标推进', () => {
+test('消息入库：message_id 去重 + 公司词典命中 + 游标推进', () => {
   const m1 = [MSG('om_1', 'Rockflow 昨天新增 2 个 HC，JD 已更新', '2026-08-07 12:01'),
               MSG('om_2', '今天天气不错', '2026-08-07 12:02')];
   const r1 = ingestMessages(db, 'oc_x', m1);
   assert.equal(r1.inserted, 2);
   assert.equal(r1.matched, 1); // om_1 命中 Rockflow
   const hit = db.prepare(`SELECT matched_project_id FROM job_messages WHERE message_id='om_1'`).get();
-  assert.equal(hit.matched_project_id, 'P-FIX-E5FC611B');
+  assert.equal(hit.matched_project_id, 'P-FIX-6FFEA4D1'); // 拆分后 Rockflow×产品
   // 重复拉取同一批 → 0 新增（幂等）
   const r2 = ingestMessages(db, 'oc_x', m1);
   assert.equal(r2.inserted, 0);

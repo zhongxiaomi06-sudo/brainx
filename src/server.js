@@ -4,8 +4,8 @@
 import './env.js';
 import http from 'node:http';
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { join, normalize, dirname, sep } from 'node:path';
+import { existsSync, readFileSync, statSync } from 'node:fs';
+import { join, normalize, dirname, sep, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openDb } from './db.js';
 import { runSync, latestSync, latestCompleteSnapshot } from './sync.js';
@@ -37,6 +37,26 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const FRONTEND_DIR = join(ROOT, 'frontend', 'btex-frontend');
 const FRONTEND_HOST = process.env.BRAINX_FRONTEND_HOST || '127.0.0.1';
 const FRONTEND_PORT = Number(process.env.BRAINX_FRONTEND_PORT || 4321);
+// 本地静态资源目录：vinext 在部分环境（Windows）不提供 /assets，后端直接读 dist 产物绕过
+const STATIC_DIR = join(FRONTEND_DIR, 'dist', 'client');
+const STATIC_MIME = {
+  '.css': 'text/css; charset=utf-8',
+  '.js': 'application/javascript; charset=utf-8',
+  '.mjs': 'application/javascript; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.html': 'text/html; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.ico': 'image/x-icon',
+  '.webp': 'image/webp',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf',
+  '.eot': 'application/vnd.ms-fontobject',
+};
 
 /** 目录穿越判定：必须带分隔符前缀——裸 startsWith(base) 会把兄弟目录
  * （public-x/… 前缀同为 /…/public）误判为内部（2026-08-10 框架修正）。 */
@@ -622,6 +642,17 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
         catch (e) { return err(res, 500, 'INTERNAL', String(e.message).slice(0, 300)); }
       }
       return;
+    }
+    // —— 本地静态资源直读：vinext Windows 下不提供 /assets，从 dist/client 直接返回 ——
+    if (!path.startsWith('/api/') && STATIC_DIR && /^\/(assets|favicon\.ico|fonts|images|icons)\b/.test(path)) {
+      const rel = path.replace(/^\/+/, '');
+      const fp = join(STATIC_DIR, rel);
+      if (isPathInside(STATIC_DIR, fp) && existsSync(fp) && statSync(fp).isFile()) {
+        const ct = STATIC_MIME[extname(fp).toLowerCase()] || 'application/octet-stream';
+        res.writeHead(200, { 'Content-Type': ct, 'Cache-Control': 'no-cache' });
+        res.end(readFileSync(fp));
+        return;
+      }
     }
     if (deps.frontendTarget && !path.startsWith('/api/')) {
       return proxyFrontend(req, res, deps.frontendTarget);

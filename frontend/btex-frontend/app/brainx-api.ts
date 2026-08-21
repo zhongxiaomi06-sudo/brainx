@@ -62,6 +62,7 @@ export type BrainxSnapshot = {
   snapshotId: string | null;
   policyVersion: string | null;
   profileKeywords: string[];
+  openmai: Record<string, OpenmaiResult | null>;
 };
 
 export type BrainxReplay = {
@@ -119,6 +120,7 @@ export type BackendOpportunity = {
   relation: { relation: string | null; source?: string | null; valid_from?: string | null };
   engagement_state: EngagementState; legal_actions: EngagementCommand[];
   events: BackendEvent[]; outcomes: BackendOutcome[]; latest_recommendation: BackendLatestRecommendation | null;
+  openmai?: OpenmaiResult | null;
 };
 export type BackendEvent = { event_type: string; occurred_at?: string; actor?: string; reason?: string | null };
 export type BackendOutcome = { stage: string; observed_at?: string; value?: { rating?: number; note?: string } | null };
@@ -701,6 +703,7 @@ export async function getSnapshot(): Promise<BrainxSnapshot> {
   const events: Record<string, DecisionEvent[]> = {};
   const outcomes: Record<string, Outcome[]> = {};
   const legal: Record<string, EngagementCommand[]> = {};
+  const openmai: Record<string, OpenmaiResult | null> = {};
 
   const details = await Promise.all(
     jobs.map((j) => brainxFetch<BackendOpportunity>(`/api/v1/opportunities/${encodeURIComponent(j.id)}`).catch(() => null)),
@@ -710,6 +713,7 @@ export async function getSnapshot(): Promise<BrainxSnapshot> {
     const decisionId = d?.latest_recommendation?.decision_id || recs.items[i]?.decision_id;
     job.brainxDecisionId = decisionId;
     if (!d) return;
+    openmai[job.id] = d.openmai ?? null;
     engagement[job.id] = d.engagement_state as EngagementState;
     events[job.id] = mapEvents(d.events);
     outcomes[job.id] = mapOutcomes(d.outcomes);
@@ -743,6 +747,7 @@ export async function getSnapshot(): Promise<BrainxSnapshot> {
     events,
     outcomes,
     legal,
+    openmai,
     sync: mapSyncStatus(wb.sync, wb.feishu_auth),
     auth: {
       consultant: profile.display_name || wb.consultant_id || "顾问",

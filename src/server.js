@@ -32,6 +32,7 @@ import { talentSupplyForJob, talentSupplyEnabled } from './talent-supply.js';
 import { effectiveJob, effectiveFactPayload, updateFactOverrides } from './facts.js';
 import { chatStream, isLlmConfigured } from './llm.js';
 import { pickTray, nextBatch, feedback as recommendationFeedback, undoFeedback as recommendationUndoFeedback } from './recommendation-batch.js';
+import { verifySnapshotKey, jobSnapshot } from './snapshot.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const FRONTEND_DIR = join(ROOT, 'frontend', 'btex-frontend');
@@ -619,6 +620,18 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       json(res, 200, { ok: true, consultant_id: consultantId, ...ttcAuthStatus(db, consultantId) });
     },
 
+    // 职位快照（外部系统消费，替代直打 CRM job/search；API Key 鉴权，不走 session）
+    'GET /api/v1/jobs/snapshot': (req, res, cid, q) => {
+      if (!verifySnapshotKey(req)) return err(res, 401, 'INVALID_API_KEY', '缺少或无效的 API Key（Bearer token）');
+      const out = jobSnapshot(db, {
+        updated_after: q.get('updated_after') || undefined,
+        updated_before: q.get('updated_before') || undefined,
+        status: q.get('status') || undefined,
+        limit: q.get('limit') || undefined,
+      });
+      json(res, 200, out);
+    },
+
     // SSE：桥接器有变化时推 sync/recommend/sync_error；25s 心跳保活
     'GET /api/v1/events': (req, res, cid) => {
       res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8',
@@ -686,7 +699,10 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
                     'POST /api/v1/ttc/ext-sync', 'GET /api/v1/ttc/status',
                     // 人才库健康探测：纯状态（后端类型/连通性/建表），不含任何用户数据或密码，
                     // 允许未登录访问，以便数据源页无论登录与否都能显示真库连接状态。
-                    'GET /api/v1/talent/health', 'GET /api/v1/talent/status'];
+                    'GET /api/v1/talent/health', 'GET /api/v1/talent/status',
+                    // 职位快照：外部系统（York AI worker 等）无 brainx session，凭 API Key 读取；
+                    // 鉴权在 handler 内自校验（verifySnapshotKey），未配置 key 时 fail-closed 全拒。
+                    'GET /api/v1/jobs/snapshot'];
       const cid = open.includes(`${req.method} ${path}`) ? null : auth(req, res);
       if (open.includes(`${req.method} ${path}`) || cid) {
         try { return await handler(req, res, cid, u.searchParams, dynId); }

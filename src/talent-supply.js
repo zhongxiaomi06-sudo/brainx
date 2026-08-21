@@ -99,7 +99,9 @@ export async function talentSupplyForJob(job) {
     return { jobId: job.project_id, enabled: false };
   }
   // 岗位入库（幂等），拿到 position_id 才能写匹配记录
-  const pos = await upsertPosition({ title: job.role || job.company, description: job.company, requirements: job.notes || '' });
+  const title = job.role || null;
+  if (!title) return { jobId: job.project_id, enabled: true, matchableTalentCount: 0, supplyDifficulty: 'high', matchingSuggestion: '岗位名称缺失，无法匹配', topMatches: [], calculatedAt: new Date().toISOString(), source: 'talent-supply-adapter' };
+  const pos = await upsertPosition({ title, company: job.company || null, description: null, requirements: job.notes || '' });
   const ctx = buildJobMatchContext(job);
 
   // 真库候选池（含 skill/intention 标签），用 v1 算法打分

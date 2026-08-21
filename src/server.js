@@ -751,9 +751,12 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const server = createServer(db, { frontendTarget });
   let frontendProcess = null;
   if (frontendTarget && existsSync(join(FRONTEND_DIR, 'package.json'))) {
-    frontendProcess = spawn('npm', ['run', 'start', '--', '--host', FRONTEND_HOST, '--port', String(FRONTEND_PORT)], {
+    // Windows 上 npm 实为 npm.cmd，spawn 默认不带 shell 且不补 .cmd 后缀，直接 spawn('npm') 会 ENOENT
+    const isWin = process.platform === 'win32';
+    frontendProcess = spawn(isWin ? 'npm.cmd' : 'npm', ['run', 'start', '--', '--host', FRONTEND_HOST, '--port', String(FRONTEND_PORT)], {
       cwd: FRONTEND_DIR,
       env: { ...process.env, PORT: String(FRONTEND_PORT), HOSTNAME: FRONTEND_HOST },
+      shell: isWin,
       stdio: 'inherit',
     });
     frontendProcess.on('error', (e) => console.error(`[frontend] 启动失败：${e.message}`));

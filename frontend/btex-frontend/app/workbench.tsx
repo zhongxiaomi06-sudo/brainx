@@ -32,7 +32,7 @@ type DecisionJob = {
 };
 type OpportunityRowModel = {
  id:string; rank:number; company:string; role:string; city:string|null; stage:string|null; relation:string|null;
- source:string; summary:string; score:string|number; coverage:number|null; exploration:string|number; action:string;
+ source:string; summary:string; score:string|number; coverage:number|null; exploration:string|number;
 };
 type Panel = {kind:"job";jobId:string;tab:"judgement"|"engagement"|"trail"|"replay"}|{kind:"sync"}|{kind:"identity"}|{kind:"notifications"}|{kind:"commitments"}|null;
 type DirectSegmentOption<T extends string> = {value:T;label:React.ReactNode;ariaLabel?:string};
@@ -213,6 +213,7 @@ export default function DecisionWorkbench(){
  const [pendingCommand,setPendingCommand]=useState<{job:DecisionJob;command:EngagementCommand}|null>(null);
  // Brain X 后端连接态：connecting（探测中）→ connected（API 驱动）/ offline（演示模式回退）
  const [brainxMode,setBrainxMode]=useState<"connecting"|"connected"|"offline">("connecting");
+ const [workspaceMenuOpen,setWorkspaceMenuOpen]=useState(false);
  const [assistantOpen,setAssistantOpen]=useState(false);
  const [assistantMessages,setAssistantMessages]=useState<AssistantMessage[]>([]);
  const [assistantInput,setAssistantInput]=useState("");
@@ -247,9 +248,9 @@ export default function DecisionWorkbench(){
  const dismissPanelImmediately=()=>{clearPanelMotion();setPanel(null);setPanelMotion("idle")};
  const openPanel=(next:Panel)=>{if(!next)return;clearPanelMotion();if(panel&&panelMotion==="open"){setPanel(next);return}const animate=typeof window!=="undefined"&&window.matchMedia("(min-width: 961px)").matches;if(panelMotion==="closing"){setPanel(next);setPanelMotion("open");return}setPanel(next);if(!animate){setPanelMotion("open");return}setPanelMotion("entering");panelAnimationFrame.current=window.requestAnimationFrame(()=>{panelAnimationFrame.current=window.requestAnimationFrame(()=>{setPanelMotion("open");panelAnimationFrame.current=null})})};
  const closePanel=()=>{if(!panel)return;clearPanelMotion();const animate=typeof window!=="undefined"&&window.matchMedia("(min-width: 961px)").matches;if(!animate){dismissPanelImmediately();return}setPanelMotion("closing");panelCloseTimer.current=window.setTimeout(()=>{setPanel(null);setPanelMotion("idle");panelCloseTimer.current=null},380)};
- useEffect(()=>{const closeOnEscape=(event:KeyboardEvent)=>{if(event.key!=="Escape")return;closePanel();setPendingCommand(null);setDrawer(null);setDetail(null);setClientDetail(null);setMobileNavOpen(false)};window.addEventListener("keydown",closeOnEscape);return()=>window.removeEventListener("keydown",closeOnEscape)},[panel,panelMotion]);
+ useEffect(()=>{const closeOnEscape=(event:KeyboardEvent)=>{if(event.key!=="Escape")return;closePanel();setPendingCommand(null);setDrawer(null);setDetail(null);setClientDetail(null);setMobileNavOpen(false);setWorkspaceMenuOpen(false)};window.addEventListener("keydown",closeOnEscape);return()=>window.removeEventListener("keydown",closeOnEscape)},[panel,panelMotion]);
  useEffect(()=>()=>clearPanelMotion(),[]);
- const go=(p:Page)=>{setPage(p);setDetail(null);setClientDetail(null);dismissPanelImmediately();setDrawer(null);setMobileNavOpen(false)};
+ const go=(p:Page)=>{setPage(p);setDetail(null);setClientDetail(null);dismissPanelImmediately();setDrawer(null);setMobileNavOpen(false);setWorkspaceMenuOpen(false)};
  useEffect(()=>{try{const saved=localStorage.getItem("brainx-assistant-history");if(saved)setAssistantMessages(JSON.parse(saved))}catch{}},[]);
  useEffect(()=>{try{setAssistantKey(localStorage.getItem("brainx-deepseek-key")||"")}catch{}},[]);
  useEffect(()=>{const desktop=window.matchMedia("(min-width: 1280px)");const syncAssistantLayout=()=>setAssistantOpen(desktop.matches);syncAssistantLayout();desktop.addEventListener("change",syncAssistantLayout);return()=>desktop.removeEventListener("change",syncAssistantLayout)},[]);
@@ -308,7 +309,14 @@ export default function DecisionWorkbench(){
   {mobileNavOpen&&<button className="mobile-nav-backdrop" onClick={()=>closeMobileDrawer()} aria-label="关闭全部模块"/>}
   <main className="main">
    <header className="topbar">
-    <div className="concept-workspace-title"><b>招聘决策工作台</b><ChevronDown aria-hidden="true"/></div>
+    <div className="concept-workspace-switcher">
+     <button className="concept-workspace-title" type="button" onClick={()=>setWorkspaceMenuOpen(open=>!open)} aria-haspopup="menu" aria-expanded={workspaceMenuOpen}><b>招聘决策工作台</b><ChevronDown aria-hidden="true"/></button>
+     {workspaceMenuOpen&&<div className="concept-workspace-menu" role="menu" aria-label="切换工作区">
+      <button type="button" role="menuitem" className={page==="today"?"active":""} onClick={()=>go("today")}><span>招聘决策工作台</span><small>查看推荐与职位判断</small>{page==="today"&&<Check aria-hidden="true"/>}</button>
+      <button type="button" role="menuitem" className={page==="jobs"?"active":""} onClick={()=>go("jobs")}><span>职位市场</span><small>搜索当前可见职位</small>{page==="jobs"&&<Check aria-hidden="true"/>}</button>
+      <button type="button" role="menuitem" className={page==="clients"?"active":""} onClick={()=>go("clients")}><span>人才库</span><small>查看客户与人才洞察</small>{page==="clients"&&<Check aria-hidden="true"/>}</button>
+     </div>}
+    </div>
     {page==="today"?<><button className="btex-person identity-trigger" onClick={()=>openPanel({kind:"identity"})}><span className="reference-avatar">{auth.consultant.slice(0,1)}</span><span><b>{auth.consultant}</b><small>Consultant</small></span></button><button className={`sync sync-trigger ${auth.needsReauth?"auth_expired":sync.state.toLowerCase()}`} onClick={()=>openPanel(auth.needsReauth?{kind:"identity"}:{kind:"sync"})}><i/> {auth.needsReauth?"飞书授权已过期":sync.state==="READY"?`已同步 · ${sync.updatedAt}`:sync.state==="RUNNING"?"同步中…":sync.state==="INCOMPLETE"?"同步不完整":sync.state==="AUTH_EXPIRED"?"授权过期":sync.state==="ERROR"?"同步失败":"尚未同步"}</button><button className="icon-btn notification-trigger" onClick={()=>openPanel({kind:"notifications"})} aria-label="今日提醒"><BellRing/>{notifications.filter(note=>!note.read).length>0&&<i>{notifications.filter(note=>!note.read).length}</i>}</button></>:<><div className="search"><Search/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="搜索客户、职位、PM…"/></div><button className="top-pill" onClick={()=>notify("全局筛选已展开")}><Filter/> 当前团队 <ChevronRight/></button><button className="icon-btn" onClick={()=>openPanel({kind:"notifications"})} aria-label="通知"><Bell/></button></>}
     <button className={`profile-trigger ${page==="rules"?"active":""}`} onClick={()=>go("rules")} aria-label="打开设置"><Settings2/><span>设置</span></button><button className={`assistant-trigger ${assistantOpen?"active":""}`} onClick={()=>setAssistantOpen(value=>!value)} aria-label="打开 BrainX 助手" aria-expanded={assistantOpen}><Sparkles/><span>BrainX 助手</span></button>
    </header>
@@ -439,17 +447,17 @@ function FolderStrip({folder,jobs,open,onRemove}:{folder:PickFolder;jobs:Decisio
 
 function DecisionZone({tone,title,subtitle,jobs,isContext,completed,engagement,open,onAction,onFeedback,tray,onToggleTray,folderMode,folders,onAssignFolder,toolbar,anchorId}:{tone:"accepted"|"pending";title:string;subtitle:string;jobs:DecisionJob[];isContext:boolean;completed:string[];engagement:Record<string,EngagementState>;open:(job:DecisionJob,tab?:"judgement"|"engagement"|"trail"|"replay")=>void;onAction:(job:DecisionJob,action:DecisionAction)=>void;onFeedback:(job:DecisionJob,reason?:string)=>void;tray:string[];onToggleTray:(id:string)=>void;folderMode:boolean;folders:PickFolder[];onAssignFolder:(jobId:string,folderId:string)=>void;toolbar?:React.ReactNode;anchorId?:string}){return <section id={anchorId} className={`decision-zone ${tone}${isContext?" is-context":""}`}><div className="decision-group-head"><div><h2>{title}<span className="decision-zone-kicker">{tone==="accepted"?"TODAY'S COMMITMENTS":"NOT YET ACCEPTED"}</span></h2></div><span>{isContext?`当前查看 · ${jobs.length}`:`${jobs.length} 个`}</span></div>{toolbar}<div className="pick-grid">{jobs.map((job,index)=><OpportunityRow key={job.id} job={{...job,rank:index+1}} completed={completed} engagement={engagement[job.id]||"NEW"} open={open} onAction={onAction} onFeedback={onFeedback} inTray={tray.includes(job.id)} onToggleTray={onToggleTray} folderMode={folderMode} folders={folders} onAssignFolder={onAssignFolder}/>)}</div></section>}
 
-function toOpportunityRowModel(job:DecisionJob,action:DecisionAction):OpportunityRowModel{return {id:job.id,rank:job.rank,company:job.company,role:job.role,city:job.facts["城市"]||null,stage:job.facts["当前阶段"]||null,relation:job.facts["职位关系"]||null,source:job.facts["数据来源"]||"职位市场",summary:job.recommendation,score:job.finalScore,coverage:evidenceCoveragePercent(job.evidenceCoverage),exploration:job.explorationScore,action:action.label}}
+function toOpportunityRowModel(job:DecisionJob):OpportunityRowModel{return {id:job.id,rank:job.rank,company:job.company,role:job.role,city:job.facts["城市"]||null,stage:job.facts["当前阶段"]||null,relation:job.facts["职位关系"]||null,source:job.facts["数据来源"]||"职位市场",summary:job.recommendation,score:job.finalScore,coverage:evidenceCoveragePercent(job.evidenceCoverage),exploration:job.explorationScore}}
 
 function OpportunityRow({job,completed,engagement,open,onAction,onFeedback,inTray,onToggleTray,folderMode,folders,onAssignFolder}:{job:DecisionJob;completed:string[];engagement:EngagementState;open:(job:DecisionJob,tab?:"judgement"|"engagement"|"trail"|"replay")=>void;onAction:(job:DecisionJob,action:DecisionAction)=>void;onFeedback:(job:DecisionJob,reason?:string)=>void;inTray:boolean;onToggleTray:(id:string)=>void;folderMode:boolean;folders:PickFolder[];onAssignFolder:(jobId:string,folderId:string)=>void}){
  const action=job.actions.find(item=>!completed.includes(`${job.id}:${item.id}`))||job.actions[0]||{id:"view",label:"完整判断",kind:"verify" as const,detail:"查看当前职位的完整判断"};
  const actionComplete=completed.includes(`${job.id}:${action.id}`);
- const row=toOpportunityRowModel(job,action);
+ const row=toOpportunityRowModel(job);
  return <article className={`pick-card concept-job-card${inTray?" in-tray":""}`} onClick={()=>open(job)}>
   <button className="pick-add" onClick={e=>{e.stopPropagation();onToggleTray(job.id)}} aria-label={inTray?"移出精选盘":"收藏到精选盘"} title={inTray?"移出精选盘":"收藏到精选盘"}>{inTray?<Check/>:<Star/>}</button>
   <button className="pick-card-feedback" onClick={e=>{e.stopPropagation();onFeedback(job)}} aria-label="不感兴趣" title="不感兴趣">×</button>
   <div className="pick-card-leading"><div className="pick-card-brand" aria-hidden="true">{row.company.slice(0,1)}</div><div className="pick-card-leading-copy"><div className="pick-card-rank">No.{String(row.rank).padStart(2,"0")}</div><div className="pick-card-title"><b>{row.role}</b><span>{row.company}</span></div><p className="pick-card-meta">{[row.city,row.stage,row.relation].filter(Boolean).join(" · ")||row.source}</p><div className="pick-card-tags"><em>{decisionGroupMeta[job.group].title}</em>{row.stage&&<em>{row.stage}</em>}<em>{stateLabel[engagement]}</em></div><p className="pick-card-reco">{row.summary}</p></div></div>
-  <div className="pick-card-rail"><div className="pick-card-scores"><DecisionMetric label="AI 匹配分" value={row.score} emphasis="final"/><DecisionMetric label="证据覆盖" value={row.coverage===null?"—":`${row.coverage}%`}/><DecisionMetric label="探索价值" value={row.exploration}/><DecisionMetric label="建议动作" value={row.action}/></div>{folderMode&&<div className="pick-card-folder" onClick={e=>e.stopPropagation()}><FolderPlus/><select className="field" value="" onChange={e=>{if(e.target.value)onAssignFolder(job.id,e.target.value)}} aria-label={`将 ${job.company} 放入文件夹`}><option value="">放入文件夹…</option>{folders.map(f=><option key={f.id} value={f.id}>{f.name}</option>)}</select></div>}<div className="pick-card-foot"><small>{job.evidence[0]||"推荐快照"}</small><span className="pick-card-actions"><button className={`pick-card-action${actionComplete?" complete":""}`} onClick={e=>{e.stopPropagation();onAction(job,action)}} disabled={actionComplete}>{actionComplete?"已记录":action.label}<ChevronRight/></button></span></div></div>
+  <div className="pick-card-rail"><div className="pick-card-scores"><DecisionMetric label="AI 匹配分" value={row.score} emphasis="final"/><DecisionMetric label="证据覆盖" value={row.coverage===null?"—":`${row.coverage}%`}/><DecisionMetric label="探索价值" value={row.exploration}/></div>{folderMode&&<div className="pick-card-folder" onClick={e=>e.stopPropagation()}><FolderPlus/><select className="field" value="" onChange={e=>{if(e.target.value)onAssignFolder(job.id,e.target.value)}} aria-label={`将 ${job.company} 放入文件夹`}><option value="">放入文件夹…</option>{folders.map(f=><option key={f.id} value={f.id}>{f.name}</option>)}</select></div>}<div className="pick-card-foot"><span className="pick-card-actions"><button className={`pick-card-action${actionComplete?" complete":""}`} onClick={e=>{e.stopPropagation();onAction(job,action)}} disabled={actionComplete}>{actionComplete?"已记录":action.label}<ChevronRight/></button></span></div></div>
  </article>
 }
 

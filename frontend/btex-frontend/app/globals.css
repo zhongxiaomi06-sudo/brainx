@@ -1042,6 +1042,38 @@ body.btex-document{background:#fff;color:var(--reference-ink)}
 .concept-shell .assistant-ai-insights{padding-top:12px}.concept-shell .assistant-ai-insights li{font-size:11px;color:#65746f}
 .concept-shell .assistant-compose{background:#fff}.concept-shell .assistant-compose textarea{border-color:var(--reference-line);border-radius:9px}.concept-shell .assistant-compose .btn.primary{background:var(--reference-mint);border-color:var(--reference-mint);color:#073d32}
 
+/* Final desktop density: keep row controls outside the score grid and let the
+   brand breathe inside the fixed 164px rail. */
+.concept-shell .rail-brand-logo{width:108px}
+.concept-shell .concept-workspace-switcher{position:relative;z-index:40;flex:none}
+.concept-shell .concept-workspace-title{display:flex;align-items:center;gap:8px;padding:6px 0;border:0;background:transparent;color:var(--reference-ink);cursor:pointer}
+.concept-shell .concept-workspace-title[aria-expanded="true"] svg{transform:rotate(180deg)}
+.concept-shell .concept-workspace-menu{position:absolute;top:calc(100% + 10px);left:-12px;z-index:50;display:grid;min-width:236px;padding:7px;border:1px solid var(--reference-line);border-radius:11px;background:#fff;box-shadow:0 16px 36px rgba(22,39,34,.13)}
+.concept-shell .concept-workspace-menu button{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;align-items:center;padding:10px 11px;border:0;border-radius:8px;background:transparent;color:var(--reference-ink);font:inherit;text-align:left;cursor:pointer}
+.concept-shell .concept-workspace-menu button:hover,.concept-shell .concept-workspace-menu button.active{background:#eefaf6;color:#08715c}
+.concept-shell .concept-workspace-menu span{font-size:13px;font-weight:650}
+.concept-shell .concept-workspace-menu small{grid-column:1;font-size:11px;color:var(--reference-muted)}
+.concept-shell .concept-workspace-menu svg{grid-column:2;grid-row:1 / span 2;width:15px;height:15px}
+.concept-shell .concept-job-card{grid-template-columns:minmax(320px,1.05fr) minmax(330px,.95fr);min-height:158px}
+.concept-shell .pick-card-rail{position:relative;padding-top:42px}
+.concept-shell .pick-card-scores{grid-template-columns:repeat(3,minmax(0,1fr));padding:11px 0}
+.concept-shell .pick-card-foot{justify-content:flex-end;min-height:32px;padding-top:9px}
+.concept-shell .rail-alert-trigger,.concept-shell .rail-person,.concept-shell .rail-status{align-self:center;margin-left:auto;margin-right:auto}
+.concept-shell .rail-alert-trigger{margin-bottom:12px}
+
+@media (min-width:960px) and (max-width:1279px){
+  .concept-shell .topbar{overflow:visible}
+  .concept-shell .rail-brand-logo{width:108px}
+}
+@media (min-width:1280px){
+  .concept-shell .rail-brand-logo{width:108px}
+  .concept-shell .rail-person{margin:10px auto 0}
+  .concept-shell .rail-status{margin-left:auto}
+}
+@media (max-width:959px){
+  .concept-shell .pick-card-rail{padding:42px 0 0}
+}
+
 @media (min-width:1280px){
   .concept-shell,.concept-shell.nav-open{grid-template-columns:164px minmax(0,1fr)}
   .concept-shell.assistant-open{grid-template-columns:164px minmax(640px,1fr) 356px}
@@ -1081,4 +1113,19 @@ body.btex-document{background:#fff;color:var(--reference-ink)}
   .concept-shell .pick-tray{padding:15px}.concept-shell .pick-tray-plates{grid-template-columns:1fr;gap:10px}.concept-shell .concept-showcase-link{display:none}
   .concept-shell .decision-zone .decision-group-head{padding:16px 15px 10px}.concept-shell .concept-filter-bar{padding:8px 15px 16px;grid-template-columns:minmax(0,1fr) 88px}.concept-shell .concept-filter-select:nth-of-type(2){display:none}
   .concept-shell .pick-grid{padding:0 15px 16px}.concept-shell .concept-job-card{padding:15px 14px}.concept-shell .pick-card-scores{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:10px}.concept-shell .pick-card-scores>div:nth-child(3){padding-left:0;border-left:0}
+}
+
+/* Keep these at the very end: the reference-layout media queries above are
+   intentionally broad, so the final desktop density needs to win the cascade. */
+@media (min-width:960px){
+  .concept-shell .rail-brand-logo{width:108px}
+  .concept-shell .rail-alert-trigger{align-self:center;margin:0 auto 12px}
+  .concept-shell .rail-person{align-self:center;margin:10px auto 0}
+  .concept-shell .rail-status{align-self:center;margin:0 auto}
+}
+@media (min-width:960px) and (max-width:1279px){
+  .concept-shell .topbar{overflow:visible}
+}
+@media (max-width:959px){
+  .concept-shell .pick-card-rail{padding:42px 0 0}
 }

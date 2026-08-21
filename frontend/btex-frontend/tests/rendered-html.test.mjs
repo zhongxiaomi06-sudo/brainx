@@ -26,11 +26,14 @@ test("uses the reference three-column shell and a single-column opportunity work
   assert.match(workbench, /aria-label="精选盘"/);
   assert.match(css, /\.pick-tray/);
   assert.match(css, /grid-template-columns:164px minmax\(640px,1fr\) 356px/);
-  assert.match(css, /rail-brand-logo\{width:118px/);
+  assert.match(css, /rail-brand-logo\{width:108px/);
   assert.match(css, /touch-action:manipulation/);
   assert.match(css, /assistant-open \.assistant-trigger\{display:none\}/);
   assert.match(css, /\.btex-app\.panel-motion-open \.decision-drawer\{filter:none;transition:transform \.30s/);
   assert.match(css, /\.btex-app\.decision-panel-open/);
+  assert.match(workbench, /concept-workspace-menu/);
+  assert.match(workbench, /aria-haspopup="menu"/);
+  assert.match(css, /grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
 });
 
 test("splits candidates by their live engagement state and keeps verification jobs pending", async () => {
@@ -61,6 +64,8 @@ test("shows source context, row-level scores, detailed layers, reasons and risks
   assert.match(workbench, /sourceMode:"MARKET_ONLY"/);
   assert.match(workbench, /label="AI 匹配分" value=\{row\.score\}/);
   assert.match(workbench, /label="证据覆盖" value=\{row\.coverage===null\?"—":`\$\{row\.coverage\}%`\}/);
+  assert.doesNotMatch(workbench, /label="建议动作" value=\{row\.action\}/);
+  assert.doesNotMatch(workbench, /job\.evidence\[0\]\|\|"推荐快照"/);
   assert.match(workbench, /label="项目推进" value=\{job\.globalScore\}/);
   assert.match(workbench, /label="探索机会" value=\{job\.explorationScore\}/);
   assert.match(workbench, /label="个人适配" value=\{job\.personalScore\}/);

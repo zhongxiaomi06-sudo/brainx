@@ -232,6 +232,20 @@ test("turns the exhausted recommendation state into a playable dinosaur game", a
   assert.match(css, /@keyframes dino-jump/);
 });
 
+test("credits the dinosaur empty state to Otto", async () => {
+  const [workbench, css] = await Promise.all([
+    source("app/workbench.tsx"),
+    source("app/globals.css"),
+  ]);
+
+  assert.match(workbench, /className="dino-credit"/);
+  assert.match(workbench, /href="https:\/\/github\.com\/jiands233"/);
+  assert.match(workbench, /target="_blank"/);
+  assert.match(workbench, />Otto<\/a> 作品/);
+  assert.match(css, /\.recommendation-empty\{[^}]*position:relative/);
+  assert.match(css, /\.dino-credit\{position:absolute;right:24px;bottom:16px/);
+});
+
 test("keeps the collapsible resizable navigation and retains the commitments panel", async () => {
   const [workbench, css] = await Promise.all([
     source("app/workbench.tsx"),

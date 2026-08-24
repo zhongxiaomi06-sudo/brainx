@@ -570,6 +570,8 @@ html,body,.btex-app{background:var(--bg)}
  .rail-status{display:none}
  .mobile-nav-trigger{position:fixed!important;left:12px!important;top:12px!important;bottom:auto!important;z-index:53!important;width:auto!important;height:34px!important;display:inline-flex!important;align-items:center;gap:8px;background:#1c2b26!important;color:#fff!important;border-radius:10px!important;padding:0 10px!important;box-shadow:0 3px 10px rgba(0,0,0,.12)!important}
  .mobile-nav-trigger span{display:inline;font-size:13px}
+ .btex-app.mobile-nav-open .mobile-nav-trigger{left:calc(min(82vw,320px) - 50px)!important;top:calc(18px + env(safe-area-inset-top))!important;width:36px!important;height:36px!important;justify-content:center;padding:0!important;border:1px solid rgba(47,107,96,.14)!important;border-radius:10px!important;background:rgba(255,255,255,.92)!important;color:#315f57!important;box-shadow:0 4px 14px rgba(23,43,36,.10)!important}
+ .btex-app.mobile-nav-open .mobile-nav-trigger span{display:none}
  .btex-app .content{padding:28px 18px 70px}
  .pick-grid{grid-template-columns:1fr}
  .pick-tray-head .btn{margin-left:0}

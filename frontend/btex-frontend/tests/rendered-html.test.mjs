@@ -251,6 +251,17 @@ test("keeps the collapsible resizable navigation and retains the commitments pan
   assert.match(css, /\.mobile-commitment-trigger\{display:none\}/);
 });
 
+test("keeps the mobile drawer close control clear of the brand", async () => {
+  const [workbench, css] = await Promise.all([
+    source("app/workbench.tsx"),
+    source("app/globals.css"),
+  ]);
+
+  assert.match(workbench, /mobileNavOpen\?<X aria-hidden="true"\/>/);
+  assert.match(css, /\.btex-app\.mobile-nav-open \.mobile-nav-trigger\{left:calc\(min\(82vw,320px\) - 50px\)!important/);
+  assert.match(css, /\.btex-app\.mobile-nav-open \.mobile-nav-trigger span\{display:none\}/);
+});
+
 test("manual tuning adjusts soft layers without bypassing hard rules", async () => {
   const workbench = await source("app/workbench.tsx");
 

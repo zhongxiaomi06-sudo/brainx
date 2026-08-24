@@ -347,7 +347,7 @@ export default function DecisionWorkbench(){
    <button className="rail-person identity-trigger" onClick={()=>openPanel({kind:"identity"})} aria-label={`身份：${auth.consultant}`}><CircleUserRound/><span className="rail-person-dot"/></button>
    <span className="rail-status" title={brainxMode==="connected"?"BrainX 已连接":brainxMode==="connecting"?"连接 BrainX…":"演示模式"}><i className="pulse"/></span>
   </aside>
-  <button className="mobile-nav-trigger" onClick={toggleMobileDrawer} aria-label={mobileNavOpen?"收起全部模块":"打开全部模块"} aria-expanded={mobileNavOpen}><Infinity aria-hidden="true"/><span>{mobileNavOpen?"收起模块":"全部模块"}</span></button>
+  <button className="mobile-nav-trigger" onClick={toggleMobileDrawer} aria-label={mobileNavOpen?"收起全部模块":"打开全部模块"} aria-expanded={mobileNavOpen}>{mobileNavOpen?<X aria-hidden="true"/>:<Infinity aria-hidden="true"/>}<span>{mobileNavOpen?"收起模块":"全部模块"}</span></button>
   {mobileNavOpen&&<button className="mobile-nav-backdrop" onClick={()=>closeMobileDrawer()} aria-label="关闭全部模块"/>}
   <main className="main">
    <header className="topbar">

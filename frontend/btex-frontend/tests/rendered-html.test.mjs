@@ -141,6 +141,20 @@ test("preserves engagement, result recording, replay, sync and notifications", a
   assert.match(demo, /export type EngagementState = "NEW"\|"RECOMMENDED"\|"VIEWED"\|"WATCHED"\|"ACCEPTED"/);
 });
 
+test("uses one compact visual system for commitment actions and terminal results", async () => {
+  const [loop, css] = await Promise.all([
+    source("app/engagement-loop.tsx"),
+    source("app/globals.css"),
+  ]);
+
+  assert.match(loop, /className="commitment-terminal-options"/);
+  assert.match(loop, /aria-pressed=\{terminalStage==="入职"\}/);
+  assert.match(loop, /aria-pressed=\{terminalStage==="关闭"\}/);
+  assert.match(css, /--commitment-title:16px/);
+  assert.match(css, /--commitment-control-height:38px/);
+  assert.match(css, /\.commitment-terminal-options button\.selected/);
+});
+
 test("keeps the navigation permanently compact and retains the commitments panel", async () => {
   const [workbench, css] = await Promise.all([
     source("app/workbench.tsx"),

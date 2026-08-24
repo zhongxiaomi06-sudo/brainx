@@ -15,7 +15,7 @@
 
 | 任务类型 | 必读文档 |
 |---|---|
-| 任何代码、测试或配置改动 | [上传前完整验证](standards/PRE_PUSH_VERIFICATION.md) |
+| 任何代码、测试或配置改动 | [上传前完整验证](standards/PRE_PUSH_VERIFICATION.md)、[质量门禁操作手册](standards/QUALITY_GATE_OPERATIONS.md) |
 | Commit、协作记录 | [Agent Commit 记录](AGENT_COMMIT_LOG.md) |
 | 密钥、登录、权限、数据隔离 | [安全操作手册](SECURITY.md) |
 | 构建、发布、服务器、容器 | [部署编排](DEPLOYMENT.md)、[安全操作手册](SECURITY.md) |
@@ -33,6 +33,7 @@
 ### 工作规范
 
 - [上传前完整验证](standards/PRE_PUSH_VERIFICATION.md)：所有 Agent 的统一验收清单。
+- [质量门禁操作手册](standards/QUALITY_GATE_OPERATIONS.md)：统一命令、机器配置、存量基线、报告和 CI 维护方法。
 - [Agent Commit 记录](AGENT_COMMIT_LOG.md)：每次提交的中文摘要与验证结果。
 
 ### 安全与运维

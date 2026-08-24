@@ -2,6 +2,11 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-08-24｜build(quality): 建立可执行上传前质量门禁
+
+- 改动：新增统一 quick/full/ci 门禁、硬超时与结构化中文报告；落实密钥、禁止文件、500 行、超长行、Lint 豁免、个人路径、锁文件、漏洞、静态检查、完整测试、构建和烟雾测试；统一 CI，并登记有负责人和到期日的存量基线。
+- 验证：门禁单元测试 11/11、quick 13/13；隔离分支 commit 上完整门禁 18/18，包含生产依赖 0 漏洞、197/197 测试、TypeScript、ESLint、生产构建和服务烟雾测试全部通过。
+
 ## 2026-08-24｜fix(push): lark-cli 加超时 + PREVIEW 可被真实发送覆盖
 
 - 改动：`pushCard` 的 `execFileSync('lark-cli')` 加 30s 超时 + SIGKILL（防挂死阻塞整进程）；PREVIEW 记录在本次 `send=true` 时允许覆盖发送（原会幂等跳过导致预览后永远发不出），PREVIEW→PREVIEW 仍幂等。

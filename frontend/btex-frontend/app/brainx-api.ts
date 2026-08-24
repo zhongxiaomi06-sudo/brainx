@@ -277,7 +277,7 @@ export function actionsOf(action: string, relation: string): BrainxDecisionActio
 }
 
 export function factsOf(
-  job: { relation?: string; active_state?: string; current_stage?: string | null; hc?: number | null; captured_at?: string; pipeline?: string | null; pipeline_snapshot?: string | null; city?: string; priority?: string | null; company_type?: string | null; next_action?: string | null; notes?: string | null },
+  job: { relation?: string | null; active_state?: string | null; current_stage?: string | null; hc?: number | null; captured_at?: string | null; pipeline?: string | null; pipeline_snapshot?: string | null; city?: string | null; priority?: string | null; company_type?: string | null; next_action?: string | null; notes?: string | null },
 ): Record<string, string> {
   const facts: Record<string, string> = {
     "职位关系": RELATION_LABELS[job.relation || ""] || job.relation || "UNKNOWN",
@@ -298,7 +298,7 @@ export function factsOf(
 }
 
 function factFieldsOf(job: {
-  active_state?: string; current_stage?: string | null; pipeline?: string | null;
+  active_state?: string | null; current_stage?: string | null; pipeline?: string | null;
   pipeline_snapshot?: string | null; hc?: number | null; next_action?: string | null;
   notes?: string | null; fact_sources?: Partial<Record<ManualFactField, string>>;
   fact_updated_at?: Partial<Record<ManualFactField, string | null>>;
@@ -627,14 +627,14 @@ export async function brainxFetch<T = unknown>(
     headers: options.body !== undefined ? { "Content-Type": "application/json" } : undefined,
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
   });
-  if (res.status === 204) return null;
+  if (res.status === 204) return null as T;
   let data: T | BrainxErrorPayload | null = null;
   try { data = await res.json(); } catch { /* 非 JSON 响应体 */ }
   if (!res.ok) {
     // 两种错误信封：err() 的 {error:{code,message}} 与领域函数的 {error:"字符串"}（如 engage 409）
     const raw = (data as BrainxErrorPayload | null)?.error;
     const message = raw && typeof raw === "object"
-      ? raw.message
+      ? raw.message || `HTTP ${res.status}`
       : typeof raw === "string" ? raw : `HTTP ${res.status}`;
     const code = raw && typeof raw === "object" ? raw.code : undefined;
     throw new BrainxApiError(message, res.status, code, data as BrainxErrorPayload);
@@ -673,7 +673,7 @@ export async function streamAssistant(
   });
   if (!res.ok) {
     let message = `HTTP ${res.status}`;
-    try { const data = await res.json(); message = data?.error?.message || data?.error || message; } catch { /* text fallback */ }
+    try { const data = await res.json() as { error?: { message?: string } | string }; message = typeof data.error === "string" ? data.error : data.error?.message || message; } catch { /* text fallback */ }
     throw new BrainxApiError(String(message), res.status);
   }
   if (!res.body) throw new BrainxApiError("助手没有返回内容", 502);

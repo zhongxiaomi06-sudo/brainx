@@ -33,8 +33,8 @@ add_git_bins() {
       "/c/Program Files/Git/bin/bash.exe"
       "/c/Program Files/Git/usr/bin/bash.exe"
       "/c/Program Files (x86)/Git/bin/bash.exe"
-      "/c/Users/33582/AppData/Local/Programs/Git/bin/bash.exe"
-      "/c/Users/33582/scoop/apps/git/current/bin/bash.exe"
+      "$HOME/AppData/Local/Programs/Git/bin/bash.exe"
+      "$HOME/scoop/apps/git/current/bin/bash.exe"
       "/c/tools/Git/bin/bash.exe"
     )
     for d in "${candidates[@]}"; do
@@ -85,17 +85,17 @@ ensure_on_path() {
 NODE_DIRS=(
   "/c/Program Files/nodejs"
   "/c/Program Files (x86)/nodejs"
-  "/c/Users/33582/scoop/apps/nodejs/current"
-  "/c/Users/33582/AppData/Roaming/npm"
-  "/c/Users/33582/.workbuddy/binaries/node/versions/22.22.2"
+  "$HOME/scoop/apps/nodejs/current"
+  "$HOME/AppData/Roaming/npm"
+  "$HOME/.workbuddy/binaries/node/versions/22.22.2"
   "/d/AI中医药开发"
 )
 NPM_DIRS=(
   "/c/Program Files/nodejs"
   "/c/Program Files (x86)/nodejs"
-  "/c/Users/33582/scoop/apps/nodejs/current"
-  "/c/Users/33582/AppData/Roaming/npm"
-  "/c/Users/33582/.workbuddy/binaries/node/versions/22.22.2"
+  "$HOME/scoop/apps/nodejs/current"
+  "$HOME/AppData/Roaming/npm"
+  "$HOME/.workbuddy/binaries/node/versions/22.22.2"
   "/d/AI中医药开发"
 )
 

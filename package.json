@@ -28,7 +28,11 @@
     "init-talent": "node scripts/init-talent-schema.mjs",
     "talent:e2e": "node scripts/e2e-talent-flow.mjs",
     "talent:health": "node scripts/talent-health.mjs",
-    "test": "node --test --test-force-exit"
+    "test": "node --test --test-force-exit",
+    "test:quality-gate": "node --test tests/quality-gate.test.mjs",
+    "verify:quick": "node scripts/quality-gate.mjs --profile quick",
+    "verify": "node scripts/quality-gate.mjs --profile full",
+    "verify:ci": "node scripts/quality-gate.mjs --profile ci"
   },
   "bin": {
     "braintex-local-sync": "bin/brainx-sync.mjs",

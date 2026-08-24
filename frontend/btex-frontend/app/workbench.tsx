@@ -753,7 +753,7 @@ function TalentBackendCard(){
  const [state,setState]=useState<"loading"|"live"|"offline">("loading");
  useEffect(()=>{let alive=true;const ctrl=new AbortController();const t=setTimeout(()=>ctrl.abort(),2500);
   fetch("/api/v1/talent/health",{signal:ctrl.signal,credentials:"include"})
-   .then(r=>r.ok?r.json():Promise.reject())
+   .then(async r=>{if(!r.ok)throw new Error("talent health unavailable");return await r.json() as Health})
    .then((h:Health)=>{if(alive){setHealth(h);setState("live")}})
    .catch(()=>{if(alive)setState("offline")})
    .finally(()=>clearTimeout(t));

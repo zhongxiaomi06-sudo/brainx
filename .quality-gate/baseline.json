@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 1,
+  "updatedOn": "2026-08-24",
+  "secretAllowlist": [],
+  "portablePathExemptions": [],
+  "textHygieneFiles": [
+    {
+      "path": "frontend/btex-frontend/app/globals.css",
+      "allowMixedEol": true,
+      "maxTrailingWhitespace": 0,
+      "owner": "frontend",
+      "reason": "存量全局样式混用换行；只能清理，不能增加行尾空白",
+      "expiresOn": "2026-10-31"
+    }
+  ],
+  "longLineFiles": [
+    {
+      "path": "frontend/btex-frontend/app/decision-demo.ts",
+      "maxLongLines": 6,
+      "maxLength": 916,
+      "owner": "frontend",
+      "reason": "存量演示数据使用超长字面量；只能减少，不能恶化",
+      "expiresOn": "2026-10-31"
+    },
+    {
+      "path": "frontend/btex-frontend/app/globals.css",
+      "maxLongLines": 59,
+      "maxLength": 4893,
+      "owner": "frontend",
+      "reason": "存量压缩样式待按组件格式化；只能减少，不能恶化",
+      "expiresOn": "2026-10-31"
+    },
+    {
+      "path": "frontend/btex-frontend/app/showcase/editorial/editorial.css",
+      "maxLongLines": 7,
+      "maxLength": 2506,
+      "owner": "frontend",
+      "reason": "存量展示样式待格式化；只能减少，不能恶化",
+      "expiresOn": "2026-10-31"
+    },
+    {
+      "path": "frontend/btex-frontend/app/showcase/editorial/page.tsx",
+      "maxLongLines": 4,
+      "maxLength": 1029,
+      "owner": "frontend",
+      "reason": "存量展示组件待格式化；只能减少，不能恶化",
+      "expiresOn": "2026-10-31"
+    },
+    {
+      "path": "frontend/btex-frontend/app/showcase/page.tsx",
+      "maxLongLines": 4,
+      "maxLength": 962,
+      "owner": "frontend",
+      "reason": "存量展示组件待格式化；只能减少，不能恶化",
+      "expiresOn": "2026-10-31"
+    },
+    {
+      "path": "frontend/btex-frontend/app/showcase/showcase.css",
+      "maxLongLines": 6,
+      "maxLength": 2881,
+      "owner": "frontend",
+      "reason": "存量展示样式待格式化；只能减少，不能恶化",
+      "expiresOn": "2026-10-31"
+    },
+    {
+      "path": "frontend/btex-frontend/app/workbench.tsx",
+      "maxLongLines": 66,
+      "maxLength": 4517,
+      "owner": "frontend",
+      "reason": "存量工作台组件待拆分和格式化；只能减少，不能恶化",
+      "expiresOn": "2026-09-30"
+    }
+  ],
+  "oversizedFiles": [
+    {
+      "path": "frontend/btex-frontend/app/cockpit-radar-data.ts",
+      "maxLines": 851,
+      "owner": "frontend",
+      "reason": "存量雷达静态数据与转换逻辑尚未拆分；只能减少，不能增长",
+      "expiresOn": "2026-10-31"
+    },
+    {
+      "path": "frontend/btex-frontend/app/brainx-api.ts",
+      "maxLines": 821,
+      "owner": "frontend",
+      "reason": "存量 API 适配层尚未按领域拆分；只能减少，不能增长",
+      "expiresOn": "2026-10-31"
+    },
+    {
+      "path": "src/server.js",
+      "maxLines": 789,
+      "owner": "backend",
+      "reason": "存量路由与启动编排尚未拆分；只能减少，不能增长",
+      "expiresOn": "2026-10-31"
+    },
+    {
+      "path": "frontend/btex-frontend/app/workbench.tsx",
+      "maxLines": 779,
+      "owner": "frontend",
+      "reason": "存量工作台组件尚未按职责拆分；只能减少，不能增长",
+      "expiresOn": "2026-09-30"
+    },
+    {
+      "path": "frontend/btex-frontend/app/globals.css",
+      "maxLines": 738,
+      "owner": "frontend",
+      "reason": "存量全局样式尚未按组件拆分；只能减少，不能增长",
+      "expiresOn": "2026-10-31"
+    }
+  ],
+  "lintFileExemptions": [
+    {
+      "path": "app/workbench.tsx",
+      "owner": "frontend",
+      "reason": "历史工作台文件存在遗留 Lint 债务；禁止新增豁免，并要求拆分清理",
+      "expiresOn": "2026-09-30"
+    }
+  ]
+}

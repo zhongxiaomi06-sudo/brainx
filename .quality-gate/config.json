@@ -1,0 +1,224 @@
+{
+  "schemaVersion": 1,
+  "minimumNodeVersion": "22.13.0",
+  "maxFileLines": 500,
+  "maxLineLength": 500,
+  "reportDirectory": ".quality-gate/reports",
+  "syntaxCheckTimeoutMs": 10000,
+  "secretScanMaxBytes": 2000000,
+  "textHygieneMaxBytes": 2000000,
+  "lineExtensions": [
+    ".js",
+    ".jsx",
+    ".mjs",
+    ".cjs",
+    ".ts",
+    ".tsx",
+    ".css",
+    ".html",
+    ".py",
+    ".sh",
+    ".bat",
+    ".sql",
+    ".json",
+    ".yaml",
+    ".yml",
+    ".toml"
+  ],
+  "excludedPrefixes": [
+    "_archive/",
+    ".prd_pages/",
+    ".quality-gate/reports/",
+    "fixtures/",
+    "frontend/btex-frontend/dist/",
+    "frontend/btex-frontend/.next/",
+    "frontend/btex-frontend/.wrangler/",
+    "frontend/btex-frontend/reference/"
+  ],
+  "excludedFiles": [],
+  "excludedBasenames": [
+    "package-lock.json",
+    "tsconfig.tsbuildinfo"
+  ],
+  "secretExcludedPrefixes": [
+    ".prd_pages/",
+    ".quality-gate/reports/"
+  ],
+  "textHygieneExcludedPrefixes": [
+    "_archive/",
+    "docs/archive/",
+    ".prd_pages/",
+    ".quality-gate/reports/"
+  ],
+  "forbiddenTrackedPatterns": [
+    "(^|/)\\.env($|\\.)",
+    "(^|/)(?:data|logs|node_modules)/",
+    "\\.(?:db|sqlite|sqlite3|pem|p12|pfx|key)$",
+    "(^|/)scripts/session/\\.state\\.enc$"
+  ],
+  "allowedTrackedPatterns": [
+    "(^|/)\\.env\\.example$"
+  ],
+  "portablePathPatterns": [
+    {
+      "id": "mac-user-home",
+      "label": "macOS 用户目录",
+      "pattern": "(?:^|[\\s\"'])/Users/[^/\\s\"']+"
+    },
+    {
+      "id": "windows-user-home",
+      "label": "Windows 用户目录",
+      "pattern": "(?:[A-Za-z]:\\\\|/[A-Za-z]/)Users[/\\\\][^/\\\\\\s\"']+"
+    }
+  ],
+  "manifests": [
+    {
+      "manifest": "package.json",
+      "lockfile": "package-lock.json"
+    },
+    {
+      "manifest": "frontend/btex-frontend/package.json",
+      "lockfile": "frontend/btex-frontend/package-lock.json"
+    }
+  ],
+  "lintIgnoreAudits": [
+    {
+      "file": "frontend/btex-frontend/eslint.config.mjs",
+      "standardIgnores": [
+        ".next/**",
+        "out/**",
+        "build/**",
+        "next-env.d.ts"
+      ]
+    }
+  ],
+  "profiles": {
+    "quick": {
+      "requireCleanWorktree": false,
+      "commands": [
+        {
+          "stage": "静态质量",
+          "name": "前端 ESLint",
+          "command": "npm",
+          "args": ["--prefix", "frontend/btex-frontend", "run", "lint"],
+          "timeoutMs": 180000
+        },
+        {
+          "stage": "静态质量",
+          "name": "前端 TypeScript",
+          "command": "npm",
+          "args": ["--prefix", "frontend/btex-frontend", "exec", "--", "tsc", "--noEmit", "--pretty", "false", "--project", "frontend/btex-frontend/tsconfig.json"],
+          "timeoutMs": 180000
+        }
+      ]
+    },
+    "full": {
+      "requireCleanWorktree": true,
+      "commands": [
+        {
+          "stage": "依赖",
+          "name": "后端生产依赖漏洞",
+          "command": "npm",
+          "args": ["audit", "--omit=dev", "--audit-level=high"],
+          "timeoutMs": 120000
+        },
+        {
+          "stage": "依赖",
+          "name": "前端生产依赖漏洞",
+          "command": "npm",
+          "args": ["--prefix", "frontend/btex-frontend", "audit", "--omit=dev", "--audit-level=high"],
+          "timeoutMs": 120000
+        },
+        {
+          "stage": "静态质量",
+          "name": "前端 ESLint",
+          "command": "npm",
+          "args": ["--prefix", "frontend/btex-frontend", "run", "lint"],
+          "timeoutMs": 180000
+        },
+        {
+          "stage": "静态质量",
+          "name": "前端 TypeScript",
+          "command": "npm",
+          "args": ["--prefix", "frontend/btex-frontend", "exec", "--", "tsc", "--noEmit", "--pretty", "false", "--project", "frontend/btex-frontend/tsconfig.json"],
+          "timeoutMs": 180000
+        },
+        {
+          "stage": "功能",
+          "name": "完整自动化测试",
+          "command": "npm",
+          "args": ["test"],
+          "timeoutMs": 300000
+        },
+        {
+          "stage": "交付",
+          "name": "前端生产构建",
+          "command": "npm",
+          "args": ["run", "build"],
+          "timeoutMs": 300000
+        },
+        {
+          "stage": "交付",
+          "name": "服务烟雾测试",
+          "command": "node",
+          "args": ["scripts/quality-gate/smoke.mjs"],
+          "timeoutMs": 30000
+        }
+      ]
+    },
+    "ci": {
+      "requireCleanWorktree": true,
+      "commands": [
+        {
+          "stage": "依赖",
+          "name": "后端生产依赖漏洞",
+          "command": "npm",
+          "args": ["audit", "--omit=dev", "--audit-level=high"],
+          "timeoutMs": 120000
+        },
+        {
+          "stage": "依赖",
+          "name": "前端生产依赖漏洞",
+          "command": "npm",
+          "args": ["--prefix", "frontend/btex-frontend", "audit", "--omit=dev", "--audit-level=high"],
+          "timeoutMs": 120000
+        },
+        {
+          "stage": "静态质量",
+          "name": "前端 ESLint",
+          "command": "npm",
+          "args": ["--prefix", "frontend/btex-frontend", "run", "lint"],
+          "timeoutMs": 180000
+        },
+        {
+          "stage": "静态质量",
+          "name": "前端 TypeScript",
+          "command": "npm",
+          "args": ["--prefix", "frontend/btex-frontend", "exec", "--", "tsc", "--noEmit", "--pretty", "false", "--project", "frontend/btex-frontend/tsconfig.json"],
+          "timeoutMs": 180000
+        },
+        {
+          "stage": "功能",
+          "name": "完整自动化测试",
+          "command": "npm",
+          "args": ["test"],
+          "timeoutMs": 300000
+        },
+        {
+          "stage": "交付",
+          "name": "前端生产构建",
+          "command": "npm",
+          "args": ["run", "build"],
+          "timeoutMs": 300000
+        },
+        {
+          "stage": "交付",
+          "name": "服务烟雾测试",
+          "command": "node",
+          "args": ["scripts/quality-gate/smoke.mjs"],
+          "timeoutMs": 30000
+        }
+      ]
+    }
+  }
+}

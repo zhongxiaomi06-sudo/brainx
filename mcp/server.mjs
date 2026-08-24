@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /** brainx-mcp — MCP stdio 服务器（零依赖手写 NDJSON + JSON-RPC 2.0）。
  * Codex CLI / Claude Code / OpenCode 三端注册同一命令：
- *   node /Users/ashley/Downloads/brainx/mcp/server.mjs
+ *   node mcp/server.mjs
  *
  * 直连 src/*.js（不绕 HTTP，web 服务不用在线）。actor=consultant_id 参数归属，
  * 与 braintex-mcp 同一信任模型：本机 agent 代表某顾问行动，事件账本记 actor。

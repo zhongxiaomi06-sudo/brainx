@@ -177,13 +177,18 @@ test("keeps inline card feedback action-only", async () => {
   assert.match(css, /\.pick-card-feedback-reasons button\.selected/);
 });
 
-test("keeps the navigation permanently compact and retains the commitments panel", async () => {
+test("keeps the collapsible resizable navigation and retains the commitments panel", async () => {
   const [workbench, css] = await Promise.all([
     source("app/workbench.tsx"),
     source("app/globals.css"),
   ]);
 
-  assert.doesNotMatch(workbench, /navOpen|sidebarWidth|sidebarResize/);
+  // PR#5 评审恢复：可拖拽侧边栏（navOpen/sidebarWidth/sidebarResize）与键盘可达手柄
+  assert.match(workbench, /const \[navOpen,setNavOpen\]/);
+  assert.match(workbench, /const \[sidebarWidth,setSidebarWidth\]/);
+  assert.match(workbench, /sidebarResize/);
+  assert.match(workbench, /className="rail-resizer"/);
+  assert.match(workbench, /role="separator"/);
   assert.match(workbench, /\{kind:"commitments"\}/);
   assert.match(workbench, /function CommitmentsPanel/);
   assert.doesNotMatch(workbench, /mobile-commitment-trigger/);

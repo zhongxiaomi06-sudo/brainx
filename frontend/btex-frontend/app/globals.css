@@ -1163,9 +1163,24 @@ body.btex-document{background:#fff;color:var(--reference-ink)}
 .commitment-timeline{padding-top:2px}.commitment-timeline h2{margin-bottom:2px}.commitment-timeline>.muted{margin:8px 0 0;font-size:12px}.commitment-timeline article{display:grid;grid-template-columns:9px minmax(0,1fr) auto;gap:9px;padding:12px 0;border-bottom:1px solid rgba(32,79,68,.09)}.commitment-timeline article i{width:6px;height:6px;margin-top:6px;border-radius:50%;background:#4eb69b;box-shadow:0 0 0 3px rgba(78,182,155,.10)}.commitment-timeline article b{font-size:12.5px}.commitment-timeline article p{margin:3px 0 0;color:#687b76;font-size:11.5px;line-height:1.45}.commitment-timeline article time{color:#84938f;font-size:var(--commitment-meta);white-space:nowrap}
 @media(max-width:700px){.commitment-loop{padding:14px 18px 28px;gap:12px}.commitment-membership,.commitment-onboarding,.commitment-completed,.current-action-card,.commitment-editor{padding:16px}.commitment-primary-actions{display:grid;grid-template-columns:1fr 1fr}.commitment-primary-actions .quiet{margin:0}.commitment-editor-actions{display:grid}.commitment-editor-actions button{width:100%}.commitment-membership-options{grid-template-columns:1fr}.commitment-membership-actions{display:grid;grid-template-columns:1fr 1fr}.commitment-timeline article{grid-template-columns:8px minmax(0,1fr)}.commitment-timeline article time{grid-column:2}}
 
-/* 卡片内反馈保持为纯操作条，不显示重复状态说明。 */
+/* 不感兴趣反馈固定在当前卡片：快捷原因、自由输入和撤销在同一区域完成。 */
+.pick-card-hide-feedback{position:absolute;left:14px;right:14px;bottom:14px;z-index:6;display:grid;gap:8px;padding:11px;border:1px solid rgba(255,255,255,.92);border-radius:14px;background:rgba(247,255,252,.96);box-shadow:inset 0 2px 6px rgba(23,80,67,.08),0 10px 22px rgba(23,43,36,.12);backdrop-filter:blur(16px) saturate(175%);-webkit-backdrop-filter:blur(16px) saturate(175%)}
 .pick-card-hide-feedback>span{display:none}
-.pick-card-hide-feedback>svg{margin-right:auto}
+.pick-card-feedback-reasons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.pick-card-feedback-reasons button{min-width:0;min-height:32px;padding:6px 8px;border:1px solid rgba(47,107,96,.16);border-radius:9px;background:rgba(255,255,255,.74);color:#315f57;font-size:12px;font-weight:600;text-align:center}
+.pick-card-feedback-reasons button:hover{border-color:rgba(47,211,167,.55);background:#edf9f5}
+.pick-card-feedback-reasons button.selected{border-color:#2fd3a7;background:#dff7ef;color:#174f43;box-shadow:0 0 0 2px rgba(47,211,167,.12)}
+.pick-card-feedback-custom{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px}
+.pick-card-feedback-custom input{min-width:0;height:36px;padding:0 11px;border:1px solid rgba(47,107,96,.18);border-radius:9px;background:#fff;font-size:12px}
+.pick-card-feedback-custom input::placeholder{color:#94a39f}
+.pick-card-feedback-custom button,.pick-card-feedback-actions button{border:0;border-radius:9px;color:#176050;font-size:12px;font-weight:700}
+.pick-card-feedback-custom button{min-width:54px;padding:0 12px;background:#dff7ef}
+.pick-card-feedback-custom button:disabled{cursor:default;opacity:.42}
+.pick-card-feedback-actions{display:flex;align-items:center;min-height:26px;gap:8px}
+.pick-card-feedback-actions>svg{width:18px;height:18px;margin-right:auto;color:#16705e}
+.pick-card-feedback-actions button{padding:4px 7px;background:transparent}
+.pick-card-feedback-actions button:hover{background:rgba(47,211,167,.13)}
 .pick-card.feedback-active{transform:none;background:#f3f7f5}
 .pick-card.feedback-active>:not(.pick-card-hide-feedback){filter:blur(3px);opacity:.28;pointer-events:none;user-select:none;transition:filter .2s ease,opacity .2s ease}
 .pick-card.feedback-active .pick-card-hide-feedback{filter:none;opacity:1}
+@media(max-width:640px){.pick-card-hide-feedback{left:10px;right:10px;bottom:10px}.pick-card-feedback-reasons button{font-size:11px;padding-inline:5px}}

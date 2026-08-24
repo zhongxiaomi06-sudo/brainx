@@ -165,6 +165,9 @@ test("keeps inline card feedback action-only", async () => {
   assert.doesNotMatch(workbench, /说说「|补充原因/);
   assert.match(workbench, /quickFeedbackReasons/);
   assert.match(workbench, /pick-card-feedback-custom/);
+  assert.match(workbench, /const reason=customFeedbackReason\.trim\(\)\|\|selectedFeedbackReason/);
+  assert.match(workbench, /feedbackSubmitted\?"已提交":"提交"/);
+  assert.match(workbench, /if\(!reason\)\{setInlineFeedbackJobId\(job\.id\);return\}/);
   assert.match(css, /\.pick-card-hide-feedback>span\{display:none\}/);
   assert.match(css, /\.pick-card\.feedback-active>:not\(\.pick-card-hide-feedback\)\{filter:blur\(3px\);opacity:\.28;pointer-events:none/);
   assert.match(css, /\.pick-card-feedback-reasons\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);

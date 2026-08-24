@@ -7,6 +7,7 @@ import { stateLabel, type CommitmentAction, type CommitmentSnapshot, type Engage
 type JobRef = { id:string; company:string; role:string; facts:Record<string,string>; brainxDecisionId?:string };
 type Mode = "connecting"|"connected"|"offline";
 type Editor = "accept"|"progress"|"blocked"|"terminal"|"release"|null;
+type MembershipRelation = "MY_JOB"|"TEAM_SHARED";
 
 const releaseReasons=["资源不足","优先级调整","转交其他顾问","客户/职位变化","当前无法投入","其他"];
 const closeReasons=["职位关闭","HC 已满","客户暂停","需求取消","其他"];
@@ -21,7 +22,7 @@ function fallbackAction(job:JobRef):CommitmentAction{return {actionId:`local-${j
 function emptySnapshot(job:JobRef,state:EngagementState):CommitmentSnapshot{return {goal:state==="ACCEPTED"?"推进本轮交付":null,activeAction:state==="ACCEPTED"?fallbackAction(job):null,actionHistory:[],suggestedAction:null,terminalResultMissing:false}}
 function localSuggestion(job:JobRef,kind:"STAGE"|"BLOCKED",stage:string){const real=job.facts["下一步动作"];if(real)return {title:real,dueAt:toIso(localDateTime(1)),source:"MANUAL" as const,rule:"CURRENT_FACT_NEXT_ACTION"};if(kind==="BLOCKED")return {title:"解除阻塞并更新处理结果",dueAt:toIso(localDateTime(1)),source:"RULE" as const,rule:"BLOCKED_NEXT_DAY"};const map:Record<string,[string,number,string]>={"推荐采纳":["跟进客户反馈并确认面试转化",2,"RECOMMENDED_FOLLOW_UP"],"面试":["确认面试反馈和下一轮安排",2,"INTERVIEW_FOLLOW_UP"],"Offer":["确认 Offer 接受结果和入职计划",1,"OFFER_FOLLOW_UP"]};const [title,days,rule]=map[stage]||["确认下一步负责人、目标和反馈时间",1,"DEFAULT_NEXT_ACTION"];return {title,dueAt:toIso(localDateTime(days)),source:"RULE" as const,rule}}
 
-export function CommitmentLoopPanel({job,state,outcomes,mode,legal,onCommand,onUpdated,notify}:{job:JobRef;state:EngagementState;outcomes:Outcome[];mode:Mode;legal:EngagementCommand[];onCommand:(command:EngagementCommand)=>void;onUpdated:()=>Promise<void>;notify:(text:string)=>void}){
+export function CommitmentLoopPanel({job,state,outcomes,mode,legal,onCommand,onMembership,onUpdated,notify}:{job:JobRef;state:EngagementState;outcomes:Outcome[];mode:Mode;legal:EngagementCommand[];onCommand:(command:EngagementCommand)=>void;onMembership:(relation:MembershipRelation)=>Promise<void>;onUpdated:()=>Promise<void>;notify:(text:string)=>void}){
  const storageKey=`brainx-commitment:${job.id}`;
  const [displayState,setDisplayState]=useState(state);
  const [snapshot,setSnapshot]=useState<CommitmentSnapshot>(()=>emptySnapshot(job,state));
@@ -41,6 +42,8 @@ export function CommitmentLoopPanel({job,state,outcomes,mode,legal,onCommand,onU
  const [terminalStage,setTerminalStage]=useState<"入职"|"关闭">("入职");
  const [closeReason,setCloseReason]=useState(closeReasons[0]);
  const [releaseReason,setReleaseReason]=useState(releaseReasons[0]);
+ const [membershipOpen,setMembershipOpen]=useState(false);
+ const [membershipRelation,setMembershipRelation]=useState<MembershipRelation>("MY_JOB");
 
  const load=async()=>{if(mode==="connected"){const detail=await fetchJobDetail(job.id);setDisplayState(detail.engagementState);setSnapshot(detail.commitment);return}if(mode==="offline"&&typeof window!=="undefined"){try{const saved=JSON.parse(localStorage.getItem(storageKey)||"null");if(saved?.snapshot){setSnapshot(saved.snapshot);setDisplayState(saved.state||state);return}}catch{}setSnapshot(emptySnapshot(job,state));setDisplayState(state)}};
  useEffect(()=>{void load().catch(()=>setSnapshot(emptySnapshot(job,state)))},[job.id,mode]);
@@ -50,6 +53,9 @@ export function CommitmentLoopPanel({job,state,outcomes,mode,legal,onCommand,onU
  const run=async(fn:()=>Promise<void>)=>{setBusy(true);setError("");try{await fn()}catch(e){setError(e instanceof Error?e.message:"操作失败，请稍后再试")}finally{setBusy(false)}};
  const overdue=!!snapshot.activeAction&&Date.parse(snapshot.activeAction.dueAt)<Date.now();
  const remaining=useMemo(()=>snapshot.activeAction?Math.ceil((Date.parse(snapshot.activeAction.dueAt)-Date.now())/86400000):0,[snapshot.activeAction]);
+ const unjoined=["未加入","NOT_JOINED"].includes(job.facts["职位关系"]||"");
+
+ const submitMembership=()=>run(async()=>{await onMembership(membershipRelation);setMembershipOpen(false)});
 
  const submitAccept=()=>run(async()=>{if(!goal.trim()||!actionTitle.trim()){setError("请完整填写本轮目标和第一条行动");return}const invalid=dueError(dueAt);if(invalid){setError(invalid);return}if(mode==="connected"){await brainxFetch(`/api/v1/opportunities/${encodeURIComponent(job.id)}/engagement`,{method:"POST",body:{action:"ACCEPT",goal:goal.trim(),action_title:actionTitle.trim(),due_at:toIso(dueAt),idempotency_key:makeIdempotencyKey(`accept:${job.id}`)}});await refresh("已接单，第一条行动已建立");return}const action:CommitmentAction={actionId:`local-${Date.now()}`,title:actionTitle.trim(),dueAt:toIso(dueAt),status:"OPEN",source:"MANUAL",createdAt:new Date().toISOString()};setSnapshot({goal:goal.trim(),activeAction:action,actionHistory:[],suggestedAction:null,terminalResultMissing:false});dispatchLocal("ACCEPTED");notify("已接单");setEditor(null)});
 
@@ -65,7 +71,9 @@ export function CommitmentLoopPanel({job,state,outcomes,mode,legal,onCommand,onU
  const timeline=[...snapshot.actionHistory.map(a=>({id:a.actionId,title:a.status==="DONE"?"行动完成":"行动取消",detail:a.completionNote||a.title,at:a.completedAt||a.createdAt})),...outcomes.map(o=>({id:o.id,title:o.stage,detail:o.note==="结果已记录"?"":o.note||"",at:o.at}))].sort((a,b)=>String(b.at).localeCompare(String(a.at)));
 
  return <div className="commitment-loop">
-  {displayState!=="ACCEPTED"&&displayState!=="COMPLETED"?<section className="commitment-onboarding"><span>{stateLabel[displayState]}</span><h2>承接设置</h2><div className="commitment-command-row">{legal.includes("ACCEPT")&&<button className="primary" onClick={()=>setEditor("accept")}>接单并设定行动</button>}{legal.filter(a=>["WATCH","UNWATCH","DISMISS"].includes(a)).map(a=><button key={a} onClick={()=>onCommand(a)}>{a==="WATCH"?"加入关注":a==="UNWATCH"?"取消关注":"暂不考虑"}</button>)}</div></section>:null}
+  {unjoined&&<section className={`commitment-membership${membershipOpen?" editing":""}`}><div className="commitment-membership-head"><h2>确认项目归属</h2>{!membershipOpen&&<button className="primary" onClick={()=>setMembershipOpen(true)}>加入项目</button>}</div>{membershipOpen&&<div className="commitment-membership-form"><div className="commitment-membership-options"><button className={membershipRelation==="MY_JOB"?"selected":""} aria-pressed={membershipRelation==="MY_JOB"} onClick={()=>setMembershipRelation("MY_JOB")}><b>我的职位</b></button><button className={membershipRelation==="TEAM_SHARED"?"selected":""} aria-pressed={membershipRelation==="TEAM_SHARED"} onClick={()=>setMembershipRelation("TEAM_SHARED")}><b>团队共享</b></button></div><div className="commitment-membership-actions"><button onClick={()=>setMembershipOpen(false)}>取消</button><button className="primary" disabled={busy} onClick={submitMembership}>{busy?"保存中…":"确认加入"}</button></div></div>}{error&&membershipOpen&&<p className="commitment-error">{error}</p>}</section>}
+
+  {!unjoined&&displayState!=="ACCEPTED"&&displayState!=="COMPLETED"?<section className="commitment-onboarding"><span>{stateLabel[displayState]}</span><h2>承接设置</h2><div className="commitment-command-row">{legal.includes("ACCEPT")&&<button className="primary" onClick={()=>setEditor("accept")}>接单并设定行动</button>}{legal.filter(a=>["WATCH","UNWATCH","DISMISS"].includes(a)).map(a=><button key={a} onClick={()=>onCommand(a)}>{a==="WATCH"?"加入关注":a==="UNWATCH"?"取消关注":"暂不考虑"}</button>)}</div></section>:null}
 
   {displayState==="ACCEPTED"&&<><section className={`current-action-card${overdue?" overdue":snapshot.activeAction?.status==="BLOCKED"?" blocked":""}`}><div className="current-action-head"><span>当前行动</span><em>{snapshot.activeAction?snapshot.activeAction.status==="BLOCKED"?"阻塞中":overdue?`逾期 ${Math.abs(remaining)} 天`:remaining<=1?"今天需处理":`剩余 ${remaining} 天`:"待补建"}</em></div><p className="commitment-goal"><small>本轮目标</small>{snapshot.goal||"待补充"}</p><h2>{snapshot.activeAction?.title||"当前缺少行动"}</h2>{snapshot.activeAction?<time>截止 {formatAt(snapshot.activeAction.dueAt)}</time>:<button className="primary" onClick={()=>{setGoal(snapshot.goal||"继续当前承接");setEditor("accept")}}>补建当前行动</button>}</section>{snapshot.activeAction&&<div className="commitment-primary-actions"><button className="primary" onClick={()=>{setEditor("progress");setStep(1)}}>回写进展</button><button onClick={()=>{setEditor("blocked");setStep(1)}}>遇到阻塞</button><button onClick={()=>setEditor("terminal")}>终局结果</button><button className="quiet" onClick={()=>setEditor("release")}>释放承接</button></div>}</>}
 

@@ -107,6 +107,10 @@ test("preserves engagement, result recording, replay, sync and notifications", a
   assert.match(workbench, /CommitmentLoopPanel/);
   assert.match(loop, /当前行动/);
   assert.match(loop, /回写进展/);
+  assert.match(loop, /确认项目归属/);
+  assert.match(loop, /加入项目/);
+  assert.match(loop, /我的职位/);
+  assert.match(loop, /团队共享/);
   assert.match(loop, /终局结果只允许|terminal-result/);
   assert.match(loop, /progress\/suggestion/);
   assert.match(loop, /确认结果与下一行动/);
@@ -116,6 +120,8 @@ test("preserves engagement, result recording, replay, sync and notifications", a
   assert.doesNotMatch(loop, /规则草案 · 可修改，确认后才成为事实/);
   assert.doesNotMatch(loop, /结果提交后会纳入下一轮判断依据/);
   assert.match(workbench, /接单需逐个确认目标、行动和截止时间/);
+  assert.match(workbench, /updateOpportunityMembership/);
+  assert.match(workbench, /membershipRelations/);
   assert.doesNotMatch(workbench, /tray-accept/);
   assert.match(workbench, /function ReplayPanel/);
   assert.match(workbench, /function NotificationPanel/);

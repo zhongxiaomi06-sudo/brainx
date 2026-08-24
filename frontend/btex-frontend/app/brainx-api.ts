@@ -153,6 +153,7 @@ export type BackendPickTray = { snapshot_id: string | null; batch_id: string | n
 export type BackendFeedbackResponse = { ok: boolean; already?: boolean; feedback_id?: string; replacement?: BackendPickTray };
 export type BackendOutcomeResponse = { ok: boolean; already?: boolean; outcome_id?: string | number };
 export type BackendProgressResponse = { ok: boolean; already?: boolean; state?: EngagementState; active_action?: BackendCommitmentAction; incorporated_into_next_decision?: boolean; backfilled?: boolean };
+export type BackendMembershipResponse = { ok: boolean; already?: boolean; relation: "MY_JOB"|"TEAM_SHARED"; legal_actions: EngagementCommand[]; recompute?: { blocked?: boolean; reason?: string } };
 export type BackendProfileUpdate = { ok: boolean; consultant_id: string; profile_keywords?: string[]; profile_note?: string };
 export type AssistantMessage = { role: "user" | "assistant"; content: string };
 export type AssistantContext = { page: string; opportunity_id?: string | null };
@@ -608,6 +609,17 @@ export async function updateOpportunityFacts(id: string, update: ManualFactUpdat
   recommendation?: { decision_id?: string; score?: number; action?: string } | null;
 }> {
   return brainxFetch(`/api/v1/opportunities/${encodeURIComponent(id)}/facts`, { method: "PATCH", body: update });
+}
+
+export async function updateOpportunityMembership(
+  id: string,
+  relation: "MY_JOB"|"TEAM_SHARED",
+  idempotencyKey: string,
+): Promise<BackendMembershipResponse> {
+  return brainxFetch(`/api/v1/opportunities/${encodeURIComponent(id)}/membership`, {
+    method: "PATCH",
+    body: { relation, idempotency_key: idempotencyKey },
+  });
 }
 
 // —— HTTP 客户端（浏览器端专用；401 抛 BrainxApiError 由调用方决定回退/登录）——

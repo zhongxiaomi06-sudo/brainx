@@ -32,10 +32,12 @@ cmd_start(){
 cmd_docker(){
   log "构建镜像 brainx:latest …"
   docker build -t brainx:latest .
-  log "运行容器（映射 $BRAINX_PORT，注入 .env）…"
+  log "运行容器（映射 $BRAINX_PORT，注入 .env，挂持久卷）…"
+  # 持久卷承载 SQLite 与 data/.secret：容器替换不丢数据（Dockerfile 已 chown /app/data 给 node）
   docker run --rm -p "${BRAINX_PORT}:3000" \
     ${ENV_FILE:+--env-file "$ENV_FILE"} \
     $([ -f .env ] && echo "--env-file .env") \
+    -v brainx-data:/app/data \
     --name brainx brainx:latest
 }
 

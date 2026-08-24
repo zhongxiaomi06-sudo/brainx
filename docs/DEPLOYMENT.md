@@ -44,7 +44,11 @@ BrainX 是**后端反向代理前端**的一体化服务，单一对外入口 `:
 ./scripts/deploy.sh docker
 # 等价于：
 docker build -t brainx:latest .
-docker run --rm -p 3000:3000 --env-file .env brainx:latest
+# 必须挂持久卷：SQLite（data/brainx.db）与密钥（data/.secret）存卷内，容器替换不丢数据；
+# 镜像内 /app/data 已 chown 给 node 用户，新建卷可正常写入。
+docker run -d --name brainx --restart unless-stopped \
+  -p 3000:3000 --env-file .env \
+  -v brainx-data:/app/data brainx:latest
 ```
 
 ### 3) CI（GitHub Actions，见 .github/workflows/ci.yml）

@@ -2,6 +2,11 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-08-24｜fix(deploy): Docker 排除密钥 + 持久卷可写 + 启动脚本行尾修复
+
+- 改动：`.dockerignore` 排除整个 `data/`（含 `data/.secret` 令牌加密密钥）；`Dockerfile` 将 `/app/data` chown 给 node 用户（修复新卷 EACCES）；部署文档/脚本补 `-v brainx-data:/app/data` 持久卷；4 个 shell 启动/部署脚本 CRLF 转 LF 并清理行尾空格（修复脚本在 Linux/macOS 不可运行）。
+- 验证：`bash -n` 全部通过；`git diff --check` 对脚本无报错；未引入新依赖。
+
 ## 2026-08-24｜fix(frontend): 工作台空 actions 崩溃兜底 + 根错误边界
 
 - 改动：`DecisionCard` 对空 `actions` 兜底（原会在 `action.id` 处抛 TypeError 白屏）；「查看上次快照」按钮对空职位数组加守卫；新增根 `ErrorBoundary`（`error-boundary.tsx`）并由 `page.tsx` 包裹。

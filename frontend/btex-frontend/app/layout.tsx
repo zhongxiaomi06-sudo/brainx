@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist_Mono } from "next/font/google";
 import "./globals.css";
+import "./workbench-layout.css";
+import "./workbench-concept.css";
 
 const mono = Geist_Mono({ variable: "--font-mono", subsets: ["latin"] });
 
@@ -13,7 +15,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="zh-CN">
-      <body className={mono.variable}>
+      <body className={`${mono.variable} btex-document`}>
         {children}
       </body>
     </html>

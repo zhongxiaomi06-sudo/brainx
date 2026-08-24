@@ -1,16 +1,18 @@
 #!/usr/bin/env node
 
 import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import {
   existsSync,
   mkdirSync,
   readFileSync,
   writeFileSync,
 } from "node:fs";
-import { extname, join } from "node:path";
+import { dirname, extname, join, resolve } from "node:path";
 import {
   auditLintIgnores,
   checkForbiddenTracked,
+  checkTrackedFilesPresent,
   checkLineLimits,
   checkLongLines,
   checkLockfiles,
@@ -19,14 +21,15 @@ import {
   runCommand,
   scanPortablePaths,
   scanSecrets,
+  selectRegularFiles,
   versionAtLeast,
 } from "./quality-gate/core.mjs";
 
-const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim();
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 process.chdir(root);
 
-const config = readJson(".quality-gate/config.json");
-const baseline = readJson(".quality-gate/baseline.json");
+const config = readTrackedJson(".quality-gate/config.json");
+const baseline = readTrackedJson(".quality-gate/baseline.json");
 const profileName = parseProfile(process.argv.slice(2));
 const profile = config.profiles[profileName];
 if (!profile) {
@@ -50,6 +53,17 @@ addCheck(
 
 const gitState = inspectGitState(profile.requireCleanWorktree);
 addCheck("Git", "工作区与操作状态", gitState.ok, gitState.detail);
+
+const missingTrackedFiles = checkTrackedFilesPresent(listTrackedFiles());
+addCheck(
+  "Git",
+  "完整检出",
+  missingTrackedFiles.length === 0,
+  missingTrackedFiles.length
+    ? "当前工作区缺少 " + missingTrackedFiles.length + " 个被 Git 跟踪的文件，门禁不能安全扫描稀疏检出；请先执行 git sparse-checkout disable。示例：\n"
+      + missingTrackedFiles.slice(0, 20).join("\n")
+    : "全部被 Git 跟踪的文件都已检出",
+);
 
 const forbidden = checkForbiddenTracked(files, config);
 addCheck(
@@ -292,15 +306,25 @@ function trackedFiles() {
     "--others",
     "--exclude-standard",
   ]);
-  return output.toString("utf8").split("\0").filter((path) => path && existsSync(path));
+  return selectRegularFiles(output.toString("utf8").split("\0").filter(Boolean));
+}
+
+function listTrackedFiles() {
+  const output = execFileSync("git", ["ls-files", "-z", "--cached"]);
+  return output.toString("utf8").split("\0").filter(Boolean);
 }
 
 function git(args) {
   return execFileSync("git", args, { encoding: "utf8" });
 }
 
-function readJson(path) {
-  return JSON.parse(readFileSync(path, "utf8"));
+function readTrackedJson(path) {
+  if (existsSync(path)) return JSON.parse(readFileSync(path, "utf8"));
+  try {
+    return JSON.parse(git(["show", ":" + path]));
+  } catch {
+    return JSON.parse(git(["show", "HEAD:" + path]));
+  }
 }
 
 function parseProfile(args) {

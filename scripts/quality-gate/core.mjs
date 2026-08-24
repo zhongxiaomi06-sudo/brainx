@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { basename, extname } from "node:path";
 
 const SECRET_RULES = [
@@ -45,6 +45,20 @@ export function countPhysicalLines(text) {
   if (text.length === 0) return 0;
   const parts = text.split(/\r\n|\n|\r/);
   return parts.length - (/\r\n$|\n$|\r$/.test(text) ? 1 : 0);
+}
+
+export function checkTrackedFilesPresent(files, exists = existsSync) {
+  return files.filter((path) => !exists(path));
+}
+
+export function selectRegularFiles(files, stat = lstatSync) {
+  return files.filter((path) => {
+    try {
+      return stat(path).isFile();
+    } catch {
+      return false;
+    }
+  });
 }
 
 export function isExcluded(path, config) {

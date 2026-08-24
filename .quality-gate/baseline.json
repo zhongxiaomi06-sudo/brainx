@@ -5,6 +5,14 @@
   "portablePathExemptions": [],
   "textHygieneFiles": [
     {
+      "path": "prd_extracted.txt",
+      "allowMixedEol": false,
+      "maxTrailingWhitespace": 71,
+      "owner": "product-docs",
+      "reason": "存量 PRD 文本提取产物含行尾空白；只能减少，不能增加",
+      "expiresOn": "2026-10-31"
+    },
+    {
       "path": "frontend/btex-frontend/app/globals.css",
       "allowMixedEol": true,
       "maxTrailingWhitespace": 0,

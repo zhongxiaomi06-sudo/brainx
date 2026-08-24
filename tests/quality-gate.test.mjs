@@ -7,10 +7,12 @@ import {
   checkLongLines,
   checkLockfiles,
   checkTextHygiene,
+  checkTrackedFilesPresent,
   countPhysicalLines,
   runCommand,
   scanPortablePaths,
   scanSecrets,
+  selectRegularFiles,
   versionAtLeast,
 } from "../scripts/quality-gate/core.mjs";
 
@@ -19,6 +21,31 @@ test("物理行计数兼容空文件、末尾换行和 CRLF", () => {
   assert.equal(countPhysicalLines("a"), 1);
   assert.equal(countPhysicalLines("a\n"), 1);
   assert.equal(countPhysicalLines("a\r\nb\r\n"), 2);
+});
+
+test("完整检出检查会列出缺失的被跟踪文件", () => {
+  const present = new Set(["src/server.js", "package.json"]);
+  assert.deepEqual(
+    checkTrackedFilesPresent(
+      ["src/server.js", "docs/hidden.md", "package.json"],
+      (path) => present.has(path),
+    ),
+    ["docs/hidden.md"],
+  );
+});
+
+test("扫描文件集合排除 Gitlink 目录", () => {
+  const kinds = new Map([
+    ["src/server.js", "file"],
+    ["brainx", "directory"],
+  ]);
+  assert.deepEqual(
+    selectRegularFiles(
+      ["src/server.js", "brainx"],
+      (path) => ({ isFile: () => kinds.get(path) === "file" }),
+    ),
+    ["src/server.js"],
+  );
 });
 
 test("500 行基线只允许存量文件不增长且未到期", () => {

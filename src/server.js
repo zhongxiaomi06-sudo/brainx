@@ -7,7 +7,7 @@ import { spawn } from 'node:child_process';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join, normalize, dirname, sep, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { openDb } from './db.js';
+import { openDb, now } from './db.js';
 import { runSync, latestSync, latestCompleteSnapshot } from './sync.js';
 import { recommend, latestRun, loadConsultants } from './recommend.js';
 import { engage, commitmentSummary, currentState, legalActions, DISMISS_REASONS } from './engagement.js';
@@ -35,6 +35,7 @@ import { talentSupplyForJob, talentSupplyEnabled } from './talent-supply.js';
 import { effectiveJob, effectiveFactPayload, updateFactOverrides } from './facts.js';
 import { chatStream, isLlmConfigured } from './llm.js';
 import { pickTray, nextBatch, feedback as recommendationFeedback, undoFeedback as recommendationUndoFeedback } from './recommendation-batch.js';
+import { verifyQuick, quickResultPage, QUICK_ACTIONS } from './quickfb.js';
 import { verifySnapshotKey, jobSnapshot } from './snapshot.js';
 import { createGuard } from './guard.js';
 
@@ -416,6 +417,25 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       const out = recommendationUndoFeedback(db, cid, await body(req));
       json(res, out.ok ? 200 : out.status || 422, out);
     },
+    // 一键反馈（F2，2026-08-24）：推送卡片按钮直写，HMAC 签名代替 session
+    // （open 路由，鉴权全在 verifyQuick）。顾问不登录工作台也能产标签。
+    'GET /api/v1/feedback/quick': (req, res, cid, q) => {
+      const p = Object.fromEntries(q);
+      const page = (okFlag, text) => {
+        res.writeHead(okFlag ? 200 : 400, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(quickResultPage(okFlag, text));
+      };
+      const v = verifyQuick(p, now());
+      if (!v.ok) return page(false, v.error);
+      const out = p.action === 'watch'
+        ? engage(db, p.consultant, p.project, 'WATCH',
+                 { idempotency_key: `quick-watch:${p.consultant}:${p.project}:${p.day}` })
+        : recommendationFeedback(db, p.consultant,
+                 { project_id: p.project, feedback: 'NOT_INTERESTED', reason: '一键反馈（推送卡片）',
+                   idempotency_key: `quick-ni:${p.consultant}:${p.project}:${p.day}` });
+      if (!out.ok) return page(false, out.error || out.message || '操作失败');
+      return page(true, `已记录：${QUICK_ACTIONS[p.action]}${out.already ? '（此前已记录）' : ''}`);
+    },
     'POST /api/v1/recommendations/next-batch': async (req, res, cid) => {
       const out = nextBatch(db, cid, await body(req));
       json(res, out.ok ? 200 : out.status || 409, out);
@@ -707,7 +727,7 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       const name = loadConsultants(db).find((x) => x.consultant_id === cid)?.display_name || cid;
       const card = sync && !sync.complete
         ? buildSyncAlertCard(sync)
-        : buildDailyCard({ consultant_name: name, run: run?.run, items: run?.items || [],
+        : buildDailyCard({ consultant_name: name, consultant_id: cid, run: run?.run, items: run?.items || [],
                            commitments: c, sync, snapshot_id: snapshot?.sync_id });
       json(res, 200, { card });
     },
@@ -722,7 +742,7 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       const kind = sync && !sync.complete ? 'SYNC_ALERT' : 'DAILY_TOP3';
       const card = kind === 'SYNC_ALERT'
         ? buildSyncAlertCard(sync)
-        : buildDailyCard({ consultant_name: name, run: run?.run, items: run?.items || [],
+        : buildDailyCard({ consultant_name: name, consultant_id: cid, run: run?.run, items: run?.items || [],
                            commitments: c, sync, snapshot_id: snapshot?.sync_id });
       const target = b?.target || process.env.BRAINX_PUSH_TARGET || '';
       if (!target) return err(res, 400, 'NO_TARGET', '缺推送目标（chat_id/open_id 或 BRAINX_PUSH_TARGET）');
@@ -759,7 +779,9 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
                     'GET /api/v1/talent/health', 'GET /api/v1/talent/status',
                     // 职位快照：外部系统（York AI worker 等）无 brainx session，凭 API Key 读取；
                     // 鉴权在 handler 内自校验（verifySnapshotKey），未配置 key 时 fail-closed 全拒。
-                    'GET /api/v1/jobs/snapshot', 'GET /api/v1/meta/guard'];
+                    'GET /api/v1/jobs/snapshot', 'GET /api/v1/meta/guard',
+                    // 一键反馈：无 session，HMAC 签名即鉴权（verifyQuick fail-closed）
+                    'GET /api/v1/feedback/quick'];
       const cid = open.includes(`${req.method} ${path}`) ? null : auth(req, res);
       if (open.includes(`${req.method} ${path}`) || cid) {
         try { return await handler(req, res, cid, u.searchParams, dynId); }
@@ -827,7 +849,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   // 桥接常驻：BRAINX_BRIDGE_INTERVAL_MS（默认 180s）；BRAINX_BRIDGE_OFF=1 关闭
   if (process.env.BRAINX_BRIDGE_OFF !== '1') {
     startBridge(db, server.bus, {
-      recommendFn: (cid) => recommend(db, cid, { top: 20 }),
+      recommendFn: (cid) => recommend(db, cid, { top: 20, throttle: true }), // 方案 A：自动轮次快照未变<2h 跳过冻结
       consultantIdsFn: () => loadConsultants(db).map((c) => c.consultant_id),
       onRecommended: makeAutoPush(db), // 重大变化自动推卡；BRAINX_PUSH_AUTO=1 才真发
     });

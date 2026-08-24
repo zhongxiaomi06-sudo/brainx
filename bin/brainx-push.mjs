@@ -17,7 +17,7 @@ const c = commitmentSummary(db, cid);
 const name = loadConsultants(db).find((x) => x.consultant_id === cid)?.display_name || cid;
 const kind = sync && !sync.complete ? 'SYNC_ALERT' : 'DAILY_TOP3';
 const card = kind === 'SYNC_ALERT' ? buildSyncAlertCard(sync)
-  : buildDailyCard({ consultant_name: name, run: run?.run, items: run?.items || [],
+  : buildDailyCard({ consultant_name: name, consultant_id: cid, run: run?.run, items: run?.items || [],
                      commitments: c, sync, snapshot_id: snapshot?.sync_id });
 if (!process.argv.includes('--send')) {
   console.log(JSON.stringify(card, null, 2));

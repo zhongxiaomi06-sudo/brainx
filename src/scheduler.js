@@ -39,7 +39,7 @@ export function pushSlotFor(db, consultant_id, open_id, slotKey, { send = true }
   const c = commitmentSummary(db, consultant_id);
   const name = db.prepare('SELECT display_name FROM consultants WHERE consultant_id=?')
     .get(consultant_id)?.display_name || consultant_id;
-  const card = buildDailyCard({ consultant_name: name, run: run.run, items: run.items,
+  const card = buildDailyCard({ consultant_name: name, consultant_id, run: run.run, items: run.items,
                                 commitments: c, sync, snapshot_id: snapshot?.sync_id });
   return pushCard(db, { consultant_id, kind: 'DAILY_TOP3', run_id: slotKey, card,
                         target: open_id, send });

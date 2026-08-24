@@ -139,6 +139,16 @@ export function runSync(db, { source = 'fixture', consultant_id = 'felix', dry_r
       ON CONFLICT(consultant_id, project_id, relation, valid_from) DO NOTHING`);
     const closeRel = db.prepare(`UPDATE job_memberships SET valid_to=?
       WHERE consultant_id=? AND project_id=? AND valid_to IS NULL AND relation != ?`);
+    // F1（2026-08-24）：owner_name 回种策展层。0007 前 memberships 由 fixture 种子写入，
+    // 2026-08-19 P-FIX 清理后全表归零，而 TTC/bridge/Bitable 同步 relation=null 结构性
+    // 无法回种 → historical_texts（recommend.js buildCtx）断供。TTC owner 本就是
+    // relations.js 推导的权威层（规则 2），这里把它落成 source='ttc-owner' 的 MY_JOB 行：
+    // 只动 owner 本人的关系（他人策展行不被冲掉），已有活跃 MY_JOB 时跳过（幂等）。
+    const ownerIds = new Map(db.prepare(`SELECT display_name, consultant_id FROM consultants
+      WHERE active=1 AND display_name IS NOT NULL AND display_name != ''`).all()
+      .map((r) => [r.display_name, r.consultant_id]));
+    const activeRel = db.prepare(`SELECT relation FROM job_memberships
+      WHERE consultant_id=? AND project_id=? AND valid_to IS NULL`);
 
     for (const j of valid) {
       upsert.run(j.project_id, j.company, j.role, j.city, j.pipeline, j.hc,
@@ -149,6 +159,11 @@ export function runSync(db, { source = 'fixture', consultant_id = 'felix', dry_r
       if (j.relation && writeRels) {
         closeRel.run(now(), consultant_id, j.project_id, j.relation); // 旧关系到期
         upsertRel.run(consultant_id, j.project_id, j.relation, source, j.captured_at || as_of);
+      }
+      const ownerId = j.owner_name ? ownerIds.get(j.owner_name) : null;
+      if (ownerId && activeRel.get(ownerId, j.project_id)?.relation !== 'MY_JOB') {
+        closeRel.run(now(), ownerId, j.project_id, 'MY_JOB'); // owner 本人旧关系到期
+        upsertRel.run(ownerId, j.project_id, 'MY_JOB', 'ttc-owner', j.captured_at || as_of);
       }
     }
     db.exec('COMMIT');

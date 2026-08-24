@@ -125,18 +125,23 @@ test('驾驶舱群消息：单职位群精确归因（不依赖公司名）', ()
   assert.equal(row.matched_project_id, 'JCHAT1');
 });
 
-test('scorer：群活跃基底——今日活跃 65 起，沉寂 30+ 天降 20', () => {
+test('scorer：群活跃基底——连续指数衰减（baseline-1.1），今日活跃≈65 起，沉寂渐近 20', () => {
   const ctx = { consultant_id: 'mia', profile_keywords: [], historical_texts: [],
     watched_count: 0, accepted_count: 0, outcomes_avg: null, now: '2026-08-14T00:00:00.000Z' };
   const mk = (chat_last_at, captured_at = '2026-07-01') => ({ project_id: 'JX', company: '甲', role: '算法', pipeline: 'Sourcing×1',
     active_state: 'OPEN', captured_at, priority: null, chat_last_at, chat_msgs_7d: 3 });
   const act = (j) => scoreJob(j, 'TEAM_SHARED', ctx).breakdown.find((d) => d.dim === 'activity').score;
-  // 今日群活跃（10 小时前）+ pipeline 25 + 事实今日新鲜 25 → 65+25+25=115 → 封顶 100
+  // 今日群活跃（10 小时前）：基底 20+45·e^(-0.4/14)≈64 + pipeline 25 + 事实今日新鲜 25 → 封顶 100
   assert.equal(act(mk('2026-08-13 22:00', '2026-08-14')), 100);
-  // 44 天无群消息 → 基底 20；pipeline 25；事实 44 天前（>30d）+0 → 45
-  assert.equal(act(mk('2026-07-01 10:00')), 45);
+  // 44 天无群消息 → 基底 20+45·e^(-44/14)≈22；pipeline 25；事实 44 天前（>30d）+0 → 47
+  assert.equal(act(mk('2026-07-01 10:00')), 47);
   // 无群数据 → 原路径 50+25+0=75
   assert.equal(act(mk(null)), 75);
+  // 衰减单调且边界无跳变：相邻两天分差 ≤2（阶梯时代 d1→d3 跳 5 分）
+  const d = (days) => { const t = new Date(Date.parse('2026-08-14T00:00:00Z') - days * 86400000);
+    return `${t.toISOString().slice(0, 10)} ${t.toISOString().slice(11, 16)}`; };
+  const a1 = act(mk(d(1), '2026-07-01')), a2 = act(mk(d(2), '2026-07-01')); // 旧 captured_at 避免封顶
+  assert.ok(a1 > a2 && a1 - a2 <= 3, `连续衰减应平滑（d1=${a1}, d2=${a2}，整数取整允许 ≤3）`);
 });
 
 // bridge 模块的 CJS/ESM 便捷引入（文件已是 ESM，这里直接静态 import 亦可；

@@ -19,6 +19,7 @@ import { buildDailyCard, buildSyncAlertCard } from '../src/push.js';
 import { jobVisibleTo } from '../src/visibility.js';
 import { relationOf } from '../src/relations.js';
 import { updateProfile } from '../src/roster.js';
+import { feedback as recommendationFeedback, undoFeedback as recommendationUndoFeedback } from '../src/recommendation-batch.js';
 
 const db = openDb();
 
@@ -68,6 +69,17 @@ const TOOLS = {
     inputSchema: { type: 'object', required: ['consultant_id'], properties: {
       consultant_id: { type: 'string' }, top: { type: 'number' } } },
     run: ({ consultant_id: cid, top = 10 }) => recommend(db, cid, { top }),
+  },
+  brainx_feedback: {
+    description: '对推荐职位表态（F3）：NOT_INTERESTED 标记不感兴趣（可从排序降权）；undo=true 撤销。与工作台 × 按钮同一写入路径',
+    inputSchema: { type: 'object', required: ['consultant_id', 'project_id'], properties: {
+      consultant_id: { type: 'string' }, project_id: { type: 'string' },
+      reason: { type: 'string' }, undo: { type: 'boolean' },
+      idempotency_key: { type: 'string' } } },
+    run: ({ consultant_id: cid, project_id, reason = 'agent 会话反馈', undo = false, idempotency_key }) =>
+      undo ? recommendationUndoFeedback(db, cid, { project_id })
+           : recommendationFeedback(db, cid, { project_id, feedback: 'NOT_INTERESTED', reason,
+              idempotency_key: idempotency_key || `mcp-feedback:${cid}:${project_id}` }),
   },
   brainx_opportunity: {
     description: '单个职位全量：事实/关系/承接状态/合法操作/事件/结果/最近推荐',
@@ -197,7 +209,7 @@ const TOOLS = {
       const c = commitmentSummary(db, cid);
       const name = loadConsultants(db).find((x) => x.consultant_id === cid)?.display_name || cid;
       return sync && !sync.complete ? buildSyncAlertCard(sync)
-        : buildDailyCard({ consultant_name: name, run: run?.run, items: run?.items || [],
+        : buildDailyCard({ consultant_name: name, consultant_id: cid, run: run?.run, items: run?.items || [],
                            commitments: c, sync, snapshot_id: snapshot?.sync_id });
     },
   },

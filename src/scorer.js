@@ -17,7 +17,7 @@ export const WEIGHTS = {
   exploration: 0.10, // 探索额度
 };
 
-export const POLICY_VERSION = 'baseline-1.0';
+export const POLICY_VERSION = 'baseline-1.1'; // 1.1（2026-08-24）：活跃度连续衰减 + 反馈闭环（公司级记忆/僵尸降权/承接加权）
 export const DIM_LABELS = {
   direction: '职位方向匹配', activity: '项目活跃度与 Pipeline', similarity: '与历史项目相似度',
   capacity: '当前承接容量', outcomes: '历史行为与交付结果', exploration: '探索额度',
@@ -108,6 +108,15 @@ export function scoreJob(job, relation, ctx) {
   if (dims.direction != null && ctx.feedback_projects?.includes(job.project_id)) {
     dims.direction = Math.max(0, dims.direction - 20);
   }
+  // 反馈闭环（baseline-1.1，2026-08-24）：公司级记忆。
+  // 修正前只按 project_id 降权——同一客户换个职位重新进池就忘了顾问说过「不感兴趣」。
+  // 负向：DISMISSED / ×不感兴趣 过的公司 -15；正向：承接（ACCEPTED）过的公司 +10。
+  if (dims.direction != null && ctx.negative_companies?.includes(job.company)) {
+    dims.direction = Math.max(0, dims.direction - 15);
+  }
+  if (dims.direction != null && ctx.positive_companies?.includes(job.company)) {
+    dims.direction = Math.min(100, dims.direction + 10);
+  }
 
   // 活跃度 20%：状态 + 优先级/pipeline + 新鲜度
   // 盘点源（Bitable）有结构化 priority（0007 起）；fixture 行用 pipeline 有无近似。
@@ -119,7 +128,10 @@ export function scoreJob(job, relation, ctx) {
     let base = 50;
     if (job.chat_last_at) {
       const cd = (Date.parse(ctx.now) - chatTs(job.chat_last_at)) / 86400000;
-      base = cd <= 1 ? 65 : cd <= 3 ? 60 : cd <= 7 ? 55 : cd <= 14 ? 45 : cd <= 30 ? 35 : 20;
+      // 连续指数衰减（baseline-1.1）：替代阶梯分档（65/60/55/45/35/20）。
+      // 阶梯在边界跳变（昨天 65 今天 60），且平顶段无区分度；τ=14 拟合原档位：
+      // d0≈65 d1≈62 d3≈56 d7≈47 d14≈36 d30≈25 d44≈22（>30 天渐近 20，活跃假象破除保留）。
+      base = Math.round(20 + 45 * Math.exp(-cd / 14));
     }
     act = base;
     if (job.priority != null) act += PRIORITY_BOOST[job.priority] ?? 0;
@@ -127,6 +139,12 @@ export function scoreJob(job, relation, ctx) {
     const d = daysSince(job.captured_at, ctx.now);
     act += d <= 1 ? 25 : d <= 7 ? 18 : d <= 30 ? 8 : 0;
     if (act > 100) act = 100;
+  }
+  // 僵尸职位衰减（baseline-1.1）：同顾问 ≥3 轮推荐仍零互动 → 活跃 7 折。
+  // 修正前高活跃僵尸职位可以无限霸榜 Top20（诊断：57% 行 score≥90 的天花板主因之一）。
+  if (act != null && (ctx.rec_rounds?.[job.project_id] || 0) >= 3
+      && !ctx.engaged_projects?.has(job.project_id)) {
+    act = Math.round(act * 0.7);
   }
   dims.activity = act;
 
@@ -195,7 +213,11 @@ export function explain(job, relation, scored, ctx) {
   if (b.direction != null) reasons.push(`方向匹配 ${b.direction} 分：与你画像关键词（${ctx.profile_keywords.slice(0, 3).join('/')}等）的重合度`);
   if (b.activity != null) reasons.push(`活跃度 ${b.activity} 分：状态 ${job.active_state}${job.priority ? `，优先级${PRIORITY_LABEL[job.priority] || job.priority}` : job.pipeline ? '，Pipeline 有进展记录' : ''}${job.chat_last_at ? `，群活跃 ${String(job.chat_last_at).slice(5, 16)}（近7天 ${job.chat_msgs_7d ?? 0} 条）` : ''}，最近变化 ${String(job.captured_at).slice(0, 10)}`);
   if (b.similarity != null && b.similarity > 0) reasons.push(`历史相似 ${b.similarity} 分：与你历史主做项目存在重合特征`);
+  if (ctx.positive_companies?.includes(job.company)) reasons.push(`你曾承接该公司项目，方向维加权`);
   const risks = [];
+  if (ctx.negative_companies?.includes(job.company)) risks.push(`该公司此前被你标记不感兴趣/暂不考虑，方向维已降权`);
+  const zombieRounds = (ctx.rec_rounds?.[job.project_id] || 0);
+  if (zombieRounds >= 3 && !ctx.engaged_projects?.has(job.project_id)) risks.push(`已连续 ${zombieRounds} 轮推荐未互动，活跃度降权防霸榜`);
   if ((ctx.watched_count || 0) >= 7) risks.push(`关注榜已 ${ctx.watched_count}/10，接近上限`);
   if (job.hc != null && job.hc <= 1) risks.push('HC 仅剩 1，窗口小');
   if (job.hc == null) risks.push('HC 未知（飞书源无此字段，待 ATS 补齐）');

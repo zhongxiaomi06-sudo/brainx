@@ -194,6 +194,10 @@ test("refreshes algorithmic recommendations from the brand control", async () =>
   assert.match(workbench, /await nextRecommendationBatch\(/);
   assert.match(workbench, /\/api\/v1\/recommendations\/run/);
   assert.match(workbench, /aria-label="刷新推荐"/);
+  assert.match(workbench, /const handleBrandClick=/);
+  assert.match(workbench, /brandClickCountRef\.current>=5/);
+  assert.match(workbench, /window\.open\("https:\/\/github\.com\/jiands233","_blank","noopener,noreferrer"\)/);
+  assert.match(workbench, /onClick=\{handleBrandClick\}/);
   assert.match(workbench, /recommendationRefreshing/);
   assert.match(workbench, /演示推荐已换一批/);
   assert.match(workbench, /dismissedRecommendationIds/);

@@ -12,6 +12,8 @@ import { runSync, latestSync, latestCompleteSnapshot } from './sync.js';
 import { recommend, latestRun, loadConsultants } from './recommend.js';
 import { engage, commitmentSummary, currentState, legalActions, DISMISS_REASONS } from './engagement.js';
 import { replay, recordOutcome } from './replay.js';
+import { acceptCommitment, commitmentDetails, recordProgress, recordTerminalResult,
+  releaseCommitment, suggestedAction, RELEASE_REASONS, CLOSE_REASONS } from './commitment.js';
 import { buildDailyCard, buildSyncAlertCard, pushCard } from './push.js';
 import { signSession, verifySession, cookieOf } from './session.js';
 import { signState, verifyState, buildAuthorizeUrl, exchangeCode, oauthConfigured } from './oauth.js';
@@ -380,7 +382,7 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       ].sort((a, b) => String(a.occurred_at).localeCompare(String(b.occurred_at)));
       const rec = db.prepare(`SELECT * FROM recommendations WHERE project_id=? AND consultant_id=?
         ORDER BY created_at DESC LIMIT 1`).get(id, cid);
-      const outs = db.prepare(`SELECT stage, value_json, observed_at FROM job_outcomes
+      const outs = db.prepare(`SELECT stage, value_json, observed_at, action_id, kind FROM job_outcomes
         WHERE project_id=? AND consultant_id=? ORDER BY observed_at`).all(id, cid);
       // 接单自动找人（0015）：本人接单过才带出状态/结果，其余 null（fail-closed，不泄露存在性）
       const openmai = ['ACCEPTED', 'COMPLETED'].includes(eng.state) ? getOpenmaiResult(db, cid, id) : null;
@@ -388,8 +390,9 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
         job: { ...effective, raw_json: undefined, relation: rel },
         fact_updates: effectiveFactPayload(db, cid, id),
         relation: { relation: rel, source: relRow?.source || null, valid_from: relRow?.valid_from || null },
-        engagement_state: eng.state, legal_actions: legalActions(db, cid, id),
+        engagement_state: eng.state, legal_actions: legalActions(db, cid, id).filter((action) => action !== 'COMPLETE'),
         events, outcomes: outs.map((o) => ({ ...o, value: JSON.parse(o.value_json) })),
+        ...commitmentDetails(db, cid, id),
         openmai,
         latest_recommendation: rec ? { decision_id: rec.decision_id, score: rec.score,
           action: rec.action, confidence_band: rec.confidence_band,
@@ -427,15 +430,42 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
     },
 
     'POST /api/v1/opportunities/:id/engagement': async (req, res, cid, q, id) => {
+      if (!jobVisibleTo(db, cid, id)) return err(res, 404, 'NOT_FOUND', '职位不存在');
       const b = await body(req);
       if (!b) return err(res, 400, 'BAD_JSON', '请求体不是合法 JSON');
-      const out = engage(db, cid, id, b.action, b);
+      if (b.action === 'COMPLETE') return err(res, 422, 'TERMINAL_RESULT_REQUIRED', '请通过终局结果接口提交入职或关闭');
+      const out = b.action === 'ACCEPT' ? acceptCommitment(db, cid, id, b)
+        : b.action === 'RELEASE' ? releaseCommitment(db, cid, id, b)
+        : engage(db, cid, id, b.action, b);
       // 接单自动触发 OpenMai 找人（接单 → 异步找人 → SSE 定向回传；防重/费用控制在任务模块内）
       if (out.ok && out.state === 'ACCEPTED' && b?.action === 'ACCEPT') {
         try { out.openmai = startOpenmaiTask(db, bus, cid, id); }
         catch (e) { out.openmai = { status: 'error', message: String(e.message).slice(0, 200) }; }
       }
       json(res, out.ok ? 200 : (out.status || 409), out);
+    },
+
+    'POST /api/v1/opportunities/:id/progress/suggestion': async (req, res, cid, q, id) => {
+      if (!jobVisibleTo(db, cid, id)) return err(res, 404, 'NOT_FOUND', '职位不存在');
+      const b = await body(req);
+      if (!b) return err(res, 400, 'BAD_JSON', '请求体不是合法 JSON');
+      json(res, 200, { ok: true, suggestion: suggestedAction(db, cid, id, b) });
+    },
+
+    'POST /api/v1/opportunities/:id/progress': async (req, res, cid, q, id) => {
+      if (!jobVisibleTo(db, cid, id)) return err(res, 404, 'NOT_FOUND', '职位不存在');
+      const b = await body(req);
+      if (!b) return err(res, 400, 'BAD_JSON', '请求体不是合法 JSON');
+      const out = recordProgress(db, cid, id, b);
+      json(res, out.ok ? 200 : (out.status || 422), out);
+    },
+
+    'POST /api/v1/opportunities/:id/terminal-result': async (req, res, cid, q, id) => {
+      if (!jobVisibleTo(db, cid, id)) return err(res, 404, 'NOT_FOUND', '职位不存在');
+      const b = await body(req);
+      if (!b) return err(res, 400, 'BAD_JSON', '请求体不是合法 JSON');
+      const out = recordTerminalResult(db, cid, id, b);
+      json(res, out.ok ? 200 : (out.status || 422), out);
     },
 
     // —— 接单自动找人：状态/结果查询（fail-closed：只许本人接单过的职位）——
@@ -471,6 +501,9 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
     },
 
     'GET /api/v1/dismiss-reasons': (req, res) => json(res, 200, { items: DISMISS_REASONS }),
+    'GET /api/v1/commitment-options': (req, res) => json(res, 200, {
+      release_reasons: RELEASE_REASONS, close_reasons: CLOSE_REASONS,
+    }),
 
     // 职位雷达与客户洞察（fail-closed 可见性；只呈现事实，不补造运营指标）
     'GET /api/v1/radar': (req, res, cid) => json(res, 200, { items: radarRows(db, cid) }),

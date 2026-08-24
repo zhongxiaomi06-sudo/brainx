@@ -171,6 +171,9 @@ test("keeps inline card feedback action-only", async () => {
   assert.match(workbench, /feedbackSubmitted\?" feedback-active":" feedback-selecting"/);
   assert.match(workbench, /pick-card-hide-feedback is-thanks/);
   assert.match(workbench, />感谢反馈</);
+  assert.match(workbench, /feedbackTrayRestoreRef/);
+  assert.match(workbench, /setTray\(current=>current\.filter\(id=>id!==job\.id\)\)/);
+  assert.match(workbench, /current\.includes\(job\.id\)\?current:\[\.\.\.current,job\.id\]/);
   assert.match(css, /\.pick-card-hide-feedback\.is-thanks\{display:flex/);
   assert.match(css, /\.pick-card\.feedback-active>:not\(\.pick-card-hide-feedback\)\{filter:blur\(3px\);opacity:\.28;pointer-events:none/);
   assert.match(css, /\.pick-card-feedback-reasons\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);

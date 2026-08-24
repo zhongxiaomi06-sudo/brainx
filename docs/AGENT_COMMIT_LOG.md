@@ -2,6 +2,11 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-08-24｜fix(frontend): 工作台空 actions 崩溃兜底 + 根错误边界
+
+- 改动：`DecisionCard` 对空 `actions` 兜底（原会在 `action.id` 处抛 TypeError 白屏）；「查看上次快照」按钮对空职位数组加守卫；新增根 `ErrorBoundary`（`error-boundary.tsx`）并由 `page.tsx` 包裹。
+- 验证：`vinext build` 通过；`tests/brainx-adapter.test.mjs` 17 例通过；`workbench.tsx` 保持 779 行未增长。
+
 ## 2026-08-24｜docs: 增加文件规模与审查门禁
 
 - 改动：规定手写文件最多 500 行，将 DeepSeek 审查中已复核的问题模式转化为上传前验证规则，并新增审查提炼文档及阅读路由。

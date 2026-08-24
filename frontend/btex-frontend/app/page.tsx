@@ -1,5 +1,10 @@
 import DecisionWorkbench from "./workbench";
+import ErrorBoundary from "./error-boundary";
 
 export default function Home() {
-  return <DecisionWorkbench />;
+  return (
+    <ErrorBoundary>
+      <DecisionWorkbench />
+    </ErrorBoundary>
+  );
 }

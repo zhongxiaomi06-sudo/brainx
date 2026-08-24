@@ -38,11 +38,11 @@ const fixtureJob = (rel) => loadFixture().jobs.find((j) => j.relation === rel);
 /* ① 关系推导：本人行 > 他人主做 → OTHER_CONSULTANT > 团队池默认 TEAM_SHARED */
 test('关系推导：无本人行时按他人主做/团队池默认推导', () => {
   runSync(db, { source: 'fixture', consultant_id: 'felix' }); // 属主本人：关系落位
-  const myJob = fixtureJob('MY_JOB');
-  const teamJob = fixtureJob('TEAM_SHARED');
-  assert.equal(relationOf(db, 'felix', myJob.project_id), 'MY_JOB');        // 本人行优先
-  assert.equal(relationOf(db, 'mia', myJob.project_id), 'OTHER_CONSULTANT'); // Felix 主做 → 对他人
-  assert.equal(relationOf(db, 'mia', teamJob.project_id), 'TEAM_SHARED');    // 团队池默认
+  const myJobPid = splitFixtureJob(fixtureJob('MY_JOB'))[0].project_id;
+  const teamJobPid = splitFixtureJob(fixtureJob('TEAM_SHARED'))[0].project_id;
+  assert.equal(relationOf(db, 'felix', myJobPid), 'MY_JOB');        // 本人行优先
+  assert.equal(relationOf(db, 'mia', myJobPid), 'OTHER_CONSULTANT'); // Felix 主做 → 对他人
+  assert.equal(relationOf(db, 'mia', teamJobPid), 'TEAM_SHARED');    // 团队池默认
   const ctx = relationMap(db, 'mia');
   assert.equal(deriveRelation(ctx, 'P-NO-SUCH-JOB'), 'TEAM_SHARED');         // 无记录亦默认团队池
 });
@@ -64,15 +64,14 @@ test('无策展关系的顾问（mia）推荐池不再为空，且关系均为�
   for (const r of out.items) assert.ok(['TEAM_SHARED', 'OTHER_CONSULTANT'].includes(r.job.relation));
 });
 
-/* ③ ACCEPT 守卫：他人主做职位不可直接接单 */
-test('ACCEPT 守卫：OTHER_CONSULTANT 职位 409，只可机会发现', () => {
-  const myJob = fixtureJob('MY_JOB');
-  let r = engage(db, 'york', myJob.project_id, 'VIEW', { idempotency_key: 'fw:york:view' });
+/* ③ ACCEPT：他人主做职位也可独立接单 */
+test('ACCEPT：OTHER_CONSULTANT 职位可由当前顾问独立接单', () => {
+  const myJobPid = splitFixtureJob(fixtureJob('MY_JOB'))[0].project_id;
+  let r = engage(db, 'york', myJobPid, 'VIEW', { idempotency_key: 'fw:york:view' });
   assert.equal(r.ok, true);
-  r = engage(db, 'york', myJob.project_id, 'ACCEPT', { idempotency_key: 'fw:york:accept', confirm: true });
-  assert.equal(r.ok, false);
-  assert.equal(r.status, 409);
-  assert.match(r.error, /其他顾问主做/);
+  r = engage(db, 'york', myJobPid, 'ACCEPT', { idempotency_key: 'fw:york:accept', confirm: true });
+  assert.equal(r.ok, true);
+  assert.equal(r.state, 'ACCEPTED');
 });
 
 /* ④ 状态机：VIEWED 真正可达；查看 WATCHED 职位不降级；UNWATCH note 落 reason */
@@ -163,7 +162,8 @@ test('migrations：schema_migrations 逐文件记账，重开不重跑', () => {
                           '0007_bitable_fields.sql', '0008_agent12.sql', '0009_switch_app.sql',
                           '0010_ttc_tokens.sql', '0011_ttc_owner.sql', '0012_drop_placeholder.sql',
                           '0013_chat_activity.sql', '0014_recommendation_pick_tray.sql',
-                          '0015_openmai_results.sql', '0016_manual_fact_overrides.sql']);
+                          '0015_openmai_results.sql', '0016_manual_fact_overrides.sql',
+                          '0017_position_add_company.sql', '0017_workbench_preferences.sql']);
 });
 
 const TMPDB = join(tmpdir(), `brainx-fw-${process.pid}.db`);
@@ -180,7 +180,7 @@ test('migrations：旧库 user_version=2 兼容——前 2 个文件标记已应
   legacy.close();
   const reopened = openDb(TMPDB);
   const rows = reopened.prepare('SELECT name FROM schema_migrations ORDER BY name').all().map((r) => r.name);
-  assert.equal(rows.length, 16); // 全部记账
+  assert.equal(rows.length, 18); // 全部记账（0017 两个文件：position + workbench）
   const view = reopened.prepare(`SELECT sql FROM sqlite_master WHERE type='view' AND name='current_engagement'`).get();
   assert.match(view.sql, /VIEWED/); // 0006 新视图已应用（含 VIEWED 推导）
   // 0007 扩列已生效

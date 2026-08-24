@@ -1,0 +1,2 @@
+-- position 表补 company 字段：原 description 被误用存公司名，现独立拆出。
+-- SQLite 侧无 position 表（position 仅在 MySQL 人才库），此迁移仅作占位保持编号连续。

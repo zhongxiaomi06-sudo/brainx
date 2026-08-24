@@ -201,7 +201,7 @@ export function explain(job, relation, scored, ctx) {
   if (job.hc == null) risks.push('HC 未知（飞书源无此字段，待 ATS 补齐）');
   if (b.outcomes == null) risks.push('历史结果维度缺失：冷启动期，证据覆盖率被拉低');
   if (relation === 'TEAM_SHARED') risks.push('团队共享职位：需先确认无人已接单');
-  if (relation === 'OTHER_CONSULTANT') risks.push('其他顾问主做：只能作机会发现，默认不可接单');
+  if (relation === 'OTHER_CONSULTANT') risks.push('其他顾问主做：可作机会发现，接单后请及时与对方沟通协调');
   const evidence_refs = [];
   if (job.source_url) evidence_refs.push({ type: 'source', ref: job.source_url, excerpt: `${job.company}/${job.role}` });
   evidence_refs.push({ type: 'sync', ref: ctx.snapshot_id || '', excerpt: `快照 ${ctx.snapshot_id || 'N/A'} · ${String(job.captured_at).slice(0, 10)}` });

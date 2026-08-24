@@ -8,3 +8,34 @@ logs/
 scripts/session/.state.enc
 scripts/session/out/
 .workbuddy/
+# Claude Code 本地会话配置（不入库）
+/.claude/
+
+# Codex 本地配置与缓存（不入库）
+/.codex/
+
+# 本地一键启动脚本（含本地路径/环境差异，不入库）
+/start-local.bat
+/start-local.sh
+
+# 本地服务日志与 SQLite 临时文件（不入库）
+server.log
+server.err.log
+frontend.log
+sync.out.log
+sync.err.log
+*.db-shm
+*.db-wal
+
+# 构建产物（部署时由 npm run build 生成，不入库）
+dist/
+build/
+
+# 调试/一次性脚本与备份（不入库）
+*.bak
+*.bak.*
+.env.bak*
+diag_*.mjs
+check_om.mjs
+fix_zombie.mjs
+test_rerun.mjs

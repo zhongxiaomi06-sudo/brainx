@@ -249,10 +249,12 @@ const TALENT_DDL = [
   `CREATE TABLE IF NOT EXISTS \`position\` (
     \`id\` bigint(20) NOT NULL AUTO_INCREMENT,
     \`title\` varchar(200) NOT NULL COMMENT '岗位名称',
+    \`company\` varchar(200) DEFAULT NULL COMMENT '所属公司',
     \`description\` text COMMENT '岗位描述',
     \`requirements\` text COMMENT '岗位要求',
     \`created_at\` datetime DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (\`id\`)
+    PRIMARY KEY (\`id\`),
+    UNIQUE KEY \`uk_title_company\` (\`title\`, \`company\`)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='岗位表'`,
 
   // 7) 人才岗位匹配记录表（依赖 talent + position）

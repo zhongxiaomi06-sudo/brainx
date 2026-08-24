@@ -4,8 +4,8 @@
 import './env.js';
 import http from 'node:http';
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { join, normalize, dirname, sep } from 'node:path';
+import { existsSync, readFileSync, statSync } from 'node:fs';
+import { join, normalize, dirname, sep, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openDb } from './db.js';
 import { runSync, latestSync, latestCompleteSnapshot } from './sync.js';
@@ -32,21 +32,67 @@ import { talentSupplyForJob, talentSupplyEnabled } from './talent-supply.js';
 import { effectiveJob, effectiveFactPayload, updateFactOverrides } from './facts.js';
 import { chatStream, isLlmConfigured } from './llm.js';
 import { pickTray, nextBatch, feedback as recommendationFeedback, undoFeedback as recommendationUndoFeedback } from './recommendation-batch.js';
+import { verifySnapshotKey, jobSnapshot } from './snapshot.js';
+import { createGuard } from './guard.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const FRONTEND_DIR = join(ROOT, 'frontend', 'btex-frontend');
 const FRONTEND_HOST = process.env.BRAINX_FRONTEND_HOST || '127.0.0.1';
 const FRONTEND_PORT = Number(process.env.BRAINX_FRONTEND_PORT || 4321);
+// 本地静态资源目录：vinext 在部分环境（Windows）不提供 /assets，后端直接读 dist 产物绕过
+const STATIC_DIR = join(FRONTEND_DIR, 'dist', 'client');
+const STATIC_MIME = {
+  '.css': 'text/css; charset=utf-8',
+  '.js': 'application/javascript; charset=utf-8',
+  '.mjs': 'application/javascript; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.html': 'text/html; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.ico': 'image/x-icon',
+  '.webp': 'image/webp',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf',
+  '.eot': 'application/vnd.ms-fontobject',
+};
 
 /** 目录穿越判定：必须带分隔符前缀——裸 startsWith(base) 会把兄弟目录
  * （public-x/… 前缀同为 /…/public）误判为内部（2026-08-10 框架修正）。 */
-export const isPathInside = (base, fp) => fp === base || fp.startsWith(base + sep);
+export const isPathInside = (base, fp) => {
+  const normalizedBase = normalize(base);
+  const normalizedPath = normalize(fp);
+  const baseWithSep = normalizedBase.endsWith(sep) ? normalizedBase : normalizedBase + sep;
+  return normalizedPath === normalizedBase || normalizedPath.startsWith(baseWithSep);
+};
 
 const json = (res, code, obj) => {
   res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
   res.end(JSON.stringify(obj));
 };
 const err = (res, code, codeStr, message) => json(res, code, { error: { code: codeStr, message } });
+const safeJsonArray = (value, fallback = []) => {
+  try {
+    const parsed = JSON.parse(value || '[]');
+    return Array.isArray(parsed) ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+};
+const normalizeWorkbenchPreferences = (input = {}) => {
+  const cleanId = (value) => String(value || '').trim().slice(0, 120);
+  const tray = Array.isArray(input.tray) ? Array.from(new Set(input.tray.map(cleanId).filter(Boolean))).slice(0, 100) : [];
+  const folders = Array.isArray(input.folders) ? input.folders.slice(0, 50).map((folder, index) => {
+    const id = cleanId(folder?.id) || `folder-${index + 1}`;
+    const name = String(folder?.name || '').trim().slice(0, 80) || '未命名文件夹';
+    const jobIds = Array.isArray(folder?.jobIds) ? Array.from(new Set(folder.jobIds.map(cleanId).filter(Boolean))).slice(0, 200) : [];
+    return { id, name, jobIds };
+  }) : [];
+  return { tray, folders, folderMode: !!input.folderMode };
+};
 
 const proxyFrontend = (req, res, target) => {
   const targetPath = req.url === '/login' || req.url?.startsWith('/login?')
@@ -78,6 +124,8 @@ async function body(req) {
 export function createServer(db = openDb(), deps = {}) {
   const exchange = deps.exchangeCode || exchangeCode;
   const devAuth = process.env.BRAINX_DEV_AUTH === '1';
+  // 请求指标（预测告警装置数据源）：仅聚合数字，无业务数据，经 /api/v1/meta/guard 暴露
+  const guard = createGuard();
   const auth = (req, res) => {
     const s = verifySession(cookieOf(req));
     if (!s) err(res, 401, 'UNAUTHORIZED', '未登录或会话已过期');
@@ -309,6 +357,33 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
         today_top3: run ? run.items.slice(0, 3) : [],
         run_id: run?.run?.run_id || null,
       });
+    },
+
+    'GET /api/v1/workbench/preferences': (req, res, cid) => {
+      const row = db.prepare('SELECT tray_json, folders_json, folder_mode, updated_at FROM workbench_preferences WHERE consultant_id=?').get(cid);
+      json(res, 200, row ? {
+        tray: safeJsonArray(row.tray_json),
+        folders: safeJsonArray(row.folders_json),
+        folderMode: !!row.folder_mode,
+        updatedAt: row.updated_at,
+      } : { tray: [], folders: [], folderMode: false, updatedAt: null });
+    },
+
+    'PUT /api/v1/workbench/preferences': async (req, res, cid) => {
+      const b = await body(req);
+      if (!b) return err(res, 400, 'BAD_JSON', '请求体不是合法 JSON');
+      const prefs = normalizeWorkbenchPreferences(b);
+      const updatedAt = new Date().toISOString();
+      db.prepare(`INSERT INTO workbench_preferences (consultant_id, tray_json, folders_json, folder_mode, updated_at)
+        VALUES (?,?,?,?,?)
+        ON CONFLICT(consultant_id) DO UPDATE SET
+          tray_json=excluded.tray_json,
+          folders_json=excluded.folders_json,
+          folder_mode=excluded.folder_mode,
+          updated_at=excluded.updated_at`).run(
+        cid, JSON.stringify(prefs.tray), JSON.stringify(prefs.folders), prefs.folderMode ? 1 : 0, updatedAt,
+      );
+      json(res, 200, { ok: true, ...prefs, updatedAt });
     },
 
     'GET /api/v1/recommendations': (req, res, cid, q) => {
@@ -548,6 +623,21 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       json(res, 200, { ok: true, consultant_id: consultantId, ...ttcAuthStatus(db, consultantId) });
     },
 
+    // 职位快照（外部系统消费，替代直打 CRM job/search；API Key 鉴权，不走 session）
+    'GET /api/v1/jobs/snapshot': (req, res, cid, q) => {
+      if (!verifySnapshotKey(req)) return err(res, 401, 'INVALID_API_KEY', '缺少或无效的 API Key（Bearer token）');
+      const out = jobSnapshot(db, {
+        updated_after: q.get('updated_after') || undefined,
+        updated_before: q.get('updated_before') || undefined,
+        status: q.get('status') || undefined,
+        limit: q.get('limit') || undefined,
+      });
+      json(res, 200, out);
+    },
+
+    // 请求指标（预测告警装置数据源）：聚合计数/字节量，无敏感数据，供看门狗轮询
+    'GET /api/v1/meta/guard': (req, res) => json(res, 200, guard.snapshot()),
+
     // SSE：桥接器有变化时推 sync/recommend/sync_error；25s 心跳保活
     'GET /api/v1/events': (req, res, cid) => {
       res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8',
@@ -593,6 +683,7 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
   };
 
   const server = http.createServer(async (req, res) => {
+    guard.record(req, res);
     const u = new URL(req.url, 'http://x');
     let path = u.pathname;
     // 动态段匹配：/api/v1/opportunities/:id/engagement 等
@@ -615,13 +706,27 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
                     'POST /api/v1/ttc/ext-sync', 'GET /api/v1/ttc/status',
                     // 人才库健康探测：纯状态（后端类型/连通性/建表），不含任何用户数据或密码，
                     // 允许未登录访问，以便数据源页无论登录与否都能显示真库连接状态。
-                    'GET /api/v1/talent/health', 'GET /api/v1/talent/status'];
+                    'GET /api/v1/talent/health', 'GET /api/v1/talent/status',
+                    // 职位快照：外部系统（York AI worker 等）无 brainx session，凭 API Key 读取；
+                    // 鉴权在 handler 内自校验（verifySnapshotKey），未配置 key 时 fail-closed 全拒。
+                    'GET /api/v1/jobs/snapshot', 'GET /api/v1/meta/guard'];
       const cid = open.includes(`${req.method} ${path}`) ? null : auth(req, res);
       if (open.includes(`${req.method} ${path}`) || cid) {
         try { return await handler(req, res, cid, u.searchParams, dynId); }
         catch (e) { return err(res, 500, 'INTERNAL', String(e.message).slice(0, 300)); }
       }
       return;
+    }
+    // —— 本地静态资源直读：vinext Windows 下不提供 /assets，从 dist/client 直接返回 ——
+    if (!path.startsWith('/api/') && STATIC_DIR && /^\/(assets|favicon\.ico|fonts|images|icons)\b/.test(path)) {
+      const rel = path.replace(/^\/+/, '');
+      const fp = join(STATIC_DIR, rel);
+      if (isPathInside(STATIC_DIR, fp) && existsSync(fp) && statSync(fp).isFile()) {
+        const ct = STATIC_MIME[extname(fp).toLowerCase()] || 'application/octet-stream';
+        res.writeHead(200, { 'Content-Type': ct, 'Cache-Control': 'no-cache' });
+        res.end(readFileSync(fp));
+        return;
+      }
     }
     if (deps.frontendTarget && !path.startsWith('/api/')) {
       return proxyFrontend(req, res, deps.frontendTarget);
@@ -630,6 +735,7 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
     err(res, 404, 'NOT_FOUND', `${req.method} ${path}`);
   });
   server.bus = bus; // 主块/测试用来广播桥接事件
+  server.guard = guard; // 看门狗/测试可直读指标
   server.frontendTarget = deps.frontendTarget || null;
   return server;
 }
@@ -645,9 +751,12 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const server = createServer(db, { frontendTarget });
   let frontendProcess = null;
   if (frontendTarget && existsSync(join(FRONTEND_DIR, 'package.json'))) {
-    frontendProcess = spawn('npm', ['run', 'start', '--', '--host', FRONTEND_HOST, '--port', String(FRONTEND_PORT)], {
+    // Windows 上 npm 实为 npm.cmd，spawn 默认不带 shell 且不补 .cmd 后缀，直接 spawn('npm') 会 ENOENT
+    const isWin = process.platform === 'win32';
+    frontendProcess = spawn(isWin ? 'npm.cmd' : 'npm', ['run', 'start', '--', '--host', FRONTEND_HOST, '--port', String(FRONTEND_PORT)], {
       cwd: FRONTEND_DIR,
       env: { ...process.env, PORT: String(FRONTEND_PORT), HOSTNAME: FRONTEND_HOST },
+      shell: isWin,
       stdio: 'inherit',
     });
     frontendProcess.on('error', (e) => console.error(`[frontend] 启动失败：${e.message}`));

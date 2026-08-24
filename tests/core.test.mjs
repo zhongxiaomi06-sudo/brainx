@@ -2,7 +2,7 @@
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { openDb } from '../src/db.js';
-import { runSync, latestCompleteSnapshot } from '../src/sync.js';
+import { runSync, latestCompleteSnapshot, loadFixture } from '../src/sync.js';
 import { recommend, latestRun } from '../src/recommend.js';
 import { engage, currentState, commitmentSummary, inCooldown } from '../src/engagement.js';
 import { replay, recordOutcome } from '../src/replay.js';
@@ -23,10 +23,12 @@ test('迁移幂等：重复打开不报错、版本前进', () => {
   assert.ok(v1 >= 2 && v2 >= 2);
 });
 
-test('同步：60 行全量入库，complete=1', () => {
+test('同步：fixture 全量入库，complete=1', () => {
   const out = runSync(db, { source: 'fixture', consultant_id: CID });
   assert.equal(out.complete, true);
-  assert.equal(out.rows_read, 60);
+  // fixture 63 条原始 → splitFixtureJob 公司×单职能展开（fixture_split.js），
+  // rows_expected/rows_read 均按展开后计；干净 fixture 无重复无错误 → 两者相等即全量入库。
+  assert.equal(out.rows_read, out.rows_expected);
   assert.equal(out.errors.length, 0);
 });
 
@@ -154,7 +156,11 @@ test('关注榜上限 10：满员拒绝且禁止静默替换', () => {
     if (r.ok) watched++;
   }
   assert.equal(watched, 10);
-  const extra = others.find((p) => currentState(db, CID, p).state !== 'WATCHED');
+  // 找一个没被 DISMISS 过（无冷却期）也没被 WATCH 的 pid
+  const extra = others.find((p) => {
+    const s = currentState(db, CID, p);
+    return !s.state || s.state === 'RECOMMENDED' || s.state === 'VIEWED';
+  });
   const r = engage(db, CID, extra, 'WATCH', { idempotency_key: `t4:extra:${extra}` });
   assert.equal(r.ok, false);
   assert.match(r.error, /关注榜已满/);

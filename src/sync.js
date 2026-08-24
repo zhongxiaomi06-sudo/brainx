@@ -86,6 +86,8 @@ export function runSync(db, { source = 'fixture', consultant_id = 'felix', dry_r
     // 进而触发前端「本次同步不完整」阻断全部推荐。
     if (seen.has(j.project_id)) { warnings.push(`输入内重复 project_id（已去重保留首条）：${j.project_id}`); continue; }
     seen.add(j.project_id);
+    j.company = j.company.replace(/[\n\r]/g, '').trim();
+    j.role = j.role.replace(/[\n\r]/g, '').trim();
     valid.push(j);
   }
   const sync_id = uuid();

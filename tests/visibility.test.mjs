@@ -20,7 +20,7 @@ before(() => {
   runSync(db, { source: 'fixture', consultant_id: 'felix' }); // 60 职位 + felix 策展关系
 });
 
-const PID = 'P-FIX-E5FC611B'; // fixture 中 felix PRIMARY_PM 的职位
+const PID = 'P-FIX-6FFEA4D1'; // fixture 拆分后 Rockflow×产品（felix PRIMARY_PM）
 
 const serve = async () => {
   const server = createServer(db);

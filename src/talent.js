@@ -229,9 +229,9 @@ export async function listMatchesForPosition(positionId) {
 }
 
 /** UPSERT 岗位（供匹配写入前建岗位用）。 */
-export async function upsertPosition({ title, description, requirements }) {
+export async function upsertPosition({ title, company, description, requirements }) {
   const b = await backend();
-  return b.upsertPosition({ title: norm(title), description: description ?? null, requirements: requirements ?? null });
+  return b.upsertPosition({ title: norm(title), company: company ?? null, description: description ?? null, requirements: requirements ?? null });
 }
 
 // ---------------------------------------------------------------------------
@@ -329,12 +329,12 @@ function makeMysqlBackend(db) {
         return rows.map((r) => ({ ...r, tags: byTalent.get(r.id) || [] }));
       });
     },
-    async upsertPosition({ title, description, requirements }) {
+    async upsertPosition({ title, company, description, requirements }) {
       return withMysql(async (conn) => {
-        const [hit] = await conn.execute(`SELECT id FROM \`position\` WHERE title=? LIMIT 1`, [title]);
+        const [hit] = await conn.execute(`SELECT id FROM \`position\` WHERE title=? AND (company=? OR (company IS NULL AND ? IS NULL)) LIMIT 1`, [title, company, company]);
         if (hit[0]) return { id: hit[0].id, created: false };
         const [res] = await conn.execute(
-          `INSERT INTO \`position\` (title, description, requirements) VALUES (?,?,?)`, [title, description, requirements]);
+          `INSERT INTO \`position\` (title, company, description, requirements) VALUES (?,?,?,?)`, [title, company, description, requirements]);
         return { id: res.insertId, created: true };
       });
     },
@@ -464,10 +464,10 @@ const MEM = {
         .map((x) => { const g = tagById.get(x.tag_id); return { name: g?.name, category: g?.category }; }),
     }));
   },
-  async upsertPosition({ title, description, requirements }) {
-    for (const p of this._positions.values()) if (p.title === title) return { id: p.id, created: false };
+  async upsertPosition({ title, company, description, requirements }) {
+    for (const p of this._positions.values()) if (p.title === title && p.company === company) return { id: p.id, created: false };
     const id = ++this._seq.position;
-    this._positions.set(id, { id, title, description, requirements });
+    this._positions.set(id, { id, title, company, description, requirements });
     return { id, created: true };
   },
   async writeMatch({ talentId, positionId, score, detail }) {

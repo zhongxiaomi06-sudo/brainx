@@ -104,13 +104,34 @@ push({
 });
 
 // 4b. ZP 日报职位（真实标题+顾问+城市+客户状态）→ 对 Felix 均为他人主做
+// 修复：原代码错把 z.owner(主做顾问姓名)+'线' 当公司名，产生"Devin郭显然线"等脏数据。
+// 改为：用 z.role 反查 pandian 职位池的真实公司名，匹配上才录入；仍无公司的跳过。
+const roleToCompany = new Map();
+for (const r of pandianRows) {
+  const rRole = flat(r['职位']);
+  if (rRole) roleToCompany.set(rRole, flat(r['公司']));
+}
+let zpMatched = 0, zpSkipped = 0;
 for (const z of zpJobs) {
+  let company = roleToCompany.get(z.role) || '';
+  if (!company) {
+    // 容错：去掉"（多岗）"与空白后再比一次
+    const norm = (s) => s.replace(/（多岗）|\s/g, '');
+    for (const [r, c] of roleToCompany) {
+      if (norm(r) === norm(z.role)) { company = c; break; }
+    }
+  }
+  if (!company) { zpSkipped += 1; continue; }
+  zpMatched += 1;
   push({
-    company: z.owner.replace(/\s/g, '') + '线', role: z.role, city: z.city || null,
+    company, role: z.role, city: z.city || null,
     pipeline: z.pipeline || null, relation: 'OTHER_CONSULTANT',
     relation_note: `主做：${z.owner}`,
     source_url: 'feishu://chat/oc_a56daa7bcbb36c27ae2d5de16f01abf1',
   });
+}
+if (zpMatched || zpSkipped) {
+  console.log(`ZP 日报: 反查公司匹配 ${zpMatched} 条, 跳过无公司 ${zpSkipped} 条`);
 }
 
 // 4c. 职位盘点行（真实公司池）→ 团队共享；两条「无，待定」作 COOLING/历史

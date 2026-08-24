@@ -40,6 +40,15 @@ test("uses the reference three-column shell and a single-column opportunity work
   assert.match(workbench, /冻结快照/); // PR#5 评审恢复：证据出处标注必须存在（禁止裸分数纪律）
   assert.doesNotMatch(workbench, /离线演示态不显示供给/);
   assert.match(workbench, /旁路只读 · 不计入最终得分/); // PR#5 评审恢复：供给不并入评分的用户可见承诺
+  // main 侧功能移植断言（第一批合并：5194e9a/bbcbf4e/9c6d400 语义不得在新壳里丢失）
+  assert.match(workbench, /为什么删除「\$\{job\.company\} · \$\{job\.role\}」？（必填）/);
+  assert.match(workbench, /确定接单/);
+  assert.match(workbench, /pick-card-accept/);
+  assert.match(workbench, /updateWorkbenchPreferences/);
+  assert.match(workbench, /snapshot\.preferences\.tray/);
+  assert.match(workbench, /setOpenmaiByJob\(snapshot\.openmai\|\|\{\}\)/);
+  assert.match(workbench, /退出承接/);
+  assert.match(css, /\.pick-card-accept\{display:inline-flex/);
   assert.match(css, /\.drawer-section-head\{margin-bottom:14px\}/);
   assert.match(css, /\.drawer-section-head h2\{margin:0\}/);
 });

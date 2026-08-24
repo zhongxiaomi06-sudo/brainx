@@ -62,6 +62,8 @@ export type BrainxSnapshot = {
   snapshotId: string | null;
   policyVersion: string | null;
   profileKeywords: string[];
+  openmai: Record<string, OpenmaiResult | null>;
+  preferences: WorkbenchPreferences;
 };
 
 export type BrainxReplay = {
@@ -119,6 +121,7 @@ export type BackendOpportunity = {
   relation: { relation: string | null; source?: string | null; valid_from?: string | null };
   engagement_state: EngagementState; legal_actions: EngagementCommand[];
   events: BackendEvent[]; outcomes: BackendOutcome[]; latest_recommendation: BackendLatestRecommendation | null;
+  openmai?: OpenmaiResult | null;
 };
 export type BackendEvent = { event_type: string; occurred_at?: string; actor?: string; reason?: string | null };
 export type BackendOutcome = { stage: string; observed_at?: string; value?: { rating?: number; note?: string } | null };
@@ -134,11 +137,13 @@ export type BackendReplay = {
   events: BackendEvent[]; outcomes: BackendOutcome[];
 };
 export type BackendProfile = { consultant_id: string; display_name: string; profile_keywords: string[]; profile_note: string; feishu_auth?: { authorized?: boolean; needs_reauth?: boolean } };
+export type WorkbenchFolder = { id: string; name: string; jobIds: string[] };
+export type WorkbenchPreferences = { tray: string[]; folders: WorkbenchFolder[]; folderMode: boolean; updatedAt?: string | null };
 export type BackendRadarRow = BackendJob & { engagement_state?: EngagementState; cockpit?: { membership_status?: string | null; current_stage?: string | null; stage_confidence?: string | null; pipeline_snapshot?: string | null; next_action?: string | null; cockpit_as_of?: string | null; completeness?: string | null; source_url?: string | null } | null };
 export type BackendClientRow = { company: string; company_type?: string | null; job_count?: number; active_jobs?: number; hc_known?: number | null; last_activity?: string | null; relations?: string[]; states?: string[] };
 export type BackendDismissReasons = { items: string[] };
 export type BackendSessionStatus = { configured: boolean; dev_auth: boolean };
-export type BackendSseEvent = { type?: "hello" | "sync" | "recommend" | "sync_error"; message?: string; consultant_id?: string; at?: string };
+export type BackendSseEvent = { type?: "hello" | "sync" | "recommend" | "sync_error" | "openmai_result"; message?: string; consultant_id?: string; project_id?: string; status?: string; at?: string };
 export type BackendConsultants = { items: { consultant_id: string; display_name: string }[] };
 export type BackendEngagementResponse = { ok: boolean; already?: boolean; event_id?: string; state: EngagementState; legal_actions: EngagementCommand[] };
 export type BackendRecommendationRun = { blocked?: boolean; reason?: string; run_id?: string | null; items?: BackendRecommendation[] };
@@ -245,7 +250,8 @@ export function directionOf(role: string): BrainxDirection {
 
 export function eligibilityOf(action: string, relation: string, hc: number | null, activeState: string): BrainxEligibility {
   if (hc === 0 || activeState === "CLOSED" || activeState === "COMPLETED") return "EXCLUDED";
-  if (relation === "NOT_JOINED" || relation === "OTHER_CONSULTANT" || relation === "UNKNOWN") return "VERIFY_REQUIRED";
+  // OTHER_CONSULTANT 不再阻塞接单（顾问接单互不影响，仅保留"他人主做"提示）
+  if (relation === "NOT_JOINED" || relation === "UNKNOWN") return "VERIFY_REQUIRED";
   if (action === "OBSERVE") return "VERIFY_REQUIRED";
   return "ELIGIBLE";
 }
@@ -588,6 +594,12 @@ export async function undoRecommendationFeedback(projectId: string): Promise<{ o
   });
 }
 
+export async function updateWorkbenchPreferences(preferences: Pick<WorkbenchPreferences, "tray" | "folders" | "folderMode">): Promise<{ ok: boolean } & WorkbenchPreferences> {
+  return brainxFetch<{ ok: boolean } & WorkbenchPreferences>("/api/v1/workbench/preferences", {
+    method: "PUT", body: preferences,
+  });
+}
+
 export type ManualFactUpdate = {
   changes?: Partial<Record<ManualFactField, string | number>>;
   clear_fields?: ManualFactField[];
@@ -689,11 +701,12 @@ export async function streamAssistant(
 /** 读取完整工作台快照：概览 + 推荐 + 逐职位详情（承接态/允许动作/事件/结果）+ 画像。
  *  会话未登录（401）时抛错，由调用方进入离线回退。 */
 export async function getSnapshot(): Promise<BrainxSnapshot> {
-  const [wb, recs, profile, dismiss] = await Promise.all([
+  const [wb, recs, profile, dismiss, preferences] = await Promise.all([
     brainxFetch<BackendWorkbench>("/api/v1/workbench"),
     brainxFetch<BackendRecommendations>("/api/v1/recommendations?limit=20"),
     brainxFetch<BackendProfile>("/api/v1/profile"),
     brainxFetch<BackendDismissReasons>("/api/v1/dismiss-reasons").catch(() => ({ items: FALLBACK_DISMISS_REASONS })),
+    brainxFetch<WorkbenchPreferences>("/api/v1/workbench/preferences").catch(() => ({ tray: [], folders: [], folderMode: false, updatedAt: null })),
   ]);
 
   const jobs = (recs.items || []).map(mapRecommendation) as BrainxJob[];
@@ -701,6 +714,7 @@ export async function getSnapshot(): Promise<BrainxSnapshot> {
   const events: Record<string, DecisionEvent[]> = {};
   const outcomes: Record<string, Outcome[]> = {};
   const legal: Record<string, EngagementCommand[]> = {};
+  const openmai: Record<string, OpenmaiResult | null> = {};
 
   const details = await Promise.all(
     jobs.map((j) => brainxFetch<BackendOpportunity>(`/api/v1/opportunities/${encodeURIComponent(j.id)}`).catch(() => null)),
@@ -710,6 +724,7 @@ export async function getSnapshot(): Promise<BrainxSnapshot> {
     const decisionId = d?.latest_recommendation?.decision_id || recs.items[i]?.decision_id;
     job.brainxDecisionId = decisionId;
     if (!d) return;
+    openmai[job.id] = d.openmai ?? null;
     engagement[job.id] = d.engagement_state as EngagementState;
     events[job.id] = mapEvents(d.events);
     outcomes[job.id] = mapOutcomes(d.outcomes);
@@ -743,6 +758,7 @@ export async function getSnapshot(): Promise<BrainxSnapshot> {
     events,
     outcomes,
     legal,
+    openmai,
     sync: mapSyncStatus(wb.sync, wb.feishu_auth),
     auth: {
       consultant: profile.display_name || wb.consultant_id || "顾问",
@@ -755,6 +771,7 @@ export async function getSnapshot(): Promise<BrainxSnapshot> {
     snapshotId: recs.snapshot_id || null,
     policyVersion: recs.policy_version || wb.current_policy_version || null,
     profileKeywords: profile.profile_keywords || [],
+    preferences,
   };
 }
 

@@ -456,6 +456,28 @@ function DecisionToday({activeJobId,completed,jobs,engagement,sync,open,onAction
 }
 
 function PickTray({trayJobs,featuredJobs,allJobs,folderMode,onFolderMode,folders,onRemoveTray,onToggleTray,onConfirmTray,onAssignFolder,onCreateFolder,open}:{trayJobs:DecisionJob[];featuredJobs:DecisionJob[];allJobs:DecisionJob[];folderMode:boolean;onFolderMode:()=>void;folders:PickFolder[];onRemoveTray:(id:string)=>void;onToggleTray:(id:string)=>void;onConfirmTray:()=>void;onAssignFolder:(jobId:string,folderId:string)=>void;onCreateFolder:(name:string)=>void;open:(job:DecisionJob)=>void}){
+ const fireworkClickCount=useRef(0);
+ const fireworkClickResetTimer=useRef<number|null>(null);
+ const fireworkHideTimer=useRef<number|null>(null);
+ const [fireworksRun,setFireworksRun]=useState(0);
+ const [fireworksVisible,setFireworksVisible]=useState(false);
+ useEffect(()=>()=>{
+  if(fireworkClickResetTimer.current!==null)window.clearTimeout(fireworkClickResetTimer.current);
+  if(fireworkHideTimer.current!==null)window.clearTimeout(fireworkHideTimer.current);
+ },[]);
+ const triggerFireworks=()=>{
+  fireworkClickCount.current+=1;
+  if(fireworkClickResetTimer.current!==null)window.clearTimeout(fireworkClickResetTimer.current);
+  fireworkClickResetTimer.current=window.setTimeout(()=>{fireworkClickCount.current=0;fireworkClickResetTimer.current=null},900);
+  if(fireworkClickCount.current>=2){
+   fireworkClickCount.current=0;
+   if(fireworkClickResetTimer.current!==null){window.clearTimeout(fireworkClickResetTimer.current);fireworkClickResetTimer.current=null}
+   if(fireworkHideTimer.current!==null)window.clearTimeout(fireworkHideTimer.current);
+   setFireworksRun(value=>value+1);
+   setFireworksVisible(true);
+   fireworkHideTimer.current=window.setTimeout(()=>{setFireworksVisible(false);fireworkHideTimer.current=null},2200);
+  }
+ };
  if(folderMode)return <section className="pick-tray folder-mode" aria-label="职位文件夹">
   <div className="pick-tray-head"><div className="pick-tray-title"><span className="decision-zone-kicker">PICK FOLDERS</span><b>文件夹</b></div><button className="btn quiet" onClick={onFolderMode}><Sparkles/>返回精选盘</button></div>
   <div className="folder-create"><FolderPlus/><input className="field" placeholder="新建文件夹，如：周末回访" aria-label="新建文件夹名称" onKeyDown={e=>{const t=e.target as HTMLInputElement;if(e.key==="Enter"&&t.value.trim()){onCreateFolder(t.value);t.value=""}}}/><button className="btn" onClick={e=>{const input=(e.currentTarget.parentElement as HTMLElement).querySelector("input") as HTMLInputElement;if(input.value.trim()){onCreateFolder(input.value);input.value=""}}}>新建</button></div>
@@ -463,8 +485,9 @@ function PickTray({trayJobs,featuredJobs,allJobs,folderMode,onFolderMode,folders
  </section>;
  const showcaseJobs=(trayJobs.length?trayJobs:featuredJobs).slice(0,4);
  return <section className="pick-tray concept-showcase" aria-label="精选盘">
-  <div className="pick-tray-head"><div className="pick-tray-title"><b>精选盘</b><span className="decision-zone-kicker">MY PICK TRAY</span><em>{trayJobs.length?`${trayJobs.length} 已收藏`:"推荐预览"}</em></div><div className="pick-tray-actions"><button className="concept-showcase-link" type="button" onClick={()=>document.getElementById("opportunity-list")?.scrollIntoView({behavior:"smooth",block:"start"})}>查看全部<ChevronRight/></button><button className="icon-btn concept-folder-button" onClick={onFolderMode} aria-label="打开精选文件夹" title="文件夹模式"><FolderOpen/></button><button className="btn primary" onClick={onConfirmTray} disabled={trayJobs.length===0}><Check/>确定</button></div></div>
+  <div className="pick-tray-head"><div className="pick-tray-title"><button type="button" className="pick-tray-firework-trigger" onClick={triggerFireworks}>精选盘</button><span className="decision-zone-kicker">MY PICK TRAY</span><em>{trayJobs.length?`${trayJobs.length} 已收藏`:"推荐预览"}</em></div><div className="pick-tray-actions"><button className="concept-showcase-link" type="button" onClick={()=>document.getElementById("opportunity-list")?.scrollIntoView({behavior:"smooth",block:"start"})}>查看全部<ChevronRight/></button><button className="icon-btn concept-folder-button" onClick={onFolderMode} aria-label="打开精选文件夹" title="文件夹模式"><FolderOpen/></button><button className="btn primary" onClick={onConfirmTray} disabled={trayJobs.length===0}><Check/>确定</button></div></div>
   <div className="pick-tray-plates">{showcaseJobs.map(job=><ShowcaseCard key={job.id} job={job} selected={trayJobs.some(item=>item.id===job.id)} open={open} onToggle={()=>onToggleTray(job.id)} onRemove={()=>onRemoveTray(job.id)}/>)}</div>
+  {fireworksVisible&&<div key={fireworksRun} className="pick-tray-fireworks" aria-hidden="true">{["one","two","three","four","five"].map(burst=><i key={burst} className={`pick-tray-firework-burst burst-${burst}`}>{Array.from({length:12},(_,index)=><span key={index}/>)}</i>)}</div>}
  </section>
 }
 

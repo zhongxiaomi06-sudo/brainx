@@ -246,6 +246,20 @@ test("credits the dinosaur empty state to Otto", async () => {
   assert.match(css, /\.dino-credit\{position:absolute;right:24px;bottom:16px/);
 });
 
+test("launches a silent firework easter egg after two pick-tray title clicks", async () => {
+  const [workbench, css] = await Promise.all([
+    source("app/workbench.tsx"),
+    source("app/globals.css"),
+  ]);
+
+  assert.match(workbench, /fireworkClickCount\.current\+=1/);
+  assert.match(workbench, /fireworkClickCount\.current>=2/);
+  assert.match(workbench, /className="pick-tray-firework-trigger"/);
+  assert.match(workbench, /className="pick-tray-fireworks"/);
+  assert.match(css, /@keyframes pick-tray-firework-ray/);
+  assert.match(css, /@media\(prefers-reduced-motion:reduce\)\{\.pick-tray-fireworks\{display:none\}\}/);
+});
+
 test("keeps the collapsible resizable navigation and retains the commitments panel", async () => {
   const [workbench, css] = await Promise.all([
     source("app/workbench.tsx"),

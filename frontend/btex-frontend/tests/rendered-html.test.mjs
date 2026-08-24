@@ -37,6 +37,11 @@ test("uses the reference three-column shell and a single-column opportunity work
   assert.match(workbench, /<Pencil aria-hidden="true"\/>编辑/);
   assert.doesNotMatch(workbench, /修正事实/);
   assert.match(css, /\.fact-edit-trigger\{display:inline-flex/);
+  assert.doesNotMatch(workbench, /冻结快照/);
+  assert.doesNotMatch(workbench, /离线演示态不显示供给/);
+  assert.doesNotMatch(workbench, /旁路只读 · 不计入最终得分/);
+  assert.match(css, /\.drawer-section-head\{margin-bottom:14px\}/);
+  assert.match(css, /\.drawer-section-head h2\{margin:0\}/);
 });
 
 test("splits candidates by their live engagement state and keeps verification jobs pending", async () => {

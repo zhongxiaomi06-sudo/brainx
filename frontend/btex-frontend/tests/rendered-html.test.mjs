@@ -201,8 +201,8 @@ test("refreshes algorithmic recommendations from the brand control", async () =>
   assert.match(workbench, /!excludedRecommendationIds\.has\(job\.id\)/);
   assert.match(workbench, /!tray\.includes\(job\.id\)&&!dismissedRecommendationIds\.includes\(job\.id\)/);
   assert.match(workbench, /const allJobs=\[\.\.\.acceptedJobs,\.\.\.jobs\.filter\(job=>engagement\[job\.id\]!=="ACCEPTED"\),\.\.\.verificationJobs\]/);
-  assert.match(workbench, /当前推荐已处理完/);
-  assert.match(workbench, /精选盘和不感兴趣的职位不会重复出现/);
+  assert.match(workbench, /你已到达世界的尽头/);
+  assert.doesNotMatch(workbench, /当前推荐已处理完|精选盘和不感兴趣的职位不会重复出现|换一批推荐<\/button>/);
   assert.match(css, /\.rail-brand-logo\.is-spinning/);
   assert.match(css, /\.recommendation-empty/);
 });

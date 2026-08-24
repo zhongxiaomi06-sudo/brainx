@@ -111,6 +111,16 @@ test("preserves engagement, result recording, replay, sync and notifications", a
   assert.match(loop, /加入项目/);
   assert.match(loop, /我的职位/);
   assert.match(loop, /团队共享/);
+  assert.match(loop, /membershipNeedsConfirmation/);
+  assert.match(loop, /"待确认","UNKNOWN"/);
+  assert.match(loop, /requiresFactVerification/);
+  assert.match(loop, /核验关键事实/);
+  assert.match(loop, /去核验/);
+  assert.match(loop, /state==="COMPLETED"/);
+  assert.match(loop, /terminalResult:/);
+  assert.match(loop, /待补录终局结果/);
+  assert.match(workbench, /editRequest=\{factEditRequest\}/);
+  assert.match(workbench, /onVerify=\{requestFactEdit\}/);
   assert.match(loop, /终局结果只允许|terminal-result/);
   assert.match(loop, /progress\/suggestion/);
   assert.match(loop, /确认结果与下一行动/);

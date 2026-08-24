@@ -10,7 +10,8 @@ export type AuthStatus = {consultant:string;authorized:boolean;needsReauth:boole
 export type DecisionEvent = {id:string;type:string;at:string;reason?:string};
 export type Outcome = {id:string;stage:"推荐采纳"|"面试"|"Offer"|"入职"|"关闭"|"反馈";rating?:number;note?:string;at:string};
 export type CommitmentAction = {actionId:string;title:string;dueAt:string;status:"OPEN"|"BLOCKED"|"DONE"|"CANCELLED";source:"RULE"|"MANUAL";createdAt:string;completedAt?:string|null;completionNote?:string|null};
-export type CommitmentSnapshot = {goal:string|null;activeAction:CommitmentAction|null;actionHistory:CommitmentAction[];suggestedAction:{title:string;dueAt:string;source:"RULE"|"MANUAL";rule?:string}|null;terminalResultMissing:boolean};
+export type TerminalResult = {stage:"入职"|"关闭";summary:string;at:string};
+export type CommitmentSnapshot = {goal:string|null;activeAction:CommitmentAction|null;actionHistory:CommitmentAction[];suggestedAction:{title:string;dueAt:string;source:"RULE"|"MANUAL";rule?:string}|null;terminalResultMissing:boolean;terminalResult?:TerminalResult|null};
 export type DecisionReplay = {decisionId:string;runId:string;snapshotAt:string;policyVersion:string;rank:number;reasons:string[];risks:string[];evidence:string[]};
 export type Notification = {id:string;kind:"DAILY_TOP3"|"SYNC_ALERT"|"COMMITMENT";title:string;detail:string;jobId?:string;read:boolean};
 

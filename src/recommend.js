@@ -34,6 +34,21 @@ export function buildCtx(db, consultant_id, snapshot) {
     WHERE consultant_id=? AND json_extract(value_json,'$.rating') IS NOT NULL`).get(consultant_id).a;
   const feedbackProjects = db.prepare(`SELECT project_id FROM recommendation_feedback
     WHERE consultant_id=?`).all(consultant_id).map((row) => row.project_id);
+  // 反馈闭环（baseline-1.1）：公司级记忆 + 僵尸职位检测信号
+  const negCompanies = db.prepare(`SELECT DISTINCT j.company FROM decision_events e
+    JOIN job_facts j ON j.project_id=e.project_id
+    WHERE e.actor=? AND e.event_type='DISMISSED'
+    UNION SELECT DISTINCT j.company FROM recommendation_feedback f
+    JOIN job_facts j ON j.project_id=f.project_id
+    WHERE f.consultant_id=?`).all(consultant_id, consultant_id).map((r) => r.company);
+  const posCompanies = db.prepare(`SELECT DISTINCT j.company FROM decision_events e
+    JOIN job_facts j ON j.project_id=e.project_id
+    WHERE e.actor=? AND e.event_type='ACCEPTED'`).all(consultant_id).map((r) => r.company);
+  const recRounds = Object.fromEntries(db.prepare(`SELECT project_id, COUNT(*) n FROM decision_events
+    WHERE actor=? AND event_type='RECOMMENDED' GROUP BY project_id`).all(consultant_id)
+    .map((r) => [r.project_id, r.n]));
+  const engagedProjects = new Set(db.prepare(`SELECT DISTINCT project_id FROM decision_events
+    WHERE actor=? AND event_type != 'RECOMMENDED'`).all(consultant_id).map((r) => r.project_id));
   return {
     consultant_id,
     profile_keywords: c.profile_keywords || [],
@@ -41,15 +56,23 @@ export function buildCtx(db, consultant_id, snapshot) {
     capacity_limit: Number(c.capacity_limit) > 0 ? Number(c.capacity_limit) : undefined,
     historical_texts: hist.map((h) => h.text),
     watched_count: watched, accepted_count: accepted,
-    outcomes_avg: avg, feedback_projects: feedbackProjects, now: now(), snapshot_id: snapshot?.sync_id || '',
+    outcomes_avg: avg, feedback_projects: feedbackProjects,
+    negative_companies: negCompanies, positive_companies: posCompanies,
+    rec_rounds: recRounds, engaged_projects: engagedProjects,
+    now: now(), snapshot_id: snapshot?.sync_id || '',
   };
 }
 
+/** 自动轮次最小冻结间隔（方案 A，db-growth-governance-proposal）：快照未变时不重复全量冻结。 */
+const THROTTLE_MS = Number(process.env.BRAINX_RECOMMEND_THROTTLE_MS || 2 * 3600 * 1000);
+
 /**
  * 生成一轮推荐。硬约束：最近同步 complete=0 → blocked，不落推荐。
+ * throttle=true（桥接等自动路径）：快照与上轮相同且距上轮 <2h → 跳过冻结，
+ * 记一行 SKIPPED_UNCHANGED 审计轮并返回上轮 run_id（手动 run/事实修正重算不传，强制全量）。
  * 返回 { run_id, blocked, items[] }；dry_run 不落库。
  */
-export function recommend(db, consultant_id, { top = 20, dry_run = false } = {}) {
+export function recommend(db, consultant_id, { top = 20, dry_run = false, throttle = false } = {}) {
   const last = latestSync(db, consultant_id);
   const snapshot = latestCompleteSnapshot(db, consultant_id);
   if (!snapshot) {
@@ -58,6 +81,23 @@ export function recommend(db, consultant_id, { top = 20, dry_run = false } = {})
   if (!last || !last.complete) {
     return { blocked: true, reason: '本次同步不完整，暂不生成正式推荐',
              sync: last, snapshot_id: snapshot.sync_id, items: [], run_id: null };
+  }
+
+  // 方案 A 节流（2026-08-24）：修正前 bridge 每 180s 无条件全量冻结，
+  // recommendations 5 天膨胀 166 万行、磁盘 ~0.6G/天。跳过轮记 SKIPPED_UNCHANGED——
+  // latestRun/autopush/导出只认 COMPLETED，不受影响；retention 定期清理。
+  if (throttle && !dry_run) {
+    const lastRun = db.prepare(`SELECT run_id, snapshot_id, created_at FROM decision_runs
+      WHERE consultant_id=? AND status='COMPLETED' ORDER BY created_at DESC LIMIT 1`).get(consultant_id);
+    if (lastRun && lastRun.snapshot_id === snapshot.sync_id
+        && Date.parse(now()) - Date.parse(lastRun.created_at) < THROTTLE_MS) {
+      db.prepare(`INSERT INTO decision_runs
+        (run_id, consultant_id, snapshot_id, policy_version, candidate_count, status, created_at)
+        VALUES (?,?,?,?,?,?,?)`)
+        .run(uuid(), consultant_id, snapshot.sync_id, POLICY_VERSION, 0, 'SKIPPED_UNCHANGED', now());
+      return { skipped: true, reason: '快照未变化且距上轮不足 2h，复用上轮', blocked: false,
+               run_id: lastRun.run_id, items: null, generated_at: now() };
+    }
   }
 
   // 人工覆盖只作用于当前顾问；同步源 job_facts 保持不变。
@@ -142,9 +182,10 @@ export const publicRec = (r) => ({
   },
 });
 
-/** 读最新一轮推荐（工作台默认视图）。raw_json 不出网（原始负载只供库内/回放对照）。 */
+/** 读最新一轮推荐（工作台默认视图）。raw_json 不出网（原始负载只供库内/回放对照）。
+ * 只认 COMPLETED 轮：节流产物的 SKIPPED_UNCHANGED 审计行没有冻结推荐，不可当最新轮。 */
 export function latestRun(db, consultant_id) {
-  const run = db.prepare(`SELECT * FROM decision_runs WHERE consultant_id=?
+  const run = db.prepare(`SELECT * FROM decision_runs WHERE consultant_id=? AND status='COMPLETED'
     ORDER BY created_at DESC LIMIT 1`).get(consultant_id);
   if (!run) return null;
   const recs = db.prepare(`SELECT * FROM recommendations WHERE run_id=? ORDER BY rank`).all(run.run_id);

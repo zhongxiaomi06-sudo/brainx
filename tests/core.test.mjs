@@ -176,7 +176,7 @@ test('回放：冻结行不受职位后续变化影响', () => {
   const after = replay(db, dec);
   assert.equal(after.recommendation.score, before.recommendation.score);
   assert.equal(after.job_now.active_state, 'CLOSED'); // 现状对照
-  assert.equal(after.recommendation.policy_version, 'baseline-1.0');
+  assert.equal(after.recommendation.policy_version, 'baseline-1.1');
 });
 
 test('结果反馈：关联推荐 + 幂等', () => {

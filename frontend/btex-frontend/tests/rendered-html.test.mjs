@@ -42,6 +42,9 @@ test("uses the reference three-column shell and a single-column opportunity work
   assert.doesNotMatch(workbench, /旁路只读 · 不计入最终得分/);
   assert.match(css, /\.drawer-section-head\{margin-bottom:14px\}/);
   assert.match(css, /\.drawer-section-head h2\{margin:0\}/);
+  assert.match(css, /\.drawer-metrics>div\{box-sizing:border-box;min-width:0;grid-template-rows:16px auto/);
+  assert.match(css, /\.drawer-metrics small\{display:block;white-space:nowrap;line-height:16px\}/);
+  assert.match(css, /@media\(min-width:721px\)\{\.drawer-metrics\{grid-template-columns:repeat\(4,minmax\(0,1fr\)\);gap:0\}/);
 });
 
 test("splits candidates by their live engagement state and keeps verification jobs pending", async () => {

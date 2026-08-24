@@ -260,6 +260,21 @@ test("launches a silent firework easter egg after two pick-tray title clicks", a
   assert.match(css, /@media\(prefers-reduced-motion:reduce\)\{\.pick-tray-fireworks\{display:none\}\}/);
 });
 
+test("keeps the identity panel focused on one login action", async () => {
+  const [workbench, css] = await Promise.all([
+    source("app/workbench.tsx"),
+    source("app/globals.css"),
+  ]);
+
+  assert.match(workbench, /className="identity-panel"/);
+  assert.match(workbench, /className="identity-status-card"/);
+  assert.match(workbench, /className="identity-primary-action identity-login-only"/);
+  assert.match(workbench, />登录<\/button>/);
+  assert.doesNotMatch(workbench, /identity-dev-card|identity-demo-card|identity-demo-grid/);
+  assert.match(css, /\.identity-panel\{display:grid;gap:/);
+  assert.match(css, /\.identity-primary-action\{[^}]*background:rgba\(229,245,240,\.92\)/);
+});
+
 test("keeps the collapsible resizable navigation and retains the commitments panel", async () => {
   const [workbench, css] = await Promise.all([
     source("app/workbench.tsx"),

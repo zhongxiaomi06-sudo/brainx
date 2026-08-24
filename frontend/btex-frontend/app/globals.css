@@ -425,6 +425,8 @@ html,body,.btex-app{background:var(--bg)}
 .btex-app,.btex-app.nav-open{grid-template-columns:88px minmax(0,1fr)}
 .rail-nav{position:sticky;top:0;height:100vh;display:flex;flex-direction:column;align-items:center;gap:8px;padding:18px 10px 14px;background:#fff;border-right:1px solid rgba(28,43,38,.07);z-index:20}
 .rail-brand{width:48px;height:48px;border:0;background:transparent;padding:0;cursor:pointer}
+.rail-brand:disabled{cursor:wait}.rail-brand-logo{transform-origin:center}.rail-brand-logo.is-spinning{animation:btex-recommendation-spin .65s cubic-bezier(.16,1,.3,1)}
+@keyframes btex-recommendation-spin{0%{transform:rotate(0deg) scale(1)}45%{transform:rotate(190deg) scale(1.04)}100%{transform:rotate(360deg) scale(1)}}
 .rail-brand-mark{display:grid;width:44px;height:44px;place-items:center;margin:0 auto;border-radius:14px;background:#1c2b26;color:#fff}
 .rail-brand-mark svg{width:22px;height:22px}
 .rail-blocks{display:flex;flex-direction:column;gap:8px;width:100%}

@@ -62,7 +62,7 @@ test("splits candidates by their live engagement state and keeps verification jo
   assert.match(workbench, /eligibility:"VERIFY_REQUIRED"/);
   assert.match(workbench, /const initialEngagement:Record<string,EngagementState>=\{"JU87P01":"ACCEPTED","JNDLIXO":"ACCEPTED","JVS2PHH":"ACCEPTED"/);
   assert.match(workbench, /const acceptedJobs=(?:activeDecisionJobs|jobs)\.filter\(job=>engagement\[job\.id\]==="ACCEPTED"\)/);
-  assert.match(workbench, /const pendingJobs=\[\.\.\.jobs\.filter\(job=>engagement\[job\.id\]!=="ACCEPTED"\),\.\.\.verificationJobs\]/);
+  assert.match(workbench, /const pendingJobs=\[\.\.\.jobs\.filter\(job=>engagement\[job\.id\]!=="ACCEPTED"&&!tray\.includes\(job\.id\)&&!dismissedRecommendationIds\.includes\(job\.id\)\)/);
   assert.match(workbench, /const pendingShown=showVerification\?pendingJobs/);
   assert.match(workbench, /const isContext=activeJobId!==null&&pendingShown\.some/);
   assert.match(workbench, /isContext=\{isContext\}/);
@@ -178,6 +178,29 @@ test("keeps inline card feedback action-only", async () => {
   assert.match(css, /\.pick-card\.feedback-active>:not\(\.pick-card-hide-feedback\)\{filter:blur\(3px\);opacity:\.28;pointer-events:none/);
   assert.match(css, /\.pick-card-feedback-reasons\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
   assert.match(css, /\.pick-card-feedback-reasons button\.selected/);
+});
+
+test("refreshes algorithmic recommendations from the brand control", async () => {
+  const [workbench, api, css] = await Promise.all([
+    source("app/workbench.tsx"),
+    source("app/brainx-api.ts"),
+    source("app/globals.css"),
+  ]);
+
+  assert.match(api, /export async function getPickTray/);
+  assert.match(api, /export async function nextRecommendationBatch/);
+  assert.match(workbench, /const refreshRecommendations=/);
+  assert.match(workbench, /await getPickTray\(\)/);
+  assert.match(workbench, /await nextRecommendationBatch\(/);
+  assert.match(workbench, /\/api\/v1\/recommendations\/run/);
+  assert.match(workbench, /aria-label="刷新推荐"/);
+  assert.match(workbench, /recommendationRefreshing/);
+  assert.match(workbench, /演示推荐已换一批/);
+  assert.match(workbench, /dismissedRecommendationIds/);
+  assert.match(workbench, /const excludedRecommendationIds=new Set\(\[\.\.\.tray,\.\.\.dismissedRecommendationIds\]\)/);
+  assert.match(workbench, /!excludedRecommendationIds\.has\(job\.id\)/);
+  assert.match(workbench, /!tray\.includes\(job\.id\)&&!dismissedRecommendationIds\.includes\(job\.id\)/);
+  assert.match(css, /\.rail-brand-logo\.is-spinning/);
 });
 
 test("keeps the collapsible resizable navigation and retains the commitments panel", async () => {

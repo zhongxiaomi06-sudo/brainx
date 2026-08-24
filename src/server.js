@@ -24,6 +24,7 @@ import { makeAutoPush } from './autopush.js';
 import { saveUserTokens, tokenStatus } from './feishu.js';
 import { jobVisibleTo } from './visibility.js';
 import { relationOf } from './relations.js';
+import { confirmMembership } from './membership.js';
 import { validateJwt, saveTtcToken, ttcAuthStatus } from './ttcsdk/auth.js';
 import { quota as ttcQuota } from './ttcsdk/user.js';
 import { TtcApiError } from './ttcsdk/http.js';
@@ -427,6 +428,22 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
           recompute: rec?.blocked ? { blocked: true, reason: rec.reason } : { blocked: false },
         });
       } catch (e) { err(res, 500, 'FACT_UPDATE_FAILED', String(e.message).slice(0, 300)); }
+    },
+
+    'PATCH /api/v1/opportunities/:id/membership': async (req, res, cid, q, id) => {
+      const job = db.prepare('SELECT 1 FROM job_facts WHERE project_id=?').get(id);
+      if (!job || !jobVisibleTo(db, cid, id)) return err(res, 404, 'NOT_FOUND', '职位不存在');
+      const b = await body(req);
+      if (!b) return err(res, 400, 'BAD_JSON', '请求体不是合法 JSON');
+      try {
+        const out = confirmMembership(db, cid, id, b);
+        if (!out.ok) return err(res, out.status || 422, 'MEMBERSHIP_UPDATE_REJECTED', out.error);
+        const rec = out.already ? null : recommend(db, cid, { top: 20 });
+        json(res, 200, {
+          ...out,
+          recompute: rec?.blocked ? { blocked: true, reason: rec.reason } : { blocked: false },
+        });
+      } catch (e) { err(res, 500, 'MEMBERSHIP_UPDATE_FAILED', String(e.message).slice(0, 300)); }
     },
 
     'POST /api/v1/opportunities/:id/engagement': async (req, res, cid, q, id) => {

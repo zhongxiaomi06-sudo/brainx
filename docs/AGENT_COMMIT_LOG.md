@@ -2,6 +2,11 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-08-24｜fix(push): lark-cli 加超时 + PREVIEW 可被真实发送覆盖
+
+- 改动：`pushCard` 的 `execFileSync('lark-cli')` 加 30s 超时 + SIGKILL（防挂死阻塞整进程）；PREVIEW 记录在本次 `send=true` 时允许覆盖发送（原会幂等跳过导致预览后永远发不出），PREVIEW→PREVIEW 仍幂等。
+- 验证：新增回归测试「PREVIEW 可被 send=true 覆盖」；后端全量 187 例 186 通过（唯一失败为根目录 CSV 缺失的环境问题，非本次改动）。
+
 ## 2026-08-24｜fix(deploy): Docker 排除密钥 + 持久卷可写 + 启动脚本行尾修复
 
 - 改动：`.dockerignore` 排除整个 `data/`（含 `data/.secret` 令牌加密密钥）；`Dockerfile` 将 `/app/data` chown 给 node 用户（修复新卷 EACCES）；部署文档/脚本补 `-v brainx-data:/app/data` 持久卷；4 个 shell 启动/部署脚本 CRLF 转 LF 并清理行尾空格（修复脚本在 Linux/macOS 不可运行）。

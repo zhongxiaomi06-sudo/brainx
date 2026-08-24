@@ -228,3 +228,18 @@ test('推送：FAILED 行可重发——更新同一 push_id，不新增行', ()
   const n = db.prepare(`SELECT COUNT(*) n FROM push_log WHERE consultant_id=? AND kind=?`).get(CID, kind).n;
   assert.equal(n, 1);
 });
+
+test('推送：PREVIEW 可被 send=true 覆盖发送，不幂等跳过', () => {
+  const run = latestRun(db, CID);
+  const kind = 'HEATING_ALERT_PREVIEW';
+  const rid = run.run.run_id;
+  // 先预览：落一条 PREVIEW 行
+  const preview = pushCard(db, { consultant_id: CID, kind, run_id: rid, card: { config: {} }, target: 'ou_x', send: false });
+  assert.equal(preview.status, 'PREVIEW');
+  // PREVIEW 后真实发送：不得再 SKIPPED_DUPLICATE；发送结果取决于 lark-cli（SENT/FAILED 均可），但必须覆盖同一 push_id
+  const real = pushCard(db, { consultant_id: CID, kind, run_id: rid, card: { config: {}, send: true }, target: 'ou_x', send: true });
+  assert.ok(['SENT', 'FAILED'].includes(real.status), `应为 SENT/FAILED 而非 ${real.status}`);
+  assert.equal(real.push_id, preview.push_id);
+  const n = db.prepare(`SELECT COUNT(*) n FROM push_log WHERE consultant_id=? AND kind=?`).get(CID, kind).n;
+  assert.equal(n, 1); // 覆盖同一行，不新增
+});

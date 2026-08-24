@@ -103,9 +103,10 @@ export function pushCard(db, { consultant_id, kind, run_id, card, target, send =
   const rid = run_id ?? '';
   const dup = db.prepare(`SELECT push_id, status FROM push_log
     WHERE consultant_id=? AND kind=? AND run_id=?`).get(consultant_id, kind, rid);
-  if (dup && dup.status !== 'FAILED') {
-    // 唯一键（consultant+kind+run_id）即幂等保证：已成功的推送跳过，
-    // 返回首次记录——该 run 在 push_log 中永远只有一条成功记录。
+  // 幂等：已成功发送（SENT）或仅预览（PREVIEW）的推送，重复调用都跳过，返回首次记录。
+  // 唯一例外：PREVIEW 只落卡未发送，本次 send=true 时允许覆盖成真实发送；
+  // PREVIEW→PREVIEW 仍幂等跳过（不重复落行），FAILED 可重发（更新同一 push_id）。
+  if (dup && dup.status !== 'FAILED' && !(dup.status === 'PREVIEW' && send)) {
     return { ok: true, status: 'SKIPPED_DUPLICATE', push_id: dup.push_id };
   }
   let status = 'SENT', message_id = null, error = null;
@@ -113,11 +114,12 @@ export function pushCard(db, { consultant_id, kind, run_id, card, target, send =
     try {
       // lark-cli 1.0.67 无 im messages create 打字命令 → 走 api 逃生舱（bot 身份，im:message:send_as_bot）。
       // 卡片 content 需要二次 stringify（Feishu 契约：content 是 JSON 字符串）。
+      // timeout+SIGKILL：lark-cli 实测会无限 hang（见 bridge.js 同款注释），必须限时杀掉。
       const out = execFileSync('lark-cli', [...larkProfileArgs(), 'api', 'POST', '/open-apis/im/v1/messages', '--as', 'bot',
         '--params', JSON.stringify({ receive_id_type: target.startsWith('oc_') ? 'chat_id' : 'open_id' }),
         '--data', JSON.stringify({ receive_id: target, msg_type: 'interactive',
                                    content: JSON.stringify(card) })],
-        { encoding: 'utf8', maxBuffer: 4 * 1024 * 1024 });
+        { encoding: 'utf8', maxBuffer: 4 * 1024 * 1024, timeout: 30000, killSignal: 'SIGKILL' });
       const d = JSON.parse(out.slice(out.indexOf('{')));
       // api 逃生舱可能直出 Feishu 响应（{code,data:{message_id}}）或包一层 {ok,data}
       const feishu = d?.data?.code != null ? d.data : d;

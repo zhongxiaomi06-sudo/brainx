@@ -10,6 +10,8 @@ import type {
   EngagementState,
   Notification,
   Outcome,
+  CommitmentAction,
+  CommitmentSnapshot,
   SyncStatus,
 } from "./decision-demo";
 
@@ -119,7 +121,12 @@ export type BackendOpportunity = {
   relation: { relation: string | null; source?: string | null; valid_from?: string | null };
   engagement_state: EngagementState; legal_actions: EngagementCommand[];
   events: BackendEvent[]; outcomes: BackendOutcome[]; latest_recommendation: BackendLatestRecommendation | null;
+  commitment_goal?: string | null; active_action?: BackendCommitmentAction | null;
+  action_history?: BackendCommitmentAction[]; suggested_action?: BackendSuggestedAction | null;
+  terminal_result_missing?: boolean;
 };
+export type BackendCommitmentAction = { action_id: string; title: string; due_at: string; status: "OPEN"|"BLOCKED"|"DONE"|"CANCELLED"; source: "RULE"|"MANUAL"; created_at: string; completed_at?: string|null; completion_note?: string|null };
+export type BackendSuggestedAction = { title: string; due_at: string; source: "RULE"|"MANUAL"; rule?: string };
 export type BackendEvent = { event_type: string; occurred_at?: string; actor?: string; reason?: string | null };
 export type BackendOutcome = { stage: string; observed_at?: string; value?: { rating?: number; note?: string } | null };
 export type BackendLatestRecommendation = {
@@ -145,6 +152,7 @@ export type BackendRecommendationRun = { blocked?: boolean; reason?: string; run
 export type BackendPickTray = { snapshot_id: string | null; batch_id: string | null; cursor?: string; next_cursor: string | null; has_more: boolean; items: BackendRecommendation[] };
 export type BackendFeedbackResponse = { ok: boolean; already?: boolean; feedback_id?: string; replacement?: BackendPickTray };
 export type BackendOutcomeResponse = { ok: boolean; already?: boolean; outcome_id?: string | number };
+export type BackendProgressResponse = { ok: boolean; already?: boolean; state?: EngagementState; active_action?: BackendCommitmentAction; incorporated_into_next_decision?: boolean; backfilled?: boolean };
 export type BackendProfileUpdate = { ok: boolean; consultant_id: string; profile_keywords?: string[]; profile_note?: string };
 export type AssistantMessage = { role: "user" | "assistant"; content: string };
 export type AssistantContext = { page: string; opportunity_id?: string | null };
@@ -781,6 +789,7 @@ export async function fetchJobDetail(id: string): Promise<{
   outcomes: Outcome[];
   decisionId: string | null;
   openmai: OpenmaiResult | null;
+  commitment: CommitmentSnapshot;
 }> {
   const d = await brainxFetch<BackendOpportunity>(`/api/v1/opportunities/${encodeURIComponent(id)}`);
   return {
@@ -790,7 +799,23 @@ export async function fetchJobDetail(id: string): Promise<{
     outcomes: mapOutcomes(d.outcomes),
     decisionId: d.latest_recommendation?.decision_id || null,
     openmai: (d as { openmai?: OpenmaiResult | null }).openmai ?? null,
+    commitment: {
+      goal: d.commitment_goal || null,
+      activeAction: d.active_action ? mapCommitmentAction(d.active_action) : null,
+      actionHistory: (d.action_history || []).map(mapCommitmentAction),
+      suggestedAction: d.suggested_action ? {
+        title: d.suggested_action.title, dueAt: d.suggested_action.due_at,
+        source: d.suggested_action.source, rule: d.suggested_action.rule,
+      } : null,
+      terminalResultMissing: !!d.terminal_result_missing,
+    },
   };
+}
+
+function mapCommitmentAction(action: BackendCommitmentAction): CommitmentAction {
+  return { actionId: action.action_id, title: action.title, dueAt: action.due_at,
+    status: action.status, source: action.source, createdAt: action.created_at,
+    completedAt: action.completed_at, completionNote: action.completion_note };
 }
 
 /** SSE 订阅（/api/v1/events）；返回带 close 的句柄。 */

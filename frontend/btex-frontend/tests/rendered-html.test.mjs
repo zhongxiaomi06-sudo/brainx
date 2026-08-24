@@ -92,9 +92,10 @@ test("shows source context, row-level scores, detailed layers, reasons and risks
 });
 
 test("preserves engagement, result recording, replay, sync and notifications", async () => {
-  const [workbench, demo] = await Promise.all([
+  const [workbench, demo, loop] = await Promise.all([
     source("app/workbench.tsx"),
     source("app/decision-demo.ts"),
+    source("app/engagement-loop.tsx"),
   ]);
 
   assert.match(workbench, /function WorkbenchPanel/);
@@ -103,11 +104,21 @@ test("preserves engagement, result recording, replay, sync and notifications", a
   assert.match(workbench, /if\(state==="RELEASED"\)return \["WATCH","DISMISS"\]/);
   assert.match(workbench, /if\(state==="DISMISSED"\)return \["WATCH"\]/);
   assert.match(workbench, /已从当前工作区释放；如需继续推进，可重新关注后再接单。/);
-  assert.match(workbench, /DrawerSection title=\{canRecordOutcome\?"记录结果":"结果记录"\}/);
+  assert.match(workbench, /CommitmentLoopPanel/);
+  assert.match(loop, /当前行动/);
+  assert.match(loop, /回写进展/);
+  assert.match(loop, /规则草案 · 可修改，确认后才成为事实/);
+  assert.match(loop, /终局结果只允许|terminal-result/);
+  assert.match(loop, /仅保存在当前浏览器/);
+  assert.match(loop, /progress\/suggestion/);
+  assert.match(loop, /确认结果与下一行动/);
+  assert.match(loop, /结果提交后会纳入下一轮判断依据/);
+  assert.match(workbench, /接单需逐个确认目标、行动和截止时间/);
+  assert.doesNotMatch(workbench, /tray-accept/);
   assert.match(workbench, /function ReplayPanel/);
   assert.match(workbench, /function NotificationPanel/);
   assert.match(workbench, /const runSync=\(\)=>/);
-  assert.match(workbench, /const recordOutcome=/);
+  assert.match(workbench, /const recordOutcome=/); // 旧兼容入口保留，但新面板不再调用
   assert.match(workbench, /localStorage\.setItem\("decision-workbench"/);
   assert.match(demo, /export type EngagementState = "NEW"\|"RECOMMENDED"\|"VIEWED"\|"WATCHED"\|"ACCEPTED"/);
 });

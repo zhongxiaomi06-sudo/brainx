@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity, AlertTriangle, ArrowLeft, BarChart3, Bell, BriefcaseBusiness,
   Check, ChevronDown, ChevronRight, CircleHelp, Clock3, Database, Filter, FolderOpen, FolderPlus, GitCompareArrows,
-  Infinity, ListFilter, MoreHorizontal, Plus, RotateCcw, Search, Settings2,
+  Infinity, ListFilter, MoreHorizontal, Pencil, Plus, RotateCcw, Search, Settings2,
   BellRing, CheckCircle2, CircleUserRound, ClipboardCheck, Send, ShieldCheck, SlidersHorizontal, Sparkles, Star, Users, X, Zap,
 } from "lucide-react";
 import { actionLabel, seedAuth, seedNotifications, seedSync, stateLabel, type AuthStatus, type DecisionEvent, type EngagementCommand, type EngagementState, type Notification, type Outcome, type SyncStatus } from "./decision-demo";
@@ -603,7 +603,7 @@ function ManualFactSection({job,mode,onUpdated,notify,editRequest=0}:{job:Decisi
  const editable=mode!=="connecting";
  const displayFacts={...job.facts};
  (Object.keys(factFieldByLabel) as string[]).forEach(label=>{const field=factFieldByLabel[label];const value=effectiveValue(field);if(value!==null&&value!==undefined&&value!=="")displayFacts[label]=field==="active_state"?(({OPEN:"招聘中",COOLING:"冷却期",CLOSED:"已关闭",COMPLETED:"已完成"} as Record<string,string>)[String(value)]||String(value)):String(value)});
- return <DrawerSection title="当前事实" action={editable?<button type="button" className="fact-edit-trigger" onClick={editing?()=>setEditing(false):beginEdit}>{editing?"取消编辑":"修正事实"}</button>:<span className="fact-readonly">正在连接</span>}>
+ return <DrawerSection title="当前事实" action={editable?<button type="button" className="fact-edit-trigger" onClick={editing?()=>setEditing(false):beginEdit}>{editing?<><X aria-hidden="true"/>取消编辑</>:<><Pencil aria-hidden="true"/>编辑</>}</button>:<span className="fact-readonly">正在连接</span>}>
   <dl className="facts">{Object.entries(displayFacts).map(([key,value])=>{const source=sourceOf(key);return <div key={key}><dt>{key}</dt><dd className={value==="UNKNOWN"?"unknown":""}>{value}{source&&<small className={`fact-source ${source.source.toLowerCase()}`}>{factSourceLabels[source.source]}</small>}</dd></div>})}</dl>
   {editing&&<form className="fact-edit-form" onSubmit={save}>
    <label>职位状态<select value={values.active_state} onChange={e=>{setValues(v=>({...v,active_state:e.target.value}));setClearFields(v=>v.filter(f=>f!=="active_state"))}}><option value="">请选择</option><option value="OPEN">活跃 / 招聘中</option><option value="COOLING">冷却期</option><option value="CLOSED">已关闭</option><option value="COMPLETED">已完成</option></select></label>

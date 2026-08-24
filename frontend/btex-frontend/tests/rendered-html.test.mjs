@@ -34,6 +34,9 @@ test("uses the reference three-column shell and a single-column opportunity work
   assert.match(workbench, /concept-workspace-menu/);
   assert.match(workbench, /aria-haspopup="menu"/);
   assert.match(css, /grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
+  assert.match(workbench, /<Pencil aria-hidden="true"\/>编辑/);
+  assert.doesNotMatch(workbench, /修正事实/);
+  assert.match(css, /\.fact-edit-trigger\{display:inline-flex/);
 });
 
 test("splits candidates by their live engagement state and keeps verification jobs pending", async () => {

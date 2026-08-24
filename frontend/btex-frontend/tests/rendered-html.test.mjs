@@ -211,6 +211,27 @@ test("refreshes algorithmic recommendations from the brand control", async () =>
   assert.match(css, /\.recommendation-empty/);
 });
 
+test("turns the exhausted recommendation state into a playable dinosaur game", async () => {
+  const [workbench, game, css] = await Promise.all([
+    source("app/workbench.tsx"),
+    source("app/dino-runner.tsx"),
+    source("app/globals.css"),
+  ]);
+
+  assert.match(workbench, /import \{ DinoRunner \} from "\.\/dino-runner"/);
+  assert.match(workbench, /<DinoRunner\/>/);
+  assert.match(game, /event\.code==="Space"\|\|event\.code==="ArrowUp"/);
+  assert.match(game, /setPhase\("running"\)/);
+  assert.match(game, /setPhase\("over"\)/);
+  assert.match(game, /setScore\(value=>value\+1\)/);
+  assert.match(game, /点击或按空格开始/);
+  assert.match(game, /点击重新开始/);
+  assert.match(css, /\.recommendation-empty\{[^}]*min-height:360px/);
+  assert.match(css, /\.dino-runner\{/);
+  assert.match(css, /@keyframes dino-obstacle-run/);
+  assert.match(css, /@keyframes dino-jump/);
+});
+
 test("keeps the collapsible resizable navigation and retains the commitments panel", async () => {
   const [workbench, css] = await Promise.all([
     source("app/workbench.tsx"),

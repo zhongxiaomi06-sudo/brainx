@@ -37,9 +37,9 @@ test("uses the reference three-column shell and a single-column opportunity work
   assert.match(workbench, /<Pencil aria-hidden="true"\/>编辑/);
   assert.doesNotMatch(workbench, /修正事实/);
   assert.match(css, /\.fact-edit-trigger\{display:inline-flex/);
-  assert.doesNotMatch(workbench, /冻结快照/);
+  assert.match(workbench, /冻结快照/); // PR#5 评审恢复：证据出处标注必须存在（禁止裸分数纪律）
   assert.doesNotMatch(workbench, /离线演示态不显示供给/);
-  assert.doesNotMatch(workbench, /旁路只读 · 不计入最终得分/);
+  assert.match(workbench, /旁路只读 · 不计入最终得分/); // PR#5 评审恢复：供给不并入评分的用户可见承诺
   assert.match(css, /\.drawer-section-head\{margin-bottom:14px\}/);
   assert.match(css, /\.drawer-section-head h2\{margin:0\}/);
 });
@@ -105,13 +105,18 @@ test("preserves engagement, result recording, replay, sync and notifications", a
   assert.match(demo, /export type EngagementState = "NEW"\|"RECOMMENDED"\|"VIEWED"\|"WATCHED"\|"ACCEPTED"/);
 });
 
-test("keeps the navigation permanently compact and retains the commitments panel", async () => {
+test("keeps the collapsible resizable navigation and retains the commitments panel", async () => {
   const [workbench, css] = await Promise.all([
     source("app/workbench.tsx"),
     source("app/globals.css"),
   ]);
 
-  assert.doesNotMatch(workbench, /navOpen|sidebarWidth|sidebarResize/);
+  // PR#5 评审恢复：可拖拽侧边栏（navOpen/sidebarWidth/sidebarResize）与键盘可达手柄
+  assert.match(workbench, /const \[navOpen,setNavOpen\]/);
+  assert.match(workbench, /const \[sidebarWidth,setSidebarWidth\]/);
+  assert.match(workbench, /sidebarResize/);
+  assert.match(workbench, /className="rail-resizer"/);
+  assert.match(workbench, /role="separator"/);
   assert.match(workbench, /\{kind:"commitments"\}/);
   assert.match(workbench, /function CommitmentsPanel/);
   assert.doesNotMatch(workbench, /mobile-commitment-trigger/);

@@ -13,6 +13,8 @@ import { runSync, latestSync, latestCompleteSnapshot } from '../src/sync.js';
 import { recommend, latestRun, loadConsultants } from '../src/recommend.js';
 import { engage, commitmentSummary, currentState, legalActions, DISMISS_REASONS } from '../src/engagement.js';
 import { replay, recordOutcome } from '../src/replay.js';
+import { acceptCommitment, commitmentDetails, recordProgress, recordTerminalResult,
+  releaseCommitment, suggestedAction, RELEASE_REASONS, CLOSE_REASONS } from '../src/commitment.js';
 import { buildDailyCard, buildSyncAlertCard } from '../src/push.js';
 import { jobVisibleTo } from '../src/visibility.js';
 import { relationOf } from '../src/relations.js';
@@ -62,7 +64,8 @@ const TOOLS = {
                generated_at: run.run.created_at, items: run.items.slice(0, Math.min(limit, 50)) };
     },
   },
-  brainx_recommend_run: {    description: '生成一轮新推荐（写 recommendations + RECOMMENDED 事件）',
+  brainx_recommend_run: {
+    description: '生成一轮新推荐（写 recommendations + RECOMMENDED 事件）',
     inputSchema: { type: 'object', required: ['consultant_id'], properties: {
       consultant_id: { type: 'string' }, top: { type: 'number' } } },
     run: ({ consultant_id: cid, top = 10 }) => recommend(db, cid, { top }),
@@ -92,12 +95,13 @@ const TOOLS = {
         WHERE project_id=? AND actor=? ORDER BY occurred_at, id`).all(pid, cid);
       const rec = db.prepare(`SELECT * FROM recommendations WHERE project_id=? AND consultant_id=?
         ORDER BY created_at DESC LIMIT 1`).get(pid, cid);
-      const outs = db.prepare(`SELECT stage, value_json, observed_at FROM job_outcomes
+      const outs = db.prepare(`SELECT stage, value_json, observed_at, action_id, kind FROM job_outcomes
         WHERE project_id=? AND consultant_id=? ORDER BY observed_at`).all(pid, cid);
       return {
         job: { ...job, raw_json: undefined, relation: rel }, relation: rel,
-        engagement_state: eng.state, legal_actions: legalActions(db, cid, pid),
+        engagement_state: eng.state, legal_actions: legalActions(db, cid, pid).filter((action) => action !== 'COMPLETE'),
         events, outcomes: outs.map((o) => ({ ...o, value: JSON.parse(o.value_json) })),
+        ...commitmentDetails(db, cid, pid),
         latest_recommendation: rec ? { decision_id: rec.decision_id, score: rec.score,
           action: rec.action, confidence_band: rec.confidence_band,
           evidence_coverage: rec.evidence_coverage,
@@ -107,13 +111,46 @@ const TOOLS = {
     },
   },
   brainx_engage: {
-    description: '承接操作：VIEW/WATCH/UNWATCH/ACCEPT(需confirm=true)/DISMISS(需reason)/RELEASE/COMPLETE；幂等键防重复',
+    description: '承接操作：接单必须带目标/第一行动/截止时间；释放必须带原因/说明；终局请用 brainx_terminal_result',
     inputSchema: { type: 'object', required: ['consultant_id', 'project_id', 'action'], properties: {
       consultant_id: { type: 'string' }, project_id: { type: 'string' },
-      action: { type: 'string', enum: ['VIEW', 'WATCH', 'UNWATCH', 'ACCEPT', 'DISMISS', 'RELEASE', 'COMPLETE'] },
-      confirm: { type: 'boolean' }, reason: { type: 'string', enum: DISMISS_REASONS },
+      action: { type: 'string', enum: ['VIEW', 'WATCH', 'UNWATCH', 'ACCEPT', 'DISMISS', 'RELEASE'] },
+      confirm: { type: 'boolean' }, reason: { type: 'string' }, summary: { type: 'string' },
+      goal: { type: 'string' }, action_title: { type: 'string' }, due_at: { type: 'string' },
       idempotency_key: { type: 'string' } } },
-    run: ({ consultant_id: cid, project_id: pid, action, ...rest }) => engage(db, cid, pid, action, rest),
+    run: ({ consultant_id: cid, project_id: pid, action, ...rest }) => {
+      if (!jobVisibleTo(db, cid, pid)) return { error: 'NOT_FOUND', project_id: pid };
+      if (action === 'ACCEPT') return acceptCommitment(db, cid, pid, rest);
+      if (action === 'RELEASE') return releaseCommitment(db, cid, pid, rest);
+      return engage(db, cid, pid, action, rest);
+    },
+  },
+  brainx_progress_suggestion: {
+    description: '根据阶段或阻塞状态生成可审计的下一行动草案；只返回建议，不写库',
+    inputSchema: { type: 'object', required: ['consultant_id', 'project_id'], properties: {
+      consultant_id: { type: 'string' }, project_id: { type: 'string' },
+      kind: { type: 'string', enum: ['PROGRESS', 'STAGE', 'BLOCKED'] }, stage: { type: 'string' } } },
+    run: ({ consultant_id: cid, project_id: pid, ...input }) =>
+      jobVisibleTo(db, cid, pid) ? suggestedAction(db, cid, pid, input) : { error: 'NOT_FOUND', project_id: pid },
+  },
+  brainx_record_progress: {
+    description: '原子完成当前行动、记录本次结果并创建下一行动',
+    inputSchema: { type: 'object', required: ['consultant_id', 'project_id', 'action_id', 'summary', 'next_action', 'idempotency_key'], properties: {
+      consultant_id: { type: 'string' }, project_id: { type: 'string' }, action_id: { type: 'string' },
+      kind: { type: 'string', enum: ['PROGRESS', 'STAGE', 'BLOCKED'] }, stage: { type: 'string' },
+      summary: { type: 'string' }, rating: { type: 'number' }, next_action: { type: 'object' },
+      idempotency_key: { type: 'string' } } },
+    run: ({ consultant_id: cid, project_id: pid, ...input }) =>
+      jobVisibleTo(db, cid, pid) ? recordProgress(db, cid, pid, input) : { error: 'NOT_FOUND', project_id: pid },
+  },
+  brainx_terminal_result: {
+    description: '用入职或关闭完成承接；也可为历史完成记录补录终局结果',
+    inputSchema: { type: 'object', required: ['consultant_id', 'project_id', 'stage', 'summary', 'idempotency_key'], properties: {
+      consultant_id: { type: 'string' }, project_id: { type: 'string' },
+      stage: { type: 'string', enum: ['入职', '关闭'] }, summary: { type: 'string' },
+      close_reason: { type: 'string', enum: CLOSE_REASONS }, idempotency_key: { type: 'string' } } },
+    run: ({ consultant_id: cid, project_id: pid, ...input }) =>
+      jobVisibleTo(db, cid, pid) ? recordTerminalResult(db, cid, pid, input) : { error: 'NOT_FOUND', project_id: pid },
   },
   brainx_replay: {
     description: '决策回放：冻结推荐 + 当轮 run + 事件 + 结果（job_now 仅对照）；consultant_id 必填且须与推荐归属一致',

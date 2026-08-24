@@ -10,6 +10,8 @@ import type {
   EngagementState,
   Notification,
   Outcome,
+  CommitmentAction,
+  CommitmentSnapshot,
   SyncStatus,
 } from "./decision-demo";
 
@@ -65,6 +67,9 @@ export type BrainxSnapshot = {
   openmai: Record<string, OpenmaiResult | null>;
   preferences: WorkbenchPreferences;
 };
+
+export type WorkbenchFolder = { id: string; name: string; jobIds: string[] };
+export type WorkbenchPreferences = { tray: string[]; folders: WorkbenchFolder[]; folderMode: boolean; updatedAt?: string | null };
 
 export type BrainxReplay = {
   decisionId: string;
@@ -122,7 +127,12 @@ export type BackendOpportunity = {
   engagement_state: EngagementState; legal_actions: EngagementCommand[];
   events: BackendEvent[]; outcomes: BackendOutcome[]; latest_recommendation: BackendLatestRecommendation | null;
   openmai?: OpenmaiResult | null;
+  commitment_goal?: string | null; active_action?: BackendCommitmentAction | null;
+  action_history?: BackendCommitmentAction[]; suggested_action?: BackendSuggestedAction | null;
+  terminal_result_missing?: boolean;
 };
+export type BackendCommitmentAction = { action_id: string; title: string; due_at: string; status: "OPEN"|"BLOCKED"|"DONE"|"CANCELLED"; source: "RULE"|"MANUAL"; created_at: string; completed_at?: string|null; completion_note?: string|null };
+export type BackendSuggestedAction = { title: string; due_at: string; source: "RULE"|"MANUAL"; rule?: string };
 export type BackendEvent = { event_type: string; occurred_at?: string; actor?: string; reason?: string | null };
 export type BackendOutcome = { stage: string; observed_at?: string; value?: { rating?: number; note?: string } | null };
 export type BackendLatestRecommendation = {
@@ -137,19 +147,19 @@ export type BackendReplay = {
   events: BackendEvent[]; outcomes: BackendOutcome[];
 };
 export type BackendProfile = { consultant_id: string; display_name: string; profile_keywords: string[]; profile_note: string; feishu_auth?: { authorized?: boolean; needs_reauth?: boolean } };
-export type WorkbenchFolder = { id: string; name: string; jobIds: string[] };
-export type WorkbenchPreferences = { tray: string[]; folders: WorkbenchFolder[]; folderMode: boolean; updatedAt?: string | null };
 export type BackendRadarRow = BackendJob & { engagement_state?: EngagementState; cockpit?: { membership_status?: string | null; current_stage?: string | null; stage_confidence?: string | null; pipeline_snapshot?: string | null; next_action?: string | null; cockpit_as_of?: string | null; completeness?: string | null; source_url?: string | null } | null };
 export type BackendClientRow = { company: string; company_type?: string | null; job_count?: number; active_jobs?: number; hc_known?: number | null; last_activity?: string | null; relations?: string[]; states?: string[] };
 export type BackendDismissReasons = { items: string[] };
 export type BackendSessionStatus = { configured: boolean; dev_auth: boolean };
-export type BackendSseEvent = { type?: "hello" | "sync" | "recommend" | "sync_error" | "openmai_result"; message?: string; consultant_id?: string; project_id?: string; status?: string; at?: string };
+export type BackendSseEvent = { type?: "hello" | "sync" | "recommend" | "sync_error"; message?: string; consultant_id?: string; at?: string };
 export type BackendConsultants = { items: { consultant_id: string; display_name: string }[] };
 export type BackendEngagementResponse = { ok: boolean; already?: boolean; event_id?: string; state: EngagementState; legal_actions: EngagementCommand[] };
 export type BackendRecommendationRun = { blocked?: boolean; reason?: string; run_id?: string | null; items?: BackendRecommendation[] };
 export type BackendPickTray = { snapshot_id: string | null; batch_id: string | null; cursor?: string; next_cursor: string | null; has_more: boolean; items: BackendRecommendation[] };
 export type BackendFeedbackResponse = { ok: boolean; already?: boolean; feedback_id?: string; replacement?: BackendPickTray };
 export type BackendOutcomeResponse = { ok: boolean; already?: boolean; outcome_id?: string | number };
+export type BackendProgressResponse = { ok: boolean; already?: boolean; state?: EngagementState; active_action?: BackendCommitmentAction; incorporated_into_next_decision?: boolean; backfilled?: boolean };
+export type BackendMembershipResponse = { ok: boolean; already?: boolean; relation: "MY_JOB"|"TEAM_SHARED"; legal_actions: EngagementCommand[]; recompute?: { blocked?: boolean; reason?: string } };
 export type BackendProfileUpdate = { ok: boolean; consultant_id: string; profile_keywords?: string[]; profile_note?: string };
 export type AssistantMessage = { role: "user" | "assistant"; content: string };
 export type AssistantContext = { page: string; opportunity_id?: string | null };
@@ -594,12 +604,6 @@ export async function undoRecommendationFeedback(projectId: string): Promise<{ o
   });
 }
 
-export async function updateWorkbenchPreferences(preferences: Pick<WorkbenchPreferences, "tray" | "folders" | "folderMode">): Promise<{ ok: boolean } & WorkbenchPreferences> {
-  return brainxFetch<{ ok: boolean } & WorkbenchPreferences>("/api/v1/workbench/preferences", {
-    method: "PUT", body: preferences,
-  });
-}
-
 export type ManualFactUpdate = {
   changes?: Partial<Record<ManualFactField, string | number>>;
   clear_fields?: ManualFactField[];
@@ -612,6 +616,17 @@ export async function updateOpportunityFacts(id: string, update: ManualFactUpdat
   recommendation?: { decision_id?: string; score?: number; action?: string } | null;
 }> {
   return brainxFetch(`/api/v1/opportunities/${encodeURIComponent(id)}/facts`, { method: "PATCH", body: update });
+}
+
+export async function updateOpportunityMembership(
+  id: string,
+  relation: "MY_JOB"|"TEAM_SHARED",
+  idempotencyKey: string,
+): Promise<BackendMembershipResponse> {
+  return brainxFetch(`/api/v1/opportunities/${encodeURIComponent(id)}/membership`, {
+    method: "PATCH",
+    body: { relation, idempotency_key: idempotencyKey },
+  });
 }
 
 // —— HTTP 客户端（浏览器端专用；401 抛 BrainxApiError 由调用方决定回退/登录）——
@@ -724,8 +739,8 @@ export async function getSnapshot(): Promise<BrainxSnapshot> {
     const decisionId = d?.latest_recommendation?.decision_id || recs.items[i]?.decision_id;
     job.brainxDecisionId = decisionId;
     if (!d) return;
-    openmai[job.id] = d.openmai ?? null;
     engagement[job.id] = d.engagement_state as EngagementState;
+    openmai[job.id] = d.openmai ?? null;
     events[job.id] = mapEvents(d.events);
     outcomes[job.id] = mapOutcomes(d.outcomes);
     legal[job.id] = (d.legal_actions || []).filter((a: string) => a !== "VIEW") as EngagementCommand[];
@@ -758,7 +773,6 @@ export async function getSnapshot(): Promise<BrainxSnapshot> {
     events,
     outcomes,
     legal,
-    openmai,
     sync: mapSyncStatus(wb.sync, wb.feishu_auth),
     auth: {
       consultant: profile.display_name || wb.consultant_id || "顾问",
@@ -771,8 +785,15 @@ export async function getSnapshot(): Promise<BrainxSnapshot> {
     snapshotId: recs.snapshot_id || null,
     policyVersion: recs.policy_version || wb.current_policy_version || null,
     profileKeywords: profile.profile_keywords || [],
+    openmai,
     preferences,
   };
+}
+
+export async function updateWorkbenchPreferences(preferences: Pick<WorkbenchPreferences, "tray" | "folders" | "folderMode">): Promise<{ ok: boolean } & WorkbenchPreferences> {
+  return brainxFetch<{ ok: boolean } & WorkbenchPreferences>("/api/v1/workbench/preferences", {
+    method: "PUT", body: preferences,
+  });
 }
 
 /** 接单自动找人结果（/api/v1/opportunities/:id 响应内嵌 openmai 字段）。 */
@@ -798,6 +819,7 @@ export async function fetchJobDetail(id: string): Promise<{
   outcomes: Outcome[];
   decisionId: string | null;
   openmai: OpenmaiResult | null;
+  commitment: CommitmentSnapshot;
 }> {
   const d = await brainxFetch<BackendOpportunity>(`/api/v1/opportunities/${encodeURIComponent(id)}`);
   return {
@@ -807,7 +829,23 @@ export async function fetchJobDetail(id: string): Promise<{
     outcomes: mapOutcomes(d.outcomes),
     decisionId: d.latest_recommendation?.decision_id || null,
     openmai: (d as { openmai?: OpenmaiResult | null }).openmai ?? null,
+    commitment: {
+      goal: d.commitment_goal || null,
+      activeAction: d.active_action ? mapCommitmentAction(d.active_action) : null,
+      actionHistory: (d.action_history || []).map(mapCommitmentAction),
+      suggestedAction: d.suggested_action ? {
+        title: d.suggested_action.title, dueAt: d.suggested_action.due_at,
+        source: d.suggested_action.source, rule: d.suggested_action.rule,
+      } : null,
+      terminalResultMissing: !!d.terminal_result_missing,
+    },
   };
+}
+
+function mapCommitmentAction(action: BackendCommitmentAction): CommitmentAction {
+  return { actionId: action.action_id, title: action.title, dueAt: action.due_at,
+    status: action.status, source: action.source, createdAt: action.created_at,
+    completedAt: action.completed_at, completionNote: action.completion_note };
 }
 
 /** SSE 订阅（/api/v1/events）；返回带 close 的句柄。 */

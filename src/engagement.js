@@ -59,7 +59,7 @@ export function inCooldown(db, consultant_id, project_id, at = now()) {
  * 幂等：同 idempotency_key 直接返回首次结果（already=true）。
  */
 export function engage(db, consultant_id, project_id, action,
-                       { reason = '', confirm = false, idempotency_key = '' } = {}) {
+                       { reason = '', confirm = false, idempotency_key = '', payload = {} } = {}) {
   if (!idempotency_key) return { ok: false, status: 400, error: '缺 idempotency_key' };
   const dup = db.prepare(`SELECT event_id, next_state FROM decision_events
     WHERE idempotency_key=?`).get(idempotency_key);
@@ -97,7 +97,7 @@ export function engage(db, consultant_id, project_id, action,
      idempotency_key, prev_state, next_state, reason, payload_json)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`)
     .run(event_id, t.event, consultant_id, now(), project_id, null, null,
-         idempotency_key, cur.state, next, t.note || reason || null, '{}');
+         idempotency_key, cur.state, next, t.note || reason || null, JSON.stringify(payload || {}));
   return { ok: true, already: false, event_id, state: next,
            legal_actions: legalActions(db, consultant_id, project_id) };
 }
@@ -123,14 +123,15 @@ export function commitmentSummary(db, consultant_id) {
   }));
   const accepted = rows.filter((r) => r.state === 'ACCEPTED');
   const watched = rows.filter((r) => r.state === 'WATCHED');
-  // 需要处理：关注超过 7 天未推进 或 接单后无任何结果记录
+  // 需要处理：关注超过 7 天，或接单行动逾期/阻塞/缺失。
   const need = items.filter((r) => {
     if (r.state === 'WATCHED' && r.state_since &&
         Date.parse(now()) - Date.parse(r.state_since) > 7 * 86400000) return true;
     if (r.state === 'ACCEPTED') {
-      const o = db.prepare(`SELECT 1 FROM job_outcomes WHERE project_id=? AND consultant_id=? LIMIT 1`)
-        .get(r.project_id, consultant_id);
-      return !o;
+      const action = db.prepare(`SELECT status, due_at FROM commitment_actions
+        WHERE project_id=? AND consultant_id=? AND status IN ('OPEN','BLOCKED')
+        ORDER BY created_at DESC LIMIT 1`).get(r.project_id, consultant_id);
+      return !action || action.status === 'BLOCKED' || Date.parse(action.due_at) < Date.parse(now());
     }
     return false;
   });

@@ -155,6 +155,16 @@ test("uses one compact visual system for commitment actions and terminal results
   assert.match(css, /\.commitment-terminal-options button\.selected/);
 });
 
+test("keeps inline card feedback action-only", async () => {
+  const [workbench, css] = await Promise.all([
+    source("app/workbench.tsx"),
+    source("app/globals.css"),
+  ]);
+
+  assert.doesNotMatch(workbench, /已标记为不感兴趣|当前卡片已暂时保留/);
+  assert.match(css, /\.pick-card-hide-feedback>span\{display:none\}/);
+});
+
 test("keeps the navigation permanently compact and retains the commitments panel", async () => {
   const [workbench, css] = await Promise.all([
     source("app/workbench.tsx"),

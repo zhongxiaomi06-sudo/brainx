@@ -163,6 +163,7 @@ test("keeps inline card feedback action-only", async () => {
 
   assert.doesNotMatch(workbench, /已标记为不感兴趣|当前卡片已暂时保留/);
   assert.match(css, /\.pick-card-hide-feedback>span\{display:none\}/);
+  assert.match(css, /\.pick-card\.feedback-active>:not\(\.pick-card-hide-feedback\)\{filter:blur\(3px\);opacity:\.28;pointer-events:none/);
 });
 
 test("keeps the navigation permanently compact and retains the commitments panel", async () => {

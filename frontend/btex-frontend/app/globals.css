@@ -1166,3 +1166,6 @@ body.btex-document{background:#fff;color:var(--reference-ink)}
 /* 卡片内反馈保持为纯操作条，不显示重复状态说明。 */
 .pick-card-hide-feedback>span{display:none}
 .pick-card-hide-feedback>svg{margin-right:auto}
+.pick-card.feedback-active{transform:none;background:#f3f7f5}
+.pick-card.feedback-active>:not(.pick-card-hide-feedback){filter:blur(3px);opacity:.28;pointer-events:none;user-select:none;transition:filter .2s ease,opacity .2s ease}
+.pick-card.feedback-active .pick-card-hide-feedback{filter:none;opacity:1}

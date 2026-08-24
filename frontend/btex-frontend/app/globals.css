@@ -1211,3 +1211,4 @@ body.btex-document{background:#fff;color:var(--reference-ink)}
 .pick-card.feedback-active>:not(.pick-card-hide-feedback){filter:blur(3px);opacity:.28;pointer-events:none;user-select:none;transition:filter .2s ease,opacity .2s ease}
 .pick-card.feedback-active .pick-card-hide-feedback{filter:none;opacity:1}
 @media(max-width:640px){.pick-card-hide-feedback{left:10px;right:10px;bottom:10px}.pick-card-feedback-reasons button{font-size:11px;padding-inline:5px}}
+.recommendation-empty{display:grid;justify-items:center;gap:9px;margin-top:26px;padding:42px 24px;border:1px solid rgba(60,60,67,.12);border-radius:20px;background:rgba(255,255,255,.74);text-align:center;color:#6e6e73}.recommendation-empty>svg{width:25px;color:var(--blue)}.recommendation-empty>b{font-size:17px;color:#1d1d1f}.recommendation-empty>p{margin:0 0 7px;font-size:12px}

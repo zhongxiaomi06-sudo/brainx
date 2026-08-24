@@ -45,6 +45,10 @@ test("uses the reference three-column shell and a single-column opportunity work
   assert.match(css, /\.drawer-metrics>div\{box-sizing:border-box;min-width:0;grid-template-rows:16px auto/);
   assert.match(css, /\.drawer-metrics small\{display:block;white-space:nowrap;line-height:16px\}/);
   assert.match(css, /@media\(min-width:721px\)\{\.drawer-metrics\{grid-template-columns:repeat\(4,minmax\(0,1fr\)\);gap:0\}/);
+  assert.match(workbench, /briefTone=title==="为什么现在做"\?"is-reason":title==="风险与缺失"\?"is-risk"/);
+  assert.match(workbench, /briefTone==="is-reason"\?<Sparkles\/>:<AlertTriangle\/>/);
+  assert.match(css, /\.decision-brief-item\{margin-top:24px;padding:16px;border:1px solid/);
+  assert.match(css, /\.decision-brief-item \.explanations\{list-style:none/);
 });
 
 test("splits candidates by their live engagement state and keeps verification jobs pending", async () => {

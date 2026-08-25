@@ -228,3 +228,18 @@ test('推送：FAILED 行可重发——更新同一 push_id，不新增行', as
   const n = db.prepare(`SELECT COUNT(*) n FROM push_log WHERE consultant_id=? AND kind=?`).get(CID, kind).n;
   assert.equal(n, 1);
 });
+
+test('推送：PREVIEW 可被 send=true 覆盖发送，不幂等跳过', async () => {
+  const run = latestRun(db, CID);
+  const kind = 'HEATING_ALERT_PREVIEW';
+  const rid = run.run.run_id;
+  const preview = await pushCard(db, { consultant_id: CID, kind, run_id: rid,
+    card: { config: {} }, target: 'ou_x', send: false });
+  assert.equal(preview.status, 'PREVIEW');
+  const real = await pushCard(db, { consultant_id: CID, kind, run_id: rid,
+    card: { config: {}, send: true }, target: 'ou_x', send: true });
+  assert.ok(['SENT', 'FAILED'].includes(real.status), `应为 SENT/FAILED 而非 ${real.status}`);
+  assert.equal(real.push_id, preview.push_id);
+  const n = db.prepare(`SELECT COUNT(*) n FROM push_log WHERE consultant_id=? AND kind=?`).get(CID, kind).n;
+  assert.equal(n, 1);
+});

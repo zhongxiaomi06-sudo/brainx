@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { Geist_Mono } from "next/font/google";
 import ErrorBoundary from "./error-boundary";
 import "./globals.css";
+import "./workbench-layout.css";
+import "./engagement-loop.css";
+import "./workbench-concept.css";
 
 const mono = Geist_Mono({ variable: "--font-mono", subsets: ["latin"] });
 

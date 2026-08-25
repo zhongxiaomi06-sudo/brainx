@@ -131,7 +131,7 @@ test('匹配算法 v1：技能维权重高于意向维（同等命中率时 skil
 
 test('CSV 同步骨架：从岗位盘点表 UPSERT 候选画像并打意向标签', async () => {
   const { syncTalentsFromCsv } = await import('../src/talent.js');
-  const out = await syncTalentsFromCsv(fileURLToPath(new URL('../公司岗位情况-Shanon - Sheet1.csv', import.meta.url)));
+  const out = await syncTalentsFromCsv(fileURLToPath(new URL('./fixtures/talent-positions.csv', import.meta.url)));
   assert.ok(out.read > 0);
   assert.equal(out.inserted + out.updated, out.read);
   const list = await listTalents({ limit: 5 });

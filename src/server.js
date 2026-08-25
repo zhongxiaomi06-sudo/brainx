@@ -4,8 +4,8 @@
 import './env.js';
 import http from 'node:http';
 import { spawn } from 'node:child_process';
-import { existsSync, readFileSync, statSync, appendFileSync, mkdirSync } from 'node:fs';
-import { join, normalize, dirname, sep, extname } from 'node:path';
+import { existsSync, readFileSync, statSync } from 'node:fs';
+import { join, normalize, dirname, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openDb, now } from './db.js';
 import { runSync, latestSync, latestRealSync, latestBridgeError, latestCompleteSnapshot, friendlyBridgeError } from './sync.js';
@@ -33,106 +33,22 @@ import { radarRows, clientRows } from './radar.js';
 import { syncTalentsFromCsv, listTalents as listTalentsRepo, getTalent, talentBackendStatus, ingestResume, syncTalentsFromResumes, listResumes, talentHealth } from './talent.js';
 import { talentSupplyForJob, talentSupplyEnabled } from './talent-supply.js';
 import { effectiveJob, effectiveFactPayload, updateFactOverrides } from './facts.js';
-import { chatStream, isLlmConfigured } from './llm.js';
+import { assistantRoutes } from './assistant-routes.js';
 import { pickTray, nextBatch, feedback as recommendationFeedback, undoFeedback as recommendationUndoFeedback } from './recommendation-batch.js';
 import { verifyQuick, quickResultPage, QUICK_ACTIONS } from './quickfb.js';
 import { verifySnapshotKey, jobSnapshot } from './snapshot.js';
 import { createGuard } from './guard.js';
+import { makeClientErrorRoute } from './client-error.js';
+import { body, err, isPathInside, json, normalizeWorkbenchPreferences, proxyFrontend,
+  safeJsonArray, STATIC_MIME } from './server-http.js';
 
+export { isPathInside } from './server-http.js';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const FRONTEND_DIR = join(ROOT, 'frontend', 'btex-frontend');
 const FRONTEND_HOST = process.env.BRAINX_FRONTEND_HOST || '127.0.0.1';
 const FRONTEND_PORT = Number(process.env.BRAINX_FRONTEND_PORT || 4321);
 // 本地静态资源目录：vinext 在部分环境（Windows）不提供 /assets，后端直接读 dist 产物绕过
 const STATIC_DIR = join(FRONTEND_DIR, 'dist', 'client');
-const STATIC_MIME = {
-  '.css': 'text/css; charset=utf-8',
-  '.js': 'application/javascript; charset=utf-8',
-  '.mjs': 'application/javascript; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.html': 'text/html; charset=utf-8',
-  '.svg': 'image/svg+xml',
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.gif': 'image/gif',
-  '.ico': 'image/x-icon',
-  '.webp': 'image/webp',
-  '.woff': 'font/woff',
-  '.woff2': 'font/woff2',
-  '.ttf': 'font/ttf',
-  '.eot': 'application/vnd.ms-fontobject',
-};
-
-/** 目录穿越判定：必须带分隔符前缀——裸 startsWith(base) 会把兄弟目录
- * （public-x/… 前缀同为 /…/public）误判为内部（2026-08-10 框架修正）。 */
-export const isPathInside = (base, fp) => {
-  const normalizedBase = normalize(base);
-  const normalizedPath = normalize(fp);
-  const baseWithSep = normalizedBase.endsWith(sep) ? normalizedBase : normalizedBase + sep;
-  return normalizedPath === normalizedBase || normalizedPath.startsWith(baseWithSep);
-};
-
-const json = (res, code, obj) => {
-  res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
-  res.end(JSON.stringify(obj));
-};
-const err = (res, code, codeStr, message) => json(res, code, { error: { code: codeStr, message } });
-const safeJsonArray = (value, fallback = []) => {
-  try {
-    const parsed = JSON.parse(value || '[]');
-    return Array.isArray(parsed) ? parsed : fallback;
-  } catch {
-    return fallback;
-  }
-};
-const normalizeWorkbenchPreferences = (input = {}) => {
-  const cleanId = (value) => String(value || '').trim().slice(0, 120);
-  const tray = Array.isArray(input.tray) ? Array.from(new Set(input.tray.map(cleanId).filter(Boolean))).slice(0, 100) : [];
-  const folders = Array.isArray(input.folders) ? input.folders.slice(0, 50).map((folder, index) => {
-    const id = cleanId(folder?.id) || `folder-${index + 1}`;
-    const name = String(folder?.name || '').trim().slice(0, 80) || '未命名文件夹';
-    const jobIds = Array.isArray(folder?.jobIds) ? Array.from(new Set(folder.jobIds.map(cleanId).filter(Boolean))).slice(0, 200) : [];
-    return { id, name, jobIds };
-  }) : [];
-  return { tray, folders, folderMode: !!input.folderMode };
-};
-
-const proxyFrontend = (req, res, target) => {
-  const targetPath = req.url === '/login' || req.url?.startsWith('/login?')
-    ? `/${req.url.slice('/login'.length)}`
-    : req.url || '/';
-  const proxy = http.request({
-    hostname: target.host,
-    port: target.port,
-    path: targetPath,
-    method: req.method,
-    headers: { ...req.headers, host: `${target.host}:${target.port}` },
-  }, (upstream) => {
-    // B9（2026-08-24）：HTML 应用壳禁止启发式缓存——旧 HTML 引用已删除的 hash JS 是
-    // 「白屏/点不动」的主要体感来源（nginx 日志实证 geist-mono 404 ×30）。
-    // HTML 强制 revalidate；带内容 hash 的静态资产不受影响（vinext 自行长缓存）。
-    const headers = { ...upstream.headers };
-    if (String(headers['content-type'] || '').includes('text/html')) {
-      headers['cache-control'] = 'no-cache';
-      delete headers.etag;
-    }
-    res.writeHead(upstream.statusCode || 502, headers);
-    upstream.pipe(res);
-  });
-  proxy.on('error', (e) => {
-    if (!res.headersSent) err(res, 502, 'FRONTEND_UNAVAILABLE', `前端服务不可用：${e.message}`);
-    else res.destroy(e);
-  });
-  req.pipe(proxy);
-};
-
-async function body(req) {
-  let s = '';
-  for await (const c of req) s += c;
-  try { return JSON.parse(s || '{}'); } catch { return null; }
-}
-
 export function createServer(db = openDb(), deps = {}) {
   const exchange = deps.exchangeCode || exchangeCode;
   const devAuth = process.env.BRAINX_DEV_AUTH === '1';
@@ -158,6 +74,7 @@ export function createServer(db = openDb(), deps = {}) {
   };
 
   const routes = {
+    ...assistantRoutes(db, deps),
     'GET /api/v1/consultants': (req, res) => {
       json(res, 200, { items: loadConsultants(db)
         .map((c) => ({ consultant_id: c.consultant_id, display_name: c.display_name })) });
@@ -305,54 +222,7 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       res.end();
     },
 
-    'POST /api/v1/assistant/chat': async (req, res, cid) => {
-      const b = await body(req);
-      const question = typeof b?.question === 'string' ? b.question.trim() : '';
-      if (!question || question.length > 4000) return err(res, 422, 'INVALID_QUESTION', '问题不能为空且不能超过 4000 字');
-      const requestApiKey = typeof b?.api_key === 'string' ? b.api_key.trim().slice(0, 300) : '';
-      if (!isLlmConfigured() && !requestApiKey) return err(res, 503, 'LLM_NOT_CONFIGURED', 'DeepSeek 尚未配置，请联系管理员设置服务器环境变量');
-      const requestedHistory = Array.isArray(b?.history) ? b.history : [];
-      const history = requestedHistory.slice(-12).filter((m) =>
-        m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
-        .map((m) => ({ role: m.role, content: m.content.slice(0, 4000) }));
-      const run = latestRun(db, cid);
-      const sync = latestSync(db, cid);
-      const commitments = commitmentSummary(db, cid);
-      const selectedId = typeof b?.context?.opportunity_id === 'string' ? b.context.opportunity_id : null;
-      const items = (run?.items || []).slice(0, 10).map((item) => ({
-        project_id: item.job?.project_id, company: item.job?.company, role: item.job?.role,
-        score: item.score, action: item.action, confidence_band: item.confidence_band,
-        evidence_coverage: item.evidence_coverage, reasons: item.reasons, risks: item.risks,
-      }));
-      const selected = selectedId ? items.find((item) => item.project_id === selectedId) || null : null;
-      const context = JSON.stringify({
-        consultant_id: cid,
-        page: typeof b?.context?.page === 'string' ? b.context.page.slice(0, 80) : 'today',
-        selected_opportunity: selected,
-        recommendations: items,
-        sync: sync ? { state: sync.complete ? 'READY' : 'INCOMPLETE', updated_at: sync.completed_at, rows_read: sync.rows_read } : { state: 'EMPTY' },
-        commitments: commitments.items?.slice(0, 20) || [],
-      });
-      const system = `你是 BrainX 工作台的只读业务助手。你只能依据提供的当前顾问可见上下文回答，不得编造事实，不得声称已经执行任何操作。你不能调用工具、SQL、Shell，也不能修改职位、承接、结果或画像。没有数据时明确说“当前后端没有这项数据”。回答使用简洁中文。当前上下文：${context}`;
-      res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-cache, no-transform', Connection: 'keep-alive' });
-      res.write(`event: meta\ndata: ${JSON.stringify({ ok: true, read_only: true })}\n\n`);
-      try {
-        await chatStream([{ role: 'system', content: system }, ...history, { role: 'user', content: question }], {
-        signal: req.signal,
-          apiKey: requestApiKey || undefined,
-          onText: (text) => { if (!res.destroyed) res.write(`data: ${JSON.stringify({ text })}\n\n`); },
-        });
-        if (!res.destroyed) res.write('event: done\ndata: {}\n\n');
-      } catch (e) {
-        if (!res.destroyed) {
-          const status = e?.status === 429 ? 429 : e?.status >= 500 ? 504 : 502;
-          res.write(`event: error\ndata: ${JSON.stringify({ code: status === 429 ? 'LLM_RATE_LIMIT' : 'LLM_UNAVAILABLE', message: status === 429 ? 'DeepSeek 请求过于频繁，请稍后重试' : 'DeepSeek 暂时不可用，请稍后重试' })}\n\n`);
-        }
-      } finally { if (!res.destroyed) res.end(); }
-    },
-
     'GET /api/v1/workbench': (req, res, cid) => {
-      // 2026-08-25：状态判定看真实同步；bridge-error 降级为 warning（上游限流不再锁死工作台）
       const sync = latestRealSync(db, cid);
       const bridgeErr = latestBridgeError(db, cid, sync?.completed_at || '');
       const run = latestRun(db, cid);
@@ -360,10 +230,8 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       json(res, 200, {
         consultant_id: cid,
         sync: sync ? { state: sync.complete ? 'READY' : 'INCOMPLETE', updated_at: sync.completed_at,
-                       rows_read: sync.rows_read, rows_expected: sync.rows_expected,
-                       errors: JSON.parse(sync.errors || '[]'),
-                       warning: bridgeErr ? { at: bridgeErr.started_at,
-                         ...friendlyBridgeError(bridgeErr.errors) } : null }
+                       rows_read: sync.rows_read, rows_expected: sync.rows_expected, errors: JSON.parse(sync.errors || '[]'),
+                       warning: bridgeErr ? { at: bridgeErr.started_at, ...friendlyBridgeError(bridgeErr.errors) } : null }
                    : { state: 'EMPTY', updated_at: null },
         feishu_auth: tokenStatus(db, cid), // {authorized, needs_reauth}——头胶囊提示重登
         ttc_auth: ttcAuthStatus(db, cid),  // TTC 系统托管状态（连接胶囊；绝不出 JWT 本体）
@@ -375,7 +243,6 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
         run_id: run?.run?.run_id || null,
       });
     },
-
     'GET /api/v1/workbench/preferences': (req, res, cid) => {
       const row = db.prepare('SELECT tray_json, folders_json, folder_mode, updated_at FROM workbench_preferences WHERE consultant_id=?').get(cid);
       json(res, 200, row ? {
@@ -402,7 +269,6 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       );
       json(res, 200, { ok: true, ...prefs, updatedAt });
     },
-
     'GET /api/v1/recommendations': (req, res, cid, q) => {
       const limit = Math.min(Number(q.get('limit')) || 10, 50);
       const sync = latestSync(db, cid);
@@ -434,7 +300,6 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
     // （open 路由，鉴权全在 verifyQuick）。顾问不登录工作台也能产标签。
     'GET /api/v1/feedback/quick': (req, res, cid, q) => {
       const p = Object.fromEntries(q);
-      // B12：失败页透传 verifyQuick 的语义状态码（503 未配置 / 403 过期或签名无效 / 400 参数不全）
       const page = (okFlag, text, status) => {
         res.writeHead(okFlag ? 200 : (status || 400), { 'Content-Type': 'text/html; charset=utf-8' });
         res.end(quickResultPage(okFlag, text));
@@ -640,7 +505,7 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       const c = loadConsultants(db).find((x) => x.consultant_id === cid);
       json(res, 200, { consultant_id: cid, display_name: c?.display_name || cid,
         profile_keywords: c?.profile_keywords || [], profile_note: c?.profile_note || '',
-        weights: c?.weights || null, // 六维权重覆盖（null = 基线 baseline-1.1）
+        weights: c?.weights || null,
         feishu_auth: tokenStatus(db, cid) });
     },
     'PUT /api/v1/profile': async (req, res, cid) => {
@@ -723,29 +588,8 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
     // 请求指标（预测告警装置数据源）：聚合计数/字节量，无敏感数据，供看门狗轮询
     'GET /api/v1/meta/guard': (req, res) => json(res, 200, guard.snapshot()),
 
-    // 浏览器端运行时错误上报（layout.tsx 内联探针）：白屏/资源 404/水合失败的事故特征源。
-    // 免登录（出错时 session 可能也不可用）；只落聚合日志行 + guard 计数，不存业务数据。
-    'POST /api/v1/meta/client-error': async (req, res) => {
-      const b = await body(req);
-      if (!b || typeof b.message !== 'string') return err(res, 400, 'BAD_BODY', '缺 message 字段');
-      const line = JSON.stringify({
-        ts: new Date().toISOString(),
-        kind: String(b.kind || 'error').slice(0, 40),
-        message: b.message.slice(0, 500),
-        source: String(b.source || '').slice(0, 300),
-        line: Number(b.line) || 0,
-        stack: String(b.stack || '').slice(0, 1000),
-        url: String(b.url || '').slice(0, 300),
-        chunk: !!b.chunk,
-        component_stack: String(b.component_stack || '').slice(0, 1000),
-      });
-      try {
-        mkdirSync(join(ROOT, 'logs'), { recursive: true });
-        appendFileSync(join(ROOT, 'logs', 'frontend-errors.log'), line + '\n');
-      } catch { /* 日志不可写不影响主流程 */ }
-      guard.clientError();
-      json(res, 200, { ok: true });
-    },
+    // 浏览器端错误上报（白屏/资源 404/水合失败特征源）：实现在 client-error.js
+    'POST /api/v1/meta/client-error': makeClientErrorRoute(guard),
 
     // SSE：桥接器有变化时推 sync/recommend/sync_error；25s 心跳保活
     'GET /api/v1/events': (req, res, cid) => {
@@ -819,8 +663,7 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
                     // 职位快照：外部系统（York AI worker 等）无 brainx session，凭 API Key 读取；
                     // 鉴权在 handler 内自校验（verifySnapshotKey），未配置 key 时 fail-closed 全拒。
                     'GET /api/v1/jobs/snapshot', 'GET /api/v1/meta/guard',
-                    // 浏览器端错误探针：出错时未必有 session，且只写聚合日志
-                    'POST /api/v1/meta/client-error',
+                    'POST /api/v1/meta/client-error', // 浏览器端错误探针：未必有 session，只写聚合日志
                     // 一键反馈：无 session，HMAC 签名即鉴权（verifyQuick fail-closed）
                     'GET /api/v1/feedback/quick'];
       const cid = open.includes(`${req.method} ${path}`) ? null : auth(req, res);

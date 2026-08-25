@@ -9,8 +9,9 @@ node_modules
 frontend/**/dist
 frontend/**/.wrangler
 frontend/**/.next
-data/*.db
-data/*.sqlite
+# 整个 data/ 不进镜像：含本地数据库与 data/.secret 令牌加密密钥
+# （密钥 + 库一起外发等同明文，见 docs/SECURITY.md 打包纪律；镜像内 /app/data 由 Dockerfile 运行时创建）
+data/
 *.pdf
 # 收敛后旧前端与归档，不进镜像（减小体积）
 frontend/decision-workbench

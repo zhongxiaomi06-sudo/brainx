@@ -96,13 +96,13 @@ test("derives observe/verify for low-coverage recommendations", () => {
   assert.equal(job.actions[0].kind, "verify");
 });
 
-test("blocks engagement for jobs owned by another consultant", () => {
+test("allows independent engagement while flagging another consultant ownership", () => {
   const rec = {
     ...sampleRec,
     job: { ...sampleRec.job, hc: 1, relation: "OTHER_CONSULTANT" },
   };
   const job = mapRecommendation(rec);
-  assert.equal(job.eligibility, "VERIFY_REQUIRED");
+  assert.equal(job.eligibility, "ELIGIBLE");
   assert.equal(job.actions[0].id, "ownership");
   assert.equal(eligibilityOf("RECOMMEND_ACCEPT", "NOT_JOINED", 1, "OPEN"), "VERIFY_REQUIRED");
 });

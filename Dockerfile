@@ -36,6 +36,9 @@ ENV BRAINX_FRONTEND_PORT=4321
 EXPOSE 3000
 
 # 非 root 运行（node 基础镜像自带 node 用户），降低容器逃逸面。
+# data 目录必须归 node 用户：运行时要新建 SQLite 与 data/.secret；
+# 挂载持久卷时 Docker 沿用镜像内该目录属主（root 属主会导致 node 写库 EACCES）。
+RUN mkdir -p /app/data && chown node:node /app/data
 USER node
 
 # 入口：启动后端，后端会自行拉起并代理前端。

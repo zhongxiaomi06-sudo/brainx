@@ -1,7 +1,7 @@
 # Brain X 每日数据进度与健康简报
 
-**日期**：2026-08-24（周一）09:18 CST  
-**检查方式**：只读（未修改任何数据、未重启服务）  
+**日期**：2026-08-24（周一）09:18 CST
+**检查方式**：只读（未修改任何数据、未重启服务）
 **DB**：`/Users/ashley/Downloads/brainx/data/brainx.db`（只读 mode=ro）
 
 ---
@@ -66,7 +66,7 @@
 - 各顾问最近一次 decision_runs（created_at 均为 `2026-08-21T14:05:5xZ`≈CST 22:05，candidate_count=984）。
 
 ### 最近 24h sync_runs 异常检查
-- 过去 24h 内 **无任何 sync_runs 记录**（complete=0 或 errors 非空：0 条；总条数：0）。  
+- 过去 24h 内 **无任何 sync_runs 记录**（complete=0 或 errors 非空：0 条；总条数：0）。
   原因：180s 桥接同步每 tick 均因 DNS 故障失败，未写入 sync_runs。
 
 ---
@@ -102,12 +102,12 @@
 ## 5. 日志检查
 
 ### launchd.err.log（18,537 行）
-- 末尾 20 行为飞书 OAuth token 刷新失败 JSON：`accounts.feishu.cn: no such host`（网络/DNS）。  
-- 全文 `no such host / lookup / dns` 命中 **43 次**，从行 4746 → 18521（近末尾），属持续故障。  
+- 末尾 20 行为飞书 OAuth token 刷新失败 JSON：`accounts.feishu.cn: no such host`（网络/DNS）。
+- 全文 `no such host / lookup / dns` 命中 **43 次**，从行 4746 → 18521（近末尾），属持续故障。
 - 早期还出现过：`[frontend] 启动失败：spawn npm ENOENT`、`open_id cross app`（code 99992361）、`[feishu] refresh 异常 cid=mia：fetch failed`。
 
 ### launchd.out.log（1,081 行）
-- `桥接器已启动（间隔 180s）` 全文共 **27 次**，均为启动横幅（非周期心跳）。今日（08-24，行 1075–1081）**0 次** → 今日无异常重启。  
+- `桥接器已启动（间隔 180s）` 全文共 **27 次**，均为启动横幅（非周期心跳）。今日（08-24，行 1075–1081）**0 次** → 今日无异常重启。
 - 最近一次启动横幅在行 684（对应 08-21#1900 推送窗口前后）。
 - 末尾定时推送结果（近 3 天全部失败）：
 

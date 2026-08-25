@@ -116,7 +116,7 @@ export async function pushCard(db, { consultant_id, kind, run_id, card, target, 
   const rid = run_id ?? '';
   const dup = db.prepare(`SELECT push_id, status FROM push_log
     WHERE consultant_id=? AND kind=? AND run_id=?`).get(consultant_id, kind, rid);
-  if (dup && dup.status !== 'FAILED') {
+  if (dup && dup.status !== 'FAILED' && !(dup.status === 'PREVIEW' && send)) {
     // 唯一键（consultant+kind+run_id）即幂等保证：已成功的推送跳过，
     // 返回首次记录——该 run 在 push_log 中永远只有一条成功记录。
     return { ok: true, status: 'SKIPPED_DUPLICATE', push_id: dup.push_id };

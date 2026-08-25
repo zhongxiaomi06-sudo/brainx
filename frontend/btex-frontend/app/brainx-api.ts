@@ -64,6 +64,8 @@ export type BrainxSnapshot = {
   snapshotId: string | null;
   policyVersion: string | null;
   profileKeywords: string[];
+  openmai: Record<string, OpenmaiResult | null>;
+  preferences: WorkbenchPreferences;
 };
 
 export type BrainxReplay = {
@@ -99,8 +101,8 @@ export type BackendRecommendation = {
 };
 export type BackendSync = {
   state: string; updated_at?: string | null; rows_read?: number | null;
-  rows_expected?: number | null; errors?: string[];
- warning?: { at: string; message: string; detail?: string } | null; };
+  rows_expected?: number | null; errors?: string[]; warning?: { at: string; message: string; detail?: string } | null;
+};
 export type BackendCommitment = {
   project_id: string; state: EngagementState; state_since?: string | null;
   company?: string | null; role?: string | null; active_state?: string | null; next_action?: string | null;
@@ -121,6 +123,7 @@ export type BackendOpportunity = {
   relation: { relation: string | null; source?: string | null; valid_from?: string | null };
   engagement_state: EngagementState; legal_actions: EngagementCommand[];
   events: BackendEvent[]; outcomes: BackendOutcome[]; latest_recommendation: BackendLatestRecommendation | null;
+  openmai?: OpenmaiResult | null;
   commitment_goal?: string | null; active_action?: BackendCommitmentAction | null;
   action_history?: BackendCommitmentAction[]; suggested_action?: BackendSuggestedAction | null;
   terminal_result_missing?: boolean;
@@ -140,12 +143,14 @@ export type BackendReplay = {
   job_now?: { company?: string; role?: string; active_state?: string; note?: string } | null;
   events: BackendEvent[]; outcomes: BackendOutcome[];
 };
-export type BackendProfile = { consultant_id: string; display_name: string; profile_keywords: string[]; profile_note: string; weights?: Record<string, number> | null; feishu_auth?: { authorized?: boolean; needs_reauth?: boolean } };
+export type BackendProfile = { consultant_id: string; display_name: string; profile_keywords: string[]; profile_note: string; feishu_auth?: { authorized?: boolean; needs_reauth?: boolean } };
+export type WorkbenchFolder = { id: string; name: string; jobIds: string[] };
+export type WorkbenchPreferences = { tray: string[]; folders: WorkbenchFolder[]; folderMode: boolean; updatedAt?: string | null };
 export type BackendRadarRow = BackendJob & { engagement_state?: EngagementState; cockpit?: { membership_status?: string | null; current_stage?: string | null; stage_confidence?: string | null; pipeline_snapshot?: string | null; next_action?: string | null; cockpit_as_of?: string | null; completeness?: string | null; source_url?: string | null } | null };
 export type BackendClientRow = { company: string; company_type?: string | null; job_count?: number; active_jobs?: number; hc_known?: number | null; last_activity?: string | null; relations?: string[]; states?: string[] };
 export type BackendDismissReasons = { items: string[] };
 export type BackendSessionStatus = { configured: boolean; dev_auth: boolean };
-export type BackendSseEvent = { type?: "hello" | "sync" | "recommend" | "sync_error"; message?: string; consultant_id?: string; at?: string };
+export type BackendSseEvent = { type?: "hello" | "sync" | "recommend" | "sync_error" | "openmai_result"; message?: string; consultant_id?: string; project_id?: string; status?: string; at?: string };
 export type BackendConsultants = { items: { consultant_id: string; display_name: string }[] };
 export type BackendEngagementResponse = { ok: boolean; already?: boolean; event_id?: string; state: EngagementState; legal_actions: EngagementCommand[] };
 export type BackendRecommendationRun = { blocked?: boolean; reason?: string; run_id?: string | null; items?: BackendRecommendation[] };
@@ -154,10 +159,7 @@ export type BackendFeedbackResponse = { ok: boolean; already?: boolean; feedback
 export type BackendOutcomeResponse = { ok: boolean; already?: boolean; outcome_id?: string | number };
 export type BackendProgressResponse = { ok: boolean; already?: boolean; state?: EngagementState; active_action?: BackendCommitmentAction; incorporated_into_next_decision?: boolean; backfilled?: boolean };
 export type BackendMembershipResponse = { ok: boolean; already?: boolean; relation: "MY_JOB"|"TEAM_SHARED"; legal_actions: EngagementCommand[]; recompute?: { blocked?: boolean; reason?: string } };
-export type BackendProfileUpdate = { ok: boolean; consultant_id: string; profile_keywords?: string[]; profile_note?: string; weights?: Record<string, number> | null; weights_effective?: string | Record<string, number> };
-export type AssistantMessage = { role: "user" | "assistant"; content: string };
-export type AssistantContext = { page: string; opportunity_id?: string | null };
-export type AssistantChatOptions = { question: string; history: AssistantMessage[]; context: AssistantContext; api_key?: string; signal?: AbortSignal };
+export type BackendProfileUpdate = { ok: boolean; consultant_id: string; profile_keywords?: string[]; profile_note?: string };
 
 export class BrainxApiError extends Error {
   status: number;
@@ -254,7 +256,8 @@ export function directionOf(role: string): BrainxDirection {
 
 export function eligibilityOf(action: string, relation: string, hc: number | null, activeState: string): BrainxEligibility {
   if (hc === 0 || activeState === "CLOSED" || activeState === "COMPLETED") return "EXCLUDED";
-  if (relation === "NOT_JOINED" || relation === "OTHER_CONSULTANT" || relation === "UNKNOWN") return "VERIFY_REQUIRED";
+  // OTHER_CONSULTANT 不再阻塞接单（顾问接单互不影响，仅保留"他人主做"提示）
+  if (relation === "NOT_JOINED" || relation === "UNKNOWN") return "VERIFY_REQUIRED";
   if (action === "OBSERVE") return "VERIFY_REQUIRED";
   return "ELIGIBLE";
 }
@@ -280,7 +283,7 @@ export function actionsOf(action: string, relation: string): BrainxDecisionActio
 }
 
 export function factsOf(
-  job: { relation?: string; active_state?: string; current_stage?: string | null; hc?: number | null; captured_at?: string; pipeline?: string | null; pipeline_snapshot?: string | null; city?: string; priority?: string | null; company_type?: string | null; next_action?: string | null; notes?: string | null },
+  job: { relation?: string | null; active_state?: string | null; current_stage?: string | null; hc?: number | null; captured_at?: string | null; pipeline?: string | null; pipeline_snapshot?: string | null; city?: string | null; priority?: string | null; company_type?: string | null; next_action?: string | null; notes?: string | null },
 ): Record<string, string> {
   const facts: Record<string, string> = {
     "职位关系": RELATION_LABELS[job.relation || ""] || job.relation || "UNKNOWN",
@@ -301,7 +304,7 @@ export function factsOf(
 }
 
 function factFieldsOf(job: {
-  active_state?: string; current_stage?: string | null; pipeline?: string | null;
+  active_state?: string | null; current_stage?: string | null; pipeline?: string | null;
   pipeline_snapshot?: string | null; hc?: number | null; next_action?: string | null;
   notes?: string | null; fact_sources?: Partial<Record<ManualFactField, string>>;
   fact_updated_at?: Partial<Record<ManualFactField, string | null>>;
@@ -348,9 +351,6 @@ export function mapRecommendation(rec: BackendRecommendation): BrainxJob {
     globalScore: breakdownDim(rec.breakdown, "activity"),
     explorationScore: breakdownDim(rec.breakdown, "exploration"),
     personalScore: breakdownDim(rec.breakdown, "direction"),
-    // 完整六维（2026-08-25：披露层修正——三层只是其中三维的别名，其余三维不再隐形）
-    scoreBreakdown: (rec.breakdown || []).map((b) => ({ dim: b.dim, label: b.label || b.dim,
-      weight: b.weight, score: b.score, status: b.status || (b.score == null ? "missing" : "available") })),
     finalScore: rec.score,
     evidenceCoverage: coveragePct,
     recommendation: rec.reasons[0] || rec.risks[0] || BACKEND_ACTION_LABELS[rec.action] || rec.action,
@@ -377,8 +377,7 @@ export function mapSyncStatus(
     updatedAt: s.updated_at ? formatClock(s.updated_at) : null,
     rowsRead: s.rows_read ?? undefined,
     rowsExpected: s.rows_expected ?? undefined,
-    errors: s.errors || [],
-    warning: s.warning ? { at: s.warning.at, message: s.warning.message, detail: s.warning.detail } : null, // 降级信号（2026-08-25）
+    errors: s.errors || [], warning: s.warning ? { at: s.warning.at, message: s.warning.message, detail: s.warning.detail } : null, // 降级信号（2026-08-25）
   };
 }
 
@@ -601,6 +600,12 @@ export async function undoRecommendationFeedback(projectId: string): Promise<{ o
   });
 }
 
+export async function updateWorkbenchPreferences(preferences: Pick<WorkbenchPreferences, "tray" | "folders" | "folderMode">): Promise<{ ok: boolean } & WorkbenchPreferences> {
+  return brainxFetch<{ ok: boolean } & WorkbenchPreferences>("/api/v1/workbench/preferences", {
+    method: "PUT", body: preferences,
+  });
+}
+
 export type ManualFactUpdate = {
   changes?: Partial<Record<ManualFactField, string | number>>;
   clear_fields?: ManualFactField[];
@@ -621,8 +626,7 @@ export async function updateOpportunityMembership(
   idempotencyKey: string,
 ): Promise<BackendMembershipResponse> {
   return brainxFetch(`/api/v1/opportunities/${encodeURIComponent(id)}/membership`, {
-    method: "PATCH",
-    body: { relation, idempotency_key: idempotencyKey },
+    method: "PATCH", body: { relation, idempotency_key: idempotencyKey },
   });
 }
 
@@ -639,14 +643,14 @@ export async function brainxFetch<T = unknown>(
     headers: options.body !== undefined ? { "Content-Type": "application/json" } : undefined,
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
   });
-  if (res.status === 204) return null;
+  if (res.status === 204) return null as T;
   let data: T | BrainxErrorPayload | null = null;
   try { data = await res.json(); } catch { /* 非 JSON 响应体 */ }
   if (!res.ok) {
     // 两种错误信封：err() 的 {error:{code,message}} 与领域函数的 {error:"字符串"}（如 engage 409）
     const raw = (data as BrainxErrorPayload | null)?.error;
     const message = raw && typeof raw === "object"
-      ? raw.message
+      ? raw.message || `HTTP ${res.status}`
       : typeof raw === "string" ? raw : `HTTP ${res.status}`;
     const code = raw && typeof raw === "object" ? raw.code : undefined;
     throw new BrainxApiError(message, res.status, code, data as BrainxErrorPayload);
@@ -672,52 +676,15 @@ export async function getTalentSupply(jobId: string): Promise<TalentSupplySnapsh
   return brainxFetch<TalentSupplySnapshot>(`/api/v1/opportunities/${encodeURIComponent(jobId)}/talent-supply`);
 }
 
-/** 只读助手的流式接口；响应内容不经过 JSON 客户端封装，避免吞掉 SSE 增量。 */
-export async function streamAssistant(
-  options: AssistantChatOptions,
-  onText: (text: string) => void,
-  onError: (message: string) => void,
-): Promise<void> {
-  const res = await fetch("/api/v1/assistant/chat", {
-    method: "POST", credentials: "same-origin", signal: options.signal,
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question: options.question, history: options.history, context: options.context, api_key: options.api_key }),
-  });
-  if (!res.ok) {
-    let message = `HTTP ${res.status}`;
-    try { const data = await res.json(); message = data?.error?.message || data?.error || message; } catch { /* text fallback */ }
-    throw new BrainxApiError(String(message), res.status);
-  }
-  if (!res.body) throw new BrainxApiError("助手没有返回内容", 502);
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  try {
-    for (;;) {
-      const { value, done } = await reader.read();
-      buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
-      const lines = buffer.split(/\r?\n/); buffer = lines.pop() || "";
-      for (const line of lines) {
-        if (!line.startsWith("data:")) continue;
-        try {
-          const data = JSON.parse(line.slice(5).trim()) as { text?: string; message?: string };
-          if (data.text) onText(data.text);
-          if (data.message) onError(data.message);
-        } catch { /* ignore malformed provider frame */ }
-      }
-      if (done) break;
-    }
-  } finally { reader.releaseLock(); }
-}
-
 /** 读取完整工作台快照：概览 + 推荐 + 逐职位详情（承接态/允许动作/事件/结果）+ 画像。
  *  会话未登录（401）时抛错，由调用方进入离线回退。 */
 export async function getSnapshot(): Promise<BrainxSnapshot> {
-  const [wb, recs, profile, dismiss] = await Promise.all([
+  const [wb, recs, profile, dismiss, preferences] = await Promise.all([
     brainxFetch<BackendWorkbench>("/api/v1/workbench"),
     brainxFetch<BackendRecommendations>("/api/v1/recommendations?limit=20"),
     brainxFetch<BackendProfile>("/api/v1/profile"),
     brainxFetch<BackendDismissReasons>("/api/v1/dismiss-reasons").catch(() => ({ items: FALLBACK_DISMISS_REASONS })),
+    brainxFetch<WorkbenchPreferences>("/api/v1/workbench/preferences").catch(() => ({ tray: [], folders: [], folderMode: false, updatedAt: null })),
   ]);
 
   const jobs = (recs.items || []).map(mapRecommendation) as BrainxJob[];
@@ -725,6 +692,7 @@ export async function getSnapshot(): Promise<BrainxSnapshot> {
   const events: Record<string, DecisionEvent[]> = {};
   const outcomes: Record<string, Outcome[]> = {};
   const legal: Record<string, EngagementCommand[]> = {};
+  const openmai: Record<string, OpenmaiResult | null> = {};
 
   const details = await Promise.all(
     jobs.map((j) => brainxFetch<BackendOpportunity>(`/api/v1/opportunities/${encodeURIComponent(j.id)}`).catch(() => null)),
@@ -734,6 +702,7 @@ export async function getSnapshot(): Promise<BrainxSnapshot> {
     const decisionId = d?.latest_recommendation?.decision_id || recs.items[i]?.decision_id;
     job.brainxDecisionId = decisionId;
     if (!d) return;
+    openmai[job.id] = d.openmai ?? null;
     engagement[job.id] = d.engagement_state as EngagementState;
     events[job.id] = mapEvents(d.events);
     outcomes[job.id] = mapOutcomes(d.outcomes);
@@ -767,6 +736,7 @@ export async function getSnapshot(): Promise<BrainxSnapshot> {
     events,
     outcomes,
     legal,
+    openmai,
     sync: mapSyncStatus(wb.sync, wb.feishu_auth),
     auth: {
       consultant: profile.display_name || wb.consultant_id || "顾问",
@@ -779,6 +749,7 @@ export async function getSnapshot(): Promise<BrainxSnapshot> {
     snapshotId: recs.snapshot_id || null,
     policyVersion: recs.policy_version || wb.current_policy_version || null,
     profileKeywords: profile.profile_keywords || [],
+    preferences,
   };
 }
 
@@ -819,9 +790,10 @@ export async function fetchJobDetail(id: string): Promise<{
       goal: d.commitment_goal || null,
       activeAction: d.active_action ? mapCommitmentAction(d.active_action) : null,
       actionHistory: (d.action_history || []).map(mapCommitmentAction),
-      suggestedAction: d.suggested_action ? { title: d.suggested_action.title,
-        dueAt: d.suggested_action.due_at, source: d.suggested_action.source,
-        rule: d.suggested_action.rule } : null,
+      suggestedAction: d.suggested_action ? {
+        title: d.suggested_action.title, dueAt: d.suggested_action.due_at,
+        source: d.suggested_action.source, rule: d.suggested_action.rule,
+      } : null,
       terminalResultMissing: !!d.terminal_result_missing,
     },
   };

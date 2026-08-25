@@ -1,0 +1,150 @@
+.commitment-loop {
+  --commitment-title: 16px;
+  --commitment-body: 13px;
+  --commitment-meta: 11px;
+  --commitment-control-height: 38px;
+  display: grid;
+  gap: 14px;
+  padding: 16px 28px 32px;
+  color: #17342e;
+  font-size: var(--commitment-body);
+}
+.commitment-membership,
+.commitment-onboarding,
+.commitment-completed,
+.current-action-card,
+.commitment-editor {
+  padding: 17px 18px;
+  border: 1px solid rgba(23, 76, 64, .13);
+  border-radius: 15px;
+  background: linear-gradient(150deg, #fff, #f8fbfa);
+  box-shadow: 0 8px 24px rgba(25, 61, 52, .05);
+}
+.commitment-membership {
+  border-color: rgba(45, 151, 124, .24);
+  background: linear-gradient(145deg, #eef9f6, #fbfefd);
+}
+.commitment-membership-head,
+.current-action-head,
+.commitment-editor-head,
+.commitment-membership-actions,
+.commitment-editor-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.commitment-onboarding h2,
+.commitment-completed h2,
+.current-action-card h2,
+.commitment-editor h2,
+.commitment-timeline h2,
+.commitment-membership h2 {
+  margin: 0;
+  color: #183d34;
+  font-size: var(--commitment-title);
+  line-height: 1.35;
+}
+.commitment-command-row,
+.commitment-primary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 14px;
+}
+.commitment-loop button {
+  min-height: var(--commitment-control-height);
+  padding: 0 13px;
+  border: 1px solid rgba(33, 92, 78, .17);
+  border-radius: 10px;
+  background: #fff;
+  color: #315a50;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.commitment-loop .primary {
+  border-color: #176f5b;
+  background: #176f5b;
+  color: #fff;
+}
+.commitment-membership-form,
+.commitment-fields {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+.commitment-membership-options,
+.commitment-terminal-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+.commitment-membership-options button.selected,
+.commitment-terminal-options button.selected {
+  border-color: #54aa92;
+  background: #fff;
+  color: #145c4c;
+  box-shadow: 0 0 0 3px rgba(84, 170, 146, .1);
+}
+.current-action-card {
+  border-color: rgba(37, 138, 113, .22);
+  background: linear-gradient(145deg, #eef8f5, #fafcfb);
+}
+.current-action-card.overdue { border-color: rgba(187, 86, 66, .3); }
+.current-action-card.blocked { border-color: rgba(189, 135, 44, .3); }
+.current-action-head em {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(27, 111, 91, .09);
+  color: #28715f;
+  font-size: var(--commitment-meta);
+  font-style: normal;
+}
+.commitment-goal {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: 9px;
+  margin: 12px 0;
+  padding: 9px 10px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, .76);
+}
+.commitment-fields label { display: grid; gap: 6px; font-size: 11.5px; }
+.commitment-fields input,
+.commitment-fields textarea,
+.commitment-fields select {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--commitment-control-height);
+  padding: 8px 11px;
+  border: 1px solid rgba(40, 86, 75, .18);
+  border-radius: 9px;
+  background: #fbfdfc;
+  color: #1f4239;
+  font: inherit;
+}
+.commitment-fields textarea { min-height: 76px; resize: vertical; }
+.commitment-deadline-options { display: flex; flex-wrap: wrap; gap: 6px; }
+.commitment-error { color: #a64736; font-size: 11.5px; }
+.commitment-timeline article {
+  display: grid;
+  grid-template-columns: 9px minmax(0, 1fr) auto;
+  gap: 9px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(32, 79, 68, .09);
+}
+.commitment-timeline article i {
+  width: 6px;
+  height: 6px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: #4eb69b;
+}
+.commitment-timeline article time { color: #84938f; font-size: var(--commitment-meta); }
+@media (max-width: 700px) {
+  .commitment-loop { padding: 14px 18px 28px; }
+  .commitment-primary-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .commitment-membership-options { grid-template-columns: 1fr; }
+}

@@ -1,77 +1,83 @@
-# BrainX 部署编排（Deployment）
+# BrainX 部署编排
 
-## 架构拓扑（为什么是单容器）
+> 上级：[文档书总目录](README.md) · 生产恢复：[云端恢复清单](cloud-recovery-checklist.md) · 安全配置：[安全操作手册](SECURITY.md)
 
-BrainX 是**后端反向代理前端**的一体化服务，单一对外入口 `:3000`：
+## 应用拓扑
 
+BrainX 是后端统一代理前端的一体化应用：
+
+```text
+浏览器 ──▶ src/server.js (node:http)
+            ├─ /api/v1/*：SQLite / 可选 MySQL / 飞书 / TTC / 服务端 LLM
+            └─ 其它路径：反向代理到 vinext 前端子进程（默认 4321）
 ```
-浏览器 :3000 ──▶ src/server.js (node:http)
-                  ├─ /api/v1/*  自己处理（SQLite / 可选 MySQL）
-                  └─ 其它路径    反向代理到前端 :4321
-                                    │ spawn: npm run start
-                                    ▼
-                                 vinext 前端 :4321
-```
 
-因为后端会 `spawn` 前端子进程并代理，**不需要 docker-compose 多容器**，单容器即可完整运行。
+后端会启动前端子进程，因此生产不需要 docker-compose。前端构建生成的 `wrangler.json` 由 vinext 管理；不要手写 `wrangler.toml`。若未来部署 Cloudflare Workers，应修改 `vite.config.ts` 的绑定源头。
 
----
+## 生产：ECS + systemd（唯一正式方案）
 
-## 关于 wrangler 配置（重要设计决策）
+现网固定口径：
 
-**本项目不手写 `wrangler.toml`。** 原因：
+- `/opt/brainx`
+- `brainx.service`
+- 应用监听 `127.0.0.1:3101`
+- nginx 对外提供 `https://base.yorkteam.cn`
 
-1. 前端 `vinext build` 会**自动生成** `frontend/btex-frontend/dist/server/wrangler.json`（每次构建覆盖）；手写一份静态 wrangler 文件会与之冲突。
-2. `vite.config.ts` 明确将部署设为 **local-only**（`d1=null; r2=null`），当前不部署到 Cloudflare Workers 的 D1/R2 绑定。
-3. `vinext start` 内部已封装 miniflare/wrangler 运行时，无需外部 CLI 编排。
-
-> 若未来要真上 Cloudflare Workers（启用 D1/R2）：在 `vite.config.ts` 里把 `d1`/`r2` 设为绑定名，`vinext build` 会把绑定写进生成的 wrangler.json，再用 `wrangler deploy` 部署 `dist/server`。**改配置源头（vite.config），而不是手写 wrangler.toml。**
-
----
-
-## 三种部署方式
-
-### 1) 本地/服务器直跑（推荐用于自托管）
 ```bash
-./scripts/deploy.sh build   # 装依赖 + 构建前端
-./scripts/deploy.sh start   # 启动一体化服务（:3000）
-# 或一步到位：
-./scripts/deploy.sh
+cd /opt/brainx
+git fetch origin
+git pull --ff-only
+npm ci
+npm --prefix frontend/btex-frontend ci
+npm --prefix frontend/btex-frontend run build
+systemctl restart brainx
+systemctl status brainx --no-pager
+curl -fsS https://base.yorkteam.cn/api/v1/meta/guard
 ```
 
-### 2) Docker 单容器
+禁止在这台生产机启动 BrainX Docker 容器或执行 `scripts/deploy-ecs-docker.sh`。详细排障、端口确认和历史事件见[云端恢复清单](cloud-recovery-checklist.md)。
+
+## 本地开发
+
 ```bash
-./scripts/deploy.sh docker
-# 等价于：
-docker build -t brainx:latest .
-docker run --rm -p 3000:3000 --env-file .env brainx:latest
+npm ci
+npm --prefix frontend/btex-frontend ci
+npm run dev
 ```
 
-### 3) CI（GitHub Actions，见 .github/workflows/ci.yml）
-每次 push / PR 到 `main` 自动跑：
-- `backend-test`：177 用例测试门禁
-- `frontend-build`：vinext 构建校验
-- `docker-build`：镜像可构建校验（仅构建不推送）
+默认后端为 3000、前端子进程为 4321；本地端口不代表生产端口。
 
----
+## Docker：只用于隔离测试
 
-## 环境变量（.env，见 .env.example）
+Docker 镜像继续由 CI 构建，用于验证镜像可运行。若开发者需要本机测试，必须使用独立端口和数据卷：
 
-运行前必须准备 `.env`（**永不提交**，已在 .gitignore）：
+```bash
+docker build -t brainx:test .
+docker run --rm -p 3300:3000 --env-file .env -v brainx-test-data:/app/data brainx:test
+```
+
+不要把生产 `/opt/brainx/data`、`/root/.lark-cli` 或宿主机 CLI 挂入测试容器，也不要让测试容器监听生产 3101。
+
+## CI
+
+`.github/workflows/ci.yml` 对 push 和 PR 执行后端测试、前端构建与 Docker 镜像构建；镜像构建只做验证，不等于生产发布。
+
+## 环境变量
+
+运行前准备 `.env`（已被 `.gitignore` 排除，永不提交）：
 
 | 变量 | 用途 |
 |---|---|
-| `BRAINX_PORT` / `BRAINX_HOST` | 后端监听（默认 3000 / 0.0.0.0） |
-| `BRAINX_FRONTEND_PORT` | 前端子进程端口（默认 4321） |
-| `BRAINX_MYSQL_*` | 接真库时填；不填则用本地 SQLite |
-| `BRAINX_FEISHU_APP_SECRET` 等 | 接飞书真实数据源时填 |
-| `BRAINX_LLM_*` | 方向分类 / 助手用的 LLM 凭据 |
+| `BRAINX_PORT` / `BRAINX_HOST` | 后端监听地址；生产由 systemd 设置为 3101 / 127.0.0.1 |
+| `BRAINX_FRONTEND_PORT` | 前端子进程端口，默认 4321 |
+| `BRAINX_MYSQL_*` | 阿里云 RDS 人才库连接 |
+| `BRAINX_FEISHU_*` | 飞书应用与授权配置 |
+| `BRAINX_LLM_*` | 服务端统一模型配置；密钥不得下发浏览器 |
 
----
+## 上线安全清单
 
-## 生产安全清单（上线前必做）
-
-- [ ] RDS 连接账号从超管 `hayden` 降级为**专库、权限受限**账号
-- [ ] RDS 白名单从 `0.0.0.0/0` 收窄为部署机固定 IP/内网段
-- [ ] 外网连 RDS 开启 **SSL**（阿里云 CA，见 `src/db.js` TODO）
-- [ ] `.env` 通过部署平台的 secret 注入，不落盘明文
+- [ ] `npm run verify` 通过，质量报告结论为“通过”
+- [ ] `.env` 权限为 600，未进入 Git、镜像或日志
+- [ ] RDS 使用专库最小权限账号，白名单只允许 ECS，外网连接启用 SSL
+- [ ] `data/.secret` 与数据库分别做加密备份，恢复流程已验证
+- [ ] 只有 `brainx.service` 监听 3101，nginx upstream 与 HTTPS 健康检查正常

@@ -30,6 +30,7 @@ sync.err.log
 # 构建产物（部署时由 npm run build 生成，不入库）
 dist/
 build/
+.quality-gate/reports/
 
 # 调试/一次性脚本与备份（不入库）
 *.bak

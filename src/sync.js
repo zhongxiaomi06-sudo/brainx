@@ -149,6 +149,12 @@ export function runSync(db, { source = 'fixture', consultant_id = 'felix', dry_r
       .map((r) => [r.display_name, r.consultant_id]));
     const activeRel = db.prepare(`SELECT relation FROM job_memberships
       WHERE consultant_id=? AND project_id=? AND valid_to IS NULL`);
+    // B6（2026-08-24 修复）：owner 变更/移除时关闭残留的 ttc-owner MY_JOB 行——
+    // 旧实现只增不减，owner A→B 后 A 的 MY_JOB 残留（deriveRelation 策展层优先 → 关系错误）。
+    // 只动 source='ttc-owner' 的行，策展资产（fixture/manual）不受影响。
+    const closeStaleOwner = db.prepare(`UPDATE job_memberships SET valid_to=?
+      WHERE project_id=? AND relation='MY_JOB' AND source='ttc-owner'
+        AND valid_to IS NULL AND consultant_id != ?`);
 
     for (const j of valid) {
       upsert.run(j.project_id, j.company, j.role, j.city, j.pipeline, j.hc,
@@ -165,6 +171,8 @@ export function runSync(db, { source = 'fixture', consultant_id = 'felix', dry_r
         closeRel.run(now(), ownerId, j.project_id, 'MY_JOB'); // owner 本人旧关系到期
         upsertRel.run(ownerId, j.project_id, 'MY_JOB', 'ttc-owner', j.captured_at || as_of);
       }
+      //  owner 不在花名册/为空时 ownerId=null → 关掉该项目全部 ttc-owner MY_JOB（保守回收）
+      closeStaleOwner.run(now(), j.project_id, ownerId || '');
     }
     db.exec('COMMIT');
   } catch (e) {

@@ -104,9 +104,9 @@ test('F2: HTTP 端点端到端（无 session，watch 落 WATCHED 事件且幂等
     const ev = db.prepare(`SELECT event_type FROM decision_events
       WHERE actor='felix' AND project_id=? AND event_type='WATCHED'`).get(pid);
     assert.ok(ev);
-    // 未签名请求被拒
+    // 未签名请求被拒（B12 后按语义返回 403 签名无效，而非笼统 400）
     const r3 = await fetch(`${base}/api/v1/feedback/quick?consultant=felix&project=${pid}&action=watch&day=2026-08-24&sig=bad`);
-    assert.equal(r3.status, 400);
+    assert.equal(r3.status, 403);
   } finally {
     server.close();
   }

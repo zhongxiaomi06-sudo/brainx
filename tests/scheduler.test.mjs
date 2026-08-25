@@ -17,22 +17,22 @@ test('slotState：07:00/19:00 CST 窗口识别，窗口外不触发', () => {
   assert.equal(slotState(new Date('2026-08-13T22:59:00Z')).inWindow, false); // 差一分
 });
 
-test('pushSlotFor：同一时段幂等（push_log 唯一键），无推荐不发', () => {
+test('pushSlotFor：同一时段幂等（push_log 唯一键），无推荐不发', async () => {
   // 无推荐 → null
-  assert.equal(pushSlotFor(db, 'mia', 'ou_x', '2026-08-14#0700', { send: false }), null);
+  assert.equal(await pushSlotFor(db, 'mia', 'ou_x', '2026-08-14#0700', { send: false }), null);
   // 造一轮推荐
   runSync(db, { source: 'bridge', consultant_id: 'felix', payload: { as_of: '2026-08-14', jobs: [
     { project_id: 'JT1', company: '思谋科技', role: '算法工程师', city: '上海', pipeline: 'Sourcing×1',
       hc: 2, active_state: 'OPEN', relation: null, source_url: 'ttc://job/JT1' },
   ] } });
   recommend(db, 'felix', { top: 10 });
-  const r1 = pushSlotFor(db, 'felix', 'ou_felix', '2026-08-14#0700', { send: false });
+  const r1 = await pushSlotFor(db, 'felix', 'ou_felix', '2026-08-14#0700', { send: false });
   assert.equal(r1.status, 'PREVIEW'); // send:false → PREVIEW 记录
   // 同时段重发：push_log 唯一键（felix, DAILY_TOP3, 2026-08-14#0700）→ 幂等跳过
-  const r2 = pushSlotFor(db, 'felix', 'ou_felix', '2026-08-14#0700', { send: false });
+  const r2 = await pushSlotFor(db, 'felix', 'ou_felix', '2026-08-14#0700', { send: false });
   assert.equal(r2.status, 'SKIPPED_DUPLICATE');
   // 晚场是新时段 → 可再发
-  const r3 = pushSlotFor(db, 'felix', 'ou_felix', '2026-08-14#1900', { send: false });
+  const r3 = await pushSlotFor(db, 'felix', 'ou_felix', '2026-08-14#1900', { send: false });
   assert.equal(r3.status, 'PREVIEW');
   const n = db.prepare(`SELECT COUNT(*) n FROM push_log WHERE consultant_id='felix' AND kind='DAILY_TOP3'`).get().n;
   assert.equal(n, 2);

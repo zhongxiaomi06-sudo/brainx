@@ -69,8 +69,17 @@ function daysSince(iso, nowIso) {
   return (Date.parse(nowIso) - Date.parse(iso)) / 86400000;
 }
 
-/** chat_last_at 是 'YYYY-MM-DD HH:mm'（Asia/Shanghai 墙钟，fromMsg 产出）→ 显式 +08:00 解析。 */
-const chatTs = (s) => Date.parse(String(s).replace(' ', 'T') + ':00+08:00');
+/** chat_last_at 多为 'YYYY-MM-DD HH:mm'（Asia/Shanghai 墙钟，fromMsg 产出）→ 显式 +08:00 解析。
+ * 2026-08-24 修复：上游偶发 'HH:mm:ss' 带秒格式，旧实现拼出 '...ss:00+08:00' 非法串 →
+ * NaN → cd=NaN → 比较全 false → 活跃基底静默掉到 20。先截断到分钟再拼时区；
+ * 已是 ISO（含 T 或 Z）的输入直接解析。 */
+const chatTs = (s) => {
+  const str = String(s || '').trim();
+  if (!str) return NaN;
+  if (str.includes('T')) return Date.parse(str);
+  const minute = str.slice(0, 16); // 'YYYY-MM-DD HH:mm'
+  return Date.parse(minute.replace(' ', 'T') + ':00+08:00');
+};
 
 /** 探索位：确定性 md5 排序，当日该顾问的后 10% 职位得探索分 100，其余 50。 */
 export function explorationScore(project_id, consultant_id, dayIso) {
@@ -210,7 +219,12 @@ export function explain(job, relation, scored, ctx) {
   const reasons = [];
   const relLabel = { MY_JOB: '我的职位', PRIMARY_PM: '我是主 PM', TEAM_SHARED: '团队共享', OTHER_CONSULTANT: '其他顾问主做' }[relation] || relation;
   reasons.push(`关系：${relLabel}${job.pipeline ? `；${job.pipeline}` : ''}`);
-  if (b.direction != null) reasons.push(`方向匹配 ${b.direction} 分：与你画像关键词（${ctx.profile_keywords.slice(0, 3).join('/')}等）的重合度`);
+  if (b.direction != null) {
+    // B13：画像为空时方向分来自历史文本兜底，文案不能出现「画像关键词（）等」
+    reasons.push(ctx.profile_keywords.length
+      ? `方向匹配 ${b.direction} 分：与你画像关键词（${ctx.profile_keywords.slice(0, 3).join('/')}等）的重合度`
+      : `方向匹配 ${b.direction} 分：与你历史主做项目文本的重合度（画像未配置）`);
+  }
   if (b.activity != null) reasons.push(`活跃度 ${b.activity} 分：状态 ${job.active_state}${job.priority ? `，优先级${PRIORITY_LABEL[job.priority] || job.priority}` : job.pipeline ? '，Pipeline 有进展记录' : ''}${job.chat_last_at ? `，群活跃 ${String(job.chat_last_at).slice(5, 16)}（近7天 ${job.chat_msgs_7d ?? 0} 条）` : ''}，最近变化 ${String(job.captured_at).slice(0, 10)}`);
   if (b.similarity != null && b.similarity > 0) reasons.push(`历史相似 ${b.similarity} 分：与你历史主做项目存在重合特征`);
   if (ctx.positive_companies?.includes(job.company)) reasons.push(`你曾承接该公司项目，方向维加权`);

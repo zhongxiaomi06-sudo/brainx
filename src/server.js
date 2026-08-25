@@ -109,7 +109,15 @@ const proxyFrontend = (req, res, target) => {
     method: req.method,
     headers: { ...req.headers, host: `${target.host}:${target.port}` },
   }, (upstream) => {
-    res.writeHead(upstream.statusCode || 502, upstream.headers);
+    // B9（2026-08-24）：HTML 应用壳禁止启发式缓存——旧 HTML 引用已删除的 hash JS 是
+    // 「白屏/点不动」的主要体感来源（nginx 日志实证 geist-mono 404 ×30）。
+    // HTML 强制 revalidate；带内容 hash 的静态资产不受影响（vinext 自行长缓存）。
+    const headers = { ...upstream.headers };
+    if (String(headers['content-type'] || '').includes('text/html')) {
+      headers['cache-control'] = 'no-cache';
+      delete headers.etag;
+    }
+    res.writeHead(upstream.statusCode || 502, headers);
     upstream.pipe(res);
   });
   proxy.on('error', (e) => {
@@ -421,12 +429,13 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
     // （open 路由，鉴权全在 verifyQuick）。顾问不登录工作台也能产标签。
     'GET /api/v1/feedback/quick': (req, res, cid, q) => {
       const p = Object.fromEntries(q);
-      const page = (okFlag, text) => {
-        res.writeHead(okFlag ? 200 : 400, { 'Content-Type': 'text/html; charset=utf-8' });
+      // B12：失败页透传 verifyQuick 的语义状态码（503 未配置 / 403 过期或签名无效 / 400 参数不全）
+      const page = (okFlag, text, status) => {
+        res.writeHead(okFlag ? 200 : (status || 400), { 'Content-Type': 'text/html; charset=utf-8' });
         res.end(quickResultPage(okFlag, text));
       };
       const v = verifyQuick(p, now());
-      if (!v.ok) return page(false, v.error);
+      if (!v.ok) return page(false, v.error, v.status);
       const out = p.action === 'watch'
         ? engage(db, p.consultant, p.project, 'WATCH',
                  { idempotency_key: `quick-watch:${p.consultant}:${p.project}:${p.day}` })
@@ -746,7 +755,7 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
                            commitments: c, sync, snapshot_id: snapshot?.sync_id });
       const target = b?.target || process.env.BRAINX_PUSH_TARGET || '';
       if (!target) return err(res, 400, 'NO_TARGET', '缺推送目标（chat_id/open_id 或 BRAINX_PUSH_TARGET）');
-      const out = pushCard(db, { consultant_id: cid, kind, run_id: run?.run?.run_id || null,
+      const out = await pushCard(db, { consultant_id: cid, kind, run_id: run?.run?.run_id || null,
                                  card, target, send: true });
       json(res, out.ok ? 200 : 502, out);
     },

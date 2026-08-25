@@ -1111,6 +1111,7 @@ html,body,.btex-app{background:var(--bg)}
 .offline-banner button{border:1px solid #d9a93f;border-radius:8px;background:#fff;padding:6px 12px;color:#7a5b13;font-size:12px;cursor:pointer;white-space:nowrap}
 .offline-banner button:hover{background:#fdf3d7}
 
+<<<<<<< HEAD
 /* 六维评分（2026-08-25 披露层修正：三层→六维完整可见） */
 .six-dim-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
 .six-dim-item{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 11px;border:1px solid rgba(60,60,67,.12);border-radius:9px;background:#fff}
@@ -1119,3 +1120,12 @@ html,body,.btex-app{background:var(--bg)}
 .six-dim-item strong{font-size:16px;color:var(--blue)}
 .six-dim-item.missing{opacity:.55}
 .six-dim-item.missing strong{color:#86868b;font-size:12px}
+=======
+/* 降级横幅（2026-08-25）：上游同步失败但最近完整快照可用时的琥珀色提示，非阻断 */
+.sync-degraded-banner{display:flex;align-items:center;gap:10px;margin:0 0 14px;padding:10px 14px;border:1px solid #f0c36d;border-radius:10px;background:#fff8e8;color:#7a5b13;font-size:12px}
+.sync-degraded-banner svg{width:16px;flex-shrink:0}
+>>>>>>> a3ce5bd (fix(sync): bridge-error 不再永久锁死推荐——降级为 warning（修「本次同步不完整」长红）)
+
+/* 降级横幅（2026-08-25）：上游同步失败但最近完整快照可用时的琥珀色提示，非阻断 */
+.sync-degraded-banner{display:flex;align-items:center;gap:10px;margin:0 0 14px;padding:10px 14px;border:1px solid #f0c36d;border-radius:10px;background:#fff8e8;color:#7a5b13;font-size:12px}
+.sync-degraded-banner svg{width:16px;flex-shrink:0}

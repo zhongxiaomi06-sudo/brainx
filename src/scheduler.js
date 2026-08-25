@@ -10,7 +10,7 @@
  */
 import { now } from './db.js';
 import { latestRun } from './recommend.js';
-import { latestSync, latestCompleteSnapshot } from './sync.js';
+import { latestRealSync, latestCompleteSnapshot } from './sync.js';
 import { commitmentSummary } from './engagement.js';
 import { buildDailyCard, pushCard } from './push.js';
 
@@ -32,7 +32,7 @@ export function slotState(at = new Date()) {
 
 /** 给一位顾问发今日卡（幂等：该时段已发则跳过）。返回 pushCard 结果或 null。 */
 export async function pushSlotFor(db, consultant_id, open_id, slotKey, { send = true } = {}) {
-  const sync = latestSync(db, consultant_id);
+  const sync = latestRealSync(db, consultant_id);
   const snapshot = latestCompleteSnapshot(db, consultant_id);
   const run = latestRun(db, consultant_id);
   if (!run || !run.items.length) return null; // 无推荐不发

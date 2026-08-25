@@ -8,7 +8,7 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join, normalize, dirname, sep, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openDb, now } from './db.js';
-import { runSync, latestSync, latestCompleteSnapshot } from './sync.js';
+import { runSync, latestSync, latestRealSync, latestBridgeError, latestCompleteSnapshot } from './sync.js';
 import { recommend, latestRun, loadConsultants } from './recommend.js';
 import { engage, commitmentSummary, currentState, legalActions, DISMISS_REASONS } from './engagement.js';
 import { replay, recordOutcome } from './replay.js';
@@ -352,14 +352,19 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
     },
 
     'GET /api/v1/workbench': (req, res, cid) => {
-      const sync = latestSync(db, cid);
+      // 2026-08-25：状态判定看真实同步；bridge-error 降级为 warning（上游限流不再锁死工作台）
+      const sync = latestRealSync(db, cid);
+      const bridgeErr = latestBridgeError(db, cid, sync?.completed_at || '');
       const run = latestRun(db, cid);
       const c = commitmentSummary(db, cid);
       json(res, 200, {
         consultant_id: cid,
         sync: sync ? { state: sync.complete ? 'READY' : 'INCOMPLETE', updated_at: sync.completed_at,
                        rows_read: sync.rows_read, rows_expected: sync.rows_expected,
-                       errors: JSON.parse(sync.errors || '[]') } : { state: 'EMPTY', updated_at: null },
+                       errors: JSON.parse(sync.errors || '[]'),
+                       warning: bridgeErr ? { at: bridgeErr.started_at,
+                         message: (JSON.parse(bridgeErr.errors || '[]')[0] || '职位源同步失败').slice(0, 120) } : null }
+                   : { state: 'EMPTY', updated_at: null },
         feishu_auth: tokenStatus(db, cid), // {authorized, needs_reauth}——头胶囊提示重登
         ttc_auth: ttcAuthStatus(db, cid),  // TTC 系统托管状态（连接胶囊；绝不出 JWT 本体）
         current_policy_version: run?.run?.policy_version || null,
@@ -730,7 +735,7 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
     },
 
     'POST /api/v1/push/preview': (req, res, cid) => {
-      const sync = latestSync(db, cid);
+      const sync = latestRealSync(db, cid);
       const snapshot = latestCompleteSnapshot(db, cid);
       const run = latestRun(db, cid);
       const c = commitmentSummary(db, cid);
@@ -744,7 +749,7 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
 
     'POST /api/v1/push/send': async (req, res, cid) => {
       const b = await body(req);
-      const sync = latestSync(db, cid);
+      const sync = latestRealSync(db, cid);
       const snapshot = latestCompleteSnapshot(db, cid);
       const run = latestRun(db, cid);
       const c = commitmentSummary(db, cid);

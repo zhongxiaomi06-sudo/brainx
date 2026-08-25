@@ -9,7 +9,7 @@
  *     每条推荐都携带整段原始负载，既泄露又臃肿）。
  */
 import { now, uuid } from './db.js';
-import { latestCompleteSnapshot, latestSync } from './sync.js';
+import { latestCompleteSnapshot, latestRealSync, latestBridgeError } from './sync.js';
 import { WEIGHTS, POLICY_VERSION, hardBlock, scoreJob, actionOf, bandOf, sortRecs, explain, normalizeWeights } from './scorer.js';
 import { listConsultants } from './roster.js';
 import { relationMap, deriveRelation } from './relations.js';
@@ -77,7 +77,9 @@ const SKIP_AUDIT_MS = Number(process.env.BRAINX_SKIP_AUDIT_MS || 60 * 60 * 1000)
  * 返回 { run_id, blocked, items[] }；dry_run 不落库。
  */
 export function recommend(db, consultant_id, { top = 20, dry_run = false, throttle = false } = {}) {
-  const last = latestSync(db, consultant_id);
+  // 阻断判定只看真实同步（2026-08-25）：bridge-error 观测行不参与 fail-closed，
+  // 上游限流期间用最后完整快照继续推荐，并以 sync_warning 暴露降级状态。
+  const last = latestRealSync(db, consultant_id);
   const snapshot = latestCompleteSnapshot(db, consultant_id);
   if (!snapshot) {
     return { blocked: true, reason: '无完整快照，先同步', items: [], run_id: null };
@@ -86,6 +88,12 @@ export function recommend(db, consultant_id, { top = 20, dry_run = false, thrott
     return { blocked: true, reason: '本次同步不完整，暂不生成正式推荐',
              sync: last, snapshot_id: snapshot.sync_id, items: [], run_id: null };
   }
+  const bridgeErr = latestBridgeError(db, consultant_id, last.completed_at || '');
+  const sync_warning = bridgeErr ? {
+    at: bridgeErr.started_at,
+    message: (JSON.parse(bridgeErr.errors || '[]')[0] || '职位源同步失败').slice(0, 120),
+    last_complete_at: snapshot.completed_at || null,
+  } : null;
 
   // 方案 A 节流（2026-08-24）：sync_id 每次同步都会变化，不能用它判断
   // 数据是否变化；必须比较 sync_runs.input_hash。旧实现比较 snapshot_id，导致
@@ -112,7 +120,7 @@ export function recommend(db, consultant_id, { top = 20, dry_run = false, thrott
           .run(uuid(), consultant_id, snapshot.sync_id, POLICY_VERSION, 0, 'SKIPPED_UNCHANGED', now());
       }
       return { skipped: true, reason: '快照未变化且距上轮不足 2h，复用上轮', blocked: false,
-               run_id: lastRun.run_id, items: null, generated_at: now() };
+               run_id: lastRun.run_id, items: null, sync_warning, generated_at: now() };
     }
   }
 
@@ -174,6 +182,7 @@ export function recommend(db, consultant_id, { top = 20, dry_run = false, thrott
     run_id, blocked: false, snapshot_id: snapshot.sync_id, policy_version: POLICY_VERSION,
     input_stats: { candidates: jobs.length, after_hard_filter: evaluated.length, blocked: blockedCount },
     items: evaluated.slice(0, top).map(publicRec),
+    sync_warning, // 降级信号（非阻断）：上游失败时告诉下游「数据在变老」
     generated_at: now(),
   };
 }

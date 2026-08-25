@@ -319,10 +319,10 @@ export async function bridgeOnce(db, { consultant_ids, execImpl = lark, api = { 
  * 2026-08-24 修复（B2/B3）：
  * - 退避：连续失败按 iv→2x→4x…封顶 30min，恢复后回位（此前固定 180s 硬撞 TTC 限流，
  *   6 个 JWT 全部 -90429 后仍每 180s × 6 重试，加重限流）；
- * - 失败可观测：console.error 进 journal + 落 sync_runs 失败行（complete=0），
- *   latestSync 取到后推荐 fail-closed「本次同步不完整」，此前错误只发 SSE、
- *   journal 与库里 4 天停滞零痕迹。失败行用独立 source='bridge-error'，
- *   不污染 source='bridge'/'ttc' 的 input_hash 增量判断。 */
+ * - 失败可观测：console.error 进 journal + 落 sync_runs 失败行（source='bridge-error'，
+ *   不污染 source='bridge'/'ttc' 的 input_hash 增量判断）。2026-08-25 修正：
+ *   bridge-error 只做观测与降级警告（workbench sync.warning），不参与阻断——
+ *   此前它会被 latestSync 取到导致上游限流期间推荐被永久 fail-closed。 */
 const BRIDGE_MAX_DELAY_MS = 30 * 60 * 1000;
 
 export function startBridge(db, bus, { intervalMs, recommendFn, consultantIdsFn, onRecommended } = {}) {

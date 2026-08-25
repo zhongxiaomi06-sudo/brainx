@@ -19,7 +19,7 @@
 | 任何代码、测试或配置改动 | [上传前完整验证](standards/PRE_PUSH_VERIFICATION.md)、[质量门禁操作手册](standards/QUALITY_GATE_OPERATIONS.md) |
 | Commit、协作记录 | [Agent Commit 记录](AGENT_COMMIT_LOG.md) |
 | 密钥、登录、权限、数据隔离 | [安全操作手册](SECURITY.md) |
-| 构建、发布、服务器、容器 | [部署编排](DEPLOYMENT.md)、[安全操作手册](SECURITY.md) |
+| 构建、发布、服务器、容器 | [部署编排](DEPLOYMENT.md)、[云端恢复清单](cloud-recovery-checklist.md)、[安全操作手册](SECURITY.md) |
 | 验证历史行为或已有能力 | [开发验证报告](VERIFICATION.md) |
 | 飞书多维表格或数据隔离 | [标准字段与云端隔离](2026-08-10-bitable-standard-fields-and-cloud-isolation.md) |
 | CRM 批量导出设计 | [CRM 批量导出提案](crm-batch-export-proposal.md) |
@@ -40,7 +40,8 @@
 ### 安全与运维
 
 - [安全操作手册](SECURITY.md)：密钥、RDS、授权与数据隔离操作。
-- [部署编排](DEPLOYMENT.md)：本地、Docker 和 CI 部署方式。
+- [部署编排](DEPLOYMENT.md)：生产 systemd、本地开发、隔离 Docker 测试和 CI。
+- [云端恢复清单](cloud-recovery-checklist.md)：现网唯一入口、标准恢复步骤与历史事件。
 - [带宽告警说明](guard-bandwidth-alert.md)：带宽监控与告警规则。
 
 ### 设计与数据

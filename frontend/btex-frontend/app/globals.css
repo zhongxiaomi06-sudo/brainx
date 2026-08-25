@@ -1110,3 +1110,7 @@ html,body,.btex-app{background:var(--bg)}
 .offline-banner{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 14px;padding:10px 14px;border:1px solid #f0c36d;border-radius:10px;background:#fff8e8;color:#7a5b13;font-size:12px}
 .offline-banner button{border:1px solid #d9a93f;border-radius:8px;background:#fff;padding:6px 12px;color:#7a5b13;font-size:12px;cursor:pointer;white-space:nowrap}
 .offline-banner button:hover{background:#fdf3d7}
+
+/* 降级横幅（2026-08-25）：上游同步失败但最近完整快照可用时的琥珀色提示，非阻断 */
+.sync-degraded-banner{display:flex;align-items:center;gap:10px;margin:0 0 14px;padding:10px 14px;border:1px solid #f0c36d;border-radius:10px;background:#fff8e8;color:#7a5b13;font-size:12px}
+.sync-degraded-banner svg{width:16px;flex-shrink:0}

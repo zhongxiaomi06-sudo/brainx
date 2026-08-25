@@ -195,3 +195,20 @@ export function latestSync(db, consultant_id) {
   return db.prepare(`SELECT sync_id, as_of, source, rows_expected, rows_read, complete, errors, completed_at
     FROM sync_runs WHERE consultant_id=? ORDER BY started_at DESC LIMIT 1`).get(consultant_id);
 }
+
+/** 最近一次真实数据源的同步（排除 bridge-error 观测行，2026-08-25）。
+ * 背景：bridge-error 行（职位源失败的可观测记录）一度成为最新行 → latestSync
+ * 恒 complete=0 → 推荐在上游限流期间被永久 fail-closed（最后完整快照被锁死）。
+ * 阻断判定应只看真实同步；bridge-error 只驱动「降级警告」，不参与阻断。 */
+export function latestRealSync(db, consultant_id) {
+  return db.prepare(`SELECT sync_id, as_of, source, rows_expected, rows_read, complete, errors, completed_at
+    FROM sync_runs WHERE consultant_id=? AND source != 'bridge-error'
+    ORDER BY started_at DESC LIMIT 1`).get(consultant_id);
+}
+
+/** 最近一条 bridge-error（降级信号源）：比 afterIso 新才返回。 */
+export function latestBridgeError(db, consultant_id, afterIso = '') {
+  return db.prepare(`SELECT errors, started_at FROM sync_runs
+    WHERE consultant_id=? AND source='bridge-error' AND started_at > ?
+    ORDER BY started_at DESC LIMIT 1`).get(consultant_id, afterIso || '');
+}

@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { openDb } from '../src/db.js';
-import { runSync } from '../src/sync.js';
+import { runSync, latestRealSync } from '../src/sync.js';
 import { recommend } from '../src/recommend.js';
 import { engage, currentState } from '../src/engagement.js';
 import { scoreJob } from '../src/scorer.js';
@@ -50,4 +50,21 @@ test('chatTs 带秒格式（HH:mm:ss）不再静默掉 20 分', () => {
   const act = scored.breakdown.find((d) => d.dim === 'activity').score;
   // 2 天前群活跃：指数衰减 20+45·e^(-2/14) ≈ 58.9，NaN 路径则恒 20
   assert.ok(act > 50, `带秒格式活跃度被静默打到 20: ${act}`);
+});
+
+test('bridge-error 观测行不阻断推荐，降级信号随响应下发（2026-08-25）', () => {
+  const db = openDb(':memory:');
+  runSync(db, { source: 'fixture', consultant_id: CID });
+  // 模拟上游限流：最新行是 bridge-error（complete=0）
+  const later = new Date(Date.now() + 60000).toISOString(); // ISO 与生产写入格式一致（字典序比较前提）
+  db.prepare(`INSERT INTO sync_runs
+    (sync_id, consultant_id, source, as_of, rows_expected, rows_read, complete, errors, input_hash, started_at, completed_at)
+    VALUES ('be1', ?, 'bridge-error', ?, 0, 0, 0, '["ttc:mia:-90429 服务繁忙"]', '', ?, ?)`)
+    .run(CID, later, later, later);
+  const out = recommend(db, CID, { top: 20 });
+  assert.ok(!out.blocked, 'bridge-error 不得触发 fail-closed');
+  assert.ok(out.sync_warning, '必须带降级信号');
+  assert.match(out.sync_warning.message, /90429/);
+  // 真实同步视图仍指向 fixture 同步（complete=1）
+  assert.equal(latestRealSync(db, CID).source, 'fixture');
 });

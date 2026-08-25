@@ -2,6 +2,11 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-08-25｜fix(ci): 兼容 Node 22 加载 TypeScript 测试
+
+- 改动：为根目录与前端测试入口显式启用 Node.js 类型剥离，修复 GitHub Actions 在 Node 22.13.0 下直接导入 `.ts` 测试依赖时报 `ERR_UNKNOWN_FILE_EXTENSION`；新增清单级回归检查，防止兼容参数被误删。
+- 验证：`npm run verify:quick` 15/15、沙箱外 `npm test` 305/305 通过；提交后继续运行完整上传前门禁和 GitHub Actions Node 22 实跑。
+
 ## 2026-08-25｜docs(deploy): 统一生产 systemd 恢复口径
 
 - 改动：明确现网唯一形态为 `/opt/brainx` 的 systemd 服务、3101 与 `base.yorkteam.cn`；删除可误执行的旧 Docker 恢复步骤，将容器事故保留为禁止照做的历史记录；同步部署、安全入口和文档总目录。

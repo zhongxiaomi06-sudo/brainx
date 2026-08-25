@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import {
   auditLintIgnores,
@@ -16,6 +17,23 @@ import {
   selectRegularFiles,
   versionAtLeast,
 } from "../scripts/quality-gate/core.mjs";
+
+test("Node 22 测试入口显式启用 TypeScript 类型剥离", () => {
+  const repoRoot = new URL("../", import.meta.url);
+  for (const manifestPath of [
+    "package.json",
+    "frontend/btex-frontend/package.json",
+  ]) {
+    const manifest = JSON.parse(
+      readFileSync(new URL(manifestPath, repoRoot), "utf8"),
+    );
+    assert.match(
+      manifest.scripts.test,
+      /(?:^|\s)node --experimental-strip-types(?:\s|$)/,
+      `${manifestPath} 的测试入口必须兼容 Node 22 加载 TypeScript`,
+    );
+  }
+});
 
 test("物理行计数兼容空文件、末尾换行和 CRLF", () => {
   assert.equal(countPhysicalLines(""), 0);

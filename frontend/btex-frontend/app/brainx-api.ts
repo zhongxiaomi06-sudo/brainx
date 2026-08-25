@@ -100,7 +100,7 @@ export type BackendRecommendation = {
 export type BackendSync = {
   state: string; updated_at?: string | null; rows_read?: number | null;
   rows_expected?: number | null; errors?: string[];
- warning?: { at: string; message: string } | null; };
+ warning?: { at: string; message: string; detail?: string } | null; };
 export type BackendCommitment = {
   project_id: string; state: EngagementState; state_since?: string | null;
   company?: string | null; role?: string | null; active_state?: string | null; next_action?: string | null;
@@ -366,7 +366,7 @@ export function mapRecommendation(rec: BackendRecommendation): BrainxJob {
 
 /** 后端 workbench.sync → 前端 SyncStatus。RUNNING 是本地瞬时态；AUTH_EXPIRED 由飞书授权推导。 */
 export function mapSyncStatus(
-  sync: { state: string; updated_at?: string | null; rows_read?: number | null; rows_expected?: number | null; errors?: string[]; warning?: { at: string; message: string } | null } | null | undefined,
+  sync: { state: string; updated_at?: string | null; rows_read?: number | null; rows_expected?: number | null; errors?: string[]; warning?: { at: string; message: string; detail?: string } | null } | null | undefined,
   feishuAuth?: { needs_reauth?: boolean } | null,
 ): SyncStatus {
   if (feishuAuth?.needs_reauth) return { state: "AUTH_EXPIRED", updatedAt: null, errors: [] };
@@ -378,7 +378,7 @@ export function mapSyncStatus(
     rowsRead: s.rows_read ?? undefined,
     rowsExpected: s.rows_expected ?? undefined,
     errors: s.errors || [],
-    warning: s.warning || null, // 降级信号：上游失败中，展示最近完整快照（2026-08-25）
+    warning: s.warning ? { at: s.warning.at, message: s.warning.message, detail: s.warning.detail } : null, // 降级信号（2026-08-25）
   };
 }
 

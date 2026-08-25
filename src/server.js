@@ -8,7 +8,7 @@ import { existsSync, readFileSync, statSync, appendFileSync, mkdirSync } from 'n
 import { join, normalize, dirname, sep, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openDb, now } from './db.js';
-import { runSync, latestSync, latestRealSync, latestBridgeError, latestCompleteSnapshot } from './sync.js';
+import { runSync, latestSync, latestRealSync, latestBridgeError, latestCompleteSnapshot, friendlyBridgeError } from './sync.js';
 import { recommend, latestRun, loadConsultants } from './recommend.js';
 import { engage, commitmentSummary, currentState, legalActions, DISMISS_REASONS } from './engagement.js';
 import { replay, recordOutcome } from './replay.js';
@@ -363,7 +363,7 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
                        rows_read: sync.rows_read, rows_expected: sync.rows_expected,
                        errors: JSON.parse(sync.errors || '[]'),
                        warning: bridgeErr ? { at: bridgeErr.started_at,
-                         message: (JSON.parse(bridgeErr.errors || '[]')[0] || '职位源同步失败').slice(0, 120) } : null }
+                         ...friendlyBridgeError(bridgeErr.errors) } : null }
                    : { state: 'EMPTY', updated_at: null },
         feishu_auth: tokenStatus(db, cid), // {authorized, needs_reauth}——头胶囊提示重登
         ttc_auth: ttcAuthStatus(db, cid),  // TTC 系统托管状态（连接胶囊；绝不出 JWT 本体）

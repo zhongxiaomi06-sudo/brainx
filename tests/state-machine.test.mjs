@@ -64,7 +64,8 @@ test('bridge-error 观测行不阻断推荐，降级信号随响应下发（2026
   const out = recommend(db, CID, { top: 20 });
   assert.ok(!out.blocked, 'bridge-error 不得触发 fail-closed');
   assert.ok(out.sync_warning, '必须带降级信号');
-  assert.match(out.sync_warning.message, /90429/);
+  assert.match(out.sync_warning.message, /限流/); // 面向用户文案（2026-08-25 起不再透原始错误码）
+  assert.match(out.sync_warning.detail, /90429/); // 原始错误进 detail 供排查
   // 真实同步视图仍指向 fixture 同步（complete=1）
   assert.equal(latestRealSync(db, CID).source, 'fixture');
 });

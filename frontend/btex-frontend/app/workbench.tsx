@@ -419,8 +419,8 @@ function DecisionToday({activeJobId,completed,jobs,engagement,sync,open,onAction
  const isContext=activeJobId!==null&&pendingShown.some(job=>job.id===activeJobId);
   return <div className="decision-home">
   <PickTray trayJobs={trayJobs} allJobs={allJobs} folderMode={folderMode} onFolderMode={onFolderMode} folders={folders} onRemoveTray={onRemoveTray} onConfirmTray={onConfirmTray} onAssignFolder={onAssignFolder} onCreateFolder={onCreateFolder} open={open}/>
-  {sync.state==="READY"&&sync.warning&&<div className="sync-degraded-banner" role="status">
-   <AlertTriangle/><span>同步失败中：{sync.warning.message} · 当前展示最近完整快照{sync.updatedAt?`（更新于 ${sync.updatedAt}）`:""}</span>
+  {sync.state==="READY"&&sync.warning&&<div className="sync-degraded-banner" role="status" title={sync.warning.detail||undefined}>
+   <AlertTriangle/><span>{sync.warning.message} · 当前展示最近完整快照{sync.updatedAt?`（更新于 ${sync.updatedAt}）`:""}</span>
   </div>}
   {sync.state==="INCOMPLETE"||sync.state==="ERROR"?<section className="decision-blocked"><AlertTriangle/><div><b>{sync.state==="INCOMPLETE"?"本次同步不完整":"同步失败"}</b><p>为避免误导，当前不展示新的项目判断。</p></div>{jobs[0]&&<button className="btn" onClick={()=>open(jobs[0],"judgement")}>查看上次快照</button>}</section>:pendingShown.length?<DecisionZone tone="pending" title="未接单" subtitle="" jobs={pendingShown} isContext={isContext} completed={completed} engagement={engagement} open={open} onAction={onAction} onFeedback={onFeedback} feedbackJobId={feedbackJobId} onUndoFeedback={onUndoFeedback} tray={tray} onToggleTray={onToggleTray} folderMode={folderMode} folders={folders} onAssignFolder={onAssignFolder}/>:<section className="recommendation-empty"><b>你已到达世界的尽头</b><DinoRunner/><span className="dino-credit"><a href="https://github.com/jiands233" target="_blank" rel="noopener noreferrer">Otto</a> 作品</span></section>}
   </div>

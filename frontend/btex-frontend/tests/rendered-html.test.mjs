@@ -87,7 +87,7 @@ test("preserves engagement, result recording, replay, sync and notifications", a
   assert.match(workbench, /function engagementStateMessage/);
   assert.match(workbench, /if\(state==="RELEASED"\)return \["WATCH","DISMISS"\]/);
   assert.match(workbench, /if\(state==="DISMISSED"\)return \["WATCH"\]/);
-  assert.match(workbench, /已从当前工作区释放；如需继续推进，可重新关注后再接单。/);
+  assert.match(workbench, /已停止当前顾问的跟进；职位本身未关闭，可重新关注后再开始承接。/);
   assert.match(workbench, /DrawerSection title=\{canRecordOutcome\?"记录结果":"结果记录"\}/);
   assert.match(workbench, /function ReplayPanel/);
   assert.match(workbench, /function NotificationPanel/);
@@ -249,4 +249,34 @@ test("keeps the identity panel focused on one login action", async () => {
   assert.doesNotMatch(workbench, /identity-dev-card|identity-demo-card|identity-demo-grid/);
   assert.match(css, /\.identity-panel\{display:grid;gap:/);
   assert.match(css, /\.identity-primary-action\{[^}]*background:rgba\(229,245,240,\.92\)/);
+});
+
+test("explains the commitment flow and separates progress from terminal outcomes", async () => {
+  const [engagement, workbench, e2e] = await Promise.all([
+    source("app/engagement-loop.tsx"),
+    source("app/workbench.tsx"),
+    source("tests/e2e-browser-check.mjs"),
+  ]);
+
+  assert.match(workbench, /const tabLabel=\{judgement:"判断",engagement:"跟进",logs:"历史记录"\}/);
+  assert.match(engagement, /这是确认谁可以负责，不等于接单。/);
+  assert.match(engagement, /title:"待确认项目归属"/);
+  assert.match(engagement, /title:"可以开始承接"/);
+  assert.match(engagement, /title:"正在推进"/);
+  assert.match(engagement, /title:"待填写最终去向"/);
+  assert.match(engagement, /title:"已完成"/);
+  assert.match(engagement, /<h2>开始承接<\/h2>/);
+  assert.match(engagement, />记录进展<\/button>/);
+  assert.match(engagement, />记录阻塞<\/button>/);
+  assert.match(engagement, />填写最终去向<\/button>/);
+  assert.match(engagement, />停止跟进<\/button>/);
+  assert.match(engagement, /const progressStages=\["推荐采纳","面试","Offer","反馈"\]/);
+  assert.match(engagement, /const terminalStages=\["入职","关闭"\]/);
+  assert.match(engagement, /type:"过程进展"/);
+  assert.match(engagement, /type:"行动完成"/);
+  assert.match(engagement, /type:"最终结果"/);
+  assert.match(engagement, /这次承接已结束，但最终去向还没有记录/);
+  assert.match(engagement, /停止当前顾问的跟进，不代表职位本身关闭。/);
+  assert.match(e2e, /clickDrawerTab\("跟进"\)/);
+  assert.doesNotMatch(e2e, /clickDrawerTab\("承接与结果"\)/);
 });

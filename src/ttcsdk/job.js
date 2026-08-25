@@ -1,27 +1,33 @@
 /** ttcsdk/job.js — 职位域 API（ATS 真 project_id / HC / Pipeline 的源头）。 */
-import { ttcRequest } from './http.js';
+import { TtcApiError, ttcRequest } from './http.js';
 
 /** 职位检索（POST search，单页）。返回该 JWT 持有者权限视图内的职位。 */
 export const search = (jwt, query = {}, fetchImpl) =>
   ttcRequest(jwt, 'POST', '/api/crm/v1/job/search', { page: 1, ...query }, fetchImpl);
 
-/** 全量拉取（cursor 分页，实测每页固定 10 条）。maxPages 防失控（100 页=1000 条上限）。
+/** 全量拉取（cursor 分页，实测每页固定 10 条）。maxPages 防失控；达到上限仍有下一页时明确失败。
  * paceMs：页间节流（2026-08-25 限流根治）——91 页连发是典型的租户级限流触发器，
  * 生产桥接传 120ms 把单顾问全量拉取摊到 ~11s；CLI/测试默认 0 不节流。 */
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-export async function searchAll(jwt, query = {}, fetchImpl, { paceMs = 0 } = {}) {
+const incomplete = (reason) => new TtcApiError(`ttc 分页未完成：${reason}`, { code: 'TTC_PAGINATION_INCOMPLETE' });
+export async function searchAll(jwt, query = {}, fetchImpl, { paceMs = 0, maxPages = 100 } = {}) {
+  if (!Number.isInteger(maxPages) || maxPages < 1) throw new TypeError('maxPages 必须是正整数');
+  const { cursor: initialCursor = '', ...filters } = query || {};
   const out = [];
-  let cursor = '';
-  for (let p = 0; p < 100; p++) {
+  let cursor = String(initialCursor || '');
+  for (let p = 0; p < maxPages; p++) {
     if (p > 0 && paceMs > 0) await sleep(paceMs);
     const d = await ttcRequest(jwt, 'POST', '/api/crm/v1/job/search',
-      { page: 1, ...(cursor ? { cursor } : {}), ...query }, fetchImpl);
+      { page: 1, ...filters, ...(cursor ? { cursor } : {}) }, fetchImpl);
     const jobs = d?.jobs || [];
     out.push(...jobs);
-    if (!d?.has_more) break;
-    cursor = d.cursor;
+    if (!d?.has_more) return out;
+    const nextCursor = String(d?.cursor || '').trim();
+    if (!nextCursor) throw incomplete(`第 ${p + 1} 页声明 has_more，但没有返回 cursor`);
+    if (nextCursor === cursor) throw incomplete(`第 ${p + 1} 页 cursor 未前进`);
+    cursor = nextCursor;
   }
-  return out;
+  throw incomplete(`达到 ${maxPages} 页安全上限，仍有下一页`);
 }
 
 /** TTC job → runSync payload 行（2026-08-14 实测字段驱动）。

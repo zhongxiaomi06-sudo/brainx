@@ -255,19 +255,24 @@ export async function bridgeOnce(db, { consultant_ids, execImpl = lark, api = { 
           if (!j.unique_id || j.has_permission === false) continue;
           if (!union.has(j.unique_id)) union.set(j.unique_id, toJobRow(j));
         }
+        // 水位棘轮（2026-08-26）：降序前缀语义 → 无论是否爬完，只要抓到新数据就把
+        // 水位推进到前缀最大 update_time。已证限流窗口极紧（第 2 页即 -90429），
+        // 棘轮让每轮至少啃下一页进度， backlog 在多轮间单调收敛；不推进则每轮
+        // 重拉同样的第 1 页、水位卡死。ttc_rr 只在完整爬完才推进（同顾问补完再换人）。
+        const maxU = Math.max(sinceMs, ...jobs.map((j) => Number(j.update_time) || 0));
+        if (maxU > sinceMs) {
+          db.prepare(`INSERT INTO bridge_cursor (source, checkpoint, updated_at) VALUES (?,?,?)
+            ON CONFLICT(source) DO UPDATE SET checkpoint=excluded.checkpoint, updated_at=excluded.updated_at`)
+            .run('ttc_watermark', new Date(maxU).toISOString(), now());
+        }
         if (ttcComplete) {
-          // 水位前进到本轮最大 update_time；成功才推进轮转（失败下轮还试同一个）
-          const maxU = Math.max(sinceMs, ...jobs.map((j) => Number(j.update_time) || 0));
-          if (maxU > sinceMs) {
-            db.prepare(`INSERT INTO bridge_cursor (source, checkpoint, updated_at) VALUES (?,?,?)
-              ON CONFLICT(source) DO UPDATE SET checkpoint=excluded.checkpoint, updated_at=excluded.updated_at`)
-              .run('ttc_watermark', new Date(maxU).toISOString(), now());
-          }
           db.prepare(`INSERT INTO bridge_cursor (source, checkpoint, updated_at) VALUES (?,?,?)
             ON CONFLICT(source) DO UPDATE SET checkpoint=excluded.checkpoint, updated_at=excluded.updated_at`)
             .run(rrKey, String((rrIdx + 1) % withJwt.length), now());
+        } else if (jobs.length) {
+          ttcErrs.push(`${cid}:限流中断，水位棘轮 +${jobs.length} 条（下轮从新水位续爬）`);
         } else {
-          ttcErrs.push(`${cid}:限流中断，已保留 ${jobs.length} 条新数据前缀（水位不动，下轮补齐）`);
+          ttcErrs.push(`${cid}:限流中断，无新数据`);
         }
       } catch (e) {
         if (e instanceof TtcApiError && e.authInvalid) markTtcReauth(db, cid);

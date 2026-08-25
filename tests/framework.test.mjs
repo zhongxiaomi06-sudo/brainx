@@ -139,11 +139,11 @@ test('isPathInside：兄弟目录（public-x）不被误判为内部', () => {
 });
 
 /* ⑧ push_log：run_id 空值哨兵唯一键真生效 */
-test('push_log：无 run_id 推送按空串哨兵去重，DB 唯一键兜底', () => {
+test('push_log：无 run_id 推送按空串哨兵去重，DB 唯一键兜底', async () => {
   const card = { config: {} };
-  const r1 = pushCard(db, { consultant_id: 'felix', kind: 'SYNC_ALERT', run_id: null, card, target: 'oc_x', send: false });
+  const r1 = await pushCard(db, { consultant_id: 'felix', kind: 'SYNC_ALERT', run_id: null, card, target: 'oc_x', send: false });
   assert.equal(r1.status, 'PREVIEW');
-  const r2 = pushCard(db, { consultant_id: 'felix', kind: 'SYNC_ALERT', run_id: null, card, target: 'oc_x', send: false });
+  const r2 = await pushCard(db, { consultant_id: 'felix', kind: 'SYNC_ALERT', run_id: null, card, target: 'oc_x', send: false });
   assert.equal(r2.status, 'SKIPPED_DUPLICATE');
   // 绕过应用层直插同键 → SQLite UNIQUE 必须拦截（修正前 NULL 可无限重复插）
   assert.throws(() => db.prepare(`INSERT INTO push_log

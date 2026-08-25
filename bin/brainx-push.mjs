@@ -26,5 +26,5 @@ if (!process.argv.includes('--send')) {
 }
 const target = arg('target', process.env.BRAINX_PUSH_TARGET || '');
 if (!target) { console.error('缺 --target（chat_id/open_id）'); process.exit(1); }
-const out = pushCard(db, { consultant_id: cid, kind, run_id: run?.run?.run_id || null, card, target, send: true });
+const out = await pushCard(db, { consultant_id: cid, kind, run_id: run?.run?.run_id || null, card, target, send: true });
 console.log(JSON.stringify(out, null, 2));

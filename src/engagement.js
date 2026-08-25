@@ -24,11 +24,13 @@ const EXPIRE_DAYS = 90;
 
 /** 合法迁移表。to 为函数时按当前态求 next_state（VIEW 不降级 WATCHED）。 */
 const TRANSITIONS = {
-  VIEW:    { from: ['NEW', 'RECOMMENDED', 'VIEWED', 'WATCHED'], to: (s) => (s === 'WATCHED' ? 'WATCHED' : 'VIEWED'), event: 'VIEWED' },
-  WATCH:   { from: ['NEW', 'RECOMMENDED', 'VIEWED', 'RELEASED', 'DISMISSED'], to: 'WATCHED', event: 'WATCHED' },
+  VIEW:    { from: ['NEW', 'RECOMMENDED', 'VIEWED', 'WATCHED', 'EXPIRED'], to: (s) => (s === 'WATCHED' ? 'WATCHED' : 'VIEWED'), event: 'VIEWED' },
+  WATCH:   { from: ['NEW', 'RECOMMENDED', 'VIEWED', 'RELEASED', 'DISMISSED', 'EXPIRED'], to: 'WATCHED', event: 'WATCHED' },
   UNWATCH: { from: ['WATCHED'], to: 'VIEWED', event: 'RELEASED', note: '关注回滚' },
-  ACCEPT:  { from: ['WATCHED', 'VIEWED', 'RECOMMENDED'], to: 'ACCEPTED', event: 'ACCEPTED', confirm: true },
-  DISMISS: { from: ['NEW', 'RECOMMENDED', 'VIEWED', 'WATCHED', 'RELEASED'], to: 'DISMISSED', event: 'DISMISSED', reason: true },
+  // 2026-08-24 修复：EXPIRED/NEW 可直接接单——90 天过期曾无出口（永远 409），
+  // 未被推荐触碰过的职位（NEW）也不应强制先关注再接单；ACCEPT 自带 confirm 门槛。
+  ACCEPT:  { from: ['NEW', 'WATCHED', 'VIEWED', 'RECOMMENDED', 'EXPIRED'], to: 'ACCEPTED', event: 'ACCEPTED', confirm: true },
+  DISMISS: { from: ['NEW', 'RECOMMENDED', 'VIEWED', 'WATCHED', 'RELEASED', 'EXPIRED'], to: 'DISMISSED', event: 'DISMISSED', reason: true },
   RELEASE: { from: ['ACCEPTED'], to: 'RELEASED', event: 'RELEASED' },
   COMPLETE:{ from: ['ACCEPTED'], to: 'COMPLETED', event: 'COMPLETED' },
 };

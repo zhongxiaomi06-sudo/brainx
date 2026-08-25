@@ -31,7 +31,7 @@ export function slotState(at = new Date()) {
 }
 
 /** 给一位顾问发今日卡（幂等：该时段已发则跳过）。返回 pushCard 结果或 null。 */
-export function pushSlotFor(db, consultant_id, open_id, slotKey, { send = true } = {}) {
+export async function pushSlotFor(db, consultant_id, open_id, slotKey, { send = true } = {}) {
   const sync = latestSync(db, consultant_id);
   const snapshot = latestCompleteSnapshot(db, consultant_id);
   const run = latestRun(db, consultant_id);
@@ -42,23 +42,25 @@ export function pushSlotFor(db, consultant_id, open_id, slotKey, { send = true }
   const card = buildDailyCard({ consultant_name: name, consultant_id, run: run.run, items: run.items,
                                 commitments: c, sync, snapshot_id: snapshot?.sync_id });
   return pushCard(db, { consultant_id, kind: 'DAILY_TOP3', run_id: slotKey, card,
-                        target: open_id, send });
+                        target: open_id, send }); // pushCard 为 async，返回值透传 Promise
 }
 
 export function startScheduler(db, { log = console.log } = {}) {
   if (process.env.BRAINX_PUSH_SCHEDULE === '0') return { stop: () => {} };
   const tick = () => {
-    try {
-      const { inWindow, slotKey } = slotState();
-      if (!inWindow) return;
-      const consultants = db.prepare(`SELECT consultant_id, open_id FROM consultants
-        WHERE active=1 AND open_id IS NOT NULL AND open_id != ''`).all();
-      log(`[scheduler] 进入推送窗口 ${slotKey}，对象 ${consultants.length} 人`); // 窗口可观测性（2026-08-14 19:00 未触发排查）
-      for (const c of consultants) {
-        const out = pushSlotFor(db, c.consultant_id, c.open_id, slotKey, { send: true });
-        log(`[scheduler] ${slotKey} ${c.consultant_id}: ${out ? out.status : 'null(无推荐轮)'}`);
-      }
-    } catch (e) { log(`[scheduler] tick 异常: ${String(e.message || e).slice(0, 120)}`); }
+    void (async () => {
+      try {
+        const { inWindow, slotKey } = slotState();
+        if (!inWindow) return;
+        const consultants = db.prepare(`SELECT consultant_id, open_id FROM consultants
+          WHERE active=1 AND open_id IS NOT NULL AND open_id != ''`).all();
+        log(`[scheduler] 进入推送窗口 ${slotKey}，对象 ${consultants.length} 人`); // 窗口可观测性（2026-08-14 19:00 未触发排查）
+        for (const c of consultants) {
+          const out = await pushSlotFor(db, c.consultant_id, c.open_id, slotKey, { send: true });
+          log(`[scheduler] ${slotKey} ${c.consultant_id}: ${out ? out.status : 'null(无推荐轮)'}`);
+        }
+      } catch (e) { log(`[scheduler] tick 异常: ${String(e.message || e).slice(0, 120)}`); }
+    })();
   };
   const timer = setInterval(tick, 60 * 1000);
   timer.unref?.();

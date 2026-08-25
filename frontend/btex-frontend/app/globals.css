@@ -1257,3 +1257,8 @@ body.btex-document{background:#fff;color:var(--reference-ink)}
 .identity-login-only,.identity-session-action{margin-top:2px}
 @media(max-width:420px){.identity-panel{gap:14px}}
 @media(prefers-reduced-motion:reduce){.identity-primary-action,.identity-secondary-action{transition:none}}
+
+/* B10（2026-08-24）：演示模式常驻提醒条——401 静默落假数据曾让顾问以为数据错乱 */
+.offline-banner{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 14px;padding:10px 14px;border:1px solid #f0c36d;border-radius:10px;background:#fff8e8;color:#7a5b13;font-size:12px}
+.offline-banner button{border:1px solid #d9a93f;border-radius:8px;background:#fff;padding:6px 12px;color:#7a5b13;font-size:12px;cursor:pointer;white-space:nowrap}
+.offline-banner button:hover{background:#fdf3d7}

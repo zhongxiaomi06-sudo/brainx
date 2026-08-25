@@ -10,6 +10,8 @@ import type {
   EngagementState,
   Notification,
   Outcome,
+  CommitmentAction,
+  CommitmentSnapshot,
   SyncStatus,
 } from "./decision-demo";
 
@@ -122,7 +124,12 @@ export type BackendOpportunity = {
   engagement_state: EngagementState; legal_actions: EngagementCommand[];
   events: BackendEvent[]; outcomes: BackendOutcome[]; latest_recommendation: BackendLatestRecommendation | null;
   openmai?: OpenmaiResult | null;
+  commitment_goal?: string | null; active_action?: BackendCommitmentAction | null;
+  action_history?: BackendCommitmentAction[]; suggested_action?: BackendSuggestedAction | null;
+  terminal_result_missing?: boolean;
 };
+export type BackendCommitmentAction = { action_id: string; title: string; due_at: string; status: "OPEN"|"BLOCKED"|"DONE"|"CANCELLED"; source: "RULE"|"MANUAL"; created_at: string; completed_at?: string|null; completion_note?: string|null };
+export type BackendSuggestedAction = { title: string; due_at: string; source: "RULE"|"MANUAL"; rule?: string };
 export type BackendEvent = { event_type: string; occurred_at?: string; actor?: string; reason?: string | null };
 export type BackendOutcome = { stage: string; observed_at?: string; value?: { rating?: number; note?: string } | null };
 export type BackendLatestRecommendation = {
@@ -150,10 +157,9 @@ export type BackendRecommendationRun = { blocked?: boolean; reason?: string; run
 export type BackendPickTray = { snapshot_id: string | null; batch_id: string | null; cursor?: string; next_cursor: string | null; has_more: boolean; items: BackendRecommendation[] };
 export type BackendFeedbackResponse = { ok: boolean; already?: boolean; feedback_id?: string; replacement?: BackendPickTray };
 export type BackendOutcomeResponse = { ok: boolean; already?: boolean; outcome_id?: string | number };
+export type BackendProgressResponse = { ok: boolean; already?: boolean; state?: EngagementState; active_action?: BackendCommitmentAction; incorporated_into_next_decision?: boolean; backfilled?: boolean };
+export type BackendMembershipResponse = { ok: boolean; already?: boolean; relation: "MY_JOB"|"TEAM_SHARED"; legal_actions: EngagementCommand[]; recompute?: { blocked?: boolean; reason?: string } };
 export type BackendProfileUpdate = { ok: boolean; consultant_id: string; profile_keywords?: string[]; profile_note?: string };
-export type AssistantMessage = { role: "user" | "assistant"; content: string };
-export type AssistantContext = { page: string; opportunity_id?: string | null };
-export type AssistantChatOptions = { question: string; history: AssistantMessage[]; context: AssistantContext; api_key?: string; signal?: AbortSignal };
 
 export class BrainxApiError extends Error {
   status: number;
@@ -614,6 +620,16 @@ export async function updateOpportunityFacts(id: string, update: ManualFactUpdat
   return brainxFetch(`/api/v1/opportunities/${encodeURIComponent(id)}/facts`, { method: "PATCH", body: update });
 }
 
+export async function updateOpportunityMembership(
+  id: string,
+  relation: "MY_JOB"|"TEAM_SHARED",
+  idempotencyKey: string,
+): Promise<BackendMembershipResponse> {
+  return brainxFetch(`/api/v1/opportunities/${encodeURIComponent(id)}/membership`, {
+    method: "PATCH", body: { relation, idempotency_key: idempotencyKey },
+  });
+}
+
 // —— HTTP 客户端（浏览器端专用；401 抛 BrainxApiError 由调用方决定回退/登录）——
 // 边界层返回任意 JSON 载荷：形状由各映射函数收敛为强类型，这里保留原样。
 export async function brainxFetch<T = unknown>(
@@ -658,44 +674,6 @@ export type TalentSupplySnapshot = {
 /** 拉取某职位的真实人才供给（真库匹配结果）。未开启开关时返回 enabled:false。 */
 export async function getTalentSupply(jobId: string): Promise<TalentSupplySnapshot> {
   return brainxFetch<TalentSupplySnapshot>(`/api/v1/opportunities/${encodeURIComponent(jobId)}/talent-supply`);
-}
-
-/** 只读助手的流式接口；响应内容不经过 JSON 客户端封装，避免吞掉 SSE 增量。 */
-export async function streamAssistant(
-  options: AssistantChatOptions,
-  onText: (text: string) => void,
-  onError: (message: string) => void,
-): Promise<void> {
-  const res = await fetch("/api/v1/assistant/chat", {
-    method: "POST", credentials: "same-origin", signal: options.signal,
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question: options.question, history: options.history, context: options.context, api_key: options.api_key }),
-  });
-  if (!res.ok) {
-    let message = `HTTP ${res.status}`;
-    try { const data = await res.json() as { error?: { message?: string } | string }; message = typeof data.error === "string" ? data.error : data.error?.message || message; } catch { /* text fallback */ }
-    throw new BrainxApiError(String(message), res.status);
-  }
-  if (!res.body) throw new BrainxApiError("助手没有返回内容", 502);
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  try {
-    for (;;) {
-      const { value, done } = await reader.read();
-      buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
-      const lines = buffer.split(/\r?\n/); buffer = lines.pop() || "";
-      for (const line of lines) {
-        if (!line.startsWith("data:")) continue;
-        try {
-          const data = JSON.parse(line.slice(5).trim()) as { text?: string; message?: string };
-          if (data.text) onText(data.text);
-          if (data.message) onError(data.message);
-        } catch { /* ignore malformed provider frame */ }
-      }
-      if (done) break;
-    }
-  } finally { reader.releaseLock(); }
 }
 
 /** 读取完整工作台快照：概览 + 推荐 + 逐职位详情（承接态/允许动作/事件/结果）+ 画像。
@@ -798,6 +776,7 @@ export async function fetchJobDetail(id: string): Promise<{
   outcomes: Outcome[];
   decisionId: string | null;
   openmai: OpenmaiResult | null;
+  commitment: CommitmentSnapshot;
 }> {
   const d = await brainxFetch<BackendOpportunity>(`/api/v1/opportunities/${encodeURIComponent(id)}`);
   return {
@@ -807,7 +786,23 @@ export async function fetchJobDetail(id: string): Promise<{
     outcomes: mapOutcomes(d.outcomes),
     decisionId: d.latest_recommendation?.decision_id || null,
     openmai: (d as { openmai?: OpenmaiResult | null }).openmai ?? null,
+    commitment: {
+      goal: d.commitment_goal || null,
+      activeAction: d.active_action ? mapCommitmentAction(d.active_action) : null,
+      actionHistory: (d.action_history || []).map(mapCommitmentAction),
+      suggestedAction: d.suggested_action ? {
+        title: d.suggested_action.title, dueAt: d.suggested_action.due_at,
+        source: d.suggested_action.source, rule: d.suggested_action.rule,
+      } : null,
+      terminalResultMissing: !!d.terminal_result_missing,
+    },
   };
+}
+
+function mapCommitmentAction(action: BackendCommitmentAction): CommitmentAction {
+  return { actionId: action.action_id, title: action.title, dueAt: action.due_at,
+    status: action.status, source: action.source, createdAt: action.created_at,
+    completedAt: action.completed_at, completionNote: action.completion_note };
 }
 
 /** SSE 订阅（/api/v1/events）；返回带 close 的句柄。 */

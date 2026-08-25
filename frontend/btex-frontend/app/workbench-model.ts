@@ -405,6 +405,7 @@ export const nav = [
 ] as const;
 export const sourceNames = ["内部项目驾驶舱", "职位库", "客户管理记录", "飞书文档", "飞书消息", "邮件反馈", "历史交付记录"];
 export type PickFolder = { id: string; name: string; jobIds: string[] };
+export type MembershipRelation = "MY_JOB" | "TEAM_SHARED";
 export const DEFAULT_FOLDERS: PickFolder[] = [
   { id: "f-week", name: "本周重点", jobIds: [] },
   { id: "f-verify", name: "待验证", jobIds: [] },
@@ -416,6 +417,7 @@ export type SavedWorkbenchState = Partial<{
   extraTasks: string[];
   weights: number[];
   decisionActions: string[];
+  membershipRelations: Record<string, MembershipRelation>;
   tray: string[];
   folders: PickFolder[];
   folderMode: boolean;

@@ -72,7 +72,7 @@
     },
     {
       "path": "frontend/btex-frontend/app/workbench.tsx",
-      "maxLongLines": 58,
+      "maxLongLines": 57,
       "maxLength": 4517,
       "owner": "frontend",
       "reason": "存量工作台组件待拆分和格式化；只能减少，不能恶化",
@@ -89,14 +89,14 @@
     },
     {
       "path": "frontend/btex-frontend/app/brainx-api.ts",
-      "maxLines": 821,
+      "maxLines": 816,
       "owner": "frontend",
       "reason": "存量 API 适配层尚未按领域拆分；只能减少，不能增长",
       "expiresOn": "2026-10-31"
     },
     {
       "path": "src/server.js",
-      "maxLines": 789,
+      "maxLines": 785,
       "owner": "backend",
       "reason": "存量路由与启动编排尚未拆分；只能减少，不能增长",
       "expiresOn": "2026-10-31"

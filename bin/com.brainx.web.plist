@@ -18,8 +18,12 @@
     <!-- OAuth 回调地址必须与飞书后台白名单一致；缺省会回落 3000 → 错误码 20029 -->
     <key>BRAINX_BASE_URL</key>
     <string>http://127.0.0.1:3100</string>
-    <key>BRAINX_BRIDGE_INTERVAL_MS</key>
-    <string>180000</string>
+    <!-- 2026-08-24 决策：本地 launchd 降级纯开发，关停 bridge 与定时推送（推送唯一出口=云端容器）。
+         要恢复本地桥接：删 BRAINX_BRIDGE_OFF，改回 BRAINX_BRIDGE_INTERVAL_MS=180000 -->
+    <key>BRAINX_BRIDGE_OFF</key>
+    <string>1</string>
+    <key>BRAINX_PUSH_SCHEDULE</key>
+    <string>0</string>
     <!-- spawn npm 启动 btex-frontend 需要 Homebrew PATH（launchd 默认 PATH 无 /opt/homebrew/bin → spawn npm ENOENT） -->
     <key>PATH</key>
     <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>

@@ -5,13 +5,15 @@ import './env.js';
 import http from 'node:http';
 import { spawn } from 'node:child_process';
 import { existsSync, readFileSync, statSync } from 'node:fs';
-import { join, normalize, dirname, sep, extname } from 'node:path';
+import { join, dirname, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { openDb } from './db.js';
+import { openDb, now } from './db.js';
 import { runSync, latestSync, latestCompleteSnapshot } from './sync.js';
 import { recommend, latestRun, loadConsultants } from './recommend.js';
 import { engage, commitmentSummary, currentState, legalActions, DISMISS_REASONS } from './engagement.js';
 import { replay, recordOutcome } from './replay.js';
+import { acceptCommitment, commitmentDetails, recordProgress, recordTerminalResult,
+  releaseCommitment, suggestedAction, RELEASE_REASONS, CLOSE_REASONS } from './commitment.js';
 import { buildDailyCard, buildSyncAlertCard, pushCard } from './push.js';
 import { signSession, verifySession, cookieOf } from './session.js';
 import { signState, verifyState, buildAuthorizeUrl, exchangeCode, oauthConfigured } from './oauth.js';
@@ -22,6 +24,7 @@ import { makeAutoPush } from './autopush.js';
 import { saveUserTokens, tokenStatus } from './feishu.js';
 import { jobVisibleTo } from './visibility.js';
 import { relationOf } from './relations.js';
+import { confirmMembership } from './membership.js';
 import { validateJwt, saveTtcToken, ttcAuthStatus } from './ttcsdk/auth.js';
 import { quota as ttcQuota } from './ttcsdk/user.js';
 import { TtcApiError } from './ttcsdk/http.js';
@@ -32,8 +35,13 @@ import { talentSupplyForJob, talentSupplyEnabled } from './talent-supply.js';
 import { effectiveJob, effectiveFactPayload, updateFactOverrides } from './facts.js';
 import { chatStream, isLlmConfigured } from './llm.js';
 import { pickTray, nextBatch, feedback as recommendationFeedback, undoFeedback as recommendationUndoFeedback } from './recommendation-batch.js';
+import { verifyQuick, quickResultPage, QUICK_ACTIONS } from './quickfb.js';
 import { verifySnapshotKey, jobSnapshot } from './snapshot.js';
 import { createGuard } from './guard.js';
+import { body, err, isPathInside, json, normalizeWorkbenchPreferences, proxyFrontend,
+  safeJsonArray, STATIC_MIME } from './server-http.js';
+
+export { isPathInside } from './server-http.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const FRONTEND_DIR = join(ROOT, 'frontend', 'btex-frontend');
@@ -41,86 +49,6 @@ const FRONTEND_HOST = process.env.BRAINX_FRONTEND_HOST || '127.0.0.1';
 const FRONTEND_PORT = Number(process.env.BRAINX_FRONTEND_PORT || 4321);
 // 本地静态资源目录：vinext 在部分环境（Windows）不提供 /assets，后端直接读 dist 产物绕过
 const STATIC_DIR = join(FRONTEND_DIR, 'dist', 'client');
-const STATIC_MIME = {
-  '.css': 'text/css; charset=utf-8',
-  '.js': 'application/javascript; charset=utf-8',
-  '.mjs': 'application/javascript; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.html': 'text/html; charset=utf-8',
-  '.svg': 'image/svg+xml',
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.gif': 'image/gif',
-  '.ico': 'image/x-icon',
-  '.webp': 'image/webp',
-  '.woff': 'font/woff',
-  '.woff2': 'font/woff2',
-  '.ttf': 'font/ttf',
-  '.eot': 'application/vnd.ms-fontobject',
-};
-
-/** 目录穿越判定：必须带分隔符前缀——裸 startsWith(base) 会把兄弟目录
- * （public-x/… 前缀同为 /…/public）误判为内部（2026-08-10 框架修正）。 */
-export const isPathInside = (base, fp) => {
-  const normalizedBase = normalize(base);
-  const normalizedPath = normalize(fp);
-  const baseWithSep = normalizedBase.endsWith(sep) ? normalizedBase : normalizedBase + sep;
-  return normalizedPath === normalizedBase || normalizedPath.startsWith(baseWithSep);
-};
-
-const json = (res, code, obj) => {
-  res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
-  res.end(JSON.stringify(obj));
-};
-const err = (res, code, codeStr, message) => json(res, code, { error: { code: codeStr, message } });
-const safeJsonArray = (value, fallback = []) => {
-  try {
-    const parsed = JSON.parse(value || '[]');
-    return Array.isArray(parsed) ? parsed : fallback;
-  } catch {
-    return fallback;
-  }
-};
-const normalizeWorkbenchPreferences = (input = {}) => {
-  const cleanId = (value) => String(value || '').trim().slice(0, 120);
-  const tray = Array.isArray(input.tray) ? Array.from(new Set(input.tray.map(cleanId).filter(Boolean))).slice(0, 100) : [];
-  const folders = Array.isArray(input.folders) ? input.folders.slice(0, 50).map((folder, index) => {
-    const id = cleanId(folder?.id) || `folder-${index + 1}`;
-    const name = String(folder?.name || '').trim().slice(0, 80) || '未命名文件夹';
-    const jobIds = Array.isArray(folder?.jobIds) ? Array.from(new Set(folder.jobIds.map(cleanId).filter(Boolean))).slice(0, 200) : [];
-    return { id, name, jobIds };
-  }) : [];
-  return { tray, folders, folderMode: !!input.folderMode };
-};
-
-const proxyFrontend = (req, res, target) => {
-  const targetPath = req.url === '/login' || req.url?.startsWith('/login?')
-    ? `/${req.url.slice('/login'.length)}`
-    : req.url || '/';
-  const proxy = http.request({
-    hostname: target.host,
-    port: target.port,
-    path: targetPath,
-    method: req.method,
-    headers: { ...req.headers, host: `${target.host}:${target.port}` },
-  }, (upstream) => {
-    res.writeHead(upstream.statusCode || 502, upstream.headers);
-    upstream.pipe(res);
-  });
-  proxy.on('error', (e) => {
-    if (!res.headersSent) err(res, 502, 'FRONTEND_UNAVAILABLE', `前端服务不可用：${e.message}`);
-    else res.destroy(e);
-  });
-  req.pipe(proxy);
-};
-
-async function body(req) {
-  let s = '';
-  for await (const c of req) s += c;
-  try { return JSON.parse(s || '{}'); } catch { return null; }
-}
-
 export function createServer(db = openDb(), deps = {}) {
   const exchange = deps.exchangeCode || exchangeCode;
   const devAuth = process.env.BRAINX_DEV_AUTH === '1';
@@ -413,6 +341,25 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       const out = recommendationUndoFeedback(db, cid, await body(req));
       json(res, out.ok ? 200 : out.status || 422, out);
     },
+    // 一键反馈（F2，2026-08-24）：推送卡片按钮直写，HMAC 签名代替 session
+    // （open 路由，鉴权全在 verifyQuick）。顾问不登录工作台也能产标签。
+    'GET /api/v1/feedback/quick': (req, res, cid, q) => {
+      const p = Object.fromEntries(q);
+      const page = (okFlag, text) => {
+        res.writeHead(okFlag ? 200 : 400, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(quickResultPage(okFlag, text));
+      };
+      const v = verifyQuick(p, now());
+      if (!v.ok) return page(false, v.error);
+      const out = p.action === 'watch'
+        ? engage(db, p.consultant, p.project, 'WATCH',
+                 { idempotency_key: `quick-watch:${p.consultant}:${p.project}:${p.day}` })
+        : recommendationFeedback(db, p.consultant,
+                 { project_id: p.project, feedback: 'NOT_INTERESTED', reason: '一键反馈（推送卡片）',
+                   idempotency_key: `quick-ni:${p.consultant}:${p.project}:${p.day}` });
+      if (!out.ok) return page(false, out.error || out.message || '操作失败');
+      return page(true, `已记录：${QUICK_ACTIONS[p.action]}${out.already ? '（此前已记录）' : ''}`);
+    },
     'POST /api/v1/recommendations/next-batch': async (req, res, cid) => {
       const out = nextBatch(db, cid, await body(req));
       json(res, out.ok ? 200 : out.status || 409, out);
@@ -455,7 +402,7 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       ].sort((a, b) => String(a.occurred_at).localeCompare(String(b.occurred_at)));
       const rec = db.prepare(`SELECT * FROM recommendations WHERE project_id=? AND consultant_id=?
         ORDER BY created_at DESC LIMIT 1`).get(id, cid);
-      const outs = db.prepare(`SELECT stage, value_json, observed_at FROM job_outcomes
+      const outs = db.prepare(`SELECT stage, value_json, observed_at, action_id, kind FROM job_outcomes
         WHERE project_id=? AND consultant_id=? ORDER BY observed_at`).all(id, cid);
       // 接单自动找人（0015）：本人接单过才带出状态/结果，其余 null（fail-closed，不泄露存在性）
       const openmai = ['ACCEPTED', 'COMPLETED'].includes(eng.state) ? getOpenmaiResult(db, cid, id) : null;
@@ -463,8 +410,9 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
         job: { ...effective, raw_json: undefined, relation: rel },
         fact_updates: effectiveFactPayload(db, cid, id),
         relation: { relation: rel, source: relRow?.source || null, valid_from: relRow?.valid_from || null },
-        engagement_state: eng.state, legal_actions: legalActions(db, cid, id),
+        engagement_state: eng.state, legal_actions: legalActions(db, cid, id).filter((action) => action !== 'COMPLETE'),
         events, outcomes: outs.map((o) => ({ ...o, value: JSON.parse(o.value_json) })),
+        ...commitmentDetails(db, cid, id),
         openmai,
         latest_recommendation: rec ? { decision_id: rec.decision_id, score: rec.score,
           action: rec.action, confidence_band: rec.confidence_band,
@@ -501,16 +449,59 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       } catch (e) { err(res, 500, 'FACT_UPDATE_FAILED', String(e.message).slice(0, 300)); }
     },
 
-    'POST /api/v1/opportunities/:id/engagement': async (req, res, cid, q, id) => {
+    'PATCH /api/v1/opportunities/:id/membership': async (req, res, cid, q, id) => {
+      const job = db.prepare('SELECT 1 FROM job_facts WHERE project_id=?').get(id);
+      if (!job || !jobVisibleTo(db, cid, id)) return err(res, 404, 'NOT_FOUND', '职位不存在');
       const b = await body(req);
       if (!b) return err(res, 400, 'BAD_JSON', '请求体不是合法 JSON');
-      const out = engage(db, cid, id, b.action, b);
+      try {
+        const out = confirmMembership(db, cid, id, b);
+        if (!out.ok) return err(res, out.status || 422, 'MEMBERSHIP_UPDATE_REJECTED', out.error);
+        const rec = out.already ? null : recommend(db, cid, { top: 20 });
+        json(res, 200, {
+          ...out,
+          recompute: rec?.blocked ? { blocked: true, reason: rec.reason } : { blocked: false },
+        });
+      } catch (e) { err(res, 500, 'MEMBERSHIP_UPDATE_FAILED', String(e.message).slice(0, 300)); }
+    },
+
+    'POST /api/v1/opportunities/:id/engagement': async (req, res, cid, q, id) => {
+      if (!jobVisibleTo(db, cid, id)) return err(res, 404, 'NOT_FOUND', '职位不存在');
+      const b = await body(req);
+      if (!b) return err(res, 400, 'BAD_JSON', '请求体不是合法 JSON');
+      if (b.action === 'COMPLETE') return err(res, 422, 'TERMINAL_RESULT_REQUIRED', '请通过终局结果接口提交入职或关闭');
+      const out = b.action === 'ACCEPT' ? acceptCommitment(db, cid, id, b)
+        : b.action === 'RELEASE' ? releaseCommitment(db, cid, id, b)
+        : engage(db, cid, id, b.action, b);
       // 接单自动触发 OpenMai 找人（接单 → 异步找人 → SSE 定向回传；防重/费用控制在任务模块内）
       if (out.ok && out.state === 'ACCEPTED' && b?.action === 'ACCEPT') {
         try { out.openmai = startOpenmaiTask(db, bus, cid, id); }
         catch (e) { out.openmai = { status: 'error', message: String(e.message).slice(0, 200) }; }
       }
       json(res, out.ok ? 200 : (out.status || 409), out);
+    },
+
+    'POST /api/v1/opportunities/:id/progress/suggestion': async (req, res, cid, q, id) => {
+      if (!jobVisibleTo(db, cid, id)) return err(res, 404, 'NOT_FOUND', '职位不存在');
+      const b = await body(req);
+      if (!b) return err(res, 400, 'BAD_JSON', '请求体不是合法 JSON');
+      json(res, 200, { ok: true, suggestion: suggestedAction(db, cid, id, b) });
+    },
+
+    'POST /api/v1/opportunities/:id/progress': async (req, res, cid, q, id) => {
+      if (!jobVisibleTo(db, cid, id)) return err(res, 404, 'NOT_FOUND', '职位不存在');
+      const b = await body(req);
+      if (!b) return err(res, 400, 'BAD_JSON', '请求体不是合法 JSON');
+      const out = recordProgress(db, cid, id, b);
+      json(res, out.ok ? 200 : (out.status || 422), out);
+    },
+
+    'POST /api/v1/opportunities/:id/terminal-result': async (req, res, cid, q, id) => {
+      if (!jobVisibleTo(db, cid, id)) return err(res, 404, 'NOT_FOUND', '职位不存在');
+      const b = await body(req);
+      if (!b) return err(res, 400, 'BAD_JSON', '请求体不是合法 JSON');
+      const out = recordTerminalResult(db, cid, id, b);
+      json(res, out.ok ? 200 : (out.status || 422), out);
     },
 
     // —— 接单自动找人：状态/结果查询（fail-closed：只许本人接单过的职位）——
@@ -546,6 +537,9 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
     },
 
     'GET /api/v1/dismiss-reasons': (req, res) => json(res, 200, { items: DISMISS_REASONS }),
+    'GET /api/v1/commitment-options': (req, res) => json(res, 200, {
+      release_reasons: RELEASE_REASONS, close_reasons: CLOSE_REASONS,
+    }),
 
     // 职位雷达与客户洞察（fail-closed 可见性；只呈现事实，不补造运营指标）
     'GET /api/v1/radar': (req, res, cid) => json(res, 200, { items: radarRows(db, cid) }),
@@ -657,7 +651,7 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       const name = loadConsultants(db).find((x) => x.consultant_id === cid)?.display_name || cid;
       const card = sync && !sync.complete
         ? buildSyncAlertCard(sync)
-        : buildDailyCard({ consultant_name: name, run: run?.run, items: run?.items || [],
+        : buildDailyCard({ consultant_name: name, consultant_id: cid, run: run?.run, items: run?.items || [],
                            commitments: c, sync, snapshot_id: snapshot?.sync_id });
       json(res, 200, { card });
     },
@@ -672,7 +666,7 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       const kind = sync && !sync.complete ? 'SYNC_ALERT' : 'DAILY_TOP3';
       const card = kind === 'SYNC_ALERT'
         ? buildSyncAlertCard(sync)
-        : buildDailyCard({ consultant_name: name, run: run?.run, items: run?.items || [],
+        : buildDailyCard({ consultant_name: name, consultant_id: cid, run: run?.run, items: run?.items || [],
                            commitments: c, sync, snapshot_id: snapshot?.sync_id });
       const target = b?.target || process.env.BRAINX_PUSH_TARGET || '';
       if (!target) return err(res, 400, 'NO_TARGET', '缺推送目标（chat_id/open_id 或 BRAINX_PUSH_TARGET）');
@@ -709,7 +703,9 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
                     'GET /api/v1/talent/health', 'GET /api/v1/talent/status',
                     // 职位快照：外部系统（York AI worker 等）无 brainx session，凭 API Key 读取；
                     // 鉴权在 handler 内自校验（verifySnapshotKey），未配置 key 时 fail-closed 全拒。
-                    'GET /api/v1/jobs/snapshot', 'GET /api/v1/meta/guard'];
+                    'GET /api/v1/jobs/snapshot', 'GET /api/v1/meta/guard',
+                    // 一键反馈：无 session，HMAC 签名即鉴权（verifyQuick fail-closed）
+                    'GET /api/v1/feedback/quick'];
       const cid = open.includes(`${req.method} ${path}`) ? null : auth(req, res);
       if (open.includes(`${req.method} ${path}`) || cid) {
         try { return await handler(req, res, cid, u.searchParams, dynId); }
@@ -777,7 +773,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   // 桥接常驻：BRAINX_BRIDGE_INTERVAL_MS（默认 180s）；BRAINX_BRIDGE_OFF=1 关闭
   if (process.env.BRAINX_BRIDGE_OFF !== '1') {
     startBridge(db, server.bus, {
-      recommendFn: (cid) => recommend(db, cid, { top: 20 }),
+      recommendFn: (cid) => recommend(db, cid, { top: 20, throttle: true }), // 方案 A：自动轮次快照未变<2h 跳过冻结
       consultantIdsFn: () => loadConsultants(db).map((c) => c.consultant_id),
       onRecommended: makeAutoPush(db), // 重大变化自动推卡；BRAINX_PUSH_AUTO=1 才真发
     });

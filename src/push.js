@@ -6,6 +6,7 @@
 import { execFileSync } from 'node:child_process';
 import { now, uuid } from './db.js';
 import { larkProfileArgs } from './env.js';
+import { quickLink } from './quickfb.js';
 
 const BASE_URL = process.env.BRAINX_BASE_URL || 'http://127.0.0.1:3000';
 
@@ -22,8 +23,10 @@ const url = (u) => ({ url: u, pc_url: u, android_url: u, ios_url: u });
 const btn = (text, u, type = 'default') =>
   ({ tag: 'button', text: { tag: 'plain_text', content: text }, type, multi_url: url(u) });
 
-/** WorkbenchModel → 飞书 card schema 2.0 JSON（纯函数，可单测）。 */
-export function buildDailyCard({ consultant_name, run, items, commitments, sync, snapshot_id }) {
+/** WorkbenchModel → 飞书 card schema 2.0 JSON（纯函数，可单测）。
+ * consultant_id 可选：提供且配置了 BRAINX_FEEDBACK_SECRET 时，每个职位追加
+ * 「关注 / 不感兴趣」一键按钮（签名直写，无需登录工作台——反馈回写主入口）。 */
+export function buildDailyCard({ consultant_name, consultant_id, run, items, commitments, sync, snapshot_id }) {
   const state = sync?.complete ? 'READY' : 'INCOMPLETE';
   const els = [
     { tag: 'markdown', content: `**今天建议先看 ${Math.min(3, items.length)} 个职位**\n`
@@ -38,10 +41,16 @@ export function buildDailyCard({ consultant_name, run, items, commitments, sync,
       + `\`Fit ${dim(r, 'direction')}  Activity ${dim(r, 'activity')}  Evidence ${Math.round(r.evidence_coverage * 100)}\`\n`
       + `综合 **${r.score}** 分 · 置信${{ HIGH: '高', MEDIUM: '中', LOW: '低' }[r.confidence_band]} · ${ACTION_LABEL[r.action]}\n`
       + `理由：${r.reasons[1] || r.reasons[0]}\n⚠️ 风险：${r.risks[0] || '—'}` });
-    els.push({ tag: 'action', actions: [
+    const actions = [
       btn('查看详情', `${BASE_URL}/?open=opportunity:${j.project_id}`, 'primary'),
       btn('回放', `${BASE_URL}/?open=replay:${r.decision_id}`),
-    ] });
+    ];
+    // 一键反馈（F2）：签名当日有效；未配置密钥时 quickLink 返 null，按钮不渲染
+    const watchUrl = consultant_id && quickLink(BASE_URL, consultant_id, j.project_id, 'watch', now());
+    const niUrl = consultant_id && quickLink(BASE_URL, consultant_id, j.project_id, 'not_interested', now());
+    if (watchUrl) actions.push(btn('👀 关注', watchUrl));
+    if (niUrl) actions.push(btn('✕ 不感兴趣', niUrl, 'danger'));
+    els.push({ tag: 'action', actions });
     if (i < Math.min(3, items.length) - 1) els.push({ tag: 'hr' });
   });
   const shared = items.filter((r) => r.job.relation === 'TEAM_SHARED').length;

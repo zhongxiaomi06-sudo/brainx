@@ -22,6 +22,7 @@ import {
   scanPortablePaths,
   scanSecrets,
   selectRegularFiles,
+  checkUnsafeTrackedEntries,
   versionAtLeast,
 } from "./quality-gate/core.mjs";
 
@@ -38,7 +39,9 @@ if (!profile) {
 }
 
 const startedAt = new Date();
+const tracked = listTrackedFiles();
 const files = trackedFiles();
+const candidatePaths = Array.from(new Set([...tracked, ...files]));
 const checks = [];
 
 console.log("\nBrainX 质量门禁");
@@ -54,7 +57,7 @@ addCheck(
 const gitState = inspectGitState(profile.requireCleanWorktree);
 addCheck("Git", "工作区与操作状态", gitState.ok, gitState.detail);
 
-const missingTrackedFiles = checkTrackedFilesPresent(listTrackedFiles());
+const missingTrackedFiles = checkTrackedFilesPresent(tracked);
 addCheck(
   "Git",
   "完整检出",
@@ -65,7 +68,17 @@ addCheck(
     : "全部被 Git 跟踪的文件都已检出",
 );
 
-const forbidden = checkForbiddenTracked(files, config);
+const unsafeTrackedEntries = checkUnsafeTrackedEntries(tracked);
+addCheck(
+  "Git",
+  "被跟踪条目类型",
+  unsafeTrackedEntries.length === 0,
+  unsafeTrackedEntries.length
+    ? unsafeTrackedEntries.map((item) => item.path + "：" + item.reason).join("\n")
+    : "未发现会绕过内容扫描的 Git 符号链接",
+);
+
+const forbidden = checkForbiddenTracked(candidatePaths, config);
 addCheck(
   "安全",
   "禁止跟踪文件",

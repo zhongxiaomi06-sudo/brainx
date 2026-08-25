@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedOn": "2026-08-24",
+  "updatedOn": "2026-08-25",
   "secretAllowlist": [],
   "portablePathExemptions": [],
   "textHygieneFiles": [
@@ -32,7 +32,7 @@
     },
     {
       "path": "frontend/btex-frontend/app/globals.css",
-      "maxLongLines": 59,
+      "maxLongLines": 56,
       "maxLength": 4893,
       "owner": "frontend",
       "reason": "存量压缩样式待按组件格式化；只能减少，不能恶化",
@@ -72,7 +72,7 @@
     },
     {
       "path": "frontend/btex-frontend/app/workbench.tsx",
-      "maxLongLines": 66,
+      "maxLongLines": 58,
       "maxLength": 4517,
       "owner": "frontend",
       "reason": "存量工作台组件待拆分和格式化；只能减少，不能恶化",
@@ -99,20 +99,6 @@
       "maxLines": 789,
       "owner": "backend",
       "reason": "存量路由与启动编排尚未拆分；只能减少，不能增长",
-      "expiresOn": "2026-10-31"
-    },
-    {
-      "path": "frontend/btex-frontend/app/workbench.tsx",
-      "maxLines": 779,
-      "owner": "frontend",
-      "reason": "存量工作台组件尚未按职责拆分；只能减少，不能增长",
-      "expiresOn": "2026-09-30"
-    },
-    {
-      "path": "frontend/btex-frontend/app/globals.css",
-      "maxLines": 738,
-      "owner": "frontend",
-      "reason": "存量全局样式尚未按组件拆分；只能减少，不能增长",
       "expiresOn": "2026-10-31"
     }
   ],

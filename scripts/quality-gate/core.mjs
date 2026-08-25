@@ -51,6 +51,20 @@ export function checkTrackedFilesPresent(files, exists = existsSync) {
   return files.filter((path) => !exists(path));
 }
 
+export function checkUnsafeTrackedEntries(files, stat = lstatSync) {
+  const findings = [];
+  for (const path of files) {
+    try {
+      if (stat(path).isSymbolicLink()) {
+        findings.push({ path, reason: "Git 跟踪的符号链接会绕过内容扫描" });
+      }
+    } catch {
+      // 缺失条目由 checkTrackedFilesPresent 统一报告。
+    }
+  }
+  return findings;
+}
+
 export function selectRegularFiles(files, stat = lstatSync) {
   return files.filter((path) => {
     try {
@@ -82,7 +96,12 @@ export function checkLineLimits(files, config, baseline, readText = defaultReadT
   for (const path of files.filter((item) => isLineChecked(item, config))) {
     const lines = countPhysicalLines(readText(path));
     const exception = registered.get(path);
-    if (lines <= config.maxFileLines) continue;
+    if (lines <= config.maxFileLines) {
+      if (exception) {
+        findings.push({ path, lines, reason: "文件已符合行数上限，应删除存量例外" });
+      }
+      continue;
+    }
     if (!exception) {
       findings.push({ path, lines, reason: "超过行数上限且未登记存量基线" });
       continue;
@@ -91,11 +110,13 @@ export function checkLineLimits(files, config, baseline, readText = defaultReadT
       findings.push({ path, lines, reason: "存量例外已到期" });
       continue;
     }
-    if (lines > exception.maxLines) {
+    if (lines !== exception.maxLines) {
       findings.push({
         path,
         lines,
-        reason: "存量超限文件继续增长，登记上限为 " + exception.maxLines,
+        reason: lines > exception.maxLines
+          ? "存量超限文件继续增长，登记上限为 " + exception.maxLines
+          : "存量超限文件已缩小，应将登记上限收紧为 " + lines,
       });
     }
   }
@@ -116,19 +137,26 @@ export function checkLongLines(files, config, baseline, readText = defaultReadTe
   for (const path of files.filter((item) => isLineChecked(item, config))) {
     const lengths = readText(path).split(/\r\n|\n|\r/).map((line) => line.length);
     const long = lengths.filter((length) => length > config.maxLineLength);
-    if (long.length === 0) continue;
-    const longest = Math.max(...long);
     const entry = registered.get(path);
+    if (long.length === 0) {
+      if (entry) {
+        findings.push({ path, longLines: 0, longest: 0, reason: "文件已无超长行，应删除存量例外" });
+      }
+      continue;
+    }
+    const longest = Math.max(...long);
     if (!entry) {
       findings.push({ path, longLines: long.length, longest, reason: "存在超长行且未登记存量基线" });
     } else if (isExpired(entry.expiresOn)) {
       findings.push({ path, longLines: long.length, longest, reason: "超长行例外已到期" });
-    } else if (long.length > entry.maxLongLines || longest > entry.maxLength) {
+    } else if (long.length !== entry.maxLongLines || longest !== entry.maxLength) {
       findings.push({
         path,
         longLines: long.length,
         longest,
-        reason: "存量超长行继续恶化",
+        reason: long.length > entry.maxLongLines || longest > entry.maxLength
+          ? "存量超长行继续恶化"
+          : "存量超长行已改善，应同步收紧登记基线",
       });
     }
   }
@@ -321,13 +349,16 @@ export async function runCommand(spec, options = {}) {
     stdio: ["ignore", "pipe", "pipe"],
   });
   let output = "";
-  const append = (chunk, stream) => {
+  let stdoutOutput = "";
+  let stderrOutput = "";
+  const append = (chunk, streamName) => {
     const text = chunk.toString();
     output += text;
-    stream.write(text);
+    if (streamName === "stdout") stdoutOutput += text;
+    else stderrOutput += text;
   };
-  child.stdout.on("data", (chunk) => append(chunk, process.stdout));
-  child.stderr.on("data", (chunk) => append(chunk, process.stderr));
+  child.stdout.on("data", (chunk) => append(chunk, "stdout"));
+  child.stderr.on("data", (chunk) => append(chunk, "stderr"));
 
   let timedOut = false;
   const timeoutMs = spec.timeoutMs || 60_000;
@@ -341,6 +372,10 @@ export async function runCommand(spec, options = {}) {
     child.once("exit", (code, signal) => resolve({ code, signal, error: null }));
   });
   clearTimeout(timer);
+  const safeStdout = redactOutput(stdoutOutput);
+  const safeStderr = redactOutput(stderrOutput);
+  if (safeStdout) (options.stdout || process.stdout).write(safeStdout);
+  if (safeStderr) (options.stderr || process.stderr).write(safeStderr);
   return {
     ...outcome,
     timedOut,

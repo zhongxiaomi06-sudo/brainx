@@ -8,6 +8,7 @@ import {
   checkLockfiles,
   checkTextHygiene,
   checkTrackedFilesPresent,
+  checkUnsafeTrackedEntries,
   countPhysicalLines,
   runCommand,
   scanPortablePaths,
@@ -48,6 +49,21 @@ test("扫描文件集合排除 Gitlink 目录", () => {
   );
 });
 
+test("Git 跟踪的符号链接不能绕过安全扫描", () => {
+  const kinds = new Map([
+    ["src/server.js", "file"],
+    ["keys/prod.pem", "symlink"],
+  ]);
+  const findings = checkUnsafeTrackedEntries(
+    [...kinds.keys()],
+    (path) => ({ isSymbolicLink: () => kinds.get(path) === "symlink" }),
+  );
+  assert.deepEqual(findings, [{
+    path: "keys/prod.pem",
+    reason: "Git 跟踪的符号链接会绕过内容扫描",
+  }]);
+});
+
 test("500 行基线只允许存量文件不增长且未到期", () => {
   const config = {
     maxFileLines: 3,
@@ -80,6 +96,10 @@ test("500 行基线只允许存量文件不增长且未到期", () => {
   text["legacy.js"] += "5\n";
   const growth = checkLineLimits(Object.keys(text), config, baseline, (path) => text[path]);
   assert.equal(growth.some((item) => item.path === "legacy.js"), true);
+
+  text["legacy.js"] = "1\n2\n3\n";
+  const stale = checkLineLimits(Object.keys(text), config, baseline, (path) => text[path]);
+  assert.equal(stale.some((item) => item.path === "legacy.js"), true);
 });
 
 test("禁止文件规则允许显式的 env 示例", () => {
@@ -134,6 +154,7 @@ test("超长行基线只允许存量问题不恶化", () => {
     checkLongLines(["legacy.js"], config, baseline, () => "1234567\nok\n").length,
     1,
   );
+  assert.equal(checkLongLines(["legacy.js"], config, baseline, () => "ok\n").length, 1);
 });
 
 test("个人电脑绝对路径按内容指纹登记", () => {
@@ -226,6 +247,21 @@ test("外部命令超时后返回失败证据", async () => {
   });
   assert.equal(result.timedOut, true);
   assert.equal(result.durationMs >= 90, true);
+});
+
+test("外部命令输出在写入日志前完成秘密脱敏", async () => {
+  const fakeKey = "ghp_" + "A".repeat(36);
+  let logged = "";
+  const sink = { write: (value) => { logged += value; } };
+  const result = await runCommand({
+    command: process.execPath,
+    args: ["-e", `console.log(${JSON.stringify(fakeKey)})`],
+    timeoutMs: 1_000,
+  }, { stdout: sink, stderr: sink });
+  assert.equal(result.code, 0);
+  assert.equal(logged.includes(fakeKey), false);
+  assert.equal(result.outputTail.includes(fakeKey), false);
+  assert.match(logged, /\[REDACTED:github-token\]/);
 });
 
 test("Node 版本比较按语义版本工作", () => {

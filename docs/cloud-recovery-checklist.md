@@ -1,4 +1,19 @@
-# 云端排查结论与恢复清单（2026-08-24 更新，含 retention 执行记录）
+# 云端排查结论与恢复清单（2026-08-25 更新：13 项审计修复已部署）
+
+## 2026-08-25 部署记录（13 项审计修复）
+
+- 代码：PR #10 合并，云端 `6de4292`（= origin/main），前后端依赖重装 + vinext build + systemctl restart；
+- 生产验证：journal 可见 `[bridge]` 错误日志（B3）、退避提示（B2）、sync_runs 落 7 行 bridge-error（B3）；
+  API/域名 200；TTC -90429 仍在（上游限流，退避已止血我方加重行为）；
+- B1 修复：`BRAINX_LARK_PROFILE=york-ai`（.env），lark-cli 发信应用 = OAuth 应用 cli_aaf72a91，跨应用 99992361 消除。
+
+## 遗留事项（需人工/协调）
+
+1. **york-ai 机器人无职位盘点 Bitable 权限**：实测 91402 NOTEXIST——需在飞书把 york-ai 应用加为该 Base 协作者
+   （当前走用户令牌直连兜底，bot 兜底通道缺失）；
+2. **TTC -90429 错峰**：York 9 worker 与 brainx 6 JWT 同池限流，需与 York 侧协调调用节奏（bridge 退避已降低我方压力）；
+3. **systemd 停止超时**：restart 时旧进程需 SIGKILL（前端 vinext 子进程不转发 SIGTERM），可在 unit 加 `KillMode=mixed`；
+4. **19:00 CST 推送窗口**：观察 push_log 验证 B1/B4（错误应变为可读 Feishu 报错而非命令回显）。
 
 ## 当前生产形态（重要，2026-08-24 确认）
 

@@ -5,11 +5,15 @@ import { ttcRequest } from './http.js';
 export const search = (jwt, query = {}, fetchImpl) =>
   ttcRequest(jwt, 'POST', '/api/crm/v1/job/search', { page: 1, ...query }, fetchImpl);
 
-/** 全量拉取（cursor 分页，实测每页固定 10 条）。maxPages 防失控（100 页=1000 条上限）。 */
-export async function searchAll(jwt, query = {}, fetchImpl) {
+/** 全量拉取（cursor 分页，实测每页固定 10 条）。maxPages 防失控（100 页=1000 条上限）。
+ * paceMs：页间节流（2026-08-25 限流根治）——91 页连发是典型的租户级限流触发器，
+ * 生产桥接传 120ms 把单顾问全量拉取摊到 ~11s；CLI/测试默认 0 不节流。 */
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+export async function searchAll(jwt, query = {}, fetchImpl, { paceMs = 0 } = {}) {
   const out = [];
   let cursor = '';
   for (let p = 0; p < 100; p++) {
+    if (p > 0 && paceMs > 0) await sleep(paceMs);
     const d = await ttcRequest(jwt, 'POST', '/api/crm/v1/job/search',
       { page: 1, ...(cursor ? { cursor } : {}), ...query }, fetchImpl);
     const jobs = d?.jobs || [];

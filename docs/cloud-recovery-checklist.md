@@ -11,7 +11,7 @@
 
 1. **york-ai 机器人无职位盘点 Bitable 权限**：实测 91402 NOTEXIST——需在飞书把 york-ai 应用加为该 Base 协作者
    （当前走用户令牌直连兜底，bot 兜底通道缺失）；
-2. **TTC -90429 错峰**：York 9 worker 与 brainx 6 JWT 同池限流，需与 York 侧协调调用节奏（bridge 退避已降低我方压力）；
+2. ~~TTC -90429 错峰~~ **已根治（2026-08-25 `880997c`）**：复盘确认我方是主要压力源——旧实现每 tick 6 JWT × ~91 页 ≈ 546 请求/180s ≈ 180 req/min（reloop 用 100条/页，效率高得多）。修正：单顾问轮询（6×↓）+ 分页 120ms 节流 + 限流 fail-fast（outage 期再 6×↓）→ 正常期 ~15 req/min（-92%）。生产已验证 fail-fast 生效，待租户配额窗口恢复后自动回位（成功才推进 ttc_rr 游标）；
 3. **systemd 停止超时**：restart 时旧进程需 SIGKILL（前端 vinext 子进程不转发 SIGTERM），可在 unit 加 `KillMode=mixed`；
 4. **19:00 CST 推送窗口**：观察 push_log 验证 B1/B4（错误应变为可读 Feishu 报错而非命令回显）。
 

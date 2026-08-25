@@ -26,7 +26,7 @@ import { getValidAccessToken, listUserChats, listChatMessages, listBitableRecord
 import { BITABLE_BASE, BITABLE_TABLE, deriveProjectId, flatLark, flatApi, parseBitableRecord } from './bitable.js';
 import { larkProfileArgs } from './env.js';
 import { getValidTtcJwt, markTtcReauth } from './ttcsdk/auth.js';
-import { searchAll, toJobRow } from './ttcsdk/job.js';
+import { searchAll, searchSince, toJobRow } from './ttcsdk/job.js';
 import { TtcApiError } from './ttcsdk/http.js';
 
 // deriveProjectId 权威已迁 bitable.js；此处 re-export 保持既有 import 不破
@@ -244,16 +244,31 @@ export async function bridgeOnce(db, { consultant_ids, execImpl = lark, api = { 
       const rrIdx = prevRr ? Number(prevRr.checkpoint) || 0 : 0;
       const cid = withJwt[rrIdx % withJwt.length];
       const jwt = getValidTtcJwt(db, cid);
+      // 增量水位（2026-08-25）：职位按 update_time 降序，翻到不新即停——
+      // 日常 1-3 页/顾问，替代 91 页全量（限流期间单页探测 200、91 页爬取 -90429 的根因）
+      const wm = db.prepare('SELECT checkpoint FROM bridge_cursor WHERE source=?').get('ttc_watermark');
+      const sinceMs = wm ? Date.parse(wm.checkpoint) || 0 : 0;
       try {
-        const jobs = await searchAll(jwt, {}, fetchImpl, { paceMs: TTC_PAGE_PACE_MS });
+        const { jobs, complete: ttcComplete } = await searchSince(jwt,
+          { sinceMs, paceMs: TTC_PAGE_PACE_MS }, fetchImpl);
         for (const j of jobs) {
           if (!j.unique_id || j.has_permission === false) continue;
           if (!union.has(j.unique_id)) union.set(j.unique_id, toJobRow(j));
         }
-        // 成功才推进轮转（失败下一轮还试同一个，避免失败顾问被跳过）
-        db.prepare(`INSERT INTO bridge_cursor (source, checkpoint, updated_at) VALUES (?,?,?)
-          ON CONFLICT(source) DO UPDATE SET checkpoint=excluded.checkpoint, updated_at=excluded.updated_at`)
-          .run(rrKey, String((rrIdx + 1) % withJwt.length), now());
+        if (ttcComplete) {
+          // 水位前进到本轮最大 update_time；成功才推进轮转（失败下轮还试同一个）
+          const maxU = Math.max(sinceMs, ...jobs.map((j) => Number(j.update_time) || 0));
+          if (maxU > sinceMs) {
+            db.prepare(`INSERT INTO bridge_cursor (source, checkpoint, updated_at) VALUES (?,?,?)
+              ON CONFLICT(source) DO UPDATE SET checkpoint=excluded.checkpoint, updated_at=excluded.updated_at`)
+              .run('ttc_watermark', new Date(maxU).toISOString(), now());
+          }
+          db.prepare(`INSERT INTO bridge_cursor (source, checkpoint, updated_at) VALUES (?,?,?)
+            ON CONFLICT(source) DO UPDATE SET checkpoint=excluded.checkpoint, updated_at=excluded.updated_at`)
+            .run(rrKey, String((rrIdx + 1) % withJwt.length), now());
+        } else {
+          ttcErrs.push(`${cid}:限流中断，已保留 ${jobs.length} 条新数据前缀（水位不动，下轮补齐）`);
+        }
       } catch (e) {
         if (e instanceof TtcApiError && e.authInvalid) markTtcReauth(db, cid);
         ttcErrs.push(`${cid}:${String(e.message).slice(0, 60)}`);

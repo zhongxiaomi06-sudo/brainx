@@ -120,6 +120,42 @@ test('bridgeOnce：TTC 限流根治——单顾问轮询 + 命中 -90429 fail-fa
   assert.ok(!rrAfter || rrAfter.checkpoint === '0');
 });
 
+test('searchSince：update_time 降序提前停 + 限流保住新前缀（2026-08-25 限流根治）', async () => {
+  const { searchSince } = await import('../src/ttcsdk/job.js');
+  const NOW = Date.now();
+  const mkJobs = (prefix, agesHours) => agesHours.map((h, i) => ({
+    unique_id: `${prefix}${i}`, name: 'x', update_time: String(NOW - h * 3600000), has_permission: true }));
+  // 3 页假数据：第 1 页全新、第 2 页部分新、第 3 页不应被请求
+  const pages = [
+    { jobs: mkJobs('A', [1, 2, 3]), has_more: true, cursor: 'c1' },
+    { jobs: mkJobs('B', [5, 30, 40]), has_more: true, cursor: 'c2' },
+    { jobs: mkJobs('C', [50, 60, 70]), has_more: false, cursor: 'c3' },
+  ];
+  let calls = 0;
+  const fetchOk = async () => {
+    const p = pages[Math.min(calls, pages.length - 1)]; calls++;
+    return new Response(JSON.stringify({ code: 0, data: p }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+  const sinceMs = NOW - 24 * 3600000; // 水位 24h
+  const out = await searchSince('jwt', { sinceMs }, fetchOk);
+  assert.equal(calls, 2, '第 2 页出现不新条目即提前停');
+  assert.equal(out.jobs.length, 4, '3 新 + 1 新（B 页只收 5h 那条）');
+  assert.equal(out.complete, true);
+  // 限流中断：第 1 页拿到新数据，第 2 页 -90429 → 保住前缀 complete=false
+  calls = 0;
+  const fetchLimited = async () => {
+    calls++;
+    if (calls === 1) return new Response(JSON.stringify({ code: 0, data: pages[0] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ code: -90429, msg: '服务繁忙，请稍后重试' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+  const out2 = await searchSince('jwt', { sinceMs }, fetchLimited);
+  assert.equal(out2.jobs.length, 3, '新前缀全部保留');
+  assert.equal(out2.complete, false);
+  // 首页即限流：无前缀可保 → 抛错由上层 fail-fast
+  const fetchDead = async () => new Response(JSON.stringify({ code: -90429, msg: '服务繁忙' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  await assert.rejects(() => searchSince('jwt', { sinceMs }, fetchDead));
+});
+
 test('remap：规范化/确定映射/歧义/事务执行', () => {
   assert.equal(normalizeCompany('天壹紫腾资产管理（宁波）有限公司'), '天壹紫腾资产管理');
   // 造数据：旧占位行 + 真 ID 行（用非 P-FIX- 前缀避免 splitFixtureJob 重算）

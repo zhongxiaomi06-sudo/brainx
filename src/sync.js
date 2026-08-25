@@ -212,3 +212,19 @@ export function latestBridgeError(db, consultant_id, afterIso = '') {
     WHERE consultant_id=? AND source='bridge-error' AND started_at > ?
     ORDER BY started_at DESC LIMIT 1`).get(consultant_id, afterIso || '');
 }
+
+/** bridge-error 的面向用户文案（2026-08-25）：banner 不暴露内部错误原文
+ * （顾问姓名/管道符拼接/截断半句）。已知错误模式映射为友好说明，
+ * 原始细节进 detail 供排查（前端可选展开/悬停）。 */
+export function friendlyBridgeError(errorsJson) {
+  let first = '';
+  try { first = JSON.parse(errorsJson || '[]')[0] || ''; } catch { /* 保持空 */ }
+  const raw = String(first);
+  const map = [
+    [/90429|服务繁忙|限流/, 'TTC 系统限流中，已自动降频，恢复后自动刷新'],
+    [/auth|凭据|令牌|reauth/i, 'TTC 登录凭据待更新'],
+    [/bitable|Bitable/, '飞书职位盘点同步失败'],
+  ];
+  for (const [re, msg] of map) if (re.test(raw)) return { message: msg, detail: raw.slice(0, 200) };
+  return { message: '职位源同步失败，展示最近完整快照', detail: raw.slice(0, 200) };
+}

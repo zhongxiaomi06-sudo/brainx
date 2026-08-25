@@ -9,7 +9,7 @@
  *     每条推荐都携带整段原始负载，既泄露又臃肿）。
  */
 import { now, uuid } from './db.js';
-import { latestCompleteSnapshot, latestRealSync, latestBridgeError } from './sync.js';
+import { latestCompleteSnapshot, latestRealSync, latestBridgeError, friendlyBridgeError } from './sync.js';
 import { WEIGHTS, POLICY_VERSION, hardBlock, scoreJob, actionOf, bandOf, sortRecs, explain, normalizeWeights } from './scorer.js';
 import { listConsultants } from './roster.js';
 import { relationMap, deriveRelation } from './relations.js';
@@ -91,7 +91,7 @@ export function recommend(db, consultant_id, { top = 20, dry_run = false, thrott
   const bridgeErr = latestBridgeError(db, consultant_id, last.completed_at || '');
   const sync_warning = bridgeErr ? {
     at: bridgeErr.started_at,
-    message: (JSON.parse(bridgeErr.errors || '[]')[0] || '职位源同步失败').slice(0, 120),
+    ...friendlyBridgeError(bridgeErr.errors), // {message 面向用户, detail 排查原文}
     last_complete_at: snapshot.completed_at || null,
   } : null;
 

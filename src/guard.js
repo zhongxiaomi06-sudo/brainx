@@ -10,6 +10,7 @@
 
 export function createGuard({ windowMs = 60_000, keep = 6 } = {}) {
   const buckets = new Map();
+  let clientErrors = 0; // 浏览器端上报的运行时错误累计（白屏/资源 404 探针）
   const at = (t = Date.now()) => Math.floor(t / windowMs) * windowMs;
   const prune = (t = Date.now()) => {
     const cutoff = at(t) - (keep - 1) * windowMs;
@@ -17,6 +18,9 @@ export function createGuard({ windowMs = 60_000, keep = 6 } = {}) {
   };
 
   return {
+    /** 浏览器端错误上报计数（POST /api/v1/meta/client-error 调用）。 */
+    clientError() { clientErrors += 1; },
+
     /** 每个请求进来调一次；同时包一层 res.end 统计出站字节（近似，流式响应记 0）。 */
     record(req, res) {
       const ts = at();
@@ -48,6 +52,7 @@ export function createGuard({ windowMs = 60_000, keep = 6 } = {}) {
         now: new Date(t).toISOString(),
         window_s: windowMs / 1000,
         retained_min: keep,
+        client_errors_total: clientErrors,
         per_minute: {
           total: curB.req,
           bytes_in: curB.bytes_in,

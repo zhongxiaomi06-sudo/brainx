@@ -4,7 +4,7 @@
 import './env.js';
 import http from 'node:http';
 import { spawn } from 'node:child_process';
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, statSync, appendFileSync, mkdirSync } from 'node:fs';
 import { join, normalize, dirname, sep, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openDb, now } from './db.js';
@@ -723,6 +723,30 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
     // 请求指标（预测告警装置数据源）：聚合计数/字节量，无敏感数据，供看门狗轮询
     'GET /api/v1/meta/guard': (req, res) => json(res, 200, guard.snapshot()),
 
+    // 浏览器端运行时错误上报（layout.tsx 内联探针）：白屏/资源 404/水合失败的事故特征源。
+    // 免登录（出错时 session 可能也不可用）；只落聚合日志行 + guard 计数，不存业务数据。
+    'POST /api/v1/meta/client-error': async (req, res) => {
+      const b = await body(req);
+      if (!b || typeof b.message !== 'string') return err(res, 400, 'BAD_BODY', '缺 message 字段');
+      const line = JSON.stringify({
+        ts: new Date().toISOString(),
+        kind: String(b.kind || 'error').slice(0, 40),
+        message: b.message.slice(0, 500),
+        source: String(b.source || '').slice(0, 300),
+        line: Number(b.line) || 0,
+        stack: String(b.stack || '').slice(0, 1000),
+        url: String(b.url || '').slice(0, 300),
+        chunk: !!b.chunk,
+        component_stack: String(b.component_stack || '').slice(0, 1000),
+      });
+      try {
+        mkdirSync(join(ROOT, 'logs'), { recursive: true });
+        appendFileSync(join(ROOT, 'logs', 'frontend-errors.log'), line + '\n');
+      } catch { /* 日志不可写不影响主流程 */ }
+      guard.clientError();
+      json(res, 200, { ok: true });
+    },
+
     // SSE：桥接器有变化时推 sync/recommend/sync_error；25s 心跳保活
     'GET /api/v1/events': (req, res, cid) => {
       res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8',
@@ -795,6 +819,8 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
                     // 职位快照：外部系统（York AI worker 等）无 brainx session，凭 API Key 读取；
                     // 鉴权在 handler 内自校验（verifySnapshotKey），未配置 key 时 fail-closed 全拒。
                     'GET /api/v1/jobs/snapshot', 'GET /api/v1/meta/guard',
+                    // 浏览器端错误探针：出错时未必有 session，且只写聚合日志
+                    'POST /api/v1/meta/client-error',
                     // 一键反馈：无 session，HMAC 签名即鉴权（verifyQuick fail-closed）
                     'GET /api/v1/feedback/quick'];
       const cid = open.includes(`${req.method} ${path}`) ? null : auth(req, res);

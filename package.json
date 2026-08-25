@@ -31,6 +31,7 @@
     "data:pull": "node scripts/pull-cloud-data.mjs",
     "data:audit": "node scripts/pull-cloud-data.mjs --audit-only",
     "diagnose": "node scripts/diagnose-policy.mjs",
+    "frontend:health": "node scripts/frontend-health.mjs",
     "label:export": "node scripts/export-labeling-sheet.mjs",
     "label:import": "node bin/brainx-label-import.mjs",
     "outcome:import": "node bin/brainx-outcome-import.mjs",

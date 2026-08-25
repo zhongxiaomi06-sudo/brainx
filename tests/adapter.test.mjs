@@ -150,6 +150,9 @@ test('classifyJobFallback：未命中关键词按 hint 兜底', () => {
 
 // ---- LLM 未配置时走回退（classifyJobs / classifyCockpit 同步可跑）----
 test('classifyJobs：未配 LLM 返回规则回退，每行一个分类', async () => {
+  const prevDisable = process.env.BRAINX_LLM_DISABLE;
+  process.env.BRAINX_LLM_DISABLE = '1'; // 本地 .env 配了 key 也强制走回退（测试隔离）
+  try {
   const rows = parseMarketCsv(MARKET_SAMPLE);
   const map = await classifyJobs(rows);
   assert.equal(map.size, rows.length);
@@ -157,13 +160,24 @@ test('classifyJobs：未配 LLM 返回规则回退，每行一个分类', async 
     assert.match(c.classification_version, /rules-v1/);
     assert.ok(typeof c.is_leadership === 'boolean');
   }
+  } finally {
+    if (prevDisable === undefined) delete process.env.BRAINX_LLM_DISABLE;
+    else process.env.BRAINX_LLM_DISABLE = prevDisable;
+  }
 });
 
 test('classifyCockpit：未配 LLM 返回规则回退', async () => {
+  const prevDisable = process.env.BRAINX_LLM_DISABLE;
+  process.env.BRAINX_LLM_DISABLE = '1';
+  try {
   const rows = parseCockpitCsv(COCKPIT_SAMPLE);
   const map = await classifyCockpit(rows);
   assert.equal(map.size, rows.length);
   assert.equal(map.get(rows[0].project_id).membership_status, 'PRIMARY_PM');
+  } finally {
+    if (prevDisable === undefined) delete process.env.BRAINX_LLM_DISABLE;
+    else process.env.BRAINX_LLM_DISABLE = prevDisable;
+  }
 });
 
 // ---- 端到端 dry_run（用真实 CSV，若存在）----

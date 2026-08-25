@@ -24,6 +24,11 @@ test('A：快照未变且 <2h → 节流跳过冻结，记 SKIPPED_UNCHANGED，l
   const r1 = recommend(db, CID, { top: 20, throttle: true });
   assert.ok(!r1.skipped && r1.run_id, '首轮正常冻结');
   const recsBefore = db.prepare('SELECT COUNT(*) n FROM recommendations').get().n;
+  // 模拟 bridge 下一轮：sync_id 必然变化，但业务输入及 input_hash 不变。
+  // 这是旧实现失效并造成数据库膨胀的真实路径。
+  const beforeSnapshot = db.prepare(`SELECT snapshot_id FROM decision_runs WHERE run_id=?`).get(r1.run_id).snapshot_id;
+  const repeated = runSync(db, { source: 'fixture', consultant_id: CID });
+  assert.notEqual(repeated.sync_id, beforeSnapshot);
   const r2 = recommend(db, CID, { top: 20, throttle: true });
   assert.equal(r2.skipped, true);
   assert.equal(r2.run_id, r1.run_id, '复用上轮 run_id');
@@ -31,6 +36,10 @@ test('A：快照未变且 <2h → 节流跳过冻结，记 SKIPPED_UNCHANGED，l
   const skipped = db.prepare(`SELECT status FROM decision_runs
     WHERE consultant_id=? AND status='SKIPPED_UNCHANGED'`).get(CID);
   assert.ok(skipped, '审计行已记');
+  recommend(db, CID, { top: 20, throttle: true });
+  assert.equal(db.prepare(`SELECT COUNT(*) n FROM decision_runs
+    WHERE consultant_id=? AND status='SKIPPED_UNCHANGED'`).get(CID).n, 1,
+  '一小时内重复跳过只保留一条审计记录');
   const latest = latestRun(db, CID);
   assert.equal(latest.run.run_id, r1.run_id, 'latestRun 仍指向 COMPLETED 轮');
   assert.ok(latest.items.length > 0);

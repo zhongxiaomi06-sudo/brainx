@@ -164,7 +164,8 @@ test('migrations：schema_migrations 逐文件记账，重开不重跑', () => {
                           '0013_chat_activity.sql', '0014_recommendation_pick_tray.sql',
                           '0015_openmai_results.sql', '0016_manual_fact_overrides.sql',
                           '0017_commitment_loop.sql',
-                          '0017_position_add_company.sql', '0017_workbench_preferences.sql']);
+                          '0017_position_add_company.sql', '0017_workbench_preferences.sql',
+                          '0018_database_growth_guard.sql']);
 });
 
 const TMPDB = join(tmpdir(), `brainx-fw-${process.pid}.db`);
@@ -181,7 +182,7 @@ test('migrations：旧库 user_version=2 兼容——前 2 个文件标记已应
   legacy.close();
   const reopened = openDb(TMPDB);
   const rows = reopened.prepare('SELECT name FROM schema_migrations ORDER BY name').all().map((r) => r.name);
-  assert.equal(rows.length, 19); // 全部记账（0017 三个文件：commitment_loop + position + workbench）
+  assert.equal(rows.length, 20); // 全部记账（含 0018 数据库增长防护索引）
   const view = reopened.prepare(`SELECT sql FROM sqlite_master WHERE type='view' AND name='current_engagement'`).get();
   assert.match(view.sql, /VIEWED/); // 0006 新视图已应用（含 VIEWED 推导）
   // 0007 扩列已生效

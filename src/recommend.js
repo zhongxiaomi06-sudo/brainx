@@ -63,8 +63,9 @@ export function buildCtx(db, consultant_id, snapshot) {
   };
 }
 
-/** 自动轮次最小冻结间隔（方案 A，db-growth-governance-proposal）：快照未变时不重复全量冻结。 */
+/** 自动轮次最小冻结间隔（方案 A，db-growth-governance-proposal）：输入未变时不重复全量冻结。 */
 const THROTTLE_MS = Number(process.env.BRAINX_RECOMMEND_THROTTLE_MS || 2 * 3600 * 1000);
+const SKIP_AUDIT_MS = Number(process.env.BRAINX_SKIP_AUDIT_MS || 60 * 60 * 1000);
 
 /**
  * 生成一轮推荐。硬约束：最近同步 complete=0 → blocked，不落推荐。
@@ -83,18 +84,30 @@ export function recommend(db, consultant_id, { top = 20, dry_run = false, thrott
              sync: last, snapshot_id: snapshot.sync_id, items: [], run_id: null };
   }
 
-  // 方案 A 节流（2026-08-24）：修正前 bridge 每 180s 无条件全量冻结，
-  // recommendations 5 天膨胀 166 万行、磁盘 ~0.6G/天。跳过轮记 SKIPPED_UNCHANGED——
-  // latestRun/autopush/导出只认 COMPLETED，不受影响；retention 定期清理。
+  // 方案 A 节流（2026-08-24）：sync_id 每次同步都会变化，不能用它判断
+  // 数据是否变化；必须比较 sync_runs.input_hash。旧实现比较 snapshot_id，导致
+  // bridge 每 180s 对相同输入仍全量冻结，5 天产生 166 万 recommendations。
   if (throttle && !dry_run) {
-    const lastRun = db.prepare(`SELECT run_id, snapshot_id, created_at FROM decision_runs
-      WHERE consultant_id=? AND status='COMPLETED' ORDER BY created_at DESC LIMIT 1`).get(consultant_id);
-    if (lastRun && lastRun.snapshot_id === snapshot.sync_id
+    const currentHash = db.prepare('SELECT input_hash FROM sync_runs WHERE sync_id=?')
+      .get(snapshot.sync_id)?.input_hash;
+    const lastRun = db.prepare(`SELECT dr.run_id, dr.snapshot_id, dr.created_at, sr.input_hash
+      FROM decision_runs dr
+      LEFT JOIN sync_runs sr ON sr.sync_id=dr.snapshot_id
+      WHERE dr.consultant_id=? AND dr.status='COMPLETED'
+      ORDER BY dr.created_at DESC LIMIT 1`).get(consultant_id);
+    if (lastRun && currentHash && lastRun.input_hash === currentHash
         && Date.parse(now()) - Date.parse(lastRun.created_at) < THROTTLE_MS) {
-      db.prepare(`INSERT INTO decision_runs
-        (run_id, consultant_id, snapshot_id, policy_version, candidate_count, status, created_at)
-        VALUES (?,?,?,?,?,?,?)`)
-        .run(uuid(), consultant_id, snapshot.sync_id, POLICY_VERSION, 0, 'SKIPPED_UNCHANGED', now());
+      // A 3-minute bridge used to create 480 skip rows/person/day.  Keep at most
+      // one audit marker per hour; the returned result still reports every skip.
+      const lastAudit = db.prepare(`SELECT created_at FROM decision_runs
+        WHERE consultant_id=? AND status='SKIPPED_UNCHANGED'
+        ORDER BY created_at DESC LIMIT 1`).get(consultant_id);
+      if (!lastAudit || Date.parse(now()) - Date.parse(lastAudit.created_at) >= SKIP_AUDIT_MS) {
+        db.prepare(`INSERT INTO decision_runs
+          (run_id, consultant_id, snapshot_id, policy_version, candidate_count, status, created_at)
+          VALUES (?,?,?,?,?,?,?)`)
+          .run(uuid(), consultant_id, snapshot.sync_id, POLICY_VERSION, 0, 'SKIPPED_UNCHANGED', now());
+      }
       return { skipped: true, reason: '快照未变化且距上轮不足 2h，复用上轮', blocked: false,
                run_id: lastRun.run_id, items: null, generated_at: now() };
     }

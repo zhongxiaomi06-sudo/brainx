@@ -19,6 +19,11 @@ export function openDb(dbPath = DB_PATH) {
   if (dbPath !== ':memory:') mkdirSync(dirname(dbPath), { recursive: true });
   const db = new DatabaseSync(dbPath);
   db.exec('PRAGMA journal_mode = WAL');
+  // Keep WAL bounded and reusable.  The old defaults allowed a busy service to
+  // leave hundreds of MB in brainx.db-wal until a manual checkpoint.
+  db.exec('PRAGMA synchronous = NORMAL');
+  db.exec('PRAGMA wal_autocheckpoint = 1000');
+  db.exec('PRAGMA journal_size_limit = 67108864'); // 64 MiB hard reuse target
   db.exec('PRAGMA foreign_keys = ON');
   db.exec('PRAGMA busy_timeout = 5000');
   migrate(db);

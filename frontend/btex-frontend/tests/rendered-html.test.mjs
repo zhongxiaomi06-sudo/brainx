@@ -125,14 +125,26 @@ test("keeps the mobile drawer close control clear of the brand", async () => {
 test("manual tuning adjusts soft layers without bypassing hard rules", async () => {
   const workbench = await source("app/workbench.tsx");
 
-  assert.match(workbench, /useState\(\[60,25,15\]\)/);
-  assert.match(workbench, /const names=\["项目推进","探索机会","个人适配"\]/);
-  assert.match(workbench, /const canApply=total===100/);
+  // 2026-08-25 披露层修正：规则页滑杆接真 policy——六维编辑器 + PUT /profile weights + 重算推荐
+  assert.match(workbench, /const DIM_META = \[/);
+  assert.match(workbench, /BASELINE_PCT/);
+  assert.match(workbench, /onSaveWeights/);
+  assert.match(workbench, /api\/v1\/recommendations\/run/);
   assert.match(workbench, /保存并生成新推荐/);
-  assert.match(workbench, /不可调整：HC、已入职、职位关闭、项目归属与数据冲突规则/);
+  assert.doesNotMatch(workbench, /Agent 已理解/); // 假 NL 文案已去除（诚实版「已按关键词粗调」）
+  assert.match(workbench, /只调软权重：HC、已入职、职位关闭、项目归属与数据冲突等硬规则不可调整/);
   assert.match(workbench, /job\.eligibility!=="ELIGIBLE"/);
   assert.match(workbench, /finalScore:seed\.final/);
   assert.doesNotMatch(workbench, /globalScore\s*\*|explorationScore\s*\*|personalScore\s*\*/);
+});
+
+test("drawer exposes the full six-dimension breakdown, not just the three-layer aliases", async () => {
+  const workbench = await source("app/workbench.tsx");
+
+  // 2026-08-25 披露层修正：三层→六维完整渲染，附映射说明
+  assert.match(workbench, /scoreBreakdown/);
+  assert.match(workbench, /六维评分（加权归一）/);
+  assert.match(workbench, /「推进\/探索\/个人」分别是活跃度\/探索\/方向维的展示别名/);
 });
 
 test("imports cockpit positions into the radar without inventing operational facts", async () => {

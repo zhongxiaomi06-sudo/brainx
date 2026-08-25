@@ -10,7 +10,7 @@
  */
 import { now, uuid } from './db.js';
 import { latestCompleteSnapshot, latestSync } from './sync.js';
-import { WEIGHTS, POLICY_VERSION, hardBlock, scoreJob, actionOf, bandOf, sortRecs, explain } from './scorer.js';
+import { WEIGHTS, POLICY_VERSION, hardBlock, scoreJob, actionOf, bandOf, sortRecs, explain, normalizeWeights } from './scorer.js';
 import { listConsultants } from './roster.js';
 import { relationMap, deriveRelation } from './relations.js';
 import { effectiveJobs } from './facts.js';
@@ -54,6 +54,9 @@ export function buildCtx(db, consultant_id, snapshot) {
     profile_keywords: c.profile_keywords || [],
     // 承接容量上限：顾问档案 profile_json 里可配 capacity_limit；缺省时 scorer 用 CAPACITY_LIMIT。
     capacity_limit: Number(c.capacity_limit) > 0 ? Number(c.capacity_limit) : undefined,
+    // 顾问级六维权重覆盖（规则页滑杆接真 policy，2026-08-25）：profile_json.weights，
+    // 经 normalizeWeights 校验归一；非法配置静默回落基线（不阻断推荐）。
+    weights: normalizeWeights(c.weights ?? null).weights ?? undefined,
     historical_texts: hist.map((h) => h.text),
     watched_count: watched, accepted_count: accepted,
     outcomes_avg: avg, feedback_projects: feedbackProjects,

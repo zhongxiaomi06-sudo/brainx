@@ -635,6 +635,7 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       const c = loadConsultants(db).find((x) => x.consultant_id === cid);
       json(res, 200, { consultant_id: cid, display_name: c?.display_name || cid,
         profile_keywords: c?.profile_keywords || [], profile_note: c?.profile_note || '',
+        weights: c?.weights || null, // 六维权重覆盖（null = 基线 baseline-1.1）
         feishu_auth: tokenStatus(db, cid) });
     },
     'PUT /api/v1/profile': async (req, res, cid) => {

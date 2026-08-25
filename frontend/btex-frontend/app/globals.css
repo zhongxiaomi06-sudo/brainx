@@ -1110,3 +1110,12 @@ html,body,.btex-app{background:var(--bg)}
 .offline-banner{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 14px;padding:10px 14px;border:1px solid #f0c36d;border-radius:10px;background:#fff8e8;color:#7a5b13;font-size:12px}
 .offline-banner button{border:1px solid #d9a93f;border-radius:8px;background:#fff;padding:6px 12px;color:#7a5b13;font-size:12px;cursor:pointer;white-space:nowrap}
 .offline-banner button:hover{background:#fdf3d7}
+
+/* 六维评分（2026-08-25 披露层修正：三层→六维完整可见） */
+.six-dim-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.six-dim-item{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 11px;border:1px solid rgba(60,60,67,.12);border-radius:9px;background:#fff}
+.six-dim-item b{display:block;font-size:12px;color:#1d1d1f}
+.six-dim-item small{color:#86868b;font-size:10px}
+.six-dim-item strong{font-size:16px;color:var(--blue)}
+.six-dim-item.missing{opacity:.55}
+.six-dim-item.missing strong{color:#86868b;font-size:12px}

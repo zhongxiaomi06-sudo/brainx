@@ -150,7 +150,7 @@ export default function DecisionWorkbench(){
  };
  return <div className={`app btex-app concept-shell ${assistantOpen?"assistant-open":""} ${panelMotion==="open"?"decision-panel-open":""} ${panelPresent?"decision-panel-present decision-panel-compact":""} panel-motion-${panelMotion} ${mobileNavOpen?"mobile-nav-open":""} ${mobileDrawerDrag.current?"mobile-nav-swiping":""}`} style={{"--mobile-drawer-progress":mobileDrawerProgress??1} as React.CSSProperties} onPointerDown={beginMobileSwipe} onPointerMove={moveMobileSwipe} onPointerUp={event=>endMobileSwipe(event)} onPointerCancel={event=>endMobileSwipe(event,true)}>
   <aside className="rail-nav" aria-label="主要导航">
-   <button className="rail-brand" onClick={()=>go("today")} aria-label="B-tex 首页"><img className="rail-brand-logo" src="/btex-logo.svg" alt="B-tex BrainX"/></button>
+   <button className="rail-brand" onClick={()=>go("today")} aria-label="B-tex 首页"><img className="rail-brand-logo" src="/brand/btex-logo.png" alt="B-tex BrainX"/></button>
    <nav className="rail-blocks">{nav.map(([id,label,Icon])=><button key={id} className={page===id?"active":""} onClick={()=>go(id)} aria-label={label} aria-current={page===id?"page":undefined}><span className="rail-ico"><Icon/></span><span className="rail-label">{label}</span>{id==="accepted"&&acceptedJobs.length>0&&<i className="rail-count">{acceptedJobs.length}</i>}</button>)}</nav>
    <div className="rail-spacer"/>
    <button className="rail-alert-trigger" onClick={()=>openPanel({kind:"notifications"})} aria-label="打开通知"><BellRing/>{notifications.filter(note=>!note.read).length>0&&<i>{notifications.filter(note=>!note.read).length}</i>}</button>

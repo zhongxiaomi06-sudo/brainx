@@ -247,6 +247,12 @@ html,body,.btex-app{background:var(--bg)}
 
 .sync-degraded-banner{display:flex;align-items:center;gap:10px;margin:0 0 14px;padding:10px 14px;border:1px solid #f0c36d;border-radius:10px;background:#fff8e8;color:#7a5b13;font-size:12px}
 .sync-degraded-banner svg{width:16px;flex-shrink:0}
+.weight-advisor{display:grid;gap:10px;padding:14px;border:1px solid rgba(0,113,227,.2);border-radius:12px;background:#f5f9ff}
+.weight-advisor-reply{display:flex;align-items:flex-start;gap:8px;color:#24517c;font-size:13px;line-height:1.5}
+.weight-advisor-reply svg{width:17px;flex:0 0 auto}
+.weight-advisor textarea{min-height:76px;resize:vertical}
+.weight-advisor .btn{justify-self:start}
+.weight-save-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
 .btex-nav{background:rgba(250,250,252,.88);border-right-color:rgba(60,60,67,.12)}
 .btex-app .topbar{background:rgba(250,250,252,.86);border-bottom-color:rgba(60,60,67,.11)}
 .search input,.field,.seg button{background:rgba(255,255,255,.88)!important;border-color:rgba(60,60,67,.15)}

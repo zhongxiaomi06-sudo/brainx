@@ -43,8 +43,8 @@ export function isLlmConfigured() {
 }
 
 /** 流式文本对话。回调收到 OpenAI-compatible delta 文本；Key 永不离开服务端。 */
-export async function chatStream(messages, { timeout = LLM_TIMEOUT_MS, signal, onText, apiKey } = {}) {
-  if (!isLlmConfigured() && !apiKey) throw new Error('LLM_NOT_CONFIGURED');
+export async function chatStream(messages, { timeout = LLM_TIMEOUT_MS, signal, onText } = {}) {
+  if (!isLlmConfigured()) throw new Error('LLM_NOT_CONFIGURED');
   const url = LLM_BASE_URL.replace(/\/$/, '') + '/chat/completions';
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeout);
@@ -52,7 +52,7 @@ export async function chatStream(messages, { timeout = LLM_TIMEOUT_MS, signal, o
   try {
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey || LLM_API_KEY}` },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${LLM_API_KEY}` },
       body: JSON.stringify({ model: LLM_MODEL, messages, stream: true, temperature: 0.2, ...LLM_EXTRA_BODY }),
       signal: ctrl.signal,
     });
@@ -142,7 +142,10 @@ export async function chatJson(system, user, { timeout = LLM_TIMEOUT_MS, signal 
     });
     if (!res.ok) {
       const body = await res.text().catch(() => '');
-      throw new Error(`LLM HTTP ${res.status}: ${body.slice(0, 200)}`);
+      const error = new Error(`LLM HTTP ${res.status}`);
+      error.status = res.status;
+      error.detail = body.slice(0, 200);
+      throw error;
     }
     const data = await res.json();
     const content = data?.choices?.[0]?.message?.content;

@@ -141,13 +141,15 @@ test("keeps the navigation permanently compact and retains the commitments panel
 });
 
 test("manual tuning adjusts soft layers without bypassing hard rules", async () => {
-  const workbench = await workbenchSource();
+  const [workbench, rules] = await Promise.all([workbenchSource(), source("app/workbench-rules.tsx")]);
 
-  assert.match(workbench, /useState\(\[60,25,15\]\)/);
-  assert.match(workbench, /const names=\["项目推进","探索机会","个人适配"\]/);
-  assert.match(workbench, /const canApply=total===100/);
-  assert.match(workbench, /保存并生成新推荐/);
-  assert.match(workbench, /不可调整：HC、已入职、职位关闭、项目归属与数据冲突规则/);
+  assert.match(rules, /const DIMENSIONS = \[/);
+  assert.match(rules, /api\/v1\/assistant\/weight-suggestion/);
+  assert.match(rules, /api\/v1\/recommendations\/run/);
+  assert.match(rules, /保存并生成新推荐/);
+  assert.match(rules, /只调软权重：HC、已入职、职位关闭、项目归属与数据冲突等硬规则不可调整/);
+  assert.doesNotMatch(rules, /api\.deepseek|API Key|type="password"/);
+  assert.doesNotMatch(workbench, /brainx-deepseek-key|api_key:/);
   assert.match(workbench, /job\.eligibility\s*!==\s*"ELIGIBLE"/);
   assert.match(workbench, /finalScore:\s*seed\.final/);
   assert.doesNotMatch(workbench, /globalScore\s*\*|explorationScore\s*\*|personalScore\s*\*/);

@@ -6,7 +6,6 @@ export type AssistantChatOptions = {
   question: string;
   history: AssistantMessage[];
   context: AssistantContext;
-  api_key?: string;
   signal?: AbortSignal;
 };
 

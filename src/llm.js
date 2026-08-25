@@ -5,11 +5,14 @@
  *   通义千问   https://dashscope.aliyuncs.com/compatible-mode/v1  model: qwen-plus
  *   Kimi      https://api.moonshot.cn/v1             model: moonshot-v1-8k
  *   OpenAI    https://api.openai.com/v1              model: gpt-4o-mini
+ *   阶跃星辰   https://api.stepfun.com/step_plan/v1   model: step-3.5-flash
+ *             （推理模型：配 BRAINX_LLM_EXTRA_BODY 关 thinking，否则 reasoning 烧 ~30x token）
  *
  * 配置只走 .env（与 BRAINX_FEISHU_APP_SECRET 同一纪律，永不硬编码）：
  *   BRAINX_LLM_BASE_URL   兼容协议基地址（到 /v1）
  *   BRAINX_LLM_API_KEY    API Key
  *   BRAINX_LLM_MODEL      模型名
+ *   BRAINX_LLM_EXTRA_BODY 可选，JSON 字符串，合入请求体（如 '{"thinking":{"type":"disabled"}}'）
  *
  * 用法：const out = await chatJson(system, user);  // out 已是 JS 对象
  * 未配置 key 时 isLlmConfigured()=false，调用方应走确定性回退（见 adapter.js）。
@@ -23,6 +26,14 @@ export const LLM_BASE_URL = process.env.BRAINX_LLM_BASE_URL || '';
 export const LLM_API_KEY = process.env.BRAINX_LLM_API_KEY || '';
 export const LLM_MODEL = process.env.BRAINX_LLM_MODEL || '';
 export const LLM_TIMEOUT_MS = Number(process.env.BRAINX_LLM_TIMEOUT_MS) || 45000;
+
+/** 供应商特定的额外请求体字段（JSON 字符串，合入 chat/completions body）。
+ * 例：阶跃 step-3.5-flash 是推理模型，默认 reasoning 烧 30 倍 token，
+ * BRAINX_LLM_EXTRA_BODY='{"thinking":{"type":"disabled"}}' 后问答 141 tok（实测）。 */
+export const LLM_EXTRA_BODY = (() => {
+  try { return JSON.parse(process.env.BRAINX_LLM_EXTRA_BODY || '{}'); }
+  catch { return {}; }
+})();
 
 /** 是否配置了可用的 LLM（三要素齐且有 key）。 */
 export function isLlmConfigured() {
@@ -40,7 +51,7 @@ export async function chatStream(messages, { timeout = LLM_TIMEOUT_MS, signal, o
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey || LLM_API_KEY}` },
-      body: JSON.stringify({ model: LLM_MODEL, messages, stream: true, temperature: 0.2 }),
+      body: JSON.stringify({ model: LLM_MODEL, messages, stream: true, temperature: 0.2, ...LLM_EXTRA_BODY }),
       signal: ctrl.signal,
     });
     if (!res.ok) {
@@ -123,6 +134,7 @@ export async function chatJson(system, user, { timeout = LLM_TIMEOUT_MS, signal 
         // 绝大多数 OpenAI 兼容端点支持 json_object；不支持时服务端忽略，extractJson 兜底。
         response_format: { type: 'json_object' },
         temperature: 0, // 分类任务要确定性，禁随机（与 scorer.js 同一纪律）
+        ...LLM_EXTRA_BODY,
       }),
       signal: ctrl.signal,
     });

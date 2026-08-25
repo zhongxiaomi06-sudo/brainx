@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="zh-CN">
-      <body className={`${mono.variable} btex-document`}>
+      <body className={mono.variable}>
         {children}
       </body>
     </html>

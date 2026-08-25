@@ -3,7 +3,7 @@
 // 如使用独立前端，可用 BRAINX_E2E_BASE 覆盖，例如 http://127.0.0.1:4320/。
 // 用法：node tests/e2e-browser-check.mjs
 // 流程：headless Chrome → 打开前端 → dev 登录 felix → 刷新 → 校验 connected 模式渲染
-//       → 待接单区第一个职位：关注 → 接单（二次确认弹窗）→ 回写结果 → 刷新持久化
+//       → 待接单区第一个职位：关注 → 接单（二次确认弹窗）→ 记录进展 → 刷新持久化
 //       → 第二个职位：暂不考虑（原因枚举弹窗）→ 退出会话回退演示模式。
 import { spawn } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -88,10 +88,10 @@ try {
   console.log(`[2] 后端策略版本（baseline-1.0）: ${text.includes("baseline-1.0") ? "PASS" : "FAIL"}`);
   console.log(`[2] 双分区渲染: ${(text.includes("已接单区") && text.includes("待接单区")) ? "PASS" : "FAIL"}`);
 
-  // 3) 待接单区第一个职位：打开 → 承接与结果 → 关注 → 接单（确认弹窗）→ 回写 → 刷新持久化
+  // 3) 待接单区第一个职位：打开 → 跟进 → 关注 → 接单（确认弹窗）→ 记录进展 → 刷新持久化
   const company = await openPendingRow(0);
   await sleep(1200);
-  await clickDrawerTab("承接与结果");
+  await clickDrawerTab("跟进");
   await sleep(600);
   console.log(`[3] 职位 ${company || "?"} 承接面板打开: ${(await sectionTitles()).includes("承接状态") ? "PASS" : "FAIL"}`);
   console.log(`[3] 初始允许动作（关注/接单/暂不考虑）: ${await evaluate(`[...document.querySelectorAll('.command-grid button')].map(b=>b.textContent.trim()).join("/")`)}`);
@@ -124,7 +124,7 @@ try {
   // 5) 第二个职位：暂不考虑（原因枚举弹窗，枚举来自后端 /dismiss-reasons）
   const company2 = await openPendingRow(0);
   await sleep(1200);
-  await clickDrawerTab("承接与结果");
+  await clickDrawerTab("跟进");
   await sleep(600);
   await evaluate(`(() => { const b = [...document.querySelectorAll('.command-grid button')].find(x => x.textContent.trim() === '暂不考虑'); b?.click(); return !!b; })()`);
   await sleep(800);

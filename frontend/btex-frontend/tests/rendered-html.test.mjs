@@ -5,7 +5,7 @@ import test from "node:test";
 const root = new URL("../", import.meta.url);
 const source = (name) => readFile(new URL(name, root), "utf8");
 
-test("uses the reference three-column shell and a single-column opportunity workspace", async () => {
+test("keeps the supplied workbench shell and presents two balanced decision zones", async () => {
   const [page, workbench, css] = await Promise.all([
     source("app/page.tsx"),
     source("app/workbench.tsx"),
@@ -14,37 +14,21 @@ test("uses the reference three-column shell and a single-column opportunity work
 
   assert.match(page, /import DecisionWorkbench from "\.\/workbench"/);
   assert.match(workbench, /type DecisionDirection = "paid"\|"growth"\|"marketing"/);
-  assert.match(workbench, /\["today","工作台",Sparkles\]/);
+  assert.match(workbench, /\["today","精选",Sparkles\]/);
   assert.match(workbench, /精选盘/);
   assert.match(workbench, /function PickTray/);
   assert.match(workbench, /function DecisionZone/);
-  assert.match(workbench, /type OpportunityRowModel/);
-  assert.match(workbench, /function OpportunityRow/);
-  assert.doesNotMatch(workbench, /<div className="pick-card-rail"><div className="pick-card-publish"/);
-  assert.match(workbench, /onClick=\{\(\)=>setTab\("market"\)\}/);
   assert.match(workbench, /title="未接单"/);
   assert.match(workbench, /aria-label="精选盘"/);
   assert.match(css, /\.pick-tray/);
-  assert.match(css, /grid-template-columns:164px minmax\(640px,1fr\) 356px/);
-  assert.match(css, /rail-brand-logo\{width:108px/);
-  assert.match(css, /touch-action:manipulation/);
-  assert.match(css, /assistant-open \.assistant-trigger\{display:none\}/);
   assert.match(css, /\.btex-app\.panel-motion-open \.decision-drawer\{filter:none;transition:transform \.30s/);
   assert.match(css, /\.btex-app\.decision-panel-open/);
-  assert.match(workbench, /concept-workspace-menu/);
-  assert.match(workbench, /aria-haspopup="menu"/);
-  assert.match(css, /grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
   assert.match(workbench, /<Pencil aria-hidden="true"\/>编辑/);
   assert.doesNotMatch(workbench, /修正事实/);
   assert.match(css, /\.fact-edit-trigger\{display:inline-flex/);
   assert.doesNotMatch(workbench, /冻结快照/);
   assert.doesNotMatch(workbench, /离线演示态不显示供给/);
   assert.doesNotMatch(workbench, /旁路只读 · 不计入最终得分/);
-  // main 侧功能移植断言（第一批合并：bbcbf4e/9c6d400 语义不得在新壳里丢失）
-  assert.match(workbench, /updateWorkbenchPreferences/);
-  assert.match(workbench, /snapshot\.preferences\.tray/);
-  assert.match(workbench, /setOpenmaiByJob\(snapshot\.openmai\|\|\{\}\)/);
-  assert.match(workbench, /退出承接/);
   assert.match(css, /\.drawer-section-head\{margin-bottom:14px\}/);
   assert.match(css, /\.drawer-section-head h2\{margin:0\}/);
   assert.match(css, /\.drawer-metrics>div\{box-sizing:border-box;min-width:0;grid-template-rows:16px auto/);
@@ -76,20 +60,16 @@ test("splits candidates by their live engagement state and keeps verification jo
   assert.match(workbench, /"剩余 HC":"UNKNOWN"/);
 });
 
-test("shows source context, row-level scores, detailed layers, reasons and risks", async () => {
+test("shows source context, three layers, final score, reasons and risks", async () => {
   const workbench = await source("app/workbench.tsx");
 
   assert.match(workbench, /type SourceMode = "COCKPIT_CONTEXT"\|"MARKET_ONLY"/);
   assert.match(workbench, /sourceMode:"COCKPIT_CONTEXT"/);
   assert.match(workbench, /sourceMode:"MARKET_ONLY"/);
-  assert.match(workbench, /label="AI 匹配分" value=\{row\.score\}/);
-  assert.match(workbench, /label="证据覆盖" value=\{row\.coverage===null\?"—":`\$\{row\.coverage\}%`\}/);
-  assert.doesNotMatch(workbench, /label="建议动作" value=\{row\.action\}/);
-  assert.doesNotMatch(workbench, /job\.evidence\[0\]\|\|"推荐快照"/);
-  assert.match(workbench, /label="项目推进" value=\{job\.globalScore\}/);
-  assert.match(workbench, /label="探索机会" value=\{job\.explorationScore\}/);
-  assert.match(workbench, /label="个人适配" value=\{job\.personalScore\}/);
-  assert.match(workbench, /label="最终得分" value=\{job\.finalScore\}/);
+  assert.match(workbench, /label="推进" value=\{job\.globalScore\}/);
+  assert.match(workbench, /label="探索" value=\{job\.explorationScore\}/);
+  assert.match(workbench, /label="个人" value=\{job\.personalScore\}/);
+  assert.match(workbench, /label="最终" value=\{job\.finalScore\}/);
   assert.match(workbench, /DrawerSection title="风险与缺失"/);
   assert.match(workbench, /DrawerSection title="证据来源"/);
   assert.match(workbench, /brainx:edit-facts/);
@@ -97,10 +77,9 @@ test("shows source context, row-level scores, detailed layers, reasons and risks
 });
 
 test("preserves engagement, result recording, replay, sync and notifications", async () => {
-  const [workbench, demo, loop] = await Promise.all([
+  const [workbench, demo] = await Promise.all([
     source("app/workbench.tsx"),
     source("app/decision-demo.ts"),
-    source("app/engagement-loop.tsx"),
   ]);
 
   assert.match(workbench, /function WorkbenchPanel/);
@@ -108,81 +87,74 @@ test("preserves engagement, result recording, replay, sync and notifications", a
   assert.match(workbench, /function engagementStateMessage/);
   assert.match(workbench, /if\(state==="RELEASED"\)return \["WATCH","DISMISS"\]/);
   assert.match(workbench, /if\(state==="DISMISSED"\)return \["WATCH"\]/);
-  assert.match(workbench, /已从当前工作区释放；如需继续推进，可重新关注后再接单。/);
-  assert.match(workbench, /CommitmentLoopPanel/);
-  assert.match(loop, /当前行动/);
-  assert.match(loop, /回写进展/);
-  assert.match(loop, /确认项目归属/);
-  assert.match(loop, /加入项目/);
-  assert.match(loop, /我的职位/);
-  assert.match(loop, /团队共享/);
-  assert.match(loop, /membershipNeedsConfirmation/);
-  assert.match(loop, /"待确认","UNKNOWN"/);
-  assert.match(loop, /requiresFactVerification/);
-  assert.match(loop, /核验关键事实/);
-  assert.match(loop, /去核验/);
-  assert.match(loop, /state==="COMPLETED"/);
-  assert.match(loop, /terminalResult:/);
-  assert.match(loop, /待补录终局结果/);
-  assert.match(workbench, /editRequest=\{factEditRequest\}/);
-  assert.match(workbench, /onVerify=\{requestFactEdit\}/);
-  assert.match(loop, /终局结果只允许|terminal-result/);
-  assert.match(loop, /progress\/suggestion/);
-  assert.match(loop, /确认结果与下一行动/);
-  assert.match(loop, /行动与结果/);
-  assert.doesNotMatch(loop, /演示数据 · 仅保存在当前浏览器/);
-  assert.doesNotMatch(loop, /承接已形成闭环/);
-  assert.doesNotMatch(loop, /规则草案 · 可修改，确认后才成为事实/);
-  assert.doesNotMatch(loop, /结果提交后会纳入下一轮判断依据/);
-  assert.match(workbench, /接单需逐个确认目标、行动和截止时间/);
-  assert.match(workbench, /updateOpportunityMembership/);
-  assert.match(workbench, /membershipRelations/);
-  assert.doesNotMatch(workbench, /tray-accept/);
+  assert.match(workbench, /已停止当前顾问的跟进；职位本身未关闭，可重新关注后再开始承接。/);
+  assert.match(workbench, /DrawerSection title=\{canRecordOutcome\?"记录结果":"结果记录"\}/);
   assert.match(workbench, /function ReplayPanel/);
   assert.match(workbench, /function NotificationPanel/);
   assert.match(workbench, /const runSync=\(\)=>/);
-  assert.match(workbench, /const recordOutcome=/); // 旧兼容入口保留，但新面板不再调用
+  assert.match(workbench, /const recordOutcome=/);
   assert.match(workbench, /localStorage\.setItem\("decision-workbench"/);
   assert.match(demo, /export type EngagementState = "NEW"\|"RECOMMENDED"\|"VIEWED"\|"WATCHED"\|"ACCEPTED"/);
 });
 
-test("uses one compact visual system for commitment actions and terminal results", async () => {
-  const [loop, css] = await Promise.all([
-    source("app/engagement-loop.tsx"),
-    source("app/globals.css"),
-  ]);
-
-  assert.match(loop, /className="commitment-terminal-options"/);
-  assert.match(loop, /aria-pressed=\{terminalStage==="入职"\}/);
-  assert.match(loop, /aria-pressed=\{terminalStage==="关闭"\}/);
-  assert.match(css, /--commitment-title:16px/);
-  assert.match(css, /--commitment-control-height:38px/);
-  assert.match(css, /\.commitment-terminal-options button\.selected/);
-});
-
-test("keeps inline card feedback action-only", async () => {
+test("keeps my commitments in the left workspace and removes the bottom duplicate", async () => {
   const [workbench, css] = await Promise.all([
     source("app/workbench.tsx"),
     source("app/globals.css"),
   ]);
 
-  assert.doesNotMatch(workbench, /已标记为不感兴趣|当前卡片已暂时保留/);
-  assert.doesNotMatch(workbench, /说说「|补充原因/);
-  assert.match(workbench, /quickFeedbackReasons/);
-  assert.match(workbench, /pick-card-feedback-custom/);
-  assert.match(workbench, /const reason=customFeedbackReason\.trim\(\)\|\|selectedFeedbackReason/);
-  assert.match(workbench, /feedbackSubmitted\?"已提交":"提交"/);
-  assert.match(workbench, /if\(!reason\)\{setInlineFeedbackJobId\(job\.id\);return\}/);
-  assert.match(workbench, /feedbackSubmitted\?" feedback-active":" feedback-selecting"/);
-  assert.match(workbench, /pick-card-hide-feedback is-thanks/);
-  assert.match(workbench, />感谢反馈</);
-  assert.match(workbench, /feedbackTrayRestoreRef/);
-  assert.match(workbench, /setTray\(current=>current\.filter\(id=>id!==job\.id\)\)/);
-  assert.match(workbench, /current\.includes\(job\.id\)\?current:\[\.\.\.current,job\.id\]/);
-  assert.match(css, /\.pick-card-hide-feedback\.is-thanks\{display:flex/);
-  assert.match(css, /\.pick-card\.feedback-active>:not\(\.pick-card-hide-feedback\)\{filter:blur\(3px\);opacity:\.28;pointer-events:none/);
-  assert.match(css, /\.pick-card-feedback-reasons\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
-  assert.match(css, /\.pick-card-feedback-reasons button\.selected/);
+  assert.match(workbench, /const \[navOpen,setNavOpen\]=useState\(false\)/);
+  assert.match(workbench, /\{kind:"commitments"\}/);
+  assert.match(workbench, /function CommitmentsPanel/);
+  assert.match(workbench, /className="mobile-commitment-trigger"/);
+  assert.doesNotMatch(workbench, /<section className="commitments">/);
+  assert.match(css, /\.mobile-commitment-trigger\{display:none\}/);
+});
+
+test("keeps the mobile drawer close control clear of the brand", async () => {
+  const [workbench, css] = await Promise.all([
+    source("app/workbench.tsx"),
+    source("app/globals.css"),
+  ]);
+
+  assert.match(workbench, /mobileNavOpen\?<X aria-hidden="true"\/>/);
+  assert.match(css, /\.btex-app\.mobile-nav-open \.mobile-nav-trigger\{left:calc\(min\(82vw,320px\) - 50px\)!important/);
+  assert.match(css, /\.btex-app\.mobile-nav-open \.mobile-nav-trigger span\{display:none\}/);
+});
+
+test("manual tuning adjusts soft layers without bypassing hard rules", async () => {
+  const workbench = await source("app/workbench.tsx");
+
+  assert.match(workbench, /useState\(\[60,25,15\]\)/);
+  assert.match(workbench, /const names=\["项目推进","探索机会","个人适配"\]/);
+  assert.match(workbench, /const canApply=total===100/);
+  assert.match(workbench, /保存并生成新推荐/);
+  assert.match(workbench, /不可调整：HC、已入职、职位关闭、项目归属与数据冲突规则/);
+  assert.match(workbench, /job\.eligibility!=="ELIGIBLE"/);
+  assert.match(workbench, /finalScore:seed\.final/);
+  assert.doesNotMatch(workbench, /globalScore\s*\*|explorationScore\s*\*|personalScore\s*\*/);
+});
+
+test("imports cockpit positions into the radar without inventing operational facts", async () => {
+  const [workbench, cockpit] = await Promise.all([
+    source("app/workbench.tsx"),
+    source("app/cockpit-radar-data.ts"),
+  ]);
+
+  assert.match(cockpit, /Generated from TTC驾驶舱全景图-副本 \(1\)\.xlsx/);
+  assert.match(cockpit, /"company": "Nooklab"/);
+  assert.match(workbench, /const cockpitRadarJobs:Job\[\]/);
+  assert.match(workbench, /source:"驾驶舱导入" as const/);
+  assert.match(workbench, /score:null,hc:null,feedback:"待接入"/);
+  assert.match(workbench, /职位类型筛选/);
+  assert.match(workbench, /全部职位类型/);
+  assert.match(workbench, /CockpitJobDetail/);
+  assert.match(workbench, /等待后端同步后再参与职位判断/);
+});
+
+test("the corrected package has one workbench implementation", async () => {
+  const page = await source("app/page.tsx");
+  assert.doesNotMatch(page, /PrototypeWorkbench|variant=/);
 });
 
 test("refreshes algorithmic recommendations from the brand control", async () => {
@@ -203,7 +175,6 @@ test("refreshes algorithmic recommendations from the brand control", async () =>
   assert.match(workbench, /brandClickCountRef\.current>=5/);
   assert.match(workbench, /window\.open\("https:\/\/github\.com\/jiands233","_blank","noopener,noreferrer"\)/);
   assert.match(workbench, /onClick=\{handleBrandClick\}/);
-  assert.match(workbench, /recommendationRefreshing/);
   assert.match(workbench, /演示推荐已换一批/);
   assert.match(workbench, /dismissedRecommendationIds/);
   assert.match(workbench, /const excludedRecommendationIds=new Set\(\[\.\.\.tray,\.\.\.dismissedRecommendationIds\]\)/);
@@ -212,7 +183,7 @@ test("refreshes algorithmic recommendations from the brand control", async () =>
   assert.match(workbench, /const allJobs=\[\.\.\.acceptedJobs,\.\.\.jobs\.filter\(job=>engagement\[job\.id\]!=="ACCEPTED"\),\.\.\.verificationJobs\]/);
   assert.match(workbench, /你已到达世界的尽头/);
   assert.doesNotMatch(workbench, /当前推荐已处理完|精选盘和不感兴趣的职位不会重复出现|换一批推荐<\/button>/);
-  assert.match(css, /\.rail-brand-logo\.is-spinning/);
+  assert.match(css, /\.rail-brand-image\.is-spinning/);
   assert.match(css, /\.recommendation-empty/);
 });
 
@@ -280,67 +251,32 @@ test("keeps the identity panel focused on one login action", async () => {
   assert.match(css, /\.identity-primary-action\{[^}]*background:rgba\(229,245,240,\.92\)/);
 });
 
-test("keeps the collapsible resizable navigation and retains the commitments panel", async () => {
-  const [workbench, css] = await Promise.all([
+test("explains the commitment flow and separates progress from terminal outcomes", async () => {
+  const [engagement, workbench, e2e] = await Promise.all([
+    source("app/engagement-loop.tsx"),
     source("app/workbench.tsx"),
-    source("app/globals.css"),
+    source("tests/e2e-browser-check.mjs"),
   ]);
 
-  // PR#5 评审恢复：可拖拽侧边栏（navOpen/sidebarWidth/sidebarResize）与键盘可达手柄
-  assert.match(workbench, /const \[navOpen,setNavOpen\]/);
-  assert.match(workbench, /const \[sidebarWidth,setSidebarWidth\]/);
-  assert.match(workbench, /sidebarResize/);
-  assert.match(workbench, /className="rail-resizer"/);
-  assert.match(workbench, /role="separator"/);
-  assert.match(workbench, /\{kind:"commitments"\}/);
-  assert.match(workbench, /function CommitmentsPanel/);
-  assert.doesNotMatch(workbench, /mobile-commitment-trigger/);
-  assert.doesNotMatch(workbench, /<section className="commitments">/);
-  assert.match(css, /\.mobile-commitment-trigger\{display:none\}/);
-});
-
-test("keeps the mobile drawer close control clear of the brand", async () => {
-  const [workbench, css] = await Promise.all([
-    source("app/workbench.tsx"),
-    source("app/globals.css"),
-  ]);
-
-  assert.match(workbench, /mobileNavOpen\?<X aria-hidden="true"\/>/);
-  assert.match(css, /\.btex-app\.mobile-nav-open \.mobile-nav-trigger\{left:calc\(min\(82vw,320px\) - 50px\)!important/);
-  assert.match(css, /\.btex-app\.mobile-nav-open \.mobile-nav-trigger span\{display:none\}/);
-});
-
-test("manual tuning adjusts soft layers without bypassing hard rules", async () => {
-  const workbench = await source("app/workbench.tsx");
-
-  assert.match(workbench, /useState\(\[60,25,15\]\)/);
-  assert.match(workbench, /const names=\["项目推进","探索机会","个人适配"\]/);
-  assert.match(workbench, /const canApply=total===100/);
-  assert.match(workbench, /保存并生成新推荐/);
-  assert.match(workbench, /不可调整：HC、已入职、职位关闭、项目归属与数据冲突规则/);
-  assert.match(workbench, /job\.eligibility!=="ELIGIBLE"/);
-  assert.match(workbench, /finalScore:seed\.final/);
-  assert.doesNotMatch(workbench, /globalScore\s*\*|explorationScore\s*\*|personalScore\s*\*/);
-});
-
-test("imports cockpit positions into the radar without inventing operational facts", async () => {
-  const [workbench, cockpit] = await Promise.all([
-    source("app/workbench.tsx"),
-    source("app/cockpit-radar-data.ts"),
-  ]);
-
-  assert.match(cockpit, /Generated from TTC驾驶舱全景图-副本 \(1\)\.xlsx/);
-  assert.match(cockpit, /"company": "Nooklab"/);
-  assert.match(workbench, /const cockpitRadarJobs:Job\[\]/);
-  assert.match(workbench, /source:"驾驶舱导入" as const/);
-  assert.match(workbench, /score:null,hc:null,feedback:"待接入"/);
-  assert.match(workbench, /职位类型筛选/);
-  assert.match(workbench, /全部职位类型/);
-  assert.match(workbench, /CockpitJobDetail/);
-  assert.match(workbench, /等待后端同步后再参与职位判断/);
-});
-
-test("the corrected package has one workbench implementation", async () => {
-  const page = await source("app/page.tsx");
-  assert.doesNotMatch(page, /PrototypeWorkbench|variant=/);
+  assert.match(workbench, /const tabLabel=\{judgement:"判断",engagement:"跟进",logs:"历史记录"\}/);
+  assert.match(engagement, /这是确认谁可以负责，不等于接单。/);
+  assert.match(engagement, /title:"待确认项目归属"/);
+  assert.match(engagement, /title:"可以开始承接"/);
+  assert.match(engagement, /title:"正在推进"/);
+  assert.match(engagement, /title:"待填写最终去向"/);
+  assert.match(engagement, /title:"已完成"/);
+  assert.match(engagement, /<h2>开始承接<\/h2>/);
+  assert.match(engagement, />记录进展<\/button>/);
+  assert.match(engagement, />记录阻塞<\/button>/);
+  assert.match(engagement, />填写最终去向<\/button>/);
+  assert.match(engagement, />停止跟进<\/button>/);
+  assert.match(engagement, /const progressStages=\["推荐采纳","面试","Offer","反馈"\]/);
+  assert.match(engagement, /const terminalStages=\["入职","关闭"\]/);
+  assert.match(engagement, /type:"过程进展"/);
+  assert.match(engagement, /type:"行动完成"/);
+  assert.match(engagement, /type:"最终结果"/);
+  assert.match(engagement, /这次承接已结束，但最终去向还没有记录/);
+  assert.match(engagement, /停止当前顾问的跟进，不代表职位本身关闭。/);
+  assert.match(e2e, /clickDrawerTab\("跟进"\)/);
+  assert.doesNotMatch(e2e, /clickDrawerTab\("承接与结果"\)/);
 });

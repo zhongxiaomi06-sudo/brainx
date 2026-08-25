@@ -64,12 +64,7 @@ export type BrainxSnapshot = {
   snapshotId: string | null;
   policyVersion: string | null;
   profileKeywords: string[];
-  openmai: Record<string, OpenmaiResult | null>;
-  preferences: WorkbenchPreferences;
 };
-
-export type WorkbenchFolder = { id: string; name: string; jobIds: string[] };
-export type WorkbenchPreferences = { tray: string[]; folders: WorkbenchFolder[]; folderMode: boolean; updatedAt?: string | null };
 
 export type BrainxReplay = {
   decisionId: string;
@@ -126,7 +121,6 @@ export type BackendOpportunity = {
   relation: { relation: string | null; source?: string | null; valid_from?: string | null };
   engagement_state: EngagementState; legal_actions: EngagementCommand[];
   events: BackendEvent[]; outcomes: BackendOutcome[]; latest_recommendation: BackendLatestRecommendation | null;
-  openmai?: OpenmaiResult | null;
   commitment_goal?: string | null; active_action?: BackendCommitmentAction | null;
   action_history?: BackendCommitmentAction[]; suggested_action?: BackendSuggestedAction | null;
   terminal_result_missing?: boolean;
@@ -260,8 +254,7 @@ export function directionOf(role: string): BrainxDirection {
 
 export function eligibilityOf(action: string, relation: string, hc: number | null, activeState: string): BrainxEligibility {
   if (hc === 0 || activeState === "CLOSED" || activeState === "COMPLETED") return "EXCLUDED";
-  // OTHER_CONSULTANT 不再阻塞接单（顾问接单互不影响，仅保留"他人主做"提示）
-  if (relation === "NOT_JOINED" || relation === "UNKNOWN") return "VERIFY_REQUIRED";
+  if (relation === "NOT_JOINED" || relation === "OTHER_CONSULTANT" || relation === "UNKNOWN") return "VERIFY_REQUIRED";
   if (action === "OBSERVE") return "VERIFY_REQUIRED";
   return "ELIGIBLE";
 }
@@ -716,12 +709,11 @@ export async function streamAssistant(
 /** 读取完整工作台快照：概览 + 推荐 + 逐职位详情（承接态/允许动作/事件/结果）+ 画像。
  *  会话未登录（401）时抛错，由调用方进入离线回退。 */
 export async function getSnapshot(): Promise<BrainxSnapshot> {
-  const [wb, recs, profile, dismiss, preferences] = await Promise.all([
+  const [wb, recs, profile, dismiss] = await Promise.all([
     brainxFetch<BackendWorkbench>("/api/v1/workbench"),
     brainxFetch<BackendRecommendations>("/api/v1/recommendations?limit=20"),
     brainxFetch<BackendProfile>("/api/v1/profile"),
     brainxFetch<BackendDismissReasons>("/api/v1/dismiss-reasons").catch(() => ({ items: FALLBACK_DISMISS_REASONS })),
-    brainxFetch<WorkbenchPreferences>("/api/v1/workbench/preferences").catch(() => ({ tray: [], folders: [], folderMode: false, updatedAt: null })),
   ]);
 
   const jobs = (recs.items || []).map(mapRecommendation) as BrainxJob[];
@@ -729,7 +721,6 @@ export async function getSnapshot(): Promise<BrainxSnapshot> {
   const events: Record<string, DecisionEvent[]> = {};
   const outcomes: Record<string, Outcome[]> = {};
   const legal: Record<string, EngagementCommand[]> = {};
-  const openmai: Record<string, OpenmaiResult | null> = {};
 
   const details = await Promise.all(
     jobs.map((j) => brainxFetch<BackendOpportunity>(`/api/v1/opportunities/${encodeURIComponent(j.id)}`).catch(() => null)),
@@ -740,7 +731,6 @@ export async function getSnapshot(): Promise<BrainxSnapshot> {
     job.brainxDecisionId = decisionId;
     if (!d) return;
     engagement[job.id] = d.engagement_state as EngagementState;
-    openmai[job.id] = d.openmai ?? null;
     events[job.id] = mapEvents(d.events);
     outcomes[job.id] = mapOutcomes(d.outcomes);
     legal[job.id] = (d.legal_actions || []).filter((a: string) => a !== "VIEW") as EngagementCommand[];
@@ -785,15 +775,7 @@ export async function getSnapshot(): Promise<BrainxSnapshot> {
     snapshotId: recs.snapshot_id || null,
     policyVersion: recs.policy_version || wb.current_policy_version || null,
     profileKeywords: profile.profile_keywords || [],
-    openmai,
-    preferences,
   };
-}
-
-export async function updateWorkbenchPreferences(preferences: Pick<WorkbenchPreferences, "tray" | "folders" | "folderMode">): Promise<{ ok: boolean } & WorkbenchPreferences> {
-  return brainxFetch<{ ok: boolean } & WorkbenchPreferences>("/api/v1/workbench/preferences", {
-    method: "PUT", body: preferences,
-  });
 }
 
 /** 接单自动找人结果（/api/v1/opportunities/:id 响应内嵌 openmai 字段）。 */
@@ -833,10 +815,9 @@ export async function fetchJobDetail(id: string): Promise<{
       goal: d.commitment_goal || null,
       activeAction: d.active_action ? mapCommitmentAction(d.active_action) : null,
       actionHistory: (d.action_history || []).map(mapCommitmentAction),
-      suggestedAction: d.suggested_action ? {
-        title: d.suggested_action.title, dueAt: d.suggested_action.due_at,
-        source: d.suggested_action.source, rule: d.suggested_action.rule,
-      } : null,
+      suggestedAction: d.suggested_action ? { title: d.suggested_action.title,
+        dueAt: d.suggested_action.due_at, source: d.suggested_action.source,
+        rule: d.suggested_action.rule } : null,
       terminalResultMissing: !!d.terminal_result_missing,
     },
   };

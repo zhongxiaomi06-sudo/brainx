@@ -149,6 +149,12 @@ export function runSync(db, { source = 'fixture', consultant_id = 'felix', dry_r
       .map((r) => [r.display_name, r.consultant_id]));
     const activeRel = db.prepare(`SELECT relation FROM job_memberships
       WHERE consultant_id=? AND project_id=? AND valid_to IS NULL`);
+    // B6（2026-08-24 修复）：owner 变更/移除时关闭残留的 ttc-owner MY_JOB 行——
+    // 旧实现只增不减，owner A→B 后 A 的 MY_JOB 残留（deriveRelation 策展层优先 → 关系错误）。
+    // 只动 source='ttc-owner' 的行，策展资产（fixture/manual）不受影响。
+    const closeStaleOwner = db.prepare(`UPDATE job_memberships SET valid_to=?
+      WHERE project_id=? AND relation='MY_JOB' AND source='ttc-owner'
+        AND valid_to IS NULL AND consultant_id != ?`);
 
     for (const j of valid) {
       upsert.run(j.project_id, j.company, j.role, j.city, j.pipeline, j.hc,
@@ -165,6 +171,8 @@ export function runSync(db, { source = 'fixture', consultant_id = 'felix', dry_r
         closeRel.run(now(), ownerId, j.project_id, 'MY_JOB'); // owner 本人旧关系到期
         upsertRel.run(ownerId, j.project_id, 'MY_JOB', 'ttc-owner', j.captured_at || as_of);
       }
+      //  owner 不在花名册/为空时 ownerId=null → 关掉该项目全部 ttc-owner MY_JOB（保守回收）
+      closeStaleOwner.run(now(), j.project_id, ownerId || '');
     }
     db.exec('COMMIT');
   } catch (e) {
@@ -186,4 +194,21 @@ export function latestCompleteSnapshot(db, consultant_id) {
 export function latestSync(db, consultant_id) {
   return db.prepare(`SELECT sync_id, as_of, source, rows_expected, rows_read, complete, errors, completed_at
     FROM sync_runs WHERE consultant_id=? ORDER BY started_at DESC LIMIT 1`).get(consultant_id);
+}
+
+/** 最近一次真实数据源的同步（排除 bridge-error 观测行，2026-08-25）。
+ * 背景：bridge-error 行（职位源失败的可观测记录）一度成为最新行 → latestSync
+ * 恒 complete=0 → 推荐在上游限流期间被永久 fail-closed（最后完整快照被锁死）。
+ * 阻断判定应只看真实同步；bridge-error 只驱动「降级警告」，不参与阻断。 */
+export function latestRealSync(db, consultant_id) {
+  return db.prepare(`SELECT sync_id, as_of, source, rows_expected, rows_read, complete, errors, completed_at
+    FROM sync_runs WHERE consultant_id=? AND source != 'bridge-error'
+    ORDER BY started_at DESC LIMIT 1`).get(consultant_id);
+}
+
+/** 最近一条 bridge-error（降级信号源）：比 afterIso 新才返回。 */
+export function latestBridgeError(db, consultant_id, afterIso = '') {
+  return db.prepare(`SELECT errors, started_at FROM sync_runs
+    WHERE consultant_id=? AND source='bridge-error' AND started_at > ?
+    ORDER BY started_at DESC LIMIT 1`).get(consultant_id, afterIso || '');
 }

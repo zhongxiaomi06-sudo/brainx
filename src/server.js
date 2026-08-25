@@ -8,7 +8,7 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join, dirname, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openDb, now } from './db.js';
-import { runSync, latestSync, latestCompleteSnapshot } from './sync.js';
+import { runSync, latestSync, latestRealSync, latestBridgeError, latestCompleteSnapshot } from './sync.js';
 import { recommend, latestRun, loadConsultants } from './recommend.js';
 import { engage, commitmentSummary, currentState, legalActions, DISMISS_REASONS } from './engagement.js';
 import { replay, recordOutcome } from './replay.js';
@@ -42,7 +42,6 @@ import { body, err, isPathInside, json, normalizeWorkbenchPreferences, proxyFron
   safeJsonArray, STATIC_MIME } from './server-http.js';
 
 export { isPathInside } from './server-http.js';
-
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const FRONTEND_DIR = join(ROOT, 'frontend', 'btex-frontend');
 const FRONTEND_HOST = process.env.BRAINX_FRONTEND_HOST || '127.0.0.1';
@@ -268,14 +267,16 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
     },
 
     'GET /api/v1/workbench': (req, res, cid) => {
-      const sync = latestSync(db, cid);
+      const sync = latestRealSync(db, cid);
+      const bridgeErr = latestBridgeError(db, cid, sync?.completed_at || '');
       const run = latestRun(db, cid);
       const c = commitmentSummary(db, cid);
       json(res, 200, {
         consultant_id: cid,
         sync: sync ? { state: sync.complete ? 'READY' : 'INCOMPLETE', updated_at: sync.completed_at,
-                       rows_read: sync.rows_read, rows_expected: sync.rows_expected,
-                       errors: JSON.parse(sync.errors || '[]') } : { state: 'EMPTY', updated_at: null },
+                       rows_read: sync.rows_read, rows_expected: sync.rows_expected, errors: JSON.parse(sync.errors || '[]'),
+                       warning: bridgeErr ? { at: bridgeErr.started_at, message: (JSON.parse(bridgeErr.errors || '[]')[0] || '职位源同步失败').slice(0, 120) } : null }
+                   : { state: 'EMPTY', updated_at: null },
         feishu_auth: tokenStatus(db, cid), // {authorized, needs_reauth}——头胶囊提示重登
         ttc_auth: ttcAuthStatus(db, cid),  // TTC 系统托管状态（连接胶囊；绝不出 JWT 本体）
         current_policy_version: run?.run?.policy_version || null,
@@ -286,7 +287,6 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
         run_id: run?.run?.run_id || null,
       });
     },
-
     'GET /api/v1/workbench/preferences': (req, res, cid) => {
       const row = db.prepare('SELECT tray_json, folders_json, folder_mode, updated_at FROM workbench_preferences WHERE consultant_id=?').get(cid);
       json(res, 200, row ? {
@@ -313,7 +313,6 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       );
       json(res, 200, { ok: true, ...prefs, updatedAt });
     },
-
     'GET /api/v1/recommendations': (req, res, cid, q) => {
       const limit = Math.min(Number(q.get('limit')) || 10, 50);
       const sync = latestSync(db, cid);
@@ -345,12 +344,12 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
     // （open 路由，鉴权全在 verifyQuick）。顾问不登录工作台也能产标签。
     'GET /api/v1/feedback/quick': (req, res, cid, q) => {
       const p = Object.fromEntries(q);
-      const page = (okFlag, text) => {
-        res.writeHead(okFlag ? 200 : 400, { 'Content-Type': 'text/html; charset=utf-8' });
+      const page = (okFlag, text, status) => {
+        res.writeHead(okFlag ? 200 : (status || 400), { 'Content-Type': 'text/html; charset=utf-8' });
         res.end(quickResultPage(okFlag, text));
       };
       const v = verifyQuick(p, now());
-      if (!v.ok) return page(false, v.error);
+      if (!v.ok) return page(false, v.error, v.status);
       const out = p.action === 'watch'
         ? engage(db, p.consultant, p.project, 'WATCH',
                  { idempotency_key: `quick-watch:${p.consultant}:${p.project}:${p.day}` })
@@ -550,6 +549,7 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       const c = loadConsultants(db).find((x) => x.consultant_id === cid);
       json(res, 200, { consultant_id: cid, display_name: c?.display_name || cid,
         profile_keywords: c?.profile_keywords || [], profile_note: c?.profile_note || '',
+        weights: c?.weights || null,
         feishu_auth: tokenStatus(db, cid) });
     },
     'PUT /api/v1/profile': async (req, res, cid) => {
@@ -644,7 +644,7 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
     },
 
     'POST /api/v1/push/preview': (req, res, cid) => {
-      const sync = latestSync(db, cid);
+      const sync = latestRealSync(db, cid);
       const snapshot = latestCompleteSnapshot(db, cid);
       const run = latestRun(db, cid);
       const c = commitmentSummary(db, cid);
@@ -658,7 +658,7 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
 
     'POST /api/v1/push/send': async (req, res, cid) => {
       const b = await body(req);
-      const sync = latestSync(db, cid);
+      const sync = latestRealSync(db, cid);
       const snapshot = latestCompleteSnapshot(db, cid);
       const run = latestRun(db, cid);
       const c = commitmentSummary(db, cid);
@@ -670,7 +670,7 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
                            commitments: c, sync, snapshot_id: snapshot?.sync_id });
       const target = b?.target || process.env.BRAINX_PUSH_TARGET || '';
       if (!target) return err(res, 400, 'NO_TARGET', '缺推送目标（chat_id/open_id 或 BRAINX_PUSH_TARGET）');
-      const out = pushCard(db, { consultant_id: cid, kind, run_id: run?.run?.run_id || null,
+      const out = await pushCard(db, { consultant_id: cid, kind, run_id: run?.run?.run_id || null,
                                  card, target, send: true });
       json(res, out.ok ? 200 : 502, out);
     },

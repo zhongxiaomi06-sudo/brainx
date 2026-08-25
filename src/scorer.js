@@ -69,8 +69,40 @@ function daysSince(iso, nowIso) {
   return (Date.parse(nowIso) - Date.parse(iso)) / 86400000;
 }
 
-/** chat_last_at 是 'YYYY-MM-DD HH:mm'（Asia/Shanghai 墙钟，fromMsg 产出）→ 显式 +08:00 解析。 */
-const chatTs = (s) => Date.parse(String(s).replace(' ', 'T') + ':00+08:00');
+/** chat_last_at 多为 'YYYY-MM-DD HH:mm'（Asia/Shanghai 墙钟，fromMsg 产出）→ 显式 +08:00 解析。
+ * 2026-08-24 修复：上游偶发 'HH:mm:ss' 带秒格式，旧实现拼出 '...ss:00+08:00' 非法串 →
+ * NaN → cd=NaN → 比较全 false → 活跃基底静默掉到 20。先截断到分钟再拼时区；
+ * 已是 ISO（含 T 或 Z）的输入直接解析。 */
+const chatTs = (s) => {
+  const str = String(s || '').trim();
+  if (!str) return NaN;
+  if (str.includes('T')) return Date.parse(str);
+  const minute = str.slice(0, 16); // 'YYYY-MM-DD HH:mm'
+  return Date.parse(minute.replace(' ', 'T') + ':00+08:00');
+};
+
+/** 顾问级权重覆盖校验与归一化（2026-08-25：规则页滑杆接真 policy）。
+ * 接受 { direction, activity, similarity, capacity, outcomes, exploration } 的子集，
+ * 值域 0–100（百分比）或 0–1（小数）；未给的维沿用 WEIGHTS 基线；最终归一化和为 1。
+ * 返回 { ok, weights?, error? }——全零/负值/未知维度/非对象均拒绝。 */
+export function normalizeWeights(input) {
+  if (input == null) return { ok: true, weights: null }; // 未覆盖 → 用基线
+  if (typeof input !== 'object' || Array.isArray(input)) return { ok: false, error: 'weights 必须是对象' };
+  const out = { ...WEIGHTS };
+  let touched = false;
+  for (const [k, v] of Object.entries(input)) {
+    if (!(k in WEIGHTS)) return { ok: false, error: `未知维度 ${k}（可选：${Object.keys(WEIGHTS).join('/')}）` };
+    const n = Number(v);
+    if (!Number.isFinite(n) || n < 0) return { ok: false, error: `维度 ${k} 权重必须是非负数字` };
+    out[k] = n > 1 ? n / 100 : n;
+    touched = true;
+  }
+  if (!touched) return { ok: true, weights: null };
+  const sum = Object.values(out).reduce((a, b) => a + b, 0);
+  if (sum <= 0) return { ok: false, error: '六维权重不能全为 0' };
+  for (const k of Object.keys(out)) out[k] = Math.round((out[k] / sum) * 1000) / 1000;
+  return { ok: true, weights: out };
+}
 
 /** 探索位：确定性 md5 排序，当日该顾问的后 10% 职位得探索分 100，其余 50。 */
 export function explorationScore(project_id, consultant_id, dayIso) {
@@ -172,14 +204,16 @@ export function scoreJob(job, relation, ctx) {
   // 探索 10%：确定性
   dims.exploration = explorationScore(job.project_id, ctx.consultant_id, ctx.now);
 
-  const available = Object.entries(WEIGHTS).filter(([k]) => dims[k] != null);
+  // 顾问级权重覆盖（ctx.weights，经 normalizeWeights 归一）优先于全局基线
+  const weights = ctx.weights || WEIGHTS;
+  const available = Object.entries(weights).filter(([k]) => dims[k] != null);
   const coverage = available.reduce((s, [, w]) => s + w, 0);
   const score = available.reduce((s, [k, w]) => s + dims[k] * w, 0) / (coverage || 1);
 
   return {
     score: Math.round(score * 10) / 10,
     coverage: Math.round(coverage * 100) / 100,
-    breakdown: Object.entries(WEIGHTS).map(([k, w]) => ({ dim: k, label: DIM_LABELS[k], weight: w,
+    breakdown: Object.entries(weights).map(([k, w]) => ({ dim: k, label: DIM_LABELS[k], weight: w,
       score: dims[k], weighted_score: dims[k] == null ? null : Math.round(dims[k] * w * 100) / 100,
       status: dims[k] == null ? 'missing' : 'available' })),
   };
@@ -210,7 +244,12 @@ export function explain(job, relation, scored, ctx) {
   const reasons = [];
   const relLabel = { MY_JOB: '我的职位', PRIMARY_PM: '我是主 PM', TEAM_SHARED: '团队共享', OTHER_CONSULTANT: '其他顾问主做' }[relation] || relation;
   reasons.push(`关系：${relLabel}${job.pipeline ? `；${job.pipeline}` : ''}`);
-  if (b.direction != null) reasons.push(`方向匹配 ${b.direction} 分：与你画像关键词（${ctx.profile_keywords.slice(0, 3).join('/')}等）的重合度`);
+  if (b.direction != null) {
+    // B13：画像为空时方向分来自历史文本兜底，文案不能出现「画像关键词（）等」
+    reasons.push(ctx.profile_keywords.length
+      ? `方向匹配 ${b.direction} 分：与你画像关键词（${ctx.profile_keywords.slice(0, 3).join('/')}等）的重合度`
+      : `方向匹配 ${b.direction} 分：与你历史主做项目文本的重合度（画像未配置）`);
+  }
   if (b.activity != null) reasons.push(`活跃度 ${b.activity} 分：状态 ${job.active_state}${job.priority ? `，优先级${PRIORITY_LABEL[job.priority] || job.priority}` : job.pipeline ? '，Pipeline 有进展记录' : ''}${job.chat_last_at ? `，群活跃 ${String(job.chat_last_at).slice(5, 16)}（近7天 ${job.chat_msgs_7d ?? 0} 条）` : ''}，最近变化 ${String(job.captured_at).slice(0, 10)}`);
   if (b.similarity != null && b.similarity > 0) reasons.push(`历史相似 ${b.similarity} 分：与你历史主做项目存在重合特征`);
   if (ctx.positive_companies?.includes(job.company)) reasons.push(`你曾承接该公司项目，方向维加权`);

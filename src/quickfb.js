@@ -42,11 +42,13 @@ export function verifyQuick({ consultant, project, action, day, sig: given }, to
   return { ok: true };
 }
 
-/** 点击后的极简结果页（飞书内置浏览器打开）。 */
+/** 点击后的极简结果页（飞书内置浏览器打开）。text 一律 HTML 转义（预埋 XSS 防护）。 */
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 export function quickResultPage(okFlag, text) {
   return `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <body style="font-family:-apple-system,sans-serif;display:flex;min-height:80vh;align-items:center;justify-content:center;background:#f7f8fa">
 <div style="text-align:center"><div style="font-size:48px">${okFlag ? '✅' : '⚠️'}</div>
-<p style="color:#333;font-size:16px">${text}</p>
+<p style="color:#333;font-size:16px">${esc(text)}</p>
 <p style="color:#999;font-size:12px">可关闭本页，已同步到 Brain X 工作台</p></div>`;
 }

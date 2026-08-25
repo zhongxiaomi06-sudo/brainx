@@ -73,7 +73,12 @@ export const proxyFrontend = (req, res, target) => {
     method: req.method,
     headers: { ...req.headers, host: `${target.host}:${target.port}` },
   }, (upstream) => {
-    res.writeHead(upstream.statusCode || 502, upstream.headers);
+    const headers = { ...upstream.headers };
+    if (String(headers['content-type'] || '').includes('text/html')) {
+      headers['cache-control'] = 'no-cache';
+      delete headers.etag;
+    }
+    res.writeHead(upstream.statusCode || 502, headers);
     upstream.pipe(res);
   });
   proxy.on('error', (error) => {

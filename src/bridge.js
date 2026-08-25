@@ -16,8 +16,11 @@
  *     （consultant_chats ∩ BRIDGE_CHATS）。无令牌/不是成员 = 一条都看不到，
  *     可见性归属写 job_message_visibility。绝不再用 Mia 身份替所有人拉。
  */
-import { execFileSync } from 'node:child_process';
-import { now } from './db.js';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+// B11（2026-08-24）：bridge 批处理 sync execFileSync 实测 3.3s 尖刺冻结事件循环 → 异步化
+const execFileP = promisify(execFile);
+import { now, uuid } from './db.js';
 import { runSync } from './sync.js';
 import { getValidAccessToken, listUserChats, listChatMessages, listBitableRecords, markReauth } from './feishu.js';
 import { BITABLE_BASE, BITABLE_TABLE, deriveProjectId, flatLark, flatApi, parseBitableRecord } from './bitable.js';
@@ -36,17 +39,18 @@ export const BRIDGE_CHATS = [
   { chat_id: 'oc_667758eb50ad4b1af86ae99d79859870', name: 'FLX-职位优先级群' },
 ];
 
-const lark = (args) => {
+const lark = async (args) => {
   // timeout 防 lark-cli 挂死（实测会无限 hang 且自我复活拖垮整机）；45s 上限杀掉
-  const out = execFileSync('lark-cli', [...larkProfileArgs(), ...args], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024,
+  const { stdout } = await execFileP('lark-cli', [...larkProfileArgs(), ...args], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024,
     timeout: 45000, killSignal: 'SIGKILL' });
-  return JSON.parse(out.slice(out.indexOf('{')));
+  return JSON.parse(stdout.slice(stdout.indexOf('{')));
 };
 
 /** 职位盘点 Bitable → runSync payload（relation=null：桥接不碰关系）。lark-cli 通道。 */
-export function fetchBitablePayload(execImpl = lark) {
-  const d = execImpl(['base', '+record-list', '--base-token', BITABLE_BASE,
-    '--table-id', BITABLE_TABLE, '--page-size', '100', '--format', 'json']).data;
+// execImpl 同步 mock（测试）或异步 lark（生产）均可：await 对非 Promise 值透传
+export async function fetchBitablePayload(execImpl = lark) {
+  const d = (await execImpl(['base', '+record-list', '--base-token', BITABLE_BASE,
+    '--table-id', BITABLE_TABLE, '--page-size', '100', '--format', 'json'])).data;
   const jobs = [];
   for (let i = 0; i < d.data.length; i++) {
     const rec = Object.fromEntries(d.fields.map((c, j) => [c, d.data[i][j]]));
@@ -199,7 +203,7 @@ export async function bridgeOnce(db, { consultant_ids, execImpl = lark, api = { 
       }
     }
     if (!payload) {
-      try { payload = fetchBitablePayload(execImpl); }
+      try { payload = await fetchBitablePayload(execImpl); }
       catch (e) { errors.push(`bitable_lark:${String(e.message).slice(0, 120)}`); }
     }
     if (payload) {
@@ -214,24 +218,46 @@ export async function bridgeOnce(db, { consultant_ids, execImpl = lark, api = { 
     }
   }
 
-  // 1.5) TTC 系统职位（真 project_id/HC/Pipeline）：每人用自己的托管 JWT 取权限视图，
-  // 合并去重为团队池。has_permission=false 的行（脱敏视图）不采。未托管者跳过不阻断；
+  // 1.5) TTC 系统职位（真 project_id/HC/Pipeline）：托管 JWT 取权限视图，合并为团队池。
+  // has_permission=false 的行（脱敏视图）不采。未托管者跳过不阻断；
   // 凭据失效 → markTtcReauth（前端胶囊提示重连），不阻断他人。
+  //
+  // 限流根治（2026-08-25，-90429 复盘）：旧实现每 tick 对 6 个 JWT 各全量分页
+  // （每页 10 条、903 职位 ≈ 91 页/JWT）→ 单 tick ~546 请求、180s 一轮 ≈ 180 req/min，
+  // 与 reloop/York worker 同租户叠加直接打爆配额。改为：
+  //   ① 单顾问轮询：每 tick 只拉一个 JWT（游标轮转），请求量降 6 倍，
+  //      团队池全量覆盖周期 = 6 tick ≈ 18min（单视角边缘职位延迟可接受；
+  //      runSync 只 UPSERT 不删除，其他顾问视角的职位不会因本轮未拉而丢失）；
+  //   ② 分页节流 120ms/页：单顾问全量从秒级连发摊到 ~11s；
+  //   ③ 限流 fail-fast：命中 -90429 立即放弃本轮（共享租户配额，其余 JWT 打也是白打），
+  //      不再每 tick 保证制造 6 次失败—— outage 期间我方压力再降 6 倍，恢复更快。
+  const TTC_PAGE_PACE_MS = Number(process.env.BRAINX_TTC_PAGE_PACE_MS || 120);
+  const isRateLimited = (e) => e instanceof TtcApiError
+    && (e.code === -90429 || String(e.message).includes('-90429') || String(e.message).includes('服务繁忙'));
   if (api) {
     const union = new Map();
     const ttcErrs = [];
-    for (const cid of cids) {
+    const withJwt = cids.filter((cid) => getValidTtcJwt(db, cid));
+    if (withJwt.length) {
+      const rrKey = 'ttc_rr';
+      const prevRr = db.prepare('SELECT checkpoint FROM bridge_cursor WHERE source=?').get(rrKey);
+      const rrIdx = prevRr ? Number(prevRr.checkpoint) || 0 : 0;
+      const cid = withJwt[rrIdx % withJwt.length];
       const jwt = getValidTtcJwt(db, cid);
-      if (!jwt) continue;
       try {
-        const jobs = await searchAll(jwt, {}, fetchImpl);
+        const jobs = await searchAll(jwt, {}, fetchImpl, { paceMs: TTC_PAGE_PACE_MS });
         for (const j of jobs) {
           if (!j.unique_id || j.has_permission === false) continue;
           if (!union.has(j.unique_id)) union.set(j.unique_id, toJobRow(j));
         }
+        // 成功才推进轮转（失败下一轮还试同一个，避免失败顾问被跳过）
+        db.prepare(`INSERT INTO bridge_cursor (source, checkpoint, updated_at) VALUES (?,?,?)
+          ON CONFLICT(source) DO UPDATE SET checkpoint=excluded.checkpoint, updated_at=excluded.updated_at`)
+          .run(rrKey, String((rrIdx + 1) % withJwt.length), now());
       } catch (e) {
         if (e instanceof TtcApiError && e.authInvalid) markTtcReauth(db, cid);
         ttcErrs.push(`${cid}:${String(e.message).slice(0, 60)}`);
+        if (isRateLimited(e)) ttcErrs.push('限流 fail-fast：本轮放弃其余顾问');
       }
     }
     if (union.size) {
@@ -309,18 +335,47 @@ export async function bridgeOnce(db, { consultant_ids, execImpl = lark, api = { 
            skipped, errors, at: now() };
 }
 
-/** 常驻调度：服务器内 setInterval。有变化 → 按人定向 SSE + 每位顾问自动推荐（+ onRecommended 钩子）。
- * SSE 定向：事件带 consultant_id 时 bus 只发给该顾问的客户端（见 server.js）。 */
+/** 常驻调度：服务器内定时器。有变化 → 按人定向 SSE + 每位顾问自动推荐（+ onRecommended 钩子）。
+ * SSE 定向：事件带 consultant_id 时 bus 只发给该顾问的客户端（见 server.js）。
+ *
+ * 2026-08-24 修复（B2/B3）：
+ * - 退避：连续失败按 iv→2x→4x…封顶 30min，恢复后回位（此前固定 180s 硬撞 TTC 限流，
+ *   6 个 JWT 全部 -90429 后仍每 180s × 6 重试，加重限流）；
+ * - 失败可观测：console.error 进 journal + 落 sync_runs 失败行（source='bridge-error'，
+ *   不污染 source='bridge'/'ttc' 的 input_hash 增量判断）。2026-08-25 修正：
+ *   bridge-error 只做观测与降级警告（workbench sync.warning），不参与阻断——
+ *   此前它会被 latestSync 取到导致上游限流期间推荐被永久 fail-closed。 */
+const BRIDGE_MAX_DELAY_MS = 30 * 60 * 1000;
+
 export function startBridge(db, bus, { intervalMs, recommendFn, consultantIdsFn, onRecommended } = {}) {
   const iv = intervalMs ?? Number(process.env.BRAINX_BRIDGE_INTERVAL_MS || 180000);
   let running = false;
+  let stopped = false;
+  let failures = 0;
+  let timer = null;
   let prevSkipped = new Set(); // 只在「新进入无令牌状态」时提醒一次，避免每轮刷屏
+  const insFailure = db.prepare(`INSERT INTO sync_runs
+    (sync_id, consultant_id, source, as_of, rows_expected, rows_read, complete, errors, input_hash, started_at, completed_at)
+    VALUES (?,?,?,?,0,0,0,?,?,?,?)`);
+  const recordFailure = (cids, errs) => {
+    const at = now();
+    for (const cid of cids) {
+      try { insFailure.run(uuid(), cid, 'bridge-error', at, JSON.stringify(errs.slice(0, 8)), '', at, at); }
+      catch (e) { console.error('[bridge] 失败行落库失败:', e.message); }
+    }
+  };
+  const schedule = (delay) => {
+    if (stopped) return;
+    timer = setTimeout(tick, delay);
+    timer.unref?.();
+  };
   const tick = () => {
-    if (running) return;
+    if (running || stopped) return;
     running = true;
     (async () => {
+      const cids = consultantIdsFn ? consultantIdsFn() : ['felix'];
+      let failed = false;
       try {
-        const cids = consultantIdsFn ? consultantIdsFn() : ['felix'];
         const out = await bridgeOnce(db, { consultant_ids: cids });
         if (out.changed) {
           for (const s of out.syncs) {
@@ -337,8 +392,14 @@ export function startBridge(db, bus, { intervalMs, recommendFn, consultantIdsFn,
         }
         // 职位源全断 = 全员事故，广播；个人令牌失效只提醒本人
         if (out.syncs.length === 0) {
+          failed = true;
           bus?.emit({ type: 'sync_error', message: '职位源拉取失败（TTC 与 Bitable 均不可用）', at: now() });
         }
+        if (out.errors.length) {
+          failed = true;
+          console.error(`[bridge] 本轮 ${out.errors.length} 个错误:`, out.errors.slice(0, 4).join(' | '));
+        }
+        if (failed) recordFailure(cids, out.errors.length ? out.errors : ['职位源拉取失败']);
         const curSkipped = new Set(out.skipped);
         for (const cid of out.skipped) {
           if (prevSkipped.has(cid)) continue; // 已提醒过，等重登后自然恢复
@@ -347,14 +408,21 @@ export function startBridge(db, bus, { intervalMs, recommendFn, consultantIdsFn,
         }
         prevSkipped = curSkipped;
       } catch (e) {
-        // 未预期异常：广播错误态，下一轮继续
+        // 未预期异常：广播错误态，退避后下一轮继续
+        failed = true;
+        console.error('[bridge] tick 未预期异常:', e.message || e);
+        recordFailure(cids, [String(e.message || e).slice(0, 200)]);
         bus?.emit({ type: 'sync_error', message: String(e.message || e).slice(0, 200), at: now() });
-      } finally { running = false; }
+      } finally {
+        running = false;
+        failures = failed ? Math.min(failures + 1, 6) : 0;
+        const delay = failed ? Math.min(iv * 2 ** (failures - 1), BRIDGE_MAX_DELAY_MS) : iv;
+        if (failed) console.error(`[bridge] 连续失败 ${failures} 次，${Math.round(delay / 1000)}s 后重试`);
+        schedule(delay);
+      }
     })();
   };
-  const timer = setInterval(tick, iv);
-  timer.unref?.();
-  const first = setTimeout(tick, 5000);
-  first.unref?.();
-  return { stop: () => { clearInterval(timer); clearTimeout(first); }, tick };
+  schedule(5000); // 首轮 5s 后
+  return { stop: () => { stopped = true; if (timer) clearTimeout(timer); },
+           tick, failures: () => failures };
 }

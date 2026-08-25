@@ -3,7 +3,11 @@
  * 硬约束：本地 127.0.0.1 收不到飞书回调 → 卡片按钮一律 URL 深链，
  * 操作只能发生在打开的工作台 UI 里。卡片 = 快照摘要；UI = 实时渲染。
  */
-import { execFileSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+// B11（2026-08-24）：execFileSync 在请求路径/调度进程内同步 shell out（单卡阻塞上限 45s，
+// 冻结整个事件循环）。一律走 promisify(execFile) 异步化。
+const execFileP = promisify(execFile);
 import { now, uuid } from './db.js';
 import { larkProfileArgs } from './env.js';
 import { quickLink } from './quickfb.js';
@@ -108,14 +112,13 @@ export function buildHeatingAlertCard({ change_label, item }) {
 /** 推送（幂等：consultant+kind+run_id 唯一；SENT 重复 → SKIPPED_DUPLICATE；FAILED 可重发并更新原行）。
  * run_id 为空统一落 '' 哨兵：SQLite UNIQUE 视 NULL 互不相等，NULL 时唯一键形同虚设
  * （SYNC_ALERT 恒无 run_id，修正前可并发重复插行）。存量 NULL 由 0006 迁移回填。 */
-export function pushCard(db, { consultant_id, kind, run_id, card, target, send = false }) {
+export async function pushCard(db, { consultant_id, kind, run_id, card, target, send = false }) {
   const rid = run_id ?? '';
   const dup = db.prepare(`SELECT push_id, status FROM push_log
     WHERE consultant_id=? AND kind=? AND run_id=?`).get(consultant_id, kind, rid);
-  // 幂等：已成功发送（SENT）或仅预览（PREVIEW）的推送，重复调用都跳过，返回首次记录。
-  // 唯一例外：PREVIEW 只落卡未发送，本次 send=true 时允许覆盖成真实发送；
-  // PREVIEW→PREVIEW 仍幂等跳过（不重复落行），FAILED 可重发（更新同一 push_id）。
   if (dup && dup.status !== 'FAILED' && !(dup.status === 'PREVIEW' && send)) {
+    // 唯一键（consultant+kind+run_id）即幂等保证：已成功的推送跳过，
+    // 返回首次记录——该 run 在 push_log 中永远只有一条成功记录。
     return { ok: true, status: 'SKIPPED_DUPLICATE', push_id: dup.push_id };
   }
   let status = 'SENT', message_id = null, error = null;
@@ -123,20 +126,24 @@ export function pushCard(db, { consultant_id, kind, run_id, card, target, send =
     try {
       // lark-cli 1.0.67 无 im messages create 打字命令 → 走 api 逃生舱（bot 身份，im:message:send_as_bot）。
       // 卡片 content 需要二次 stringify（Feishu 契约：content 是 JSON 字符串）。
-      // timeout+SIGKILL：lark-cli 实测会无限 hang（见 bridge.js 同款注释），必须限时杀掉。
-      const out = execFileSync('lark-cli', [...larkProfileArgs(), 'api', 'POST', '/open-apis/im/v1/messages', '--as', 'bot',
+      const { stdout } = await execFileP('lark-cli', [...larkProfileArgs(), 'api', 'POST', '/open-apis/im/v1/messages', '--as', 'bot',
         '--params', JSON.stringify({ receive_id_type: target.startsWith('oc_') ? 'chat_id' : 'open_id' }),
         '--data', JSON.stringify({ receive_id: target, msg_type: 'interactive',
                                    content: JSON.stringify(card) })],
-        { encoding: 'utf8', maxBuffer: 4 * 1024 * 1024, timeout: 30000, killSignal: 'SIGKILL' });
-      const d = JSON.parse(out.slice(out.indexOf('{')));
+        { encoding: 'utf8', maxBuffer: 4 * 1024 * 1024, timeout: 45000, killSignal: 'SIGKILL' });
+      const d = JSON.parse(stdout.slice(stdout.indexOf('{')));
       // api 逃生舱可能直出 Feishu 响应（{code,data:{message_id}}）或包一层 {ok,data}
       const feishu = d?.data?.code != null ? d.data : d;
       if (feishu?.code !== 0 && feishu?.ok !== true) {
         throw new Error(feishu?.msg || feishu?.error?.message || JSON.stringify(d).slice(0, 200));
       }
       message_id = feishu?.data?.message_id || d?.data?.data?.message_id || null;
-    } catch (e) { status = 'FAILED'; error = String(e.message || e).slice(0, 300); }
+    } catch (e) {
+      // execFileSync 的 e.message 是命令本体（含整张卡片 JSON），真实 Feishu 错误在
+      // e.stderr —— 优先 stderr，截断保护放在最后（2026-08-24 修复：push_log 曾全是无效命令回显）
+      status = 'FAILED';
+      error = String(e.stderr || e.message || e).trim().slice(0, 300);
+    }
   } else {
     status = 'PREVIEW';
   }

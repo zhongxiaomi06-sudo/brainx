@@ -9,8 +9,8 @@
  *     每条推荐都携带整段原始负载，既泄露又臃肿）。
  */
 import { now, uuid } from './db.js';
-import { latestCompleteSnapshot, latestSync } from './sync.js';
-import { WEIGHTS, POLICY_VERSION, hardBlock, scoreJob, actionOf, bandOf, sortRecs, explain } from './scorer.js';
+import { latestCompleteSnapshot, latestRealSync, latestBridgeError } from './sync.js';
+import { WEIGHTS, POLICY_VERSION, hardBlock, scoreJob, actionOf, bandOf, sortRecs, explain, normalizeWeights } from './scorer.js';
 import { listConsultants } from './roster.js';
 import { relationMap, deriveRelation } from './relations.js';
 import { effectiveJobs } from './facts.js';
@@ -54,6 +54,9 @@ export function buildCtx(db, consultant_id, snapshot) {
     profile_keywords: c.profile_keywords || [],
     // 承接容量上限：顾问档案 profile_json 里可配 capacity_limit；缺省时 scorer 用 CAPACITY_LIMIT。
     capacity_limit: Number(c.capacity_limit) > 0 ? Number(c.capacity_limit) : undefined,
+    // 顾问级六维权重覆盖（规则页滑杆接真 policy，2026-08-25）：profile_json.weights，
+    // 经 normalizeWeights 校验归一；非法配置静默回落基线（不阻断推荐）。
+    weights: normalizeWeights(c.weights ?? null).weights ?? undefined,
     historical_texts: hist.map((h) => h.text),
     watched_count: watched, accepted_count: accepted,
     outcomes_avg: avg, feedback_projects: feedbackProjects,
@@ -63,8 +66,9 @@ export function buildCtx(db, consultant_id, snapshot) {
   };
 }
 
-/** 自动轮次最小冻结间隔（方案 A，db-growth-governance-proposal）：快照未变时不重复全量冻结。 */
+/** 自动轮次最小冻结间隔（方案 A，db-growth-governance-proposal）：输入未变时不重复全量冻结。 */
 const THROTTLE_MS = Number(process.env.BRAINX_RECOMMEND_THROTTLE_MS || 2 * 3600 * 1000);
+const SKIP_AUDIT_MS = Number(process.env.BRAINX_SKIP_AUDIT_MS || 60 * 60 * 1000);
 
 /**
  * 生成一轮推荐。硬约束：最近同步 complete=0 → blocked，不落推荐。
@@ -73,7 +77,9 @@ const THROTTLE_MS = Number(process.env.BRAINX_RECOMMEND_THROTTLE_MS || 2 * 3600 
  * 返回 { run_id, blocked, items[] }；dry_run 不落库。
  */
 export function recommend(db, consultant_id, { top = 20, dry_run = false, throttle = false } = {}) {
-  const last = latestSync(db, consultant_id);
+  // 阻断判定只看真实同步（2026-08-25）：bridge-error 观测行不参与 fail-closed，
+  // 上游限流期间用最后完整快照继续推荐，并以 sync_warning 暴露降级状态。
+  const last = latestRealSync(db, consultant_id);
   const snapshot = latestCompleteSnapshot(db, consultant_id);
   if (!snapshot) {
     return { blocked: true, reason: '无完整快照，先同步', items: [], run_id: null };
@@ -82,21 +88,39 @@ export function recommend(db, consultant_id, { top = 20, dry_run = false, thrott
     return { blocked: true, reason: '本次同步不完整，暂不生成正式推荐',
              sync: last, snapshot_id: snapshot.sync_id, items: [], run_id: null };
   }
+  const bridgeErr = latestBridgeError(db, consultant_id, last.completed_at || '');
+  const sync_warning = bridgeErr ? {
+    at: bridgeErr.started_at,
+    message: (JSON.parse(bridgeErr.errors || '[]')[0] || '职位源同步失败').slice(0, 120),
+    last_complete_at: snapshot.completed_at || null,
+  } : null;
 
-  // 方案 A 节流（2026-08-24）：修正前 bridge 每 180s 无条件全量冻结，
-  // recommendations 5 天膨胀 166 万行、磁盘 ~0.6G/天。跳过轮记 SKIPPED_UNCHANGED——
-  // latestRun/autopush/导出只认 COMPLETED，不受影响；retention 定期清理。
+  // 方案 A 节流（2026-08-24）：sync_id 每次同步都会变化，不能用它判断
+  // 数据是否变化；必须比较 sync_runs.input_hash。旧实现比较 snapshot_id，导致
+  // bridge 每 180s 对相同输入仍全量冻结，5 天产生 166 万 recommendations。
   if (throttle && !dry_run) {
-    const lastRun = db.prepare(`SELECT run_id, snapshot_id, created_at FROM decision_runs
-      WHERE consultant_id=? AND status='COMPLETED' ORDER BY created_at DESC LIMIT 1`).get(consultant_id);
-    if (lastRun && lastRun.snapshot_id === snapshot.sync_id
+    const currentHash = db.prepare('SELECT input_hash FROM sync_runs WHERE sync_id=?')
+      .get(snapshot.sync_id)?.input_hash;
+    const lastRun = db.prepare(`SELECT dr.run_id, dr.snapshot_id, dr.created_at, sr.input_hash
+      FROM decision_runs dr
+      LEFT JOIN sync_runs sr ON sr.sync_id=dr.snapshot_id
+      WHERE dr.consultant_id=? AND dr.status='COMPLETED'
+      ORDER BY dr.created_at DESC LIMIT 1`).get(consultant_id);
+    if (lastRun && currentHash && lastRun.input_hash === currentHash
         && Date.parse(now()) - Date.parse(lastRun.created_at) < THROTTLE_MS) {
-      db.prepare(`INSERT INTO decision_runs
-        (run_id, consultant_id, snapshot_id, policy_version, candidate_count, status, created_at)
-        VALUES (?,?,?,?,?,?,?)`)
-        .run(uuid(), consultant_id, snapshot.sync_id, POLICY_VERSION, 0, 'SKIPPED_UNCHANGED', now());
+      // A 3-minute bridge used to create 480 skip rows/person/day.  Keep at most
+      // one audit marker per hour; the returned result still reports every skip.
+      const lastAudit = db.prepare(`SELECT created_at FROM decision_runs
+        WHERE consultant_id=? AND status='SKIPPED_UNCHANGED'
+        ORDER BY created_at DESC LIMIT 1`).get(consultant_id);
+      if (!lastAudit || Date.parse(now()) - Date.parse(lastAudit.created_at) >= SKIP_AUDIT_MS) {
+        db.prepare(`INSERT INTO decision_runs
+          (run_id, consultant_id, snapshot_id, policy_version, candidate_count, status, created_at)
+          VALUES (?,?,?,?,?,?,?)`)
+          .run(uuid(), consultant_id, snapshot.sync_id, POLICY_VERSION, 0, 'SKIPPED_UNCHANGED', now());
+      }
       return { skipped: true, reason: '快照未变化且距上轮不足 2h，复用上轮', blocked: false,
-               run_id: lastRun.run_id, items: null, generated_at: now() };
+               run_id: lastRun.run_id, items: null, sync_warning, generated_at: now() };
     }
   }
 
@@ -158,6 +182,7 @@ export function recommend(db, consultant_id, { top = 20, dry_run = false, thrott
     run_id, blocked: false, snapshot_id: snapshot.sync_id, policy_version: POLICY_VERSION,
     input_stats: { candidates: jobs.length, after_hard_filter: evaluated.length, blocked: blockedCount },
     items: evaluated.slice(0, top).map(publicRec),
+    sync_warning, // 降级信号（非阻断）：上游失败时告诉下游「数据在变老」
     generated_at: now(),
   };
 }

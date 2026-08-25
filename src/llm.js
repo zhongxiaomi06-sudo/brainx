@@ -35,8 +35,10 @@ export const LLM_EXTRA_BODY = (() => {
   catch { return {}; }
 })();
 
-/** 是否配置了可用的 LLM（三要素齐且有 key）。 */
+/** 是否配置了可用的 LLM（三要素齐且有 key）。
+ * BRAINX_LLM_DISABLE=1 运行时硬关（测试隔离：本地 .env 配了 key 也能验证规则回退路径）。 */
 export function isLlmConfigured() {
+  if (process.env.BRAINX_LLM_DISABLE === '1') return false;
   return !!(LLM_BASE_URL && LLM_API_KEY && LLM_MODEL);
 }
 

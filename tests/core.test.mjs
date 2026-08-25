@@ -190,7 +190,7 @@ test('结果反馈：关联推荐 + 幂等', () => {
   assert.equal(dup.already, true);
 });
 
-test('推送卡片：结构合法 + 三段信号 + 深链；同 run 重复推 SKIPPED', () => {
+test('推送卡片：结构合法 + 三段信号 + 深链；同 run 重复推 SKIPPED', async () => {
   const run = latestRun(db, CID);
   const c = commitmentSummary(db, CID);
   const card = buildDailyCard({ consultant_name: 'Felix 黄鑫', run: run.run,
@@ -201,17 +201,17 @@ test('推送卡片：结构合法 + 三段信号 + 深链；同 run 重复推 SK
   const text = JSON.stringify(card);
   assert.match(text, /Fit /);
   assert.match(text, /127\.0\.0\.1:\d+\/\?open=opportunity:/);
-  const r1 = pushCard(db, { consultant_id: CID, kind: 'DAILY_TOP3', run_id: run.run.run_id,
+  const r1 = await pushCard(db, { consultant_id: CID, kind: 'DAILY_TOP3', run_id: run.run.run_id,
                             card, target: 'oc_test', send: false });
   assert.equal(r1.status, 'PREVIEW');
-  const r2 = pushCard(db, { consultant_id: CID, kind: 'DAILY_TOP3', run_id: run.run.run_id,
+  const r2 = await pushCard(db, { consultant_id: CID, kind: 'DAILY_TOP3', run_id: run.run.run_id,
                             card, target: 'oc_test', send: false });
   assert.equal(r2.status, 'SKIPPED_DUPLICATE');
   const n = db.prepare(`SELECT COUNT(*) n FROM push_log WHERE consultant_id=? AND kind='DAILY_TOP3'`).get(CID).n;
   assert.equal(n, 1); // 同 run 永远只有一条成功记录
 });
 
-test('推送：FAILED 行可重发——更新同一 push_id，不新增行', () => {
+test('推送：FAILED 行可重发——更新同一 push_id，不新增行', async () => {
   const run = latestRun(db, CID);
   // 不同 kind 避免与上一用例的 DAILY_TOP3 成功行冲突
   const kind = 'HEATING_ALERT';
@@ -219,7 +219,7 @@ test('推送：FAILED 行可重发——更新同一 push_id，不新增行', ()
   // 手工落一条 FAILED 行（模拟上次发送失败）
   db.prepare(`INSERT INTO push_log (push_id, consultant_id, kind, run_id, card_json, target, status, created_at)
     VALUES ('pid-failed-1', ?, ?, ?, '{}', 'ou_x', 'FAILED', ?)`).run(CID, kind, rid, new Date().toISOString());
-  const r = pushCard(db, { consultant_id: CID, kind, run_id: rid, card: { retry: true }, target: 'ou_x', send: false });
+  const r = await pushCard(db, { consultant_id: CID, kind, run_id: rid, card: { retry: true }, target: 'ou_x', send: false });
   assert.equal(r.push_id, 'pid-failed-1'); // 同一行
   assert.equal(r.status, 'PREVIEW');         // 已被重发结果覆盖
   const row = db.prepare(`SELECT status, card_json FROM push_log WHERE push_id='pid-failed-1'`).get();

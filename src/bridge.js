@@ -218,24 +218,46 @@ export async function bridgeOnce(db, { consultant_ids, execImpl = lark, api = { 
     }
   }
 
-  // 1.5) TTC 系统职位（真 project_id/HC/Pipeline）：每人用自己的托管 JWT 取权限视图，
-  // 合并去重为团队池。has_permission=false 的行（脱敏视图）不采。未托管者跳过不阻断；
+  // 1.5) TTC 系统职位（真 project_id/HC/Pipeline）：托管 JWT 取权限视图，合并为团队池。
+  // has_permission=false 的行（脱敏视图）不采。未托管者跳过不阻断；
   // 凭据失效 → markTtcReauth（前端胶囊提示重连），不阻断他人。
+  //
+  // 限流根治（2026-08-25，-90429 复盘）：旧实现每 tick 对 6 个 JWT 各全量分页
+  // （每页 10 条、903 职位 ≈ 91 页/JWT）→ 单 tick ~546 请求、180s 一轮 ≈ 180 req/min，
+  // 与 reloop/York worker 同租户叠加直接打爆配额。改为：
+  //   ① 单顾问轮询：每 tick 只拉一个 JWT（游标轮转），请求量降 6 倍，
+  //      团队池全量覆盖周期 = 6 tick ≈ 18min（单视角边缘职位延迟可接受；
+  //      runSync 只 UPSERT 不删除，其他顾问视角的职位不会因本轮未拉而丢失）；
+  //   ② 分页节流 120ms/页：单顾问全量从秒级连发摊到 ~11s；
+  //   ③ 限流 fail-fast：命中 -90429 立即放弃本轮（共享租户配额，其余 JWT 打也是白打），
+  //      不再每 tick 保证制造 6 次失败—— outage 期间我方压力再降 6 倍，恢复更快。
+  const TTC_PAGE_PACE_MS = Number(process.env.BRAINX_TTC_PAGE_PACE_MS || 120);
+  const isRateLimited = (e) => e instanceof TtcApiError
+    && (e.code === -90429 || String(e.message).includes('-90429') || String(e.message).includes('服务繁忙'));
   if (api) {
     const union = new Map();
     const ttcErrs = [];
-    for (const cid of cids) {
+    const withJwt = cids.filter((cid) => getValidTtcJwt(db, cid));
+    if (withJwt.length) {
+      const rrKey = 'ttc_rr';
+      const prevRr = db.prepare('SELECT checkpoint FROM bridge_cursor WHERE source=?').get(rrKey);
+      const rrIdx = prevRr ? Number(prevRr.checkpoint) || 0 : 0;
+      const cid = withJwt[rrIdx % withJwt.length];
       const jwt = getValidTtcJwt(db, cid);
-      if (!jwt) continue;
       try {
-        const jobs = await searchAll(jwt, {}, fetchImpl);
+        const jobs = await searchAll(jwt, {}, fetchImpl, { paceMs: TTC_PAGE_PACE_MS });
         for (const j of jobs) {
           if (!j.unique_id || j.has_permission === false) continue;
           if (!union.has(j.unique_id)) union.set(j.unique_id, toJobRow(j));
         }
+        // 成功才推进轮转（失败下一轮还试同一个，避免失败顾问被跳过）
+        db.prepare(`INSERT INTO bridge_cursor (source, checkpoint, updated_at) VALUES (?,?,?)
+          ON CONFLICT(source) DO UPDATE SET checkpoint=excluded.checkpoint, updated_at=excluded.updated_at`)
+          .run(rrKey, String((rrIdx + 1) % withJwt.length), now());
       } catch (e) {
         if (e instanceof TtcApiError && e.authInvalid) markTtcReauth(db, cid);
         ttcErrs.push(`${cid}:${String(e.message).slice(0, 60)}`);
+        if (isRateLimited(e)) ttcErrs.push('限流 fail-fast：本轮放弃其余顾问');
       }
     }
     if (union.size) {

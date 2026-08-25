@@ -82,6 +82,44 @@ test('bridgeOnce：TTC 段按人拉取合并入池；无凭据者跳过；失效
   assert.ok(db.prepare(`SELECT COUNT(*) n FROM job_facts WHERE project_id IN ('JRW5YJJ','JX2')`).get().n === 2);
 });
 
+test('bridgeOnce：TTC 限流根治——单顾问轮询 + 命中 -90429 fail-fast（2026-08-25）', async () => {
+  const mkJwt = (nick) => { const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+    return `${b64({ alg: 'HS256' })}.${b64({ exp: Math.floor(Date.now() / 1000) + 86400, CustomData: { nick_name: nick } })}.sig`; };
+  saveTtcToken(db, 'otto', mkJwt('otto'), validateJwt(mkJwt('otto')));
+  saveTtcToken(db, 'wendy', mkJwt('wendy'), validateJwt(mkJwt('wendy')));
+  const okFetch = async (url) => {
+    if (String(url).includes('job/search')) {
+      return new Response(JSON.stringify({ code: 0, data: { jobs: [TTC_JOB], has_more: false } }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    throw new Error('unexpected ' + url);
+  };
+  const larkStub = () => ({ data: { fields: [], data: [], record_id_list: [] } });
+  db.prepare('DELETE FROM bridge_cursor WHERE source=?').run('ttc_rr');
+  // 轮询：第 1 tick 拉第 1 个有凭据者，第 2 tick 换下一个（游标轮转）
+  await bridgeOnce(db, { consultant_ids: ['otto', 'wendy'], execImpl: larkStub, api: { fetchImpl: okFetch } });
+  assert.equal(db.prepare('SELECT checkpoint FROM bridge_cursor WHERE source=?').get('ttc_rr').checkpoint, '1');
+  await bridgeOnce(db, { consultant_ids: ['otto', 'wendy'], execImpl: larkStub, api: { fetchImpl: okFetch } });
+  assert.equal(db.prepare('SELECT checkpoint FROM bridge_cursor WHERE source=?').get('ttc_rr').checkpoint, '0');
+  // fail-fast：命中 -90429 本轮只发起 1 次尝试（旧实现 6 JWT 各失败一次）
+  let attempts = 0;
+  const limitedFetch = async (url) => {
+    if (String(url).includes('job/search')) {
+      attempts++;
+      return new Response(JSON.stringify({ code: -90429, msg: '服务繁忙，请稍后重试' }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    throw new Error('unexpected ' + url);
+  };
+  db.prepare('DELETE FROM bridge_cursor WHERE source=?').run('ttc_rr');
+  const out = await bridgeOnce(db, { consultant_ids: ['otto', 'wendy'], execImpl: larkStub, api: { fetchImpl: limitedFetch } });
+  assert.equal(attempts, 1, '限流时本轮只允许 1 次尝试');
+  assert.match(out.errors.join('|'), /fail-fast/);
+  // 失败不推进轮转（行不存在或仍为 '0'，下一轮还试同一顾问）
+  const rrAfter = db.prepare('SELECT checkpoint FROM bridge_cursor WHERE source=?').get('ttc_rr');
+  assert.ok(!rrAfter || rrAfter.checkpoint === '0');
+});
+
 test('remap：规范化/确定映射/歧义/事务执行', () => {
   assert.equal(normalizeCompany('天壹紫腾资产管理（宁波）有限公司'), '天壹紫腾资产管理');
   // 造数据：旧占位行 + 真 ID 行（用非 P-FIX- 前缀避免 splitFixtureJob 重算）

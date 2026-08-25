@@ -81,6 +81,29 @@ const chatTs = (s) => {
   return Date.parse(minute.replace(' ', 'T') + ':00+08:00');
 };
 
+/** 顾问级权重覆盖校验与归一化（2026-08-25：规则页滑杆接真 policy）。
+ * 接受 { direction, activity, similarity, capacity, outcomes, exploration } 的子集，
+ * 值域 0–100（百分比）或 0–1（小数）；未给的维沿用 WEIGHTS 基线；最终归一化和为 1。
+ * 返回 { ok, weights?, error? }——全零/负值/未知维度/非对象均拒绝。 */
+export function normalizeWeights(input) {
+  if (input == null) return { ok: true, weights: null }; // 未覆盖 → 用基线
+  if (typeof input !== 'object' || Array.isArray(input)) return { ok: false, error: 'weights 必须是对象' };
+  const out = { ...WEIGHTS };
+  let touched = false;
+  for (const [k, v] of Object.entries(input)) {
+    if (!(k in WEIGHTS)) return { ok: false, error: `未知维度 ${k}（可选：${Object.keys(WEIGHTS).join('/')}）` };
+    const n = Number(v);
+    if (!Number.isFinite(n) || n < 0) return { ok: false, error: `维度 ${k} 权重必须是非负数字` };
+    out[k] = n > 1 ? n / 100 : n;
+    touched = true;
+  }
+  if (!touched) return { ok: true, weights: null };
+  const sum = Object.values(out).reduce((a, b) => a + b, 0);
+  if (sum <= 0) return { ok: false, error: '六维权重不能全为 0' };
+  for (const k of Object.keys(out)) out[k] = Math.round((out[k] / sum) * 1000) / 1000;
+  return { ok: true, weights: out };
+}
+
 /** 探索位：确定性 md5 排序，当日该顾问的后 10% 职位得探索分 100，其余 50。 */
 export function explorationScore(project_id, consultant_id, dayIso) {
   const h = createHash('md5').update(`${project_id}|${dayIso.slice(0, 10)}|${consultant_id}`).digest('hex');
@@ -181,14 +204,16 @@ export function scoreJob(job, relation, ctx) {
   // 探索 10%：确定性
   dims.exploration = explorationScore(job.project_id, ctx.consultant_id, ctx.now);
 
-  const available = Object.entries(WEIGHTS).filter(([k]) => dims[k] != null);
+  // 顾问级权重覆盖（ctx.weights，经 normalizeWeights 归一）优先于全局基线
+  const weights = ctx.weights || WEIGHTS;
+  const available = Object.entries(weights).filter(([k]) => dims[k] != null);
   const coverage = available.reduce((s, [, w]) => s + w, 0);
   const score = available.reduce((s, [k, w]) => s + dims[k] * w, 0) / (coverage || 1);
 
   return {
     score: Math.round(score * 10) / 10,
     coverage: Math.round(coverage * 100) / 100,
-    breakdown: Object.entries(WEIGHTS).map(([k, w]) => ({ dim: k, label: DIM_LABELS[k], weight: w,
+    breakdown: Object.entries(weights).map(([k, w]) => ({ dim: k, label: DIM_LABELS[k], weight: w,
       score: dims[k], weighted_score: dims[k] == null ? null : Math.round(dims[k] * w * 100) / 100,
       status: dims[k] == null ? 'missing' : 'available' })),
   };

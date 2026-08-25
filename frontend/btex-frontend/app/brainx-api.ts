@@ -140,7 +140,7 @@ export type BackendReplay = {
   job_now?: { company?: string; role?: string; active_state?: string; note?: string } | null;
   events: BackendEvent[]; outcomes: BackendOutcome[];
 };
-export type BackendProfile = { consultant_id: string; display_name: string; profile_keywords: string[]; profile_note: string; feishu_auth?: { authorized?: boolean; needs_reauth?: boolean } };
+export type BackendProfile = { consultant_id: string; display_name: string; profile_keywords: string[]; profile_note: string; weights?: Record<string, number> | null; feishu_auth?: { authorized?: boolean; needs_reauth?: boolean } };
 export type BackendRadarRow = BackendJob & { engagement_state?: EngagementState; cockpit?: { membership_status?: string | null; current_stage?: string | null; stage_confidence?: string | null; pipeline_snapshot?: string | null; next_action?: string | null; cockpit_as_of?: string | null; completeness?: string | null; source_url?: string | null } | null };
 export type BackendClientRow = { company: string; company_type?: string | null; job_count?: number; active_jobs?: number; hc_known?: number | null; last_activity?: string | null; relations?: string[]; states?: string[] };
 export type BackendDismissReasons = { items: string[] };
@@ -154,7 +154,7 @@ export type BackendFeedbackResponse = { ok: boolean; already?: boolean; feedback
 export type BackendOutcomeResponse = { ok: boolean; already?: boolean; outcome_id?: string | number };
 export type BackendProgressResponse = { ok: boolean; already?: boolean; state?: EngagementState; active_action?: BackendCommitmentAction; incorporated_into_next_decision?: boolean; backfilled?: boolean };
 export type BackendMembershipResponse = { ok: boolean; already?: boolean; relation: "MY_JOB"|"TEAM_SHARED"; legal_actions: EngagementCommand[]; recompute?: { blocked?: boolean; reason?: string } };
-export type BackendProfileUpdate = { ok: boolean; consultant_id: string; profile_keywords?: string[]; profile_note?: string };
+export type BackendProfileUpdate = { ok: boolean; consultant_id: string; profile_keywords?: string[]; profile_note?: string; weights?: Record<string, number> | null; weights_effective?: string | Record<string, number> };
 export type AssistantMessage = { role: "user" | "assistant"; content: string };
 export type AssistantContext = { page: string; opportunity_id?: string | null };
 export type AssistantChatOptions = { question: string; history: AssistantMessage[]; context: AssistantContext; api_key?: string; signal?: AbortSignal };
@@ -348,6 +348,9 @@ export function mapRecommendation(rec: BackendRecommendation): BrainxJob {
     globalScore: breakdownDim(rec.breakdown, "activity"),
     explorationScore: breakdownDim(rec.breakdown, "exploration"),
     personalScore: breakdownDim(rec.breakdown, "direction"),
+    // 完整六维（2026-08-25：披露层修正——三层只是其中三维的别名，其余三维不再隐形）
+    scoreBreakdown: (rec.breakdown || []).map((b) => ({ dim: b.dim, label: b.label || b.dim,
+      weight: b.weight, score: b.score, status: b.status || (b.score == null ? "missing" : "available") })),
     finalScore: rec.score,
     evidenceCoverage: coveragePct,
     recommendation: rec.reasons[0] || rec.risks[0] || BACKEND_ACTION_LABELS[rec.action] || rec.action,

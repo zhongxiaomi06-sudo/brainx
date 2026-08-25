@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { now } from './db.js';
+import { normalizeWeights } from './scorer.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -52,8 +53,10 @@ export function findByOpenId(db, open_id) {
 }
 
 /** 顾问档案自维护（2026-08-11）：只许改自己的方向画像。下一轮 recommend 即生效
- * （buildCtx 每轮实时读 consultants 表）。 */
-export function updateProfile(db, consultant_id, { profile_keywords, profile_note } = {}) {
+ * （buildCtx 每轮实时读 consultants 表）。
+ * 2026-08-25：接受 weights（六维权重覆盖，normalizeWeights 校验归一）；
+ * 修正 profile_json 整体重写会擦掉 capacity_limit 等既有键的问题——改为合并保留。 */
+export function updateProfile(db, consultant_id, { profile_keywords, profile_note, weights } = {}) {
   const cur = withProfile(db.prepare('SELECT * FROM consultants WHERE consultant_id=? AND active=1')
     .get(consultant_id));
   if (!cur) return { ok: false, status: 404, error: '顾问不存在' };
@@ -64,9 +67,25 @@ export function updateProfile(db, consultant_id, { profile_keywords, profile_not
   if (cleaned.some((k) => k.length > 20)) return { ok: false, status: 422, error: '单个关键词最长 20 字' };
   const kws = [...new Set(cleaned)]; // 去重在数量校验之后（21 个相同词也是超限）
   const note = String(profile_note !== undefined ? profile_note : (cur.profile_note || '')).slice(0, 200);
+  let weightsOut = cur.weights; // 未提交则保留原配置
+  if (weights !== undefined) {
+    const v = normalizeWeights(weights);
+    if (!v.ok) return { ok: false, status: 422, error: v.error };
+    weightsOut = v.weights; // null = 恢复基线
+  }
+  // 合并保留既有键（capacity_limit 等），只覆盖本函数负责的三个字段。
+  // withProfile 会把 profile_json 展开并置空，这里重新读原始 JSON 取全量键。
+  const rawJson = db.prepare('SELECT profile_json FROM consultants WHERE consultant_id=?')
+    .get(consultant_id)?.profile_json || '{}';
+  let preserved = {};
+  try { preserved = JSON.parse(rawJson); } catch { /* 脏数据按空处理 */ }
+  for (const k of ['profile_keywords', 'profile_note', 'weights']) delete preserved[k];
+  const merged = { ...preserved, profile_keywords: kws, profile_note: note };
+  if (weightsOut) merged.weights = weightsOut;
   db.prepare('UPDATE consultants SET profile_json=? WHERE consultant_id=?')
-    .run(JSON.stringify({ profile_keywords: kws, profile_note: note }), consultant_id);
-  return { ok: true, consultant_id, profile_keywords: kws, profile_note: note };
+    .run(JSON.stringify(merged), consultant_id);
+  return { ok: true, consultant_id, profile_keywords: kws, profile_note: note,
+           weights: weightsOut || null, weights_effective: weightsOut || 'baseline' };
 }
 
 /** 在线刷新：从群成员列表 upsert（slug = 名字首词小写，felix/mia/york 与历史数据兼容）。 */

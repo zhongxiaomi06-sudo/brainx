@@ -5,6 +5,7 @@ import "./globals.css";
 import "./workbench-layout.css";
 import "./engagement-loop.css";
 import "./workbench-concept.css";
+import "./workbench-next.css";
 
 const mono = Geist_Mono({ variable: "--font-mono", subsets: ["latin"] });
 

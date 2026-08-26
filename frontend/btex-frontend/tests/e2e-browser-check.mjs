@@ -144,7 +144,9 @@ try {
   failedResponses.length = 0;
   assert.equal(await page.title(), "B-tex · 职位决策工作台");
   await assert.doesNotReject(() => page.getByRole("main").waitFor({ state: "visible" }));
-  assert.match(await page.locator("body").innerText(), /演示模式/);
+  const signedOutBody = await page.locator("body").innerText();
+  assert.match(signedOutBody, /登录后查看真实职位/);
+  assert.doesNotMatch(signedOutBody, /39-AI|CurioSea|科漫智能/);
 
   const loginStatus = await page.evaluate(async () => {
     const response = await fetch("/api/v1/session", {
@@ -169,19 +171,23 @@ try {
   assert.equal(workbenchStatus, 200, "登录后工作台 API 必须可用");
 
   const search = page.getByRole("textbox", { name: "搜索职位或公司" });
-  await search.fill("前端链路验证");
-  assert.equal(await search.inputValue(), "前端链路验证");
-  await search.fill("");
+  if (await search.count()) {
+    await search.fill("前端链路验证");
+    assert.equal(await search.inputValue(), "前端链路验证");
+    await search.fill("");
+  } else {
+    await page.getByRole("heading", { name: "还没有可判断的职位" }).waitFor({ state: "visible" });
+  }
 
-  await page.getByRole("button", { name: "职位市场" }).click();
-  await page.getByRole("button", { name: "人才库" }).click();
-  await page.getByText("人才库", { exact: true }).first().waitFor({ state: "visible" });
-  await page.getByRole("button", { name: "数据源" }).click();
+  await page.getByRole("button", { name: "全部职位" }).click();
+  await page.getByRole("button", { name: "客户洞察" }).click();
+  await page.getByRole("heading", { name: "客户洞察" }).waitFor({ state: "visible" });
+  await page.getByRole("button", { name: "连接与数据" }).click();
   await page.getByRole("heading", { name: "TTC 职位系统" }).waitFor({ state: "visible" });
   await page.getByLabel("TTC 凭证（ottin-jwt-token-v2）").waitFor({ state: "visible" });
   assert.match(await page.locator("main").innerText(), /真实职位的权威来源/);
-  await page.getByRole("button", { name: "工作台", exact: true }).click();
-  await page.getByRole("heading", { name: /未接单/ }).waitFor({ state: "visible" });
+  await page.getByRole("button", { name: "今日决策", exact: true }).click();
+  await page.getByRole("heading", { name: /待判断职位|还没有可判断的职位/ }).waitFor({ state: "visible" });
 
   const mobile = await context.newPage();
   await mobile.setViewportSize({ width: 390, height: 844 });

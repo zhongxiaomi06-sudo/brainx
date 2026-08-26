@@ -9,13 +9,13 @@
 | 分组 | 生产组件与状态 |
 |---|---|
 | 基础控件 | 标题、状态标签、抽屉区块、筛选下拉、分段切换 |
-| 业务组件 | 机会列表、精选盘、推荐预览、文件夹、事实编辑、判断规则 |
+| 业务组件 | 今日决策队列、机会列表、精选盘、推荐预览、文件夹、事实编辑、判断规则 |
 | 承接流程 | 接单、进展、阻塞、终局、释放、已承接行动 |
-| 应用外壳 | 完整工作台、正常错误边界、错误降级界面、Dino 游戏 |
+| 应用外壳 | 完整工作台、真实数据入口三态、正常错误边界、错误降级界面、Dino 游戏 |
 
-代码清单核对后，14 个原有可渲染导出均已有 story：`Heading`、`StatusTag`、`DrawerSection`、`FilterSelect`、`DirectGlassSegment`、`DecisionZone`、`PickTray`、`ManualFactSection`、`Rules`、`CommitmentEditor`、`CommitmentLoopPanel`、`DinoRunner`、`ErrorBoundary` 和 `DecisionWorkbench`。错误边界拆出的 `ErrorFallback` 也有独立错误状态，因此当前合计覆盖 15 个组件导出。
+代码清单核对后，所有可渲染生产组件导出均已有 story。除原有基础控件、机会列表、精选盘、事实编辑、规则、承接流程、错误边界与完整工作台外，本轮新增覆盖 `TodayDecisionQueue` 和 `WorkspaceEntry`；后者包含连接中、需要登录和服务不可用三种真实数据入口状态。组件清单测试会以生产导出为准持续检查，不再依赖手工维护数量。
 
-`RootLayout` 与 `Home` 是 Next/Vinext 框架入口，不作为组件重复收录；真实鉴权、SSE、后端联动和路由继续由浏览器前后端链路覆盖。完整工作台 story 固定使用演示降级数据，不连接生产服务。
+`RootLayout` 与 `Home` 是 Next/Vinext 框架入口，不作为组件重复收录；真实鉴权、SSE、后端联动和路由继续由浏览器前后端链路覆盖。完整工作台 story 通过显式 `demo` 属性使用演示数据，正式应用不会在连接失败时静默切换到模拟职位。
 
 ## 使用命令
 

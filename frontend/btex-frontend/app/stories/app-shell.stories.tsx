@@ -12,12 +12,12 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const FullWorkbench: Story = {
-  render: () => <DecisionWorkbench />,
+  render: () => <DecisionWorkbench demo />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.findByRole("main", {}, { timeout: 10_000 })).resolves.toBeInTheDocument();
     await expect(canvas.getByLabelText("主要导航")).toBeInTheDocument();
-    await expect(canvas.getByRole("button", { name: "职位市场" })).toBeInTheDocument();
+    await expect(canvas.getByRole("button", { name: "全部职位" })).toBeInTheDocument();
   },
 };
 

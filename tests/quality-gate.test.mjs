@@ -35,6 +35,37 @@ test("Node 22 测试入口显式启用 TypeScript 类型剥离", () => {
   }
 });
 
+test("根测试入口只扫描活动测试目录，不执行归档副本", () => {
+  const manifest = JSON.parse(
+    readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+  );
+  assert.match(manifest.scripts.test, /--test --test-force-exit "tests\/\*\.test\.mjs"$/);
+  assert.doesNotMatch(manifest.scripts.test, /_archive/);
+});
+
+test("门禁分层执行前端测试，并在构建后验证浏览器链路", () => {
+  const root = new URL("../", import.meta.url);
+  const config = JSON.parse(
+    readFileSync(new URL(".quality-gate/config.json", root), "utf8"),
+  );
+  const frontend = JSON.parse(
+    readFileSync(new URL("frontend/btex-frontend/package.json", root), "utf8"),
+  );
+  assert.doesNotMatch(frontend.scripts.test, /build/);
+  assert.equal(frontend.scripts["test:e2e"], "node tests/e2e-browser-check.mjs");
+  assert.equal(
+    config.profiles.quick.commands.some((item) => item.name === "前端静态与适配测试"),
+    true,
+  );
+  for (const profileName of ["full", "ci"]) {
+    const names = config.profiles[profileName].commands.map((item) => item.name);
+    assert.equal(names.filter((name) => name === "后端与共享逻辑测试").length, 1);
+    assert.equal(names.filter((name) => name === "前端静态与适配测试").length, 1);
+    assert.equal(names.filter((name) => name === "浏览器前后端链路").length, 1);
+    assert(names.indexOf("浏览器前后端链路") > names.indexOf("前端生产构建"));
+  }
+});
+
 test("物理行计数兼容空文件、末尾换行和 CRLF", () => {
   assert.equal(countPhysicalLines(""), 0);
   assert.equal(countPhysicalLines("a"), 1);

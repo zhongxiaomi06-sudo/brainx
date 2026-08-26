@@ -25,7 +25,7 @@
 | CRM 批量导出设计 | [CRM 批量导出提案](crm-batch-export-proposal.md) |
 | 带宽监控与告警 | [带宽告警说明](guard-bandwidth-alert.md) |
 | 网站问题回溯 | [网站完整任务错误点审计](2026-08-17-网站完整任务错误点审计.md) |
-| 代码质量整改或审查规则 | [DeepSeek 审查规则提炼](audits/2026-08-24-deepseek-review-rule-extraction.md)、[上传前完整验证](standards/PRE_PUSH_VERIFICATION.md) |
+| 代码质量整改、门禁或前端测试 | [质量门禁与前端链路测试审计](audits/2026-08-26-quality-gate-frontend-test-audit.md)、[DeepSeek 审查规则提炼](audits/2026-08-24-deepseek-review-rule-extraction.md)、[上传前完整验证](standards/PRE_PUSH_VERIFICATION.md) |
 
 如果任务同时命中多个类型，必须阅读所有对应文档。找不到对应文档时，先检查代码和已有资料；若该主题会形成长期规则或决策，应先建立文档并把它加入本目录。
 
@@ -56,6 +56,7 @@
 - [网站完整任务错误点审计](2026-08-17-网站完整任务错误点审计.md)
 - [状态报告（2026-08-19）](status-report-2026-08-19.md)
 - [DeepSeek 审查规则提炼（2026-08-24）](audits/2026-08-24-deepseek-review-rule-extraction.md)
+- [质量门禁与前端链路测试审计（2026-08-26）](audits/2026-08-26-quality-gate-frontend-test-audit.md)
 
 ## 新文档规则
 

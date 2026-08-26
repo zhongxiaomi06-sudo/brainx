@@ -34,7 +34,7 @@
     "label:export": "node scripts/export-labeling-sheet.mjs",
     "label:import": "node bin/brainx-label-import.mjs",
     "outcome:import": "node bin/brainx-outcome-import.mjs",
-    "test": "node --experimental-strip-types --test --test-force-exit",
+    "test": "node --experimental-strip-types --test --test-force-exit \"tests/*.test.mjs\"",
     "test:quality-gate": "node --test tests/quality-gate.test.mjs",
     "verify:quick": "node scripts/quality-gate.mjs --profile quick",
     "verify": "node scripts/quality-gate.mjs --profile full",

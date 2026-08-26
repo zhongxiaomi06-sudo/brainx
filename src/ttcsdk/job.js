@@ -1,5 +1,6 @@
 /** ttcsdk/job.js — 职位域 API（ATS 真 project_id / HC / Pipeline 的源头）。 */
 import { TtcApiError, ttcRequest } from './http.js';
+import { inspectTtcJob, TTC_FIELD_SCHEMA_VERSION } from '../ttc-field-catalog.js';
 
 /** 职位检索（POST search，单页）。返回该 JWT 持有者权限视图内的职位。 */
 export const search = (jwt, query = {}, fetchImpl) =>
@@ -75,6 +76,7 @@ export async function searchSince(jwt, {
  * status：1=OPEN（实测 tags 新职位/活跃）；0=COOLING；其余 UNKNOWN。
  * relation=null（桥接纪律）——主做归属走 owner_name，由 relations.js 推导。 */
 export function toJobRow(j) {
+  const fieldCheck = inspectTtcJob(j);
   const blurred = j.need_blur === 1 || j.need_blur === true;
   const company = (blurred && j.company_name_for_c) ? j.company_name_for_c : (j.company_name || '');
   const steps = j.pipeline_info?.pipeline_step_count || {};
@@ -95,7 +97,9 @@ export function toJobRow(j) {
     relation: null,
     source_url: `ttc://job/${j.unique_id}`,
     captured_at: j.update_time ? new Date(Number(j.update_time)).toISOString() : undefined,
-    ttc: { company_unique_id: j.company_unique_id, cooperation: j.cooperation || '',
+    ttc: { schema_version: TTC_FIELD_SCHEMA_VERSION, field_errors: fieldCheck.errors,
+           field_warnings: fieldCheck.warnings, pipeline_steps: steps,
+           company_unique_id: j.company_unique_id, cooperation: j.cooperation || '',
            status_tags: j.status_tags || [], group_chat_id: j.group_chat?.id || '',
            participants: (j.participants || []).map((p) => p.name) },
   };

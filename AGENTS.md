@@ -69,6 +69,8 @@
 
 ## 6. 上传（Push）前的强制检查
 
+**main 分支保护（2026-08-26 起，用户明确指令）**：main 只接受 Pull Request 合入，禁止一切直推——包括仓库 owner 通道（分支保护 `allow_force_pushes: false` 管不住 owner，须靠自觉）。所有 Agent 的标准路径：feature 分支 → push 分支 → 创建 PR → 合入 PR；禁止 `git push origin main` 及任何形式的强推。向服务器部署时同样只允许快进已合入 main 的提交。
+
 上传前必须重新确认：
 
 1. 自己仍持有 `logs/agent-work.lock`，且锁中的任务标识属于当前工作。

@@ -2,6 +2,11 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-08-26｜docs(agents): main 只走 PR——禁止 owner 直推与强推
+
+- 改动：AGENTS.md §6 顶部新增 main 分支保护铁律（用户明确指令）：分支保护已设 `allow_force_pushes: false`，但 owner 通道可绕过，所有并行 Agent 会话统一 feature 分支 → PR → 合入流程；部署侧只允许快进已合入 main 的提交。
+- 验证：文档改动，`git diff --check` 通过；规则本身经由 PR 流程合入以示遵循。
+
 ## 2026-08-25｜fix(ci): 兼容 Node 22 加载 TypeScript 测试
 
 - 改动：为根目录与前端测试入口显式启用 Node.js 类型剥离，修复 GitHub Actions 在 Node 22.13.0 下直接导入 `.ts` 测试依赖时报 `ERR_UNKNOWN_FILE_EXTENSION`；新增清单级回归检查，防止兼容参数被误删。

@@ -151,9 +151,55 @@ test('searchSince：update_time 降序提前停 + 限流保住新前缀（2026-0
   const out2 = await searchSince('jwt', { sinceMs }, fetchLimited);
   assert.equal(out2.jobs.length, 3, '新前缀全部保留');
   assert.equal(out2.complete, false);
+  assert.equal(out2.nextCursor, 'c1', '限流后返回下一页游标供下轮续传');
+  let resumedBody;
+  const fetchResumed = async (_url, options) => {
+    resumedBody = JSON.parse(options.body);
+    return new Response(JSON.stringify({ code: 0, data: pages[1] }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+  const resumed = await searchSince('jwt', { sinceMs, initialCursor: out2.nextCursor }, fetchResumed);
+  assert.equal(resumedBody.cursor, 'c1', '续传请求从保存的 cursor 开始');
+  assert.equal(resumed.complete, true);
   // 首页即限流：无前缀可保 → 抛错由上层 fail-fast
   const fetchDead = async () => new Response(JSON.stringify({ code: -90429, msg: '服务繁忙' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   await assert.rejects(() => searchSince('jwt', { sinceMs }, fetchDead));
+});
+
+test('bridgeOnce：首次全量遇限流后按 cursor 续传，不用时间水位跳过旧职位', async () => {
+  const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+  const jwt = `${b64({ alg: 'HS256' })}.${b64({ exp: Math.floor(Date.now() / 1000) + 86400,
+    CustomData: { nick_name: 'Backfill' } })}.sig`;
+  saveTtcToken(db, 'backfill', jwt, validateJwt(jwt));
+  const newer = { ...TTC_JOB, unique_id: 'BF-NEW', update_time: 2000 };
+  const older = { ...TTC_JOB, unique_id: 'BF-OLD', update_time: 1000 };
+  let limited = false;
+  const fetchImpl = async (_url, options) => {
+    const body = JSON.parse(options.body);
+    if (!body.cursor) return new Response(JSON.stringify({ code: 0,
+      data: { jobs: [newer], has_more: true, cursor: 'resume-old' } }),
+    { status: 200, headers: { 'Content-Type': 'application/json' } });
+    if (!limited) {
+      limited = true;
+      return new Response(JSON.stringify({ code: -90429, msg: '服务繁忙' }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    assert.equal(body.cursor, 'resume-old');
+    return new Response(JSON.stringify({ code: 0,
+      data: { jobs: [older], has_more: false, cursor: '' } }),
+    { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+  const larkStub = () => ({ data: { fields: [], data: [], record_id_list: [] } });
+  const first = await bridgeOnce(db, { consultant_ids: ['backfill'], execImpl: larkStub, api: { fetchImpl } });
+  assert.equal(first.sources_ok, 1, '拿到一页即视为有进展，不触发指数退避');
+  assert.equal(db.prepare('SELECT checkpoint FROM bridge_cursor WHERE source=?')
+    .get('ttc_scan_cursor@backfill').checkpoint, 'resume-old');
+  await bridgeOnce(db, { consultant_ids: ['backfill'], execImpl: larkStub, api: { fetchImpl } });
+  assert.equal(db.prepare(`SELECT COUNT(*) n FROM job_facts WHERE project_id IN ('BF-NEW','BF-OLD')`).get().n, 2);
+  assert.equal(db.prepare('SELECT checkpoint FROM bridge_cursor WHERE source=?')
+    .get('ttc_backfill_done@backfill').checkpoint, '1');
+  assert.equal(db.prepare('SELECT checkpoint FROM bridge_cursor WHERE source=?')
+    .get('ttc_scan_cursor@backfill'), undefined, '完成后清理续传游标');
 });
 
 test('remap：规范化/确定映射/歧义/事务执行', () => {

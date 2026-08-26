@@ -32,12 +32,13 @@ export async function searchAll(jwt, query = {}, fetchImpl, { paceMs = 0, maxPag
 
 /** 增量拉取（2026-08-25 限流根治第二阶段）：职位按 update_time 降序返回（实测），
  * 翻到「整页都不新于 sinceMs」即提前停——日常同步从 ~91 页降到 1-3 页。
- * 返回 { jobs, complete }；中途限流时带上已抓到的新前缀返回 complete=false
- * （降序保证前缀是最新数据，可安全入库；sinceMs 不前进，下轮自然补齐）。 */
-export async function searchSince(jwt, { sinceMs = 0, paceMs = 0, maxPages = 100, query = {} } = {}, fetchImpl) {
+ * 返回 { jobs, complete, nextCursor }；中途限流时保住已抓前缀并返回续传 cursor，
+ * 下轮必须从该 cursor 继续，不能只推进时间水位（否则会永久跳过旧页）。 */
+export async function searchSince(jwt, {
+  sinceMs = 0, initialCursor = '', paceMs = 0, maxPages = 100, query = {},
+} = {}, fetchImpl) {
   const out = [];
-  let cursor = '';
-  let complete = true;
+  let cursor = String(initialCursor || '');
   for (let p = 0; p < maxPages; p++) {
     if (p > 0 && paceMs > 0) await sleep(paceMs);
     let d;
@@ -45,7 +46,7 @@ export async function searchSince(jwt, { sinceMs = 0, paceMs = 0, maxPages = 100
       d = await ttcRequest(jwt, 'POST', '/api/crm/v1/job/search',
         { page: 1, ...(cursor ? { cursor } : {}), ...query }, fetchImpl);
     } catch (e) {
-      if (out.length) { complete = false; break; } // 限流/网络中断：保住新前缀
+      if (out.length) break; // 限流/网络中断：保住新前缀和下一页 cursor
       throw e;
     }
     const jobs = d?.jobs || [];
@@ -54,14 +55,16 @@ export async function searchSince(jwt, { sinceMs = 0, paceMs = 0, maxPages = 100
     const fresh = sinceMs > 0 ? jobs.filter((j) => tsOf(j) > sinceMs) : jobs;
     out.push(...fresh);
     // 整页都不新（降序序列 → 后续页更老）→ 提前停；fresh < jobs 说明本页触达水位
-    if (sinceMs > 0 && jobs.length && fresh.length < jobs.length) return { jobs: out, complete: true };
-    if (!d?.has_more) return { jobs: out, complete: true };
+    if (sinceMs > 0 && jobs.length && fresh.length < jobs.length) {
+      return { jobs: out, complete: true, nextCursor: '' };
+    }
+    if (!d?.has_more) return { jobs: out, complete: true, nextCursor: '' };
     const nextCursor = String(d?.cursor || '').trim();
     if (!nextCursor) throw incomplete(`第 ${p + 1} 页声明 has_more，但没有返回 cursor`);
     if (nextCursor === cursor) throw incomplete(`第 ${p + 1} 页 cursor 未前进`);
     cursor = nextCursor;
   }
-  return { jobs: out, complete };
+  return { jobs: out, complete: false, nextCursor: cursor };
 }
 
 /** TTC job → runSync payload 行（2026-08-14 实测字段驱动）。

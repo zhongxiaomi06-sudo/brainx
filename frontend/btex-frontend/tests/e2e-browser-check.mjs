@@ -176,6 +176,10 @@ try {
   await page.getByRole("button", { name: "职位市场" }).click();
   await page.getByRole("button", { name: "人才库" }).click();
   await page.getByText("人才库", { exact: true }).first().waitFor({ state: "visible" });
+  await page.getByRole("button", { name: "数据源" }).click();
+  await page.getByRole("heading", { name: "TTC 职位系统" }).waitFor({ state: "visible" });
+  await page.getByLabel("TTC 凭证（ottin-jwt-token-v2）").waitFor({ state: "visible" });
+  assert.match(await page.locator("main").innerText(), /真实职位的权威来源/);
   await page.getByRole("button", { name: "工作台", exact: true }).click();
   await page.getByRole("heading", { name: /未接单/ }).waitFor({ state: "visible" });
 

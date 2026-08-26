@@ -12,6 +12,7 @@ const workbenchSource = async () => (await Promise.all([
   source("app/workbench-opportunity.tsx"),
   source("app/workbench-pick-tray.tsx"),
   source("app/workbench-radar-data.ts"),
+  source("app/workbench-sources.tsx"),
 ])).join("\n");
 const cssSource = async () => (await Promise.all([
   source("app/globals.css"),
@@ -175,4 +176,16 @@ test("imports cockpit positions into the radar without inventing operational fac
 test("the corrected package has one workbench implementation", async () => {
   const page = await source("app/page.tsx");
   assert.doesNotMatch(page, /PrototypeWorkbench|variant=/);
+});
+
+test("exposes the real TTC job source without persisting its credential in the browser", async () => {
+  const sources = await source("app/workbench-sources.tsx");
+
+  assert.match(sources, /TTC 职位系统/);
+  assert.match(sources, /\/api\/v1\/ttc\/connect/);
+  assert.match(sources, /method: "PUT", body: \{ jwt: token \}/);
+  assert.match(sources, /type="password"/);
+  assert.match(sources, /autoComplete="off"/);
+  assert.doesNotMatch(sources, /localStorage|sessionStorage/);
+  assert.match(sources, /name !== "职位库"/);
 });

@@ -10,13 +10,14 @@ import {
 import { actionLabel, seedAuth, seedNotifications, seedSync, stateLabel, type AuthStatus, type DecisionEvent, type EngagementCommand, type EngagementState, type Notification, type Outcome, type SyncStatus } from "./decision-demo";
 import { FALLBACK_DISMISS_REASONS, brainxFetch, connectSSE, fetchJobDetail, getSnapshot, makeIdempotencyKey, mapReplayData, mapRadarRow, mapClientRow, getRadar, getClients, getTalentSupply, updateWorkbenchPreferences, sendRecommendationFeedback, undoRecommendationFeedback, updateOpportunityMembership, rerunOpenmai, type TalentSupplySnapshot, type BackendConsultants, type BackendEngagementResponse, type BackendOutcomeResponse, type BackendRecommendationRun, type BackendReplay, type BackendSessionStatus, type BrainxReplay, type BrainxSnapshot, type OpenmaiResult, type RadarJob, type RadarClient } from "./brainx-api";
 import { streamAssistant, type AssistantMessage } from "./brainx-assistant-api";
-import { actionSeed, clients, cockpitRadarJobs, decisionGroupMeta, decisionJobs, DEFAULT_FOLDERS, demoRadarJobs, engagementPrerequisite, events, initialEngagement, initialEvents, initialOutcomes, INITIAL_TRAY_IDS, jobs, legalActions, nav, nextState, readSavedWorkbenchState, sourceNames, stateEvent, statusOrder, verificationJobs, type Client, type DecisionAction, type DecisionGroup, type DecisionJob, type Job, type MembershipRelation, type Page, type Panel, type PickFolder, type PositionType, type SourceMode } from "./workbench-model";
+import { actionSeed, clients, cockpitRadarJobs, decisionGroupMeta, decisionJobs, DEFAULT_FOLDERS, demoRadarJobs, engagementPrerequisite, events, initialEngagement, initialEvents, initialOutcomes, INITIAL_TRAY_IDS, jobs, legalActions, nav, nextState, readSavedWorkbenchState, stateEvent, statusOrder, verificationJobs, type Client, type DecisionAction, type DecisionGroup, type DecisionJob, type Job, type MembershipRelation, type Page, type Panel, type PickFolder, type PositionType, type SourceMode } from "./workbench-model";
 import { DirectGlassSegment, DrawerSection, FilterSelect, Heading, StatusTag, type FilterSelectOption } from "./workbench-controls";
 import { ManualFactSection } from "./workbench-facts";
 import { DecisionZone } from "./workbench-opportunity";
 import { PickTray } from "./workbench-pick-tray";
 import { Rules } from "./workbench-rules";
 import { CommitmentLoopPanel } from "./engagement-loop";
+import Sources from "./workbench-sources";
 
 
 export default function DecisionWorkbench(){
@@ -448,33 +449,3 @@ function ClientTable({rows,open}:any){return <div className="table-wrap"><table 
 function ClientDetail({c,onBack,notify}:any){return <><button className="back" onClick={onBack}><ArrowLeft/>返回客户洞察</button><Heading code={`CLIENT / ${c.industry}`} title={c.name} desc={`优先级 ${c.score??"—"} · ${c.state} · 平均反馈 ${c.feedback}`} action={<button className="btn primary" onClick={()=>notify("客户反馈已记录并触发重新判断")}><Plus/>添加客户反馈</button>}/><div className="conclusion"><div className="spark"><Sparkles/></div><div><b>{c.name}当前处于集中招聘窗口期</b><p>近30天新增 {c.active} 个职位，平均反馈时间缩短至 {c.feedback}，建议提高交付优先级。</p></div></div><div className="grid g3">{[["活跃职位",c.active],["总 HC",c.hc??"—"],["历史入职",c.hires??"—"]].map(x=><div className="card card-body" key={x[0]}><span className="eyebrow">{x[0]}</span><div className="score" style={{fontSize:28,marginTop:8}}>{x[1]}</div></div>)}</div><div className="grid g2 section"><section className="card"><div className="card-head"><h2>当前活跃职位</h2><span>{c.active} 个</span></div><JobTable rows={jobs.filter(j=>j.client===c.name).concat(jobs.slice(0,Math.max(0,3-jobs.filter(j=>j.client===c.name).length)))} open={()=>notify("已打开关联职位")}/></section><section className="card"><div className="card-head"><h2>合作判断</h2><span>近6个月</span></div><div className="card-body side-list">{["人才偏好：头部AI商业化经验、团队从0到1","高频淘汰：缺少复杂销售经验","需求变更：近30天 2 次，处于可控范围","合作风险：面试标准近期小幅抬高","建议动作：锁定本周业务负责人面试档期"].map((x,i)=><div className="mini-item" key={x}><span className="num">0{i+1}</span><b>{x}</b></div>)}</div></section></div><section className="card section"><div className="card-head"><h2>客户事件时间线</h2><span>可追溯</span></div><div className="card-body timeline">{events.concat([["06-28","新增职位","新增 AI 解决方案销售，HC 3"],["06-04","需求变化","薪资上限提高 15%"]]).map(e=><div className="event" key={e[0]}><time>{e[0]}</time><i className="event-dot"/><div><b>{e[1]}</b><p>{e[2]}</p></div></div>)}</div></section></>}
 
 function Alerts({setExtraTasks,notify,setDrawer}:any){const alerts=["云帆智能连续7天未反馈","商业化增长经理转化率下降12%","海外增长负责人面试池已拥挤","星河科技进入招聘窗口期","Creator Partnership负责人新增2个HC","棱镜互动近14天需求变更3次","AI解决方案销售参与顾问增至6人","用户增长负责人产生Offer"];const [handled,setHandled]=useState<number[]>([]);const [riskFilter,setRiskFilter]=useState("全部风险等级");const [clientFilter,setClientFilter]=useState("全部客户");return <><Heading code="DYNAMIC ALERTS" title="动态预警" desc="聚合需要人工确认的机会、变化和失活信号。"/><div className="toolbar"><FilterSelect value={riskFilter} onChange={setRiskFilter} ariaLabel="预警风险等级" options={["全部风险等级","高风险","机会"].map(value=>({value,label:value}))}/><FilterSelect value={clientFilter} onChange={setClientFilter} ariaLabel="预警客户筛选" options={[{value:"全部客户",label:"全部客户"},...clients.map(client=>({value:client.name,label:client.name}))]}/></div><section className="card"><div className="actions">{alerts.map((x,i)=><div className="action-row" key={x} style={{opacity:handled.includes(i)?.5:1}}><StatusTag s={i%3===0?"高风险":i%3===1?"关注":"机会"}/><div className="action-main"><b>{x}</b><small>{i%2?"基于近7天业务事件变化":"超过预设阈值，建议今天确认"}</small></div><div className="impact"><strong>{i%3===2?"机会升温":"需人工确认"}</strong>置信度 {88+i}%</div><div className="row-actions"><button className="btn" onClick={()=>setDrawer(x)}>依据</button><button className="btn" onClick={()=>{setExtraTasks((v:string[])=>v.includes(x)?v:[...v,x]);notify("已转为今日任务")}}>转任务</button><button className="icon-btn" onClick={()=>{setHandled([...handled,i]);notify("预警已处理")}}><Check/></button></div></div>)}</div></section></>}
-function TalentBackendCard(){
- type Health={backend:string;connected:boolean;schema:string;degraded:string|null;config?:{host:string;port:number;database:string|null;credentials_present:boolean;ssl:boolean};hint:string};
- const [health,setHealth]=useState<Health|null>(null);
- const [state,setState]=useState<"loading"|"live"|"offline">("loading");
- useEffect(()=>{let alive=true;const ctrl=new AbortController();const t=setTimeout(()=>ctrl.abort(),2500);
-  fetch("/api/v1/talent/health",{signal:ctrl.signal,credentials:"include"})
-   .then(async r=>{if(!r.ok)throw new Error("talent health unavailable");return await r.json() as Health})
-   .then((h:Health)=>{if(alive){setHealth(h);setState("live")}})
-   .catch(()=>{if(alive)setState("offline")})
-   .finally(()=>clearTimeout(t));
-  return ()=>{alive=false;ctrl.abort()};
- },[]);
- const isMysql=health?.backend==="mysql"&&health.connected;
- const badge=state==="offline"?{s:"已就绪",cls:""}:isMysql?{s:"已连接",cls:""}:{s:"内存回退",cls:"warn"};
- return <section className="card talent-backend"><div className="source-head"><div className="source-icon"><Database/></div><span className={`supply-badge ${isMysql?"ok":badge.cls==="warn"?"warn":"risk"}`}>{badge.s}</span></div>
-  <h3>人才库（阿里云 RDS）</h3>
-  {state==="loading"&&<p>正在检测人才库连接…</p>}
-  {state==="offline"&&<><p>人才库读写与供给匹配【代码已就绪】。此预览未连后端 API，填写 <code>.env</code> 的 <code>BRAINX_MYSQL_*</code> 凭据并启动服务后，此处会实时显示真库连接状态。</p>
-   <div className="backend-facts"><div><dt>切库方式</dt><dd>填凭据 → <code>npm run talent:health</code> 自检</dd></div><div><dt>连不通</dt><dd>自动降级内存库（功能不中断）</dd></div></div></>}
-  {state==="live"&&health&&<><p>{health.hint}</p>
-   <div className="backend-facts">
-    <div><dt>当前后端</dt><dd className={isMysql?"":"unknown"}>{isMysql?"MySQL 真库":"内存回退"}</dd></div>
-    <div><dt>连通性</dt><dd className={health.connected?"":"unknown"}>{health.connected?"已连通":"未连通"}</dd></div>
-    <div><dt>建表状态</dt><dd>{health.schema}</dd></div>
-    {health.config&&<div><dt>目标库</dt><dd>{health.config.database||"—"} @ {health.config.host}</dd></div>}
-    {health.degraded&&<div><dt>诊断</dt><dd className="unknown">{health.degraded}</dd></div>}
-   </div></>}
- </section>;
-}
-function Sources({notify}:any){return <><Heading code="DATA SOURCES" title="数据源" desc="演示数据源面板；当前后端没有对应的统一数据源 API，不代表真实外部账号已连接。"/><div className="source-grid"><TalentBackendCard/>{sourceNames.map((n,i)=><section className="card source" key={n}><div className="source-head"><div className="source-icon"><Database/></div><StatusTag s="演示"/></div><h3>{n}</h3><p>演示状态 · 尚未接入 BrainX 数据源接口</p><div className="completeness"><span>数据完整度</span><b>—</b></div><div className="bar"><i style={{width:"0%",background:"var(--orange)"}}/></div><button className="btn" style={{marginTop:14}} onClick={()=>notify("数据源字段查看仍为演示交互，不会写入真实系统")}><Settings2/>查看字段</button></section>)}</div></>}

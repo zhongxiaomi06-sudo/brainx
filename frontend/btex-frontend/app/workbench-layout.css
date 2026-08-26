@@ -294,7 +294,13 @@
 .backend-facts dt{font-size:11px;color:#8a94a0}
 .backend-facts dd{margin:0;font-size:12px;color:#2b3a48}
 .backend-facts dd.unknown{color:#a1323f}
+.ttc-source{border-color:rgba(47,211,167,.35)}
+.ttc-connect-form{display:grid;grid-template-columns:minmax(220px,1fr) auto;gap:8px;align-items:end;margin-top:14px}
+.ttc-connect-form label{grid-column:1 / -1;font-size:11px;color:#5b6470}
+.ttc-connect-form .field{min-width:0;width:100%;background:#fff}
+.ttc-connect-error{margin-top:9px!important;color:#a1323f!important}
 @media(max-width:720px){.backend-facts{grid-template-columns:1fr}}
+@media(max-width:720px){.ttc-connect-form{grid-template-columns:1fr}}
 .rail-toggle{width:36px;height:30px;border:0;border-radius:8px;background:transparent;color:var(--muted);display:grid;place-items:center;cursor:pointer;align-self:flex-start;margin:0 0 2px 6px}.rail-toggle:hover{background:var(--mint-soft);color:var(--mint-ink)}.rail-toggle svg{width:17px;height:17px}
 @media(min-width:721px){
  .btex-app.nav-open:not(.assistant-open){grid-template-columns:220px minmax(0,1fr)}

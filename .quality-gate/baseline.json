@@ -72,7 +72,7 @@
     },
     {
       "path": "frontend/btex-frontend/app/workbench.tsx",
-      "maxLongLines": 55,
+      "maxLongLines": 54,
       "maxLength": 3023,
       "owner": "frontend",
       "reason": "存量工作台组件待拆分和格式化；只能减少，不能恶化",

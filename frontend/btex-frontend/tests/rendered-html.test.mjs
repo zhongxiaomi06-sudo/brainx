@@ -52,6 +52,8 @@ test("uses the reference three-column shell and a single-column opportunity work
   assert.match(workbench, /BrainX 决策工作台/);
   assert.doesNotMatch(workbench, /concept-workspace-menu/);
   assert.doesNotMatch(workbench, /aria-haspopup="menu"/);
+  assert.doesNotMatch(workbench, /aria-label="打开设置"/);
+  assert.match(workbench, /\["rules",\s*"策略设置",\s*Settings2\]/);
   assert.match(css, /grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
   assert.match(workbench, /<Pencil aria-hidden="true"\s*\/>\s*编辑/);
   assert.doesNotMatch(workbench, /修正事实/);

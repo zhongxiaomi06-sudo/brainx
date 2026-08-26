@@ -127,7 +127,7 @@ test('searchSince：update_time 降序提前停 + 限流保住新前缀（2026-0
     unique_id: `${prefix}${i}`, name: 'x', update_time: String(NOW - h * 3600000), has_permission: true }));
   // 3 页假数据：第 1 页全新、第 2 页部分新、第 3 页不应被请求
   const pages = [
-    { jobs: mkJobs('A', [1, 2, 3]), has_more: true, cursor: 'c1' },
+    { jobs: mkJobs('A', [1, 2, 3]), has_more: true, cursor: 1787735275094316 },
     { jobs: mkJobs('B', [5, 30, 40]), has_more: true, cursor: 'c2' },
     { jobs: mkJobs('C', [50, 60, 70]), has_more: false, cursor: 'c3' },
   ];
@@ -151,7 +151,7 @@ test('searchSince：update_time 降序提前停 + 限流保住新前缀（2026-0
   const out2 = await searchSince('jwt', { sinceMs }, fetchLimited);
   assert.equal(out2.jobs.length, 3, '新前缀全部保留');
   assert.equal(out2.complete, false);
-  assert.equal(out2.nextCursor, 'c1', '限流后返回下一页游标供下轮续传');
+  assert.equal(out2.nextCursor, 1787735275094316, '限流后返回数字游标供下轮续传');
   let resumedBody;
   const fetchResumed = async (_url, options) => {
     resumedBody = JSON.parse(options.body);
@@ -159,7 +159,7 @@ test('searchSince：update_time 降序提前停 + 限流保住新前缀（2026-0
       { status: 200, headers: { 'Content-Type': 'application/json' } });
   };
   const resumed = await searchSince('jwt', { sinceMs, initialCursor: out2.nextCursor }, fetchResumed);
-  assert.equal(resumedBody.cursor, 'c1', '续传请求从保存的 cursor 开始');
+  assert.equal(resumedBody.cursor, 1787735275094316, '续传请求保持 TTC 要求的数字 cursor 类型');
   assert.equal(resumed.complete, true);
   // 首页即限流：无前缀可保 → 抛错由上层 fail-fast
   const fetchDead = async () => new Response(JSON.stringify({ code: -90429, msg: '服务繁忙' }), { status: 200, headers: { 'Content-Type': 'application/json' } });

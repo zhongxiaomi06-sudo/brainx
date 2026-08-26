@@ -255,7 +255,8 @@ export async function bridgeOnce(db, { consultant_ids, execImpl = lark, api = { 
       const resume = db.prepare('SELECT checkpoint FROM bridge_cursor WHERE source=?').get(cursorKey);
       const wm = db.prepare('SELECT checkpoint FROM bridge_cursor WHERE source=?').get('ttc_watermark');
       const sinceMs = backfillDone && wm ? Date.parse(wm.checkpoint) || 0 : 0;
-      const initialCursor = resume?.checkpoint || '';
+      const savedCursor = resume?.checkpoint || '';
+      const initialCursor = /^\d+$/.test(savedCursor) ? Number(savedCursor) : savedCursor;
       const putCursor = (source, checkpoint) => db.prepare(`INSERT INTO bridge_cursor
         (source, checkpoint, updated_at) VALUES (?,?,?) ON CONFLICT(source) DO UPDATE SET
         checkpoint=excluded.checkpoint, updated_at=excluded.updated_at`).run(source, checkpoint, now());

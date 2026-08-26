@@ -38,7 +38,8 @@ export async function searchSince(jwt, {
   sinceMs = 0, initialCursor = '', paceMs = 0, maxPages = 100, query = {},
 } = {}, fetchImpl) {
   const out = [];
-  let cursor = String(initialCursor || '');
+  // TTC cursor 是 JSON number；转成 string 后服务端返回 code=-111「参数有误」。
+  let cursor = initialCursor || '';
   for (let p = 0; p < maxPages; p++) {
     if (p > 0 && paceMs > 0) await sleep(paceMs);
     let d;
@@ -59,9 +60,11 @@ export async function searchSince(jwt, {
       return { jobs: out, complete: true, nextCursor: '' };
     }
     if (!d?.has_more) return { jobs: out, complete: true, nextCursor: '' };
-    const nextCursor = String(d?.cursor || '').trim();
-    if (!nextCursor) throw incomplete(`第 ${p + 1} 页声明 has_more，但没有返回 cursor`);
-    if (nextCursor === cursor) throw incomplete(`第 ${p + 1} 页 cursor 未前进`);
+    const nextCursor = d?.cursor;
+    if (nextCursor === undefined || nextCursor === null || nextCursor === '') {
+      throw incomplete(`第 ${p + 1} 页声明 has_more，但没有返回 cursor`);
+    }
+    if (String(nextCursor) === String(cursor)) throw incomplete(`第 ${p + 1} 页 cursor 未前进`);
     cursor = nextCursor;
   }
   return { jobs: out, complete: false, nextCursor: cursor };

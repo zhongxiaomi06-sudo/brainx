@@ -11,11 +11,13 @@ if (typeof document !== "undefined") {
 
 const preview: Preview = {
   decorators: [
-    (Story, context) => (
-      <div className={`concept-shell storybook-surface ${context.parameters.surfaceClass || ""}`}>
-        <Story />
-      </div>
-    ),
+    (Story, context) => context.parameters.bare
+      ? <Story />
+      : (
+          <div className={`concept-shell storybook-surface ${context.parameters.surfaceClass || ""}`}>
+            <Story />
+          </div>
+        ),
   ],
   parameters: {
     layout: "fullscreen",
@@ -32,7 +34,7 @@ const preview: Preview = {
     },
     options: {
       storySort: {
-        order: ["指南", "基础控件", "业务组件", "流程组件"],
+        order: ["指南", "基础控件", "业务组件", "流程组件", "组合场景"],
       },
     },
   },

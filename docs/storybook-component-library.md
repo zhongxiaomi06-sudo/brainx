@@ -11,9 +11,11 @@
 | 基础控件 | 标题、状态标签、抽屉区块、筛选下拉、分段切换 |
 | 业务组件 | 机会列表、精选盘、推荐预览、文件夹、事实编辑、判断规则 |
 | 承接流程 | 接单、进展、阻塞、终局、释放、已承接行动 |
-| 辅助交互 | Dino 游戏 |
+| 应用外壳 | 完整工作台、正常错误边界、错误降级界面、Dino 游戏 |
 
-整页工作台、根布局、错误边界、真实鉴权、SSE、后端联动和路由不属于组件隔离环境，继续由前端静态测试与浏览器前后端链路覆盖。
+代码清单核对后，14 个原有可渲染导出均已有 story：`Heading`、`StatusTag`、`DrawerSection`、`FilterSelect`、`DirectGlassSegment`、`DecisionZone`、`PickTray`、`ManualFactSection`、`Rules`、`CommitmentEditor`、`CommitmentLoopPanel`、`DinoRunner`、`ErrorBoundary` 和 `DecisionWorkbench`。错误边界拆出的 `ErrorFallback` 也有独立错误状态，因此当前合计覆盖 15 个组件导出。
+
+`RootLayout` 与 `Home` 是 Next/Vinext 框架入口，不作为组件重复收录；真实鉴权、SSE、后端联动和路由继续由浏览器前后端链路覆盖。完整工作台 story 固定使用演示降级数据，不连接生产服务。
 
 ## 使用命令
 
@@ -33,6 +35,7 @@
 4. 新的业务组件至少提供默认状态和一个空、异常或边界状态；关键按钮使用 `play` 验证真实交互。
 5. Storybook 使用独立 Vite 配置，不加载 Vinext、React Server Components 或 Cloudflare 部署插件。
 6. 可访问性面板始终启用。现有浅色视觉体系的对比度问题暂记为警告；新增组件不得通过关闭 a11y 插件隐藏问题。
+7. 前端测试会自动扫描生产组件导出；新增组件没有被任何 story 引用时，质量门禁会直接失败。
 
 ## 验证与边界
 

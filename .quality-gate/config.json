@@ -33,6 +33,7 @@
     "frontend/btex-frontend/dist/",
     "frontend/btex-frontend/.next/",
     "frontend/btex-frontend/.wrangler/",
+    "frontend/btex-frontend/storybook-static/",
     "frontend/btex-frontend/reference/"
   ],
   "excludedFiles": [],
@@ -88,6 +89,7 @@
         ".next/**",
         "out/**",
         "build/**",
+        "storybook-static/**",
         "next-env.d.ts"
       ]
     }
@@ -165,11 +167,25 @@
           "timeoutMs": 60000
         },
         {
+          "stage": "功能",
+          "name": "Storybook 组件交互测试",
+          "command": "npm",
+          "args": ["--prefix", "frontend/btex-frontend", "run", "storybook:test"],
+          "timeoutMs": 180000
+        },
+        {
           "stage": "交付",
           "name": "前端生产构建",
           "command": "npm",
           "args": ["run", "build"],
           "timeoutMs": 300000
+        },
+        {
+          "stage": "交付",
+          "name": "Storybook 静态构建",
+          "command": "npm",
+          "args": ["--prefix", "frontend/btex-frontend", "run", "storybook:build"],
+          "timeoutMs": 180000
         },
         {
           "stage": "功能",
@@ -233,11 +249,25 @@
           "timeoutMs": 60000
         },
         {
+          "stage": "功能",
+          "name": "Storybook 组件交互测试",
+          "command": "npm",
+          "args": ["--prefix", "frontend/btex-frontend", "run", "storybook:test"],
+          "timeoutMs": 180000
+        },
+        {
           "stage": "交付",
           "name": "前端生产构建",
           "command": "npm",
           "args": ["run", "build"],
           "timeoutMs": 300000
+        },
+        {
+          "stage": "交付",
+          "name": "Storybook 静态构建",
+          "command": "npm",
+          "args": ["--prefix", "frontend/btex-frontend", "run", "storybook:build"],
+          "timeoutMs": 180000
         },
         {
           "stage": "功能",

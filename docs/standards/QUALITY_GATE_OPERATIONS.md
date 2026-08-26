@@ -46,7 +46,9 @@ verify 和 verify:ci 都是完整门禁，不能用 quick 替代。完整门禁�
 4. 格式与可移植性：混合换行、行尾空白，以及源码、脚本和配置中新增的个人电脑绝对路径。
 5. 依赖：两个 package.json 与 lockfile 一致；生产依赖不存在未处理的高危漏洞。
 6. 静态质量：全部活动 Node.js 文件语法、前端 ESLint 和 TypeScript。
-7. 功能与交付：活动后端测试、前端静态与适配测试、前端生产构建、隔离浏览器前后端链路，以及后端真实监听和健康接口烟雾测试。根测试入口必须限定在 `tests/`，不得递归执行 `_archive/`。
+7. 功能与交付：活动后端测试、前端静态与适配测试、Storybook 组件交互测试、前端与 Storybook 静态构建、隔离浏览器前后端链路，以及后端真实监听和健康接口烟雾测试。根测试入口必须限定在 `tests/`，不得递归执行 `_archive/`。
+
+Storybook 组件测试使用系统 Chrome 验证隔离状态和 `play` 交互；静态构建证明内部目录可交付。现有调色板的对比度债务在 A11y 面板中记为警告，范围和维护规则见[内部 Storybook 组件库](../storybook-component-library.md)。
 
 浏览器链路在生产构建后运行，使用随机回环端口和临时 SQLite，不读取本地 `.env`，并关闭桥接、推送和外部模型。它验证桌面与移动端渲染、开发登录、工作台 API、搜索、导航、静态资源、页面异常、控制台异常和客户端错误上报。测试必须使用断言并以非零退出码报告失败，不能只打印 `PASS/FAIL`。
 
@@ -130,5 +132,6 @@ quality-gate job 使用 Node.js 22.13.0，通过 npm ci 安装两套锁定依赖
 - [多 Agent 协作准则](../../AGENTS.md)
 - [Agent Commit 记录](../AGENT_COMMIT_LOG.md)
 - [质量门禁与前端链路测试审计](../audits/2026-08-26-quality-gate-frontend-test-audit.md)
+- [内部 Storybook 组件库](../storybook-component-library.md)
 - [安全操作手册](../SECURITY.md)
 - [部署编排](../DEPLOYMENT.md)

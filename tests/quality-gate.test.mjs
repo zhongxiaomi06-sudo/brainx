@@ -43,7 +43,7 @@ test("根测试入口只扫描活动测试目录，不执行归档副本", () =>
   assert.doesNotMatch(manifest.scripts.test, /_archive/);
 });
 
-test("门禁分层执行前端测试，并在构建后验证浏览器链路", () => {
+test("门禁分层执行前端、Storybook 与浏览器链路测试", () => {
   const root = new URL("../", import.meta.url);
   const config = JSON.parse(
     readFileSync(new URL(".quality-gate/config.json", root), "utf8"),
@@ -53,6 +53,8 @@ test("门禁分层执行前端测试，并在构建后验证浏览器链路", ()
   );
   assert.doesNotMatch(frontend.scripts.test, /build/);
   assert.equal(frontend.scripts["test:e2e"], "node tests/e2e-browser-check.mjs");
+  assert.match(frontend.scripts["storybook:test"], /vitest --project storybook --run/);
+  assert.match(frontend.scripts["storybook:build"], /storybook build/);
   assert.equal(
     config.profiles.quick.commands.some((item) => item.name === "前端静态与适配测试"),
     true,
@@ -61,7 +63,10 @@ test("门禁分层执行前端测试，并在构建后验证浏览器链路", ()
     const names = config.profiles[profileName].commands.map((item) => item.name);
     assert.equal(names.filter((name) => name === "后端与共享逻辑测试").length, 1);
     assert.equal(names.filter((name) => name === "前端静态与适配测试").length, 1);
+    assert.equal(names.filter((name) => name === "Storybook 组件交互测试").length, 1);
+    assert.equal(names.filter((name) => name === "Storybook 静态构建").length, 1);
     assert.equal(names.filter((name) => name === "浏览器前后端链路").length, 1);
+    assert(names.indexOf("Storybook 静态构建") > names.indexOf("Storybook 组件交互测试"));
     assert(names.indexOf("浏览器前后端链路") > names.indexOf("前端生产构建"));
   }
 });

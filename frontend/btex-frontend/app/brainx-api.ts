@@ -14,6 +14,16 @@ import type {
   CommitmentSnapshot,
   SyncStatus,
 } from "./decision-demo";
+import { brainxFetch } from "./brainx-http.ts";
+
+export { brainxFetch, BrainxApiError } from "./brainx-http.ts";
+export {
+  classifyRadarPositionType, getClients, getRadar, getTtcFieldReport, mapClientRow, mapRadarRow,
+} from "./brainx-radar-api.ts";
+export type {
+  BackendClientRow, BackendRadarRow, RadarClient, RadarFieldCapability, RadarFieldReport, RadarJob, RadarPayload,
+  RadarPositionType,
+} from "./brainx-radar-api.ts";
 
 // —— 与 workbench.tsx 的 DecisionJob 结构一致的映射结果（结构类型，避免循环依赖）——
 export type BrainxDirection = "paid" | "growth" | "marketing";
@@ -80,13 +90,12 @@ export type BrainxReplay = {
   outcomes: Outcome[];
 };
 
-export type BrainxErrorPayload = { error?: { code?: string; message?: string } } & Record<string, unknown>;
-
 type BackendEvidenceRef = { type?: string; ref?: string; excerpt?: string };
 export type BackendBreakdown = { dim: string; label?: string; weight: number; score: number | null; weighted_score?: number | null; status?: "available" | "missing" };
 type BackendJob = {
   project_id: string; company?: string; role?: string; city?: string | null;
-  pipeline?: string | null; hc?: number | null; active_state?: string | null;
+  cities?: string[]; pipeline?: string | null; pipeline_steps?: Record<string, number> | null;
+  owner_name?: string | null; hc?: number | null; active_state?: string | null;
   priority?: string | null; notes?: string | null; company_type?: string | null;
   current_stage?: string | null; pipeline_snapshot?: string | null; next_action?: string | null;
   fact_sources?: Partial<Record<ManualFactField, string>>;
@@ -146,8 +155,6 @@ export type BackendReplay = {
 export type BackendProfile = { consultant_id: string; display_name: string; profile_keywords: string[]; profile_note: string; feishu_auth?: { authorized?: boolean; needs_reauth?: boolean } };
 export type WorkbenchFolder = { id: string; name: string; jobIds: string[] };
 export type WorkbenchPreferences = { tray: string[]; folders: WorkbenchFolder[]; folderMode: boolean; updatedAt?: string | null };
-export type BackendRadarRow = BackendJob & { engagement_state?: EngagementState; cockpit?: { membership_status?: string | null; current_stage?: string | null; stage_confidence?: string | null; pipeline_snapshot?: string | null; next_action?: string | null; cockpit_as_of?: string | null; completeness?: string | null; source_url?: string | null } | null };
-export type BackendClientRow = { company: string; company_type?: string | null; job_count?: number; active_jobs?: number; hc_known?: number | null; last_activity?: string | null; relations?: string[]; states?: string[] };
 export type BackendDismissReasons = { items: string[] };
 export type BackendSessionStatus = { configured: boolean; dev_auth: boolean };
 export type BackendSseEvent = { type?: "hello" | "sync" | "recommend" | "sync_error" | "openmai_result"; message?: string; consultant_id?: string; project_id?: string; status?: string; at?: string };
@@ -160,23 +167,6 @@ export type BackendOutcomeResponse = { ok: boolean; already?: boolean; outcome_i
 export type BackendProgressResponse = { ok: boolean; already?: boolean; state?: EngagementState; active_action?: BackendCommitmentAction; incorporated_into_next_decision?: boolean; backfilled?: boolean };
 export type BackendMembershipResponse = { ok: boolean; already?: boolean; relation: "MY_JOB"|"TEAM_SHARED"; legal_actions: EngagementCommand[]; recompute?: { blocked?: boolean; reason?: string } };
 export type BackendProfileUpdate = { ok: boolean; consultant_id: string; profile_keywords?: string[]; profile_note?: string };
-
-export class BrainxApiError extends Error {
-  status: number;
-  code: string | undefined;
-  payload: BrainxErrorPayload | undefined;
-  kind: "AUTH" | "CONFLICT" | "VALIDATION" | "UNAVAILABLE" | "HTTP";
-  constructor(message: string, status = 0, code?: string, payload?: BrainxErrorPayload) {
-    super(message);
-    this.status = status;
-    this.code = code;
-    this.payload = payload;
-    this.kind = status === 401 || status === 403 ? "AUTH"
-      : status === 409 ? "CONFLICT"
-      : status === 400 || status === 422 ? "VALIDATION"
-      : status >= 500 ? "UNAVAILABLE" : "HTTP";
-  }
-}
 
 // —— 词典（与后端 src/*.js 的枚举对齐，前端仅用于展示标签，不做业务判断）——
 export const RELATION_LABELS: Record<string, string> = {
@@ -448,134 +438,6 @@ export function mapReplayData(r: BackendReplay): BrainxReplay {
   };
 }
 
-// —— 职位雷达 / 客户洞察（GET /api/v1/radar、/api/v1/clients）——
-// 纪律：只呈现事实；后端没有的运营指标（评分/转化/招聘意愿）一律 null/待后端，不补造。
-
-export type RadarPositionType = "技术" | "产品" | "运营" | "算法" | "设计" | "商业化";
-export type RadarJobStatus = "待同步" | "活跃" | "降温" | "已关闭";
-
-export type RadarJob = {
-  id: string;
-  name: string;
-  client: string;
-  industry: string;
-  city: string;
-  pm: string;
-  status: RadarJobStatus;
-  score: number | null;
-  hc: number | null;
-  feedback: string;
-  recommended: number | null;
-  interview: number | null;
-  offer: number | null;
-  reason: string;
-  salary: string;
-  source: "市场信号" | "驾驶舱导入";
-  positionType: RadarPositionType;
-  sourceColumn?: string;
-};
-
-export type RadarClient = {
-  name: string;
-  industry: string;
-  state: string;
-  active: number;
-  hc: number | null;
-  feedback: string;
-  r2i: string;
-  i2o: string;
-  hires: number | null;
-  intent: string;
-  score: number | null;
-  risk: string;
-};
-
-/** 岗位方向分类（与 workbench 的 classifyCockpitRole 同一套规则，供雷达映射用）。 */
-export function classifyRadarPositionType(role: string): RadarPositionType {
-  const value = String(role || "").replace(/\s+/g, " ").trim();
-  if (/设计|UI\s*\/?\s*UX|视觉/i.test(value)) return "设计";
-  if (/算法|大模型|机器学习|深度学习|研究|Research|MLE|VLM|NLP|RAG|LLM/i.test(value)) return "算法";
-  if (/运营|社群|社区|助理|财务|FA\b|KOL/i.test(value)) return "运营";
-  if (/产品(经理|负责人|总监|设计|策略|运营|市场|增长|商业化|&)|\bPM\b|Product/i.test(value)) return "产品";
-  if (/增长|市场|投放|销售|商务|品牌|GTM|售前|招聘|HR|BD|营销|内容|CMO/i.test(value)) return "商业化";
-  if (/工程|研发|开发|前端|后端|全栈|运维|测试|架构|技术|CTO|iOS|Android|Engineer/i.test(value)) return "技术";
-  if (/产品/i.test(value)) return "产品";
-  return "商业化";
-}
-
-function radarStatusOf(activeState: string | null | undefined): RadarJobStatus {
-  if (activeState === "OPEN") return "活跃";
-  if (activeState === "COOLING") return "降温";
-  if (activeState === "CLOSED" || activeState === "COMPLETED") return "已关闭";
-  return "待同步";
-}
-
-/** 后端 /radar 行 → 雷达表格行。 */
-export function mapRadarRow(r: BackendRadarRow): RadarJob {
-  const cockpit = r.cockpit || null;
-  const relationLabel = RELATION_LABELS[r.relation || ""] || r.relation || "团队共享";
-  let reason: string;
-  if (cockpit) {
-    const statusLabel = { PRIMARY_PM: "我主做", PARTICIPANT: "参与", MENTIONED: "被提及", UNCONFIRMED: "待确认" }[cockpit.membership_status || ""] || cockpit.membership_status || "待确认";
-    reason = `驾驶舱 · ${statusLabel} · ${cockpit.current_stage || "阶段待确认"}${cockpit.next_action ? ` · ${cockpit.next_action}` : ""}`;
-  } else if (r.pipeline) {
-    reason = `Pipeline · ${r.pipeline}`;
-  } else {
-    reason = "市场信号 · 待后端同步";
-  }
-  return {
-    id: r.project_id,
-    name: r.role || "未知职位",
-    client: r.company || "未知客户",
-    industry: r.company_type || "未标注业务方向",
-    city: r.city || "待确认",
-    pm: relationLabel,
-    status: radarStatusOf(r.active_state),
-    score: null, // 雷达不做评分展示；评分以后端推荐为准
-    hc: r.hc ?? null, // UNKNOWN 原样为 null，绝不写 0
-    feedback: r.captured_at ? String(r.captured_at).slice(0, 10) : "待接入",
-    recommended: null,
-    interview: null,
-    offer: null,
-    reason,
-    salary: "待同步",
-    source: cockpit ? "驾驶舱导入" : "市场信号",
-    positionType: classifyRadarPositionType(r.role || ""),
-    sourceColumn: cockpit ? "驾驶舱导入" : undefined,
-  };
-}
-
-/** 后端 /clients 行 → 客户洞察行。 */
-export function mapClientRow(c: BackendClientRow): RadarClient {
-  const relations = c.relations || [];
-  const states = c.states || [];
-  let risk = "运营指标待后端接入";
-  if (relations.includes("OTHER_CONSULTANT")) risk = "其他顾问主做";
-  else if (states.includes("COOLING")) risk = "有职位进入冷却期";
-  return {
-    name: c.company,
-    industry: c.company_type || "未标注业务方向",
-    state: (c.active_jobs ?? 0) > 0 ? "有活跃职位" : "无活跃职位",
-    active: c.active_jobs ?? 0,
-    hc: c.hc_known ?? null, // UNKNOWN 原样为 null，绝不写 0
-    feedback: c.last_activity ? String(c.last_activity).slice(0, 10) : "—",
-    r2i: "待后端",
-    i2o: "待后端",
-    hires: null,
-    intent: "待确认",
-    score: null,
-    risk,
-  };
-}
-
-/** 拉取雷达与客户洞察（浏览器端）。 */
-export async function getRadar(): Promise<{ items: BackendRadarRow[] }> {
-  return brainxFetch<{ items: BackendRadarRow[] }>("/api/v1/radar");
-}
-export async function getClients(): Promise<{ items: BackendClientRow[] }> {
-  return brainxFetch<{ items: BackendClientRow[] }>("/api/v1/clients");
-}
-
 export async function getPickTray(cursor?: string): Promise<BackendPickTray> {
   const query = cursor ? `?limit=20&cursor=${encodeURIComponent(cursor)}` : "?limit=20";
   return brainxFetch<BackendPickTray>(`/api/v1/recommendations/pick-tray${query}`);
@@ -628,34 +490,6 @@ export async function updateOpportunityMembership(
   return brainxFetch(`/api/v1/opportunities/${encodeURIComponent(id)}/membership`, {
     method: "PATCH", body: { relation, idempotency_key: idempotencyKey },
   });
-}
-
-// —— HTTP 客户端（浏览器端专用；401 抛 BrainxApiError 由调用方决定回退/登录）——
-// 边界层返回任意 JSON 载荷：形状由各映射函数收敛为强类型，这里保留原样。
-export async function brainxFetch<T = unknown>(
-  path: string,
-  options: { method?: string; body?: unknown } = {},
-): Promise<T> {
-  const method = options.method || "GET";
-  const res = await fetch(path, {
-    method,
-    credentials: "same-origin",
-    headers: options.body !== undefined ? { "Content-Type": "application/json" } : undefined,
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-  });
-  if (res.status === 204) return null as T;
-  let data: T | BrainxErrorPayload | null = null;
-  try { data = await res.json(); } catch { /* 非 JSON 响应体 */ }
-  if (!res.ok) {
-    // 两种错误信封：err() 的 {error:{code,message}} 与领域函数的 {error:"字符串"}（如 engage 409）
-    const raw = (data as BrainxErrorPayload | null)?.error;
-    const message = raw && typeof raw === "object"
-      ? raw.message || `HTTP ${res.status}`
-      : typeof raw === "string" ? raw : `HTTP ${res.status}`;
-    const code = raw && typeof raw === "object" ? raw.code : undefined;
-    throw new BrainxApiError(message, res.status, code, data as BrainxErrorPayload);
-  }
-  return data as T;
 }
 
 // —— 人才供给（旁路，只读展示；后端 GET /opportunities/:id/talent-supply）——

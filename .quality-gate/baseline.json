@@ -72,7 +72,7 @@
     },
     {
       "path": "frontend/btex-frontend/app/workbench.tsx",
-      "maxLongLines": 55,
+      "maxLongLines": 49,
       "maxLength": 3023,
       "owner": "frontend",
       "reason": "存量工作台组件待拆分和格式化；只能减少，不能恶化",
@@ -89,16 +89,16 @@
     },
     {
       "path": "frontend/btex-frontend/app/brainx-api.ts",
-      "maxLines": 816,
+      "maxLines": 650,
       "owner": "frontend",
-      "reason": "存量 API 适配层尚未按领域拆分；只能减少，不能增长",
+      "reason": "已拆出 HTTP 与雷达适配，剩余存量 API 仍须继续按领域拆分；只能减少，不能增长",
       "expiresOn": "2026-10-31"
     },
     {
       "path": "src/server.js",
-      "maxLines": 745,
+      "maxLines": 688,
       "owner": "backend",
-      "reason": "存量路由与启动编排尚未拆分；2026-08-25 登记 +5：浏览器端错误上报路由（client-error.js）与 friendlyBridgeError 降级文案",
+      "reason": "已拆出 TTC 数据源路由，剩余存量路由与启动编排仍须继续拆分；只能减少，不能增长",
       "expiresOn": "2026-10-31"
     }
   ],

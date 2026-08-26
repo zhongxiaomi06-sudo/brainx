@@ -12,11 +12,15 @@ const workbenchSource = async () => (await Promise.all([
   source("app/workbench-opportunity.tsx"),
   source("app/workbench-pick-tray.tsx"),
   source("app/workbench-radar-data.ts"),
+  source("app/workbench-sources.tsx"),
+  source("app/workbench-entry.tsx"),
+  source("app/workbench-today.tsx"),
 ])).join("\n");
 const cssSource = async () => (await Promise.all([
   source("app/globals.css"),
   source("app/workbench-concept.css"),
   source("app/workbench-layout.css"),
+  source("app/workbench-next.css"),
 ])).join("\n");
 
 test("uses the reference three-column shell and a single-column opportunity workspace", async () => {
@@ -28,7 +32,7 @@ test("uses the reference three-column shell and a single-column opportunity work
 
   assert.match(page, /import DecisionWorkbench from "\.\/workbench"/);
   assert.match(workbench, /type DecisionDirection = "paid"\s*\|\s*"growth"\s*\|\s*"marketing"/);
-  assert.match(workbench, /\["today",\s*"工作台",\s*Sparkles\]/);
+  assert.match(workbench, /\["today",\s*"今日决策",\s*Sparkles\]/);
   assert.match(workbench, /精选盘/);
   assert.match(workbench, /function PickTray/);
   assert.match(workbench, /function DecisionZone/);
@@ -36,7 +40,7 @@ test("uses the reference three-column shell and a single-column opportunity work
   assert.match(workbench, /function OpportunityRow/);
   assert.doesNotMatch(workbench, /<div className="pick-card-rail"><div className="pick-card-publish"/);
   assert.match(workbench, /onClick=\{\(\)\s*=>\s*setTab\("market"\)\}/);
-  assert.match(workbench, /title="未接单"/);
+  assert.match(workbench, /title="待判断职位"/);
   assert.match(workbench, /aria-label="精选盘"/);
   assert.match(css, /\.pick-tray/);
   assert.match(css, /grid-template-columns:164px minmax\(640px,1fr\) 356px/);
@@ -45,8 +49,11 @@ test("uses the reference three-column shell and a single-column opportunity work
   assert.match(css, /assistant-open \.assistant-trigger\{display:none\}/);
   assert.match(css, /\.btex-app\.panel-motion-open \.decision-drawer\{filter:none;transition:transform \.30s/);
   assert.match(css, /\.btex-app\.decision-panel-open/);
-  assert.match(workbench, /concept-workspace-menu/);
-  assert.match(workbench, /aria-haspopup="menu"/);
+  assert.match(workbench, /BrainX 决策工作台/);
+  assert.doesNotMatch(workbench, /concept-workspace-menu/);
+  assert.doesNotMatch(workbench, /aria-haspopup="menu"/);
+  assert.doesNotMatch(workbench, /aria-label="打开设置"/);
+  assert.match(workbench, /\["rules",\s*"策略设置",\s*Settings2\]/);
   assert.match(css, /grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
   assert.match(workbench, /<Pencil aria-hidden="true"\s*\/>\s*编辑/);
   assert.doesNotMatch(workbench, /修正事实/);
@@ -69,12 +76,12 @@ test("splits candidates by their live engagement state and keeps verification jo
   assert.match(workbench, /eligibility:\s*"VERIFY_REQUIRED"/);
   assert.match(workbench, /const initialEngagement:\s*Record<string,\s*EngagementState>\s*=\s*\{[^}]*JU87P01:\s*"ACCEPTED"[^}]*JNDLIXO:\s*"ACCEPTED"[^}]*JVS2PHH:\s*"ACCEPTED"/);
   assert.match(workbench, /const acceptedJobs=(?:activeDecisionJobs|jobs)\.filter\(job=>engagement\[job\.id\]==="ACCEPTED"\)/);
-  assert.match(workbench, /const pendingJobs=\[\.\.\.jobs\.filter\(job=>engagement\[job\.id\]!=="ACCEPTED"\),\.\.\.verificationJobs\]/);
-  assert.match(workbench, /const pendingShown=showVerification\?pendingJobs/);
-  assert.match(workbench, /const isContext=activeJobId!==null&&pendingShown\.some/);
+  assert.match(workbench, /const pendingJobs\s*=\s*\[\.\.\.jobs\.filter\(job\s*=>\s*engagement\[job\.id\]\s*!==\s*"ACCEPTED"\),\s*\.\.\.verificationJobs\]/);
+  assert.match(workbench, /const pendingShown\s*=\s*showVerification/);
+  assert.match(workbench, /const isContext\s*=\s*activeJobId\s*!==\s*null\s*&&\s*pendingShown\.some/);
   assert.match(workbench, /isContext=\{isContext\}/);
   assert.match(workbench, /title="已确定"/);
-  assert.match(workbench, /title="未接单"/);
+  assert.match(workbench, /title="待判断职位"/);
   assert.match(workbench, /"剩余 HC"\s*:\s*"UNKNOWN"/);
 });
 
@@ -175,4 +182,16 @@ test("imports cockpit positions into the radar without inventing operational fac
 test("the corrected package has one workbench implementation", async () => {
   const page = await source("app/page.tsx");
   assert.doesNotMatch(page, /PrototypeWorkbench|variant=/);
+});
+
+test("exposes the real TTC job source without persisting its credential in the browser", async () => {
+  const sources = await source("app/workbench-sources.tsx");
+
+  assert.match(sources, /TTC 职位系统/);
+  assert.match(sources, /\/api\/v1\/ttc\/connect/);
+  assert.match(sources, /method: "PUT", body: \{ jwt: token \}/);
+  assert.match(sources, /type="password"/);
+  assert.match(sources, /autoComplete="off"/);
+  assert.doesNotMatch(sources, /localStorage|sessionStorage/);
+  assert.match(sources, /name !== "职位库"/);
 });

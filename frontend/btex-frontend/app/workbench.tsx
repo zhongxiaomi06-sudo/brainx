@@ -8,18 +8,28 @@ import {
   BellRing, CheckCircle2, CircleUserRound, ClipboardCheck, Send, ShieldCheck, SlidersHorizontal, Sparkles, Users, X, Zap,
 } from "lucide-react";
 import { actionLabel, seedAuth, seedNotifications, seedSync, stateLabel, type AuthStatus, type DecisionEvent, type EngagementCommand, type EngagementState, type Notification, type Outcome, type SyncStatus } from "./decision-demo";
-import { FALLBACK_DISMISS_REASONS, brainxFetch, connectSSE, fetchJobDetail, getSnapshot, makeIdempotencyKey, mapReplayData, mapRadarRow, mapClientRow, getRadar, getClients, getTalentSupply, updateWorkbenchPreferences, sendRecommendationFeedback, undoRecommendationFeedback, updateOpportunityMembership, rerunOpenmai, type TalentSupplySnapshot, type BackendConsultants, type BackendEngagementResponse, type BackendOutcomeResponse, type BackendRecommendationRun, type BackendReplay, type BackendSessionStatus, type BrainxReplay, type BrainxSnapshot, type OpenmaiResult, type RadarJob, type RadarClient } from "./brainx-api";
+import {
+  FALLBACK_DISMISS_REASONS, BrainxApiError, brainxFetch, connectSSE, fetchJobDetail,
+  getSnapshot, makeIdempotencyKey, mapReplayData, mapRadarRow, mapClientRow, getRadar,
+  getClients, getTalentSupply, updateWorkbenchPreferences, sendRecommendationFeedback,
+  undoRecommendationFeedback, updateOpportunityMembership, rerunOpenmai,
+  type TalentSupplySnapshot, type BackendConsultants, type BackendEngagementResponse,
+  type BackendOutcomeResponse, type BackendRecommendationRun, type BackendReplay,
+  type BackendSessionStatus, type BrainxReplay, type BrainxSnapshot, type OpenmaiResult,
+  type RadarJob, type RadarClient,
+} from "./brainx-api";
 import { streamAssistant, type AssistantMessage } from "./brainx-assistant-api";
-import { actionSeed, clients, cockpitRadarJobs, decisionGroupMeta, decisionJobs, DEFAULT_FOLDERS, demoRadarJobs, engagementPrerequisite, events, initialEngagement, initialEvents, initialOutcomes, INITIAL_TRAY_IDS, jobs, legalActions, nav, nextState, readSavedWorkbenchState, sourceNames, stateEvent, statusOrder, verificationJobs, type Client, type DecisionAction, type DecisionGroup, type DecisionJob, type Job, type MembershipRelation, type Page, type Panel, type PickFolder, type PositionType, type SourceMode } from "./workbench-model";
+import { actionSeed, clients, cockpitRadarJobs, decisionGroupMeta, decisionJobs, DEFAULT_FOLDERS, demoRadarJobs, engagementPrerequisite, events, initialEngagement, initialEvents, initialOutcomes, INITIAL_TRAY_IDS, jobs, legalActions, nav, nextState, readSavedWorkbenchState, stateEvent, statusOrder, verificationJobs, type Client, type DecisionAction, type DecisionGroup, type DecisionJob, type Job, type MembershipRelation, type Page, type Panel, type PickFolder, type PositionType, type SourceMode } from "./workbench-model";
 import { DirectGlassSegment, DrawerSection, FilterSelect, Heading, StatusTag, type FilterSelectOption } from "./workbench-controls";
 import { ManualFactSection } from "./workbench-facts";
-import { DecisionZone } from "./workbench-opportunity";
-import { PickTray } from "./workbench-pick-tray";
 import { Rules } from "./workbench-rules";
 import { CommitmentLoopPanel } from "./engagement-loop";
+import Sources from "./workbench-sources";
+import { WorkspaceEntry, type WorkspaceEntryKind } from "./workbench-entry";
+import { TodayDecisionQueue } from "./workbench-today";
 
 
-export default function DecisionWorkbench(){
+export default function DecisionWorkbench({demo=false}:{demo?:boolean}={}){
  const [hydrated,setHydrated]=useState(false);
  const [page,setPage]=useState<Page>("today");
  const [query,setQuery]=useState("");
@@ -62,7 +72,8 @@ export default function DecisionWorkbench(){
  const [pendingCommand,setPendingCommand]=useState<{job:DecisionJob;command:EngagementCommand}|null>(null);
  // Brain X 后端连接态：connecting（探测中）→ connected（API 驱动）/ offline（演示模式回退）
  const [brainxMode,setBrainxMode]=useState<"connecting"|"connected"|"offline">("connecting");
- const [workspaceMenuOpen,setWorkspaceMenuOpen]=useState(false);
+ const [workspaceIssue,setWorkspaceIssue]=useState<Exclude<WorkspaceEntryKind,"connecting">|null>(null);
+ const [connectAttempt,setConnectAttempt]=useState(0);
  const [assistantOpen,setAssistantOpen]=useState(false);
  const [assistantMessages,setAssistantMessages]=useState<AssistantMessage[]>([]);
  const [assistantInput,setAssistantInput]=useState("");
@@ -84,9 +95,25 @@ export default function DecisionWorkbench(){
  useEffect(()=>{const savedState=readSavedWorkbenchState();setDone(savedState.done||[]);setSnoozed(savedState.snoozed||[]);setExtraTasks(savedState.extraTasks||[]);setWeights(savedState.weights?.length===3?savedState.weights:[60,25,15]);setDecisionActions(savedState.decisionActions||[]);setMembershipRelations(savedState.membershipRelations||{});setTray(savedState.tray??INITIAL_TRAY_IDS);setFolders(savedState.folders?.length?savedState.folders:DEFAULT_FOLDERS);setFolderMode(!!savedState.folderMode);setEngagement({...initialEngagement,...(savedState.engagement||{})});setDecisionEvents({...initialEvents,...(savedState.events||{})});setOutcomes({...initialOutcomes,...(savedState.outcomes||{})});setSync(savedState.sync||seedSync);setAuth(savedState.auth||seedAuth);setNotifications(savedState.notifications||seedNotifications);setHydrated(true)},[]);
  useEffect(()=>{const update=(event:Event)=>{const detail=(event as CustomEvent<{jobId:string;state:EngagementState}>).detail;if(detail?.jobId&&detail?.state)setEngagement(current=>({...current,[detail.jobId]:detail.state}))};window.addEventListener("brainx:commitment-updated",update);return()=>window.removeEventListener("brainx:commitment-updated",update)},[]);
  useEffect(()=>{if(!hydrated)return;if(brainxMode==="connected"){localStorage.setItem("decision-workbench",JSON.stringify({tray,folders,folderMode,weights,decisionActions,membershipRelations}));void updateWorkbenchPreferences({tray,folders,folderMode}).catch(()=>{});return}localStorage.setItem("decision-workbench",JSON.stringify({done,snoozed,extraTasks,weights,decisionActions,membershipRelations,tray,folders,folderMode,engagement,events:decisionEvents,outcomes,sync,auth,notifications}))},[hydrated,brainxMode,done,snoozed,extraTasks,weights,decisionActions,membershipRelations,tray,folders,folderMode,engagement,decisionEvents,outcomes,sync,auth,notifications]);
- // 后端探测与快照引导：仅浏览器端；成功 → connected（API 驱动），失败 → offline（本地演示回退）。
- // localStorage 仅作演示回退与乐观缓存，连接后端后不写入本地业务状态。
- useEffect(()=>{if(!hydrated)return;let cancelled=false;void(async()=>{try{await brainxFetch<BackendSessionStatus>("/api/v1/oauth/status");const snapshot=await getSnapshot();if(!cancelled)brainxApply.current(snapshot);void loadBrainxSide.current()}catch{if(!cancelled)setBrainxMode("offline")}})();return()=>{cancelled=true}},[hydrated]);
+ // 正式工作台不再把演示数据作为失败回退；演示态只能由 Storybook 显式开启。
+ useEffect(()=>{
+  if(!hydrated)return;
+  if(demo){setWorkspaceIssue(null);setBrainxMode("offline");return}
+  let cancelled=false;
+  setBrainxMode("connecting");
+  setWorkspaceIssue(null);
+  void(async()=>{try{
+   await brainxFetch<BackendSessionStatus>("/api/v1/oauth/status");
+   const snapshot=await getSnapshot();
+   if(!cancelled)brainxApply.current(snapshot);
+   void loadBrainxSide.current();
+  }catch(error){
+   if(cancelled)return;
+   setBrainxMode("offline");
+   setWorkspaceIssue(error instanceof BrainxApiError&&error.kind==="AUTH"?"auth":"unavailable");
+  }})();
+  return()=>{cancelled=true};
+ },[hydrated,demo,connectAttempt]);
  // SSE 实时通知：同步/推荐事件 → 去抖刷新快照并插入提醒；组件卸载关闭连接
  useEffect(()=>{if(brainxMode!=="connected")return;const sub=connectSSE(event=>{if(!event.type||event.type==="hello")return;if(event.type==="openmai_result"){const pid=String((event as {project_id?:string}).project_id||"");setNotifications(current=>[{id:`sse-om-${Date.now()}`,kind:"SYNC_ALERT",title:(event as {status?:string}).status==="done"?"自动找人完成":"自动找人失败",detail:pid,read:false},...current]);if(pid)window.setTimeout(()=>{void fetchJobDetail(pid).then(d=>setOpenmaiByJob(current=>({...current,[pid]:d.openmai}))).catch(()=>{})},600);return}const title=event.type==="sync_error"?"同步异常":event.type==="recommend"?"推荐已更新":"同步完成";setNotifications(current=>[{id:`sse-${Date.now()}`,kind:"SYNC_ALERT",title,detail:String(event.message||""),read:false},...current]);window.setTimeout(()=>{void loadBrainxSnapshot.current().catch(()=>{});void loadBrainxSide.current()},800)});return()=>sub.close()},[brainxMode]);
  const notify=(s:string,opts?:{actions?:{label:string;onClick:()=>void}[];input?:{placeholder:string;onSubmit:(text:string)=>void}},ms?:number)=>{if(toastTimerRef.current){clearTimeout(toastTimerRef.current);toastTimerRef.current=null}setToast({text:s,actions:opts?.actions,input:opts?.input});if(!opts?.input)toastTimerRef.current=setTimeout(()=>{setToast(null);toastTimerRef.current=null},ms??(opts?.actions?.length?6000:2200))};
@@ -97,11 +124,10 @@ export default function DecisionWorkbench(){
  const dismissPanelImmediately=()=>{clearPanelMotion();setPanel(null);setPanelMotion("idle")};
  const openPanel=(next:Panel)=>{if(!next)return;clearPanelMotion();if(panel&&panelMotion==="open"){setPanel(next);return}const animate=typeof window!=="undefined"&&window.matchMedia("(min-width: 961px)").matches;if(panelMotion==="closing"){setPanel(next);setPanelMotion("open");return}setPanel(next);if(!animate){setPanelMotion("open");return}setPanelMotion("entering");panelAnimationFrame.current=window.requestAnimationFrame(()=>{panelAnimationFrame.current=window.requestAnimationFrame(()=>{setPanelMotion("open");panelAnimationFrame.current=null})})};
  const closePanel=()=>{if(!panel)return;clearPanelMotion();const animate=typeof window!=="undefined"&&window.matchMedia("(min-width: 961px)").matches;if(!animate){dismissPanelImmediately();return}setPanelMotion("closing");panelCloseTimer.current=window.setTimeout(()=>{setPanel(null);setPanelMotion("idle");panelCloseTimer.current=null},380)};
- useEffect(()=>{const closeOnEscape=(event:KeyboardEvent)=>{if(event.key!=="Escape")return;closePanel();setPendingCommand(null);setDrawer(null);setDetail(null);setClientDetail(null);setMobileNavOpen(false);setWorkspaceMenuOpen(false)};window.addEventListener("keydown",closeOnEscape);return()=>window.removeEventListener("keydown",closeOnEscape)},[panel,panelMotion]);
+ useEffect(()=>{const closeOnEscape=(event:KeyboardEvent)=>{if(event.key!=="Escape")return;closePanel();setPendingCommand(null);setDrawer(null);setDetail(null);setClientDetail(null);setMobileNavOpen(false)};window.addEventListener("keydown",closeOnEscape);return()=>window.removeEventListener("keydown",closeOnEscape)},[panel,panelMotion]);
  useEffect(()=>()=>clearPanelMotion(),[]);
- const go=(p:Page)=>{setPage(p);setDetail(null);setClientDetail(null);dismissPanelImmediately();setDrawer(null);setMobileNavOpen(false);setWorkspaceMenuOpen(false)};
+ const go=(p:Page)=>{setPage(p);setDetail(null);setClientDetail(null);dismissPanelImmediately();setDrawer(null);setMobileNavOpen(false)};
  useEffect(()=>{try{const saved=localStorage.getItem("brainx-assistant-history");if(saved)setAssistantMessages(JSON.parse(saved))}catch{}},[]);
- useEffect(()=>{const desktop=window.matchMedia("(min-width: 1280px)");const syncAssistantLayout=()=>setAssistantOpen(desktop.matches);syncAssistantLayout();desktop.addEventListener("change",syncAssistantLayout);return()=>desktop.removeEventListener("change",syncAssistantLayout)},[]);
  useEffect(()=>{try{localStorage.setItem("brainx-assistant-history",JSON.stringify(assistantMessages.slice(-40)))}catch{}},[assistantMessages]);
  useEffect(()=>()=>assistantAbort.current?.abort(),[]);
  const sendAssistant=()=>{const question=assistantInput.trim();if(!question||assistantBusy)return;const user:AssistantMessage={role:"user",content:question};const controller=new AbortController();assistantAbort.current=controller;setAssistantInput("");setAssistantBusy(true);setAssistantMessages(current=>[...current,user,{role:"assistant",content:""}]);void streamAssistant({question,history:assistantMessages.slice(-12),context:{page,opportunity_id:selectedDecisionJob?.id||null},signal:controller.signal},text=>setAssistantMessages(current=>{const next=[...current];const last=next.length-1;if(last>=0&&next[last].role==="assistant")next[last]={...next[last],content:next[last].content+text};return next}),message=>setAssistantMessages(current=>{const next=[...current];const last=next.length-1;if(last>=0&&next[last].role==="assistant")next[last]={...next[last],content:message};return next})).catch(error=>{if(error?.name!=="AbortError")setAssistantMessages(current=>{const next=[...current];const last=next.length-1;if(last>=0&&next[last].role==="assistant")next[last]={...next[last],content:`助手暂不可用：${error instanceof Error?error.message:"后端未响应"}`};return next})}).finally(()=>{assistantAbort.current=null;setAssistantBusy(false)})};
@@ -155,29 +181,51 @@ export default function DecisionWorkbench(){
    <div className="rail-spacer"/>
    <button className="rail-alert-trigger" onClick={()=>openPanel({kind:"notifications"})} aria-label="打开通知"><BellRing/>{notifications.filter(note=>!note.read).length>0&&<i>{notifications.filter(note=>!note.read).length}</i>}</button>
    <button className="rail-person identity-trigger" onClick={()=>openPanel({kind:"identity"})} aria-label={`身份：${auth.consultant}`}><CircleUserRound/><span className="rail-person-dot"/></button>
-   <span className="rail-status" title={brainxMode==="connected"?"BrainX 已连接":brainxMode==="connecting"?"连接 BrainX…":"演示模式"}><i className="pulse"/></span>
+   <span className="rail-status" title={brainxMode==="connected"?"BrainX 已连接":brainxMode==="connecting"?"连接 BrainX…":demo?"Storybook 演示数据":"真实数据未连接"}><i className="pulse"/></span>
   </aside>
   <button className="mobile-nav-trigger" onClick={toggleMobileDrawer} aria-label={mobileNavOpen?"收起全部模块":"打开全部模块"} aria-expanded={mobileNavOpen}><Infinity aria-hidden="true"/><span>{mobileNavOpen?"收起模块":"全部模块"}</span></button>
   {mobileNavOpen&&<button className="mobile-nav-backdrop" onClick={()=>closeMobileDrawer()} aria-label="关闭全部模块"/>}
   <main className="main">
    <header className="topbar">
     <div className="concept-workspace-switcher">
-     <button className="concept-workspace-title" type="button" onClick={()=>setWorkspaceMenuOpen(open=>!open)} aria-haspopup="menu" aria-expanded={workspaceMenuOpen}><b>招聘决策工作台</b><ChevronDown aria-hidden="true"/></button>
-     {workspaceMenuOpen&&<div className="concept-workspace-menu" role="menu" aria-label="切换工作区">
-      <button type="button" role="menuitem" className={page==="today"?"active":""} onClick={()=>go("today")}><span>招聘决策工作台</span><small>查看推荐与职位判断</small>{page==="today"&&<Check aria-hidden="true"/>}</button>
-      <button type="button" role="menuitem" className={page==="jobs"?"active":""} onClick={()=>go("jobs")}><span>职位市场</span><small>搜索当前可见职位</small>{page==="jobs"&&<Check aria-hidden="true"/>}</button>
-      <button type="button" role="menuitem" className={page==="clients"?"active":""} onClick={()=>go("clients")}><span>人才库</span><small>查看客户与人才洞察</small>{page==="clients"&&<Check aria-hidden="true"/>}</button>
-     </div>}
+     <div className="concept-workspace-title static-title">
+      <b>BrainX 决策工作台</b><small>真实职位 · 顾问专属</small>
+     </div>
     </div>
     {page==="today"?<><button className="btex-person identity-trigger" onClick={()=>openPanel({kind:"identity"})}><span className="reference-avatar">{auth.consultant.slice(0,1)}</span><span><b>{auth.consultant}</b><small>Consultant</small></span></button><button className={`sync sync-trigger ${auth.needsReauth?"auth_expired":sync.state.toLowerCase()}`} onClick={()=>openPanel(auth.needsReauth?{kind:"identity"}:{kind:"sync"})}><i/> {auth.needsReauth?"飞书授权已过期":sync.state==="READY"?`已同步 · ${sync.updatedAt}`:sync.state==="RUNNING"?"同步中…":sync.state==="INCOMPLETE"?"同步不完整":sync.state==="AUTH_EXPIRED"?"授权过期":sync.state==="ERROR"?"同步失败":"尚未同步"}</button><button className="icon-btn notification-trigger" onClick={()=>openPanel({kind:"notifications"})} aria-label="今日提醒"><BellRing/>{notifications.filter(note=>!note.read).length>0&&<i>{notifications.filter(note=>!note.read).length}</i>}</button></>:<><div className="search"><Search/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="搜索客户、职位、PM…"/></div><button className="top-pill" onClick={()=>notify("全局筛选已展开")}><Filter/> 当前团队 <ChevronRight/></button><button className="icon-btn" onClick={()=>openPanel({kind:"notifications"})} aria-label="通知"><Bell/></button></>}
-    <button className={`profile-trigger ${page==="rules"?"active":""}`} onClick={()=>go("rules")} aria-label="打开设置"><Settings2/><span>设置</span></button><button className={`assistant-trigger ${assistantOpen?"active":""}`} onClick={()=>setAssistantOpen(value=>!value)} aria-label="打开 BrainX 助手" aria-expanded={assistantOpen}><Sparkles/><span>BrainX 助手</span></button>
+    <button className={`assistant-trigger ${assistantOpen?"active":""}`} onClick={()=>setAssistantOpen(value=>!value)} aria-label="打开 BrainX 助手" aria-expanded={assistantOpen}><Sparkles/><span>BrainX 助手</span></button>
    </header>
    <div className="content">
     {detail?<JobDetail job={detail} onBack={()=>setDetail(null)} weights={weights} eventType={eventType} setEventType={setEventType} hc={hc} setHc={setHc} notify={notify}/>:clientDetail?<ClientDetail c={clientDetail} onBack={()=>setClientDetail(null)} notify={notify}/>:<>
-     {page==="today"&&<DecisionToday activeJobId={panel?.kind==="job"&&panelMotion!=="closing"?panel.jobId:null} completed={decisionActions} jobs={activeDecisionJobs} engagement={engagement} sync={sync} open={openDecision} onAction={runDecisionAction} onFeedback={feedbackJob} showVerification={brainxMode!=="connected"} tray={tray} onToggleTray={toggleTray} onRemoveTray={removeTray} onConfirmTray={confirmTray} folders={folders} folderMode={folderMode} onFolderMode={()=>setFolderMode(v=>!v)} onAssignFolder={assignFolder} onCreateFolder={createFolder}/>}
-     {page==="accepted"&&<AcceptedJobsView jobs={visibleAcceptedJobs} total={acceptedJobs.length} query={query} open={openDecision}/>}
-     {page==="jobs"&&<JobsView jobs={filteredJobs} mode={brainxMode} status={status} setStatus={setStatus} sort={sort} setSort={setSort} view={view} setView={setView} selected={selected} setSelected={setSelected} openJob={setDetail} notify={notify}/>}
-     {page==="clients"&&<ClientsView clients={(brainxMode==="connected"&&brainxClients?brainxClients:clients).filter(c=>`${c.name}${c.industry}`.includes(query))} open={setClientDetail} notify={notify}/>}
+     {["today","accepted","jobs","clients"].includes(page)&&(brainxMode==="connecting"||workspaceIssue)?
+      <WorkspaceEntry
+       kind={brainxMode==="connecting"?"connecting":workspaceIssue!}
+       onRetry={()=>setConnectAttempt(value=>value+1)}
+       onOpenSources={()=>go("sources")}
+      />:<>
+      {page==="today"&&<TodayDecisionQueue
+       activeJobId={panel?.kind==="job"&&panelMotion!=="closing"?panel.jobId:null}
+       completed={decisionActions} jobs={activeDecisionJobs} engagement={engagement} sync={sync}
+       open={openDecision} onAction={runDecisionAction} onFeedback={feedbackJob}
+       showVerification={demo} tray={tray} onToggleTray={toggleTray} onRemoveTray={removeTray}
+       onConfirmTray={confirmTray} folders={folders} folderMode={folderMode}
+       onFolderMode={()=>setFolderMode(v=>!v)} onAssignFolder={assignFolder}
+       onCreateFolder={createFolder} mode={brainxMode} onOpenSources={()=>go("sources")}
+      />}
+      {page==="accepted"&&<AcceptedJobsView
+       jobs={visibleAcceptedJobs} total={acceptedJobs.length} query={query} open={openDecision}
+      />}
+      {page==="jobs"&&<JobsView
+       jobs={filteredJobs} mode={brainxMode} status={status} setStatus={setStatus}
+       sort={sort} setSort={setSort} view={view} setView={setView} selected={selected}
+       setSelected={setSelected} openJob={setDetail} notify={notify}
+      />}
+      {page==="clients"&&<ClientsView
+       clients={(brainxMode==="connected"&&brainxClients?brainxClients:clients)
+        .filter(c=>`${c.name}${c.industry}`.includes(query))}
+       open={setClientDetail} notify={notify}
+      />}
+     </>}
      {page==="alerts"&&<Alerts setExtraTasks={setExtraTasks} notify={notify} setDrawer={setDrawer}/>}
      {page==="rules"&&<Rules key={`${brainxKeywords.join("|")}:${brainxNote}`} notify={notify} mode={brainxMode} policy={brainxRun.policyVersion} keywords={brainxKeywords} note={brainxNote} onRefresh={async()=>{await loadBrainxSnapshot.current();void loadBrainxSide.current()}} onProfileSaved={(nextKeywords,nextNote)=>{setBrainxKeywords(nextKeywords);setBrainxNote(nextNote)}}/>}
      {page==="sources"&&<Sources notify={notify}/>}
@@ -228,31 +276,6 @@ function AcceptedJobsView({jobs,total,query,open}:{jobs:DecisionJob[];total:numb
   </article>):<div className="empty accepted-empty"><Search/><b>没有匹配的已确定职位</b><p>试试输入公司名、职位名或当前阶段。</p></div>}</div>
  </div>;
 }
-
-function DecisionToday({activeJobId,completed,jobs,engagement,sync,open,onAction,onFeedback,showVerification=true,tray,onToggleTray,onRemoveTray,onConfirmTray,folders,folderMode,onFolderMode,onAssignFolder,onCreateFolder}:{activeJobId:string|null;completed:string[];jobs:DecisionJob[];engagement:Record<string,EngagementState>;sync:SyncStatus;open:(job:DecisionJob,tab?:"judgement"|"engagement"|"trail"|"replay")=>void;onAction:(job:DecisionJob,action:DecisionAction)=>void;onFeedback:(job:DecisionJob,reason?:string)=>void;showVerification?:boolean;tray:string[];onToggleTray:(id:string)=>void;onRemoveTray:(id:string)=>void;onConfirmTray:()=>void;folders:PickFolder[];folderMode:boolean;onFolderMode:()=>void;onAssignFolder:(jobId:string,folderId:string)=>void;onCreateFolder:(name:string)=>void}){
- const [query,setQuery]=useState("");
- const [sort,setSort]=useState<"score"|"recent">("score");
- const [sourceFilter,setSourceFilter]=useState<"all"|SourceMode>("all");
- const [groupFilter,setGroupFilter]=useState<"all"|DecisionGroup>("all");
- const [onlyActionable,setOnlyActionable]=useState(false);
- const acceptedJobs=jobs.filter(job=>engagement[job.id]==="ACCEPTED");
- const pendingJobs=[...jobs.filter(job=>engagement[job.id]!=="ACCEPTED"),...verificationJobs];
- const pendingShown=showVerification?pendingJobs:pendingJobs.filter(job=>!verificationJobs.includes(job));
- const filteredPending=pendingShown.filter(job=>`${job.company} ${job.role} ${job.recommendation} ${Object.values(job.facts).join(" ")}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())).filter(job=>sourceFilter==="all"||job.sourceMode===sourceFilter).filter(job=>groupFilter==="all"||job.group===groupFilter).filter(job=>!onlyActionable||job.actions.length>0);
- const visiblePending=[...filteredPending].sort((left,right)=>sort==="score"?Number(right.finalScore)-Number(left.finalScore):String(left.recentSignal).localeCompare(String(right.recentSignal)));
- const allJobs=[...acceptedJobs,...pendingShown];
- const trayJobs=tray.map(id=>allJobs.find(job=>job.id===id)).filter((job):job is DecisionJob=>!!job);
- const isContext=activeJobId!==null&&pendingShown.some(job=>job.id===activeJobId);
- const jobToolbar=<div className="concept-filter-bar"><label className="concept-search"><Search/><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="搜索职位 / 公司 / JD 关键词" aria-label="搜索职位或公司"/></label><label className="concept-filter-select"><span className="sr-only">数据来源</span><select value={sourceFilter} onChange={event=>setSourceFilter(event.target.value as "all"|SourceMode)} aria-label="数据来源"><option value="all">全部来源</option><option value="COCKPIT_CONTEXT">驾驶舱</option><option value="MARKET_ONLY">职位市场</option></select><ChevronDown/></label><label className="concept-filter-select"><span className="sr-only">推荐阶段</span><select value={groupFilter} onChange={event=>setGroupFilter(event.target.value as "all"|DecisionGroup)} aria-label="推荐阶段"><option value="all">推荐阶段</option>{Object.entries(decisionGroupMeta).map(([value,meta])=><option key={value} value={value}>{meta.title}</option>)}</select><ChevronDown/></label><button type="button" className={`concept-filter-button${onlyActionable?" is-active":""}`} aria-pressed={onlyActionable} onClick={()=>setOnlyActionable(value=>!value)}>{onlyActionable?"显示全部":"可处理职位"}<Filter/></button><label className="concept-filter-select concept-sort"><span className="sr-only">排序</span><select value={sort} onChange={event=>setSort(event.target.value as "score"|"recent")} aria-label="职位排序"><option value="score">综合匹配</option><option value="recent">最新信号</option></select><ChevronDown/></label></div>;
-  return <div className="decision-home">
-
-  <PickTray trayJobs={trayJobs} featuredJobs={visiblePending.slice(0,4)} allJobs={allJobs} folderMode={folderMode} onFolderMode={onFolderMode} folders={folders} onRemoveTray={onRemoveTray} onToggleTray={onToggleTray} onConfirmTray={onConfirmTray} onAssignFolder={onAssignFolder} onCreateFolder={onCreateFolder} open={open}/>
-  {sync.state==="READY"&&sync.warning&&<div className="sync-degraded-banner" role="status" title={sync.warning.detail||undefined}><AlertTriangle/><span>同步失败中：{sync.warning.message} · 当前展示最近完整快照{sync.updatedAt?`（更新于 ${sync.updatedAt}）`:""}</span></div>}
-  {sync.state==="INCOMPLETE"||sync.state==="ERROR"?<section className="decision-blocked"><AlertTriangle/><div><b>{sync.state==="INCOMPLETE"?"本次同步不完整":"同步失败"}</b><p>为避免误导，当前不展示新的项目判断。</p></div><button className="btn" onClick={()=>open(jobs[0],"judgement")}>查看上次快照</button></section>:<DecisionZone anchorId="opportunity-list" tone="pending" title="未接单" subtitle="" jobs={visiblePending} isContext={isContext} completed={completed} engagement={engagement} open={open} onAction={onAction} onFeedback={onFeedback} tray={tray} onToggleTray={onToggleTray} folderMode={folderMode} folders={folders} onAssignFolder={onAssignFolder} toolbar={jobToolbar}/>}
-  </div>
-}
-
-
 
 function DecisionMetric({label,value,emphasis,helpOpen,onHelpToggle}:{label:string;value:string|number;emphasis?:string;helpOpen?:boolean;onHelpToggle?:()=>void}){return <div className="decision-metric"><small>{label}</small>{onHelpToggle&&<button className="metric-help" type="button" onClick={onHelpToggle} aria-label={`解释${label}`} aria-expanded={helpOpen}>!</button>}<b className={emphasis}>{value}</b></div>}
 
@@ -448,33 +471,3 @@ function ClientTable({rows,open}:any){return <div className="table-wrap"><table 
 function ClientDetail({c,onBack,notify}:any){return <><button className="back" onClick={onBack}><ArrowLeft/>返回客户洞察</button><Heading code={`CLIENT / ${c.industry}`} title={c.name} desc={`优先级 ${c.score??"—"} · ${c.state} · 平均反馈 ${c.feedback}`} action={<button className="btn primary" onClick={()=>notify("客户反馈已记录并触发重新判断")}><Plus/>添加客户反馈</button>}/><div className="conclusion"><div className="spark"><Sparkles/></div><div><b>{c.name}当前处于集中招聘窗口期</b><p>近30天新增 {c.active} 个职位，平均反馈时间缩短至 {c.feedback}，建议提高交付优先级。</p></div></div><div className="grid g3">{[["活跃职位",c.active],["总 HC",c.hc??"—"],["历史入职",c.hires??"—"]].map(x=><div className="card card-body" key={x[0]}><span className="eyebrow">{x[0]}</span><div className="score" style={{fontSize:28,marginTop:8}}>{x[1]}</div></div>)}</div><div className="grid g2 section"><section className="card"><div className="card-head"><h2>当前活跃职位</h2><span>{c.active} 个</span></div><JobTable rows={jobs.filter(j=>j.client===c.name).concat(jobs.slice(0,Math.max(0,3-jobs.filter(j=>j.client===c.name).length)))} open={()=>notify("已打开关联职位")}/></section><section className="card"><div className="card-head"><h2>合作判断</h2><span>近6个月</span></div><div className="card-body side-list">{["人才偏好：头部AI商业化经验、团队从0到1","高频淘汰：缺少复杂销售经验","需求变更：近30天 2 次，处于可控范围","合作风险：面试标准近期小幅抬高","建议动作：锁定本周业务负责人面试档期"].map((x,i)=><div className="mini-item" key={x}><span className="num">0{i+1}</span><b>{x}</b></div>)}</div></section></div><section className="card section"><div className="card-head"><h2>客户事件时间线</h2><span>可追溯</span></div><div className="card-body timeline">{events.concat([["06-28","新增职位","新增 AI 解决方案销售，HC 3"],["06-04","需求变化","薪资上限提高 15%"]]).map(e=><div className="event" key={e[0]}><time>{e[0]}</time><i className="event-dot"/><div><b>{e[1]}</b><p>{e[2]}</p></div></div>)}</div></section></>}
 
 function Alerts({setExtraTasks,notify,setDrawer}:any){const alerts=["云帆智能连续7天未反馈","商业化增长经理转化率下降12%","海外增长负责人面试池已拥挤","星河科技进入招聘窗口期","Creator Partnership负责人新增2个HC","棱镜互动近14天需求变更3次","AI解决方案销售参与顾问增至6人","用户增长负责人产生Offer"];const [handled,setHandled]=useState<number[]>([]);const [riskFilter,setRiskFilter]=useState("全部风险等级");const [clientFilter,setClientFilter]=useState("全部客户");return <><Heading code="DYNAMIC ALERTS" title="动态预警" desc="聚合需要人工确认的机会、变化和失活信号。"/><div className="toolbar"><FilterSelect value={riskFilter} onChange={setRiskFilter} ariaLabel="预警风险等级" options={["全部风险等级","高风险","机会"].map(value=>({value,label:value}))}/><FilterSelect value={clientFilter} onChange={setClientFilter} ariaLabel="预警客户筛选" options={[{value:"全部客户",label:"全部客户"},...clients.map(client=>({value:client.name,label:client.name}))]}/></div><section className="card"><div className="actions">{alerts.map((x,i)=><div className="action-row" key={x} style={{opacity:handled.includes(i)?.5:1}}><StatusTag s={i%3===0?"高风险":i%3===1?"关注":"机会"}/><div className="action-main"><b>{x}</b><small>{i%2?"基于近7天业务事件变化":"超过预设阈值，建议今天确认"}</small></div><div className="impact"><strong>{i%3===2?"机会升温":"需人工确认"}</strong>置信度 {88+i}%</div><div className="row-actions"><button className="btn" onClick={()=>setDrawer(x)}>依据</button><button className="btn" onClick={()=>{setExtraTasks((v:string[])=>v.includes(x)?v:[...v,x]);notify("已转为今日任务")}}>转任务</button><button className="icon-btn" onClick={()=>{setHandled([...handled,i]);notify("预警已处理")}}><Check/></button></div></div>)}</div></section></>}
-function TalentBackendCard(){
- type Health={backend:string;connected:boolean;schema:string;degraded:string|null;config?:{host:string;port:number;database:string|null;credentials_present:boolean;ssl:boolean};hint:string};
- const [health,setHealth]=useState<Health|null>(null);
- const [state,setState]=useState<"loading"|"live"|"offline">("loading");
- useEffect(()=>{let alive=true;const ctrl=new AbortController();const t=setTimeout(()=>ctrl.abort(),2500);
-  fetch("/api/v1/talent/health",{signal:ctrl.signal,credentials:"include"})
-   .then(async r=>{if(!r.ok)throw new Error("talent health unavailable");return await r.json() as Health})
-   .then((h:Health)=>{if(alive){setHealth(h);setState("live")}})
-   .catch(()=>{if(alive)setState("offline")})
-   .finally(()=>clearTimeout(t));
-  return ()=>{alive=false;ctrl.abort()};
- },[]);
- const isMysql=health?.backend==="mysql"&&health.connected;
- const badge=state==="offline"?{s:"已就绪",cls:""}:isMysql?{s:"已连接",cls:""}:{s:"内存回退",cls:"warn"};
- return <section className="card talent-backend"><div className="source-head"><div className="source-icon"><Database/></div><span className={`supply-badge ${isMysql?"ok":badge.cls==="warn"?"warn":"risk"}`}>{badge.s}</span></div>
-  <h3>人才库（阿里云 RDS）</h3>
-  {state==="loading"&&<p>正在检测人才库连接…</p>}
-  {state==="offline"&&<><p>人才库读写与供给匹配【代码已就绪】。此预览未连后端 API，填写 <code>.env</code> 的 <code>BRAINX_MYSQL_*</code> 凭据并启动服务后，此处会实时显示真库连接状态。</p>
-   <div className="backend-facts"><div><dt>切库方式</dt><dd>填凭据 → <code>npm run talent:health</code> 自检</dd></div><div><dt>连不通</dt><dd>自动降级内存库（功能不中断）</dd></div></div></>}
-  {state==="live"&&health&&<><p>{health.hint}</p>
-   <div className="backend-facts">
-    <div><dt>当前后端</dt><dd className={isMysql?"":"unknown"}>{isMysql?"MySQL 真库":"内存回退"}</dd></div>
-    <div><dt>连通性</dt><dd className={health.connected?"":"unknown"}>{health.connected?"已连通":"未连通"}</dd></div>
-    <div><dt>建表状态</dt><dd>{health.schema}</dd></div>
-    {health.config&&<div><dt>目标库</dt><dd>{health.config.database||"—"} @ {health.config.host}</dd></div>}
-    {health.degraded&&<div><dt>诊断</dt><dd className="unknown">{health.degraded}</dd></div>}
-   </div></>}
- </section>;
-}
-function Sources({notify}:any){return <><Heading code="DATA SOURCES" title="数据源" desc="演示数据源面板；当前后端没有对应的统一数据源 API，不代表真实外部账号已连接。"/><div className="source-grid"><TalentBackendCard/>{sourceNames.map((n,i)=><section className="card source" key={n}><div className="source-head"><div className="source-icon"><Database/></div><StatusTag s="演示"/></div><h3>{n}</h3><p>演示状态 · 尚未接入 BrainX 数据源接口</p><div className="completeness"><span>数据完整度</span><b>—</b></div><div className="bar"><i style={{width:"0%",background:"var(--orange)"}}/></div><button className="btn" style={{marginTop:14}} onClick={()=>notify("数据源字段查看仍为演示交互，不会写入真实系统")}><Settings2/>查看字段</button></section>)}</div></>}

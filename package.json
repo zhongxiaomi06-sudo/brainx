@@ -34,12 +34,15 @@
     "label:export": "node scripts/export-labeling-sheet.mjs",
     "label:import": "node bin/brainx-label-import.mjs",
     "outcome:import": "node bin/brainx-outcome-import.mjs",
-    "test": "node --experimental-strip-types --test --test-force-exit",
+    "test": "node --experimental-strip-types --test --test-force-exit \"tests/*.test.mjs\"",
     "test:quality-gate": "node --test tests/quality-gate.test.mjs",
     "verify:quick": "node scripts/quality-gate.mjs --profile quick",
     "verify": "node scripts/quality-gate.mjs --profile full",
     "verify:ci": "node scripts/quality-gate.mjs --profile ci",
-    "frontend:health": "node scripts/frontend-health.mjs"
+    "frontend:health": "node scripts/frontend-health.mjs",
+    "storybook": "npm --prefix frontend/btex-frontend run storybook",
+    "storybook:build": "npm --prefix frontend/btex-frontend run storybook:build",
+    "storybook:test": "npm --prefix frontend/btex-frontend run storybook:test"
   },
   "bin": {
     "braintex-local-sync": "bin/brainx-sync.mjs",

@@ -1,5 +1,6 @@
 /** ttcsdk/job.js — 职位域 API（ATS 真 project_id / HC / Pipeline 的源头）。 */
 import { TtcApiError, ttcRequest } from './http.js';
+import { inspectTtcJob, TTC_FIELD_SCHEMA_VERSION } from '../ttc-field-catalog.js';
 
 /** 职位检索（POST search，单页）。返回该 JWT 持有者权限视图内的职位。 */
 export const search = (jwt, query = {}, fetchImpl) =>
@@ -32,12 +33,14 @@ export async function searchAll(jwt, query = {}, fetchImpl, { paceMs = 0, maxPag
 
 /** 增量拉取（2026-08-25 限流根治第二阶段）：职位按 update_time 降序返回（实测），
  * 翻到「整页都不新于 sinceMs」即提前停——日常同步从 ~91 页降到 1-3 页。
- * 返回 { jobs, complete }；中途限流时带上已抓到的新前缀返回 complete=false
- * （降序保证前缀是最新数据，可安全入库；sinceMs 不前进，下轮自然补齐）。 */
-export async function searchSince(jwt, { sinceMs = 0, paceMs = 0, maxPages = 100, query = {} } = {}, fetchImpl) {
+ * 返回 { jobs, complete, nextCursor }；中途限流时保住已抓前缀并返回续传 cursor，
+ * 下轮必须从该 cursor 继续，不能只推进时间水位（否则会永久跳过旧页）。 */
+export async function searchSince(jwt, {
+  sinceMs = 0, initialCursor = '', paceMs = 0, maxPages = 100, query = {},
+} = {}, fetchImpl) {
   const out = [];
-  let cursor = '';
-  let complete = true;
+  // TTC cursor 是 JSON number；转成 string 后服务端返回 code=-111「参数有误」。
+  let cursor = initialCursor || '';
   for (let p = 0; p < maxPages; p++) {
     if (p > 0 && paceMs > 0) await sleep(paceMs);
     let d;
@@ -45,7 +48,7 @@ export async function searchSince(jwt, { sinceMs = 0, paceMs = 0, maxPages = 100
       d = await ttcRequest(jwt, 'POST', '/api/crm/v1/job/search',
         { page: 1, ...(cursor ? { cursor } : {}), ...query }, fetchImpl);
     } catch (e) {
-      if (out.length) { complete = false; break; } // 限流/网络中断：保住新前缀
+      if (out.length) break; // 限流/网络中断：保住新前缀和下一页 cursor
       throw e;
     }
     const jobs = d?.jobs || [];
@@ -54,14 +57,18 @@ export async function searchSince(jwt, { sinceMs = 0, paceMs = 0, maxPages = 100
     const fresh = sinceMs > 0 ? jobs.filter((j) => tsOf(j) > sinceMs) : jobs;
     out.push(...fresh);
     // 整页都不新（降序序列 → 后续页更老）→ 提前停；fresh < jobs 说明本页触达水位
-    if (sinceMs > 0 && jobs.length && fresh.length < jobs.length) return { jobs: out, complete: true };
-    if (!d?.has_more) return { jobs: out, complete: true };
-    const nextCursor = String(d?.cursor || '').trim();
-    if (!nextCursor) throw incomplete(`第 ${p + 1} 页声明 has_more，但没有返回 cursor`);
-    if (nextCursor === cursor) throw incomplete(`第 ${p + 1} 页 cursor 未前进`);
+    if (sinceMs > 0 && jobs.length && fresh.length < jobs.length) {
+      return { jobs: out, complete: true, nextCursor: '' };
+    }
+    if (!d?.has_more) return { jobs: out, complete: true, nextCursor: '' };
+    const nextCursor = d?.cursor;
+    if (nextCursor === undefined || nextCursor === null || nextCursor === '') {
+      throw incomplete(`第 ${p + 1} 页声明 has_more，但没有返回 cursor`);
+    }
+    if (String(nextCursor) === String(cursor)) throw incomplete(`第 ${p + 1} 页 cursor 未前进`);
     cursor = nextCursor;
   }
-  return { jobs: out, complete };
+  return { jobs: out, complete: false, nextCursor: cursor };
 }
 
 /** TTC job → runSync payload 行（2026-08-14 实测字段驱动）。
@@ -69,14 +76,17 @@ export async function searchSince(jwt, { sinceMs = 0, paceMs = 0, maxPages = 100
  * status：1=OPEN（实测 tags 新职位/活跃）；0=COOLING；其余 UNKNOWN。
  * relation=null（桥接纪律）——主做归属走 owner_name，由 relations.js 推导。 */
 export function toJobRow(j) {
+  const fieldCheck = inspectTtcJob(j);
   const blurred = j.need_blur === 1 || j.need_blur === true;
   const company = (blurred && j.company_name_for_c) ? j.company_name_for_c : (j.company_name || '');
   const steps = j.pipeline_info?.pipeline_step_count || {};
+  const cities = Array.isArray(j.cities) ? j.cities.map((city) => String(city).trim()).filter(Boolean) : [];
   const pipe = Object.entries(steps).map(([k, v]) => `${k}×${v}`).join(' ');
   return {
     project_id: j.unique_id,              // 真 ATS project_id（替换 P-FIX 占位）
     company, role: j.name || '职位待定',
-    city: (j.cities || []).join('、') || null,
+    city: cities.join('、') || null,
+    cities,
     pipeline: pipe || null,               // 真 Pipeline（"Sourcing×1 二面×2" 摘要）
     hc: j.head_count ?? null,             // 真 HC
     active_state: j.status === 1 ? 'OPEN' : j.status === 0 ? 'COOLING' : 'UNKNOWN',
@@ -89,7 +99,9 @@ export function toJobRow(j) {
     relation: null,
     source_url: `ttc://job/${j.unique_id}`,
     captured_at: j.update_time ? new Date(Number(j.update_time)).toISOString() : undefined,
-    ttc: { company_unique_id: j.company_unique_id, cooperation: j.cooperation || '',
+    ttc: { schema_version: TTC_FIELD_SCHEMA_VERSION, field_errors: fieldCheck.errors,
+           field_warnings: fieldCheck.warnings, cities, pipeline_steps: steps,
+           company_unique_id: j.company_unique_id, cooperation: j.cooperation || '',
            status_tags: j.status_tags || [], group_chat_id: j.group_chat?.id || '',
            participants: (j.participants || []).map((p) => p.name) },
   };

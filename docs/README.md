@@ -17,6 +17,10 @@
 |---|---|
 | 产品范围、功能规划或验收标准 | [BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md) |
 | 任何代码、测试或配置改动 | [上传前完整验证](standards/PRE_PUSH_VERIFICATION.md)、[质量门禁操作手册](standards/QUALITY_GATE_OPERATIONS.md) |
+| 前端组件、视觉状态或交互样例 | [内部 Storybook 组件库](storybook-component-library.md)、[上传前完整验证](standards/PRE_PUSH_VERIFICATION.md) |
+| 前端信息架构、页面流程或交互重构 | [前端交互架构](frontend-interaction-architecture.md)、[BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md) |
+| 前端重构排期、施工范围或阶段验收 | [前端真实数据重构施工清单](frontend-refactor-construction-checklist.md)、[前端交互架构](frontend-interaction-architecture.md) |
+| TTC 职位字段、筛选能力或字段变化 | [TTC 职位字段库](ttc-field-catalog.md)、[BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md) |
 | Commit、协作记录 | [Agent Commit 记录](AGENT_COMMIT_LOG.md) |
 | 密钥、登录、权限、数据隔离 | [安全操作手册](SECURITY.md) |
 | 构建、发布、服务器、容器 | [部署编排](DEPLOYMENT.md)、[云端恢复清单](cloud-recovery-checklist.md)、[安全操作手册](SECURITY.md) |
@@ -25,7 +29,7 @@
 | CRM 批量导出设计 | [CRM 批量导出提案](crm-batch-export-proposal.md) |
 | 带宽监控与告警 | [带宽告警说明](guard-bandwidth-alert.md) |
 | 网站问题回溯 | [网站完整任务错误点审计](2026-08-17-网站完整任务错误点审计.md) |
-| 代码质量整改或审查规则 | [DeepSeek 审查规则提炼](audits/2026-08-24-deepseek-review-rule-extraction.md)、[上传前完整验证](standards/PRE_PUSH_VERIFICATION.md) |
+| 代码质量整改、门禁或前端测试 | [质量门禁与前端链路测试审计](audits/2026-08-26-quality-gate-frontend-test-audit.md)、[DeepSeek 审查规则提炼](audits/2026-08-24-deepseek-review-rule-extraction.md)、[上传前完整验证](standards/PRE_PUSH_VERIFICATION.md) |
 
 如果任务同时命中多个类型，必须阅读所有对应文档。找不到对应文档时，先检查代码和已有资料；若该主题会形成长期规则或决策，应先建立文档并把它加入本目录。
 
@@ -46,7 +50,11 @@
 
 ### 设计与数据
 
+- [前端交互架构](frontend-interaction-architecture.md)：BrainX 页面分层、状态诚实性和核心用户动作链。
+- [前端真实数据重构施工清单](frontend-refactor-construction-checklist.md)：TTC 主表、推荐策略、方向画像、导航设置与质量门禁的分阶段实施及审核边界。
+- [内部 Storybook 组件库](storybook-component-library.md)：生产组件的隔离展示、交互测试与维护规则。
 - [BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md)：产品定位、功能范围、已知问题、路线图与验收指标。
+- [TTC 职位字段库](ttc-field-catalog.md)：TTC 字段语义、默认职位表列、筛选能力与覆盖率规则。
 - [标准字段与云端隔离](2026-08-10-bitable-standard-fields-and-cloud-isolation.md)
 - [CRM 批量导出提案](crm-batch-export-proposal.md)
 
@@ -56,6 +64,7 @@
 - [网站完整任务错误点审计](2026-08-17-网站完整任务错误点审计.md)
 - [状态报告（2026-08-19）](status-report-2026-08-19.md)
 - [DeepSeek 审查规则提炼（2026-08-24）](audits/2026-08-24-deepseek-review-rule-extraction.md)
+- [质量门禁与前端链路测试审计（2026-08-26）](audits/2026-08-26-quality-gate-frontend-test-audit.md)
 
 ## 新文档规则
 

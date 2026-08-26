@@ -1,0 +1,77 @@
+.sb-show-main {
+  background: var(--concept-bg);
+}
+
+.storybook-surface {
+  display: block;
+  min-height: 100vh;
+  padding: 32px;
+  background: var(--concept-bg);
+}
+
+.storybook-surface.storybook-compact {
+  max-width: 760px;
+  min-height: auto;
+  margin: 0 auto;
+}
+
+.storybook-stack {
+  display: grid;
+  gap: 18px;
+}
+
+.storybook-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.storybook-panel {
+  padding: 22px;
+  border: 1px solid var(--concept-line);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: var(--concept-shadow);
+}
+
+.storybook-introduction {
+  max-width: 760px;
+  padding: 32px;
+}
+
+.storybook-introduction h1,
+.storybook-introduction h2 {
+  margin-bottom: 12px;
+}
+
+.storybook-introduction li,
+.storybook-introduction dd {
+  line-height: 1.7;
+}
+
+.storybook-introduction dl div {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgb(15 23 42 / 10%);
+}
+
+.storybook-introduction dt {
+  font-weight: 700;
+}
+
+.storybook-introduction dd {
+  margin: 0;
+}
+
+.storybook-surface.ttc-jobs-story {
+  padding: 20px;
+}
+
+@media (max-width: 720px) {
+  .storybook-surface {
+    padding: 16px;
+  }
+}

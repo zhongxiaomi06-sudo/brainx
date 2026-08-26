@@ -396,12 +396,12 @@ export const events = [
 ];
 export const statusOrder: Exclude<Status, "待同步">[] = ["新发布", "升温", "活跃", "拥挤", "降温", "疑似失活", "已关闭"];
 export const nav = [
-  ["today", "工作台", Sparkles],
-  ["jobs", "职位市场", BriefcaseBusiness],
-  ["clients", "人才库", Users],
-  ["accepted", "项目管理", ClipboardCheck],
-  ["sources", "数据源", Database],
-  ["rules", "设置中心", Settings2],
+  ["today", "今日决策", Sparkles],
+  ["jobs", "全部职位", BriefcaseBusiness],
+  ["accepted", "我的项目", ClipboardCheck],
+  ["clients", "客户洞察", Users],
+  ["sources", "连接与数据", Database],
+  ["rules", "策略设置", Settings2],
 ] as const;
 export const sourceNames = ["内部项目驾驶舱", "职位库", "客户管理记录", "飞书文档", "飞书消息", "邮件反馈", "历史交付记录"];
 export type PickFolder = { id: string; name: string; jobIds: string[] };

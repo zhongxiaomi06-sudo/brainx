@@ -25,11 +25,10 @@ import { saveUserTokens, tokenStatus } from './feishu.js';
 import { jobVisibleTo } from './visibility.js';
 import { relationOf } from './relations.js';
 import { confirmMembership } from './membership.js';
-import { validateJwt, saveTtcToken, ttcAuthStatus } from './ttcsdk/auth.js';
-import { quota as ttcQuota } from './ttcsdk/user.js';
-import { TtcApiError } from './ttcsdk/http.js';
 import { startOpenmaiTask, getOpenmaiResult } from './openmai-task.js';
-import { radarRows, clientRows } from './radar.js';
+import { radarPayload, clientRows } from './radar.js';
+import { ttcFieldReportForSync } from './ttc-field-report.js';
+import { ttcAuthStatus, ttcRoutes } from './ttc-routes.js';
 import { syncTalentsFromCsv, listTalents as listTalentsRepo, getTalent, talentBackendStatus, ingestResume, syncTalentsFromResumes, listResumes, talentHealth } from './talent.js';
 import { talentSupplyForJob, talentSupplyEnabled } from './talent-supply.js';
 import { effectiveJob, effectiveFactPayload, updateFactOverrides } from './facts.js';
@@ -336,7 +335,8 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
     'GET /api/v1/sync-runs/:id': (req, res, cid, q, id) => {
       const r = db.prepare('SELECT * FROM sync_runs WHERE sync_id=? AND consultant_id=?').get(id, cid);
       if (!r) return err(res, 404, 'NOT_FOUND', '同步批次不存在');
-      json(res, 200, { ...r, errors: JSON.parse(r.errors || '[]') });
+      json(res, 200, { ...r, errors: JSON.parse(r.errors || '[]'),
+        field_report: ttcFieldReportForSync(db, cid, id) });
     },
 
     'GET /api/v1/opportunities/:id': (req, res, cid, q, id) => {
@@ -497,8 +497,9 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
     }),
 
     // 职位雷达与客户洞察（fail-closed 可见性；只呈现事实，不补造运营指标）
-    'GET /api/v1/radar': (req, res, cid) => json(res, 200, { items: radarRows(db, cid) }),
+    'GET /api/v1/radar': (req, res, cid) => json(res, 200, radarPayload(db, cid)),
     'GET /api/v1/clients': (req, res, cid) => json(res, 200, { items: clientRows(db, cid) }),
+    ...ttcRoutes(db),
 
     // 我的档案（方向画像）：只许读/改自己；保存后下一轮 recommend 即生效
     'GET /api/v1/profile': (req, res, cid) => {
@@ -513,64 +514,6 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       if (!b) return err(res, 400, 'BAD_JSON', '请求体不是合法 JSON');
       const out = updateProfile(db, cid, b);
       json(res, out.ok ? 200 : (out.status || 400), out);
-    },
-
-    // TTC 系统凭据托管（轻无感：~60 天粘贴一次自己的 ottin-jwt-token-v2）。
-    // 只许本人；JWT 先本地校验再活验证（调一次 user/quota）才落库；永不回显。
-    'GET /api/v1/ttc/connect': (req, res, cid) => json(res, 200, ttcAuthStatus(db, cid)),
-    'PUT /api/v1/ttc/connect': async (req, res, cid) => {
-      const b = await body(req);
-      const jwt = String(b?.jwt || '').trim();
-      if (!jwt) return err(res, 400, 'EMPTY', '没收到 JWT');
-      if (jwt.length > 8192) return err(res, 400, 'TOO_LONG', '长度异常，确认只复制了 token 值');
-      let meta;
-      try { meta = validateJwt(jwt); } catch (e) { return err(res, 422, 'BAD_JWT', e.message); }
-      try { await ttcQuota(jwt); } catch (e) {
-        if (e instanceof TtcApiError && e.authInvalid) {
-          return err(res, 401, 'TTC_AUTH_INVALID', 'JWT 无效或已失效——回 TTC 系统（app.ttcadvisory.com）重新登录后再复制');
-        }
-        return err(res, 502, 'TTC_UNREACHABLE', '连不上 TTC 接口，稍后再试');
-      }
-      saveTtcToken(db, cid, jwt, meta);
-      json(res, 200, { ok: true, ...ttcAuthStatus(db, cid) });
-    },
-    'DELETE /api/v1/ttc/connect': (req, res, cid) => {
-      db.prepare('DELETE FROM ttc_tokens WHERE consultant_id=?').run(cid);
-      json(res, 200, { ok: true, connected: false });
-    },
-    // —— 浏览器扩展自动同步（顾问扫码 TTC 后扩展自动 POST，无需粘贴/登录）——
-    // 与 PUT /ttc/connect 同一验证链（validateJwt + quota 活验证），但免登录：
-    // 扩展无法持有 brainx session，凭「来源校验（扩展/本地） + JWT 本身有效」落库。
-    // 状态查询（安全视图，绝不出 JWT 本体）：凭证中心/扩展 popup 展示用。
-    'GET /api/v1/ttc/status': (req, res, cid, q) => {
-      const consultantId = q.get('consultant_id') || 'felix';
-      if (!loadConsultants(db).some((c) => c.consultant_id === consultantId))
-        return err(res, 404, 'NOT_FOUND', '顾问不存在');
-      json(res, 200, ttcAuthStatus(db, consultantId));
-    },
-    'POST /api/v1/ttc/ext-sync': async (req, res) => {
-      const origin = String(req.headers.origin || '');
-      const referer = String(req.headers.referer || '');
-      const fromExtension = origin.startsWith('chrome-extension://') || referer.startsWith('chrome-extension://');
-      const fromLocal = /^https?:\/\/(127\.0\.0\.1|localhost):/.test(origin) || /^https?:\/\/(127\.0\.0\.1|localhost):/.test(referer);
-      if (!fromExtension && !fromLocal) return err(res, 403, 'FORBIDDEN', '仅接受浏览器扩展或本地来源');
-      const b = await body(req);
-      const jwt = String(b?.jwt || '').trim();
-      const consultantId = String(b?.consultant_id || b?.consultantId || 'felix').trim();
-      if (!jwt) return err(res, 400, 'EMPTY', '没收到 JWT');
-      if (jwt.length > 8192) return err(res, 400, 'TOO_LONG', '长度异常，确认只发送了 token 值');
-      if (!loadConsultants(db).some((c) => c.consultant_id === consultantId))
-        return err(res, 422, 'BAD_CONSULTANT', '顾问不存在，请在扩展里选择正确的顾问');
-      let meta;
-      try { meta = validateJwt(jwt); } catch (e) { return err(res, 422, 'BAD_JWT', e.message); }
-      try { await ttcQuota(jwt); } catch (e) {
-        if (e instanceof TtcApiError && e.authInvalid) {
-          return err(res, 401, 'TTC_AUTH_INVALID', 'JWT 无效或已失效——回 TTC 系统重新登录后扩展会自动重试');
-        }
-        return err(res, 502, 'TTC_UNREACHABLE', '连不上 TTC 接口，稍后再试');
-      }
-      saveTtcToken(db, consultantId, jwt, meta);
-      json(res, 200, { ok: true, consultant_id: consultantId, ...ttcAuthStatus(db, consultantId) });
     },
 
     // 职位快照（外部系统消费，替代直打 CRM job/search；API Key 鉴权，不走 session）

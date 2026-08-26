@@ -1,4 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { useState } from "react";
+import { ArrowDownUp, Check, Search, SlidersHorizontal, X } from "lucide-react";
 import { fn } from "storybook/test";
 import { seedSync } from "../decision-demo";
 import { TodayDecisionQueue } from "../workbench-today";
@@ -33,3 +35,60 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const EmptyRealSource: Story = { args: { mode: "connected" } };
+
+function FilterToolbarPrototype() {
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [source, setSource] = useState("TTC 职位系统");
+  const [stage, setStage] = useState("面试中");
+  const activeFilters = [source && `来源：${source}`, stage && `状态：${stage}`].filter(Boolean);
+  return <section className="filter-prototype-card">
+    <header><div><span>DECISION QUEUE</span><h2>待判断职位</h2><p>默认只展示今天需要你判断的职位。</p></div><strong>10 个</strong></header>
+    <div className="filter-prototype-toolbar">
+      <label><Search/><input aria-label="搜索职位或公司" placeholder="搜索职位、公司或关键词"/></label>
+      <div className="filter-prototype-filter-wrap">
+        <button className={filtersOpen ? "is-active" : ""} type="button" onClick={() => setFiltersOpen(value => !value)} aria-expanded={filtersOpen}>
+          <SlidersHorizontal/>筛选{activeFilters.length > 0 && <i>{activeFilters.length}</i>}
+        </button>
+        {filtersOpen && <div className="filter-prototype-popover">
+          <div><b>筛选职位</b><button type="button" onClick={() => setFiltersOpen(false)} aria-label="关闭筛选"><X/></button></div>
+          <fieldset><legend>数据来源</legend>
+            {["全部来源", "TTC 职位系统", "驾驶舱"].map(value => <button type="button"
+              className={source === value ? "selected" : ""}
+              onClick={() => setSource(value === "全部来源" ? "" : value)} key={value}>
+              {source === value && <Check/>}{value}
+            </button>)}
+          </fieldset>
+          <fieldset><legend>职位状态</legend>
+            {["全部状态", "待核验", "面试中", "Offer 阶段"].map(value => <button type="button"
+              className={stage === value ? "selected" : ""}
+              onClick={() => setStage(value === "全部状态" ? "" : value)} key={value}>
+              {stage === value && <Check/>}{value}
+            </button>)}
+          </fieldset>
+          <footer><button type="button" onClick={() => { setSource(""); setStage(""); }}>清除筛选</button><button type="button" onClick={() => setFiltersOpen(false)}>查看结果</button></footer>
+        </div>}
+      </div>
+      <label className="filter-prototype-sort"><ArrowDownUp/><span>排序</span>
+        <select aria-label="职位排序"><option>推荐优先</option><option>最新信号</option>
+          <option>匹配度最高</option><option>证据最完整</option></select>
+      </label>
+    </div>
+    {activeFilters.length > 0 && <div className="filter-prototype-chips"><span>已选条件</span>
+      {source && <button type="button" onClick={() => setSource("")}>来源：{source}<X/></button>}
+      {stage && <button type="button" onClick={() => setStage("")}>状态：{stage}<X/></button>}
+      <button className="clear" type="button" onClick={() => { setSource(""); setStage(""); }}>清除全部</button>
+    </div>}
+    <div className="filter-prototype-list">
+      <article><i>01</i><div><b>训练 / 推理框架 Infra 工程师</b>
+        <p>北京乾章科技 · 面试中 · TTC 职位系统</p></div><strong>推荐 92</strong></article>
+      <article><i>02</i><div><b>机械结构工程师</b>
+        <p>slash robotics · 面试中 · TTC 职位系统</p></div><strong>推荐 88</strong></article>
+    </div>
+  </section>;
+}
+
+export const FilterToolbarProposal: Story = {
+  name: "筛选栏方案预览",
+  args: { mode: "offline" },
+  render: () => <FilterToolbarPrototype/>,
+};

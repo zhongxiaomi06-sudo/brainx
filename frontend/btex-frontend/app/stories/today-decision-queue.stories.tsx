@@ -1,8 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
-import { ArrowDownUp, Check, Search, SlidersHorizontal, X } from "lucide-react";
-import { fn } from "storybook/test";
+import { Check, Search, SlidersHorizontal, X } from "lucide-react";
+import { expect, fn, userEvent, within } from "storybook/test";
 import { seedSync } from "../decision-demo";
+import { FilterSelect } from "../workbench-controls";
 import { TodayDecisionQueue } from "../workbench-today";
 
 const meta = {
@@ -40,9 +41,10 @@ function FilterToolbarPrototype() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [source, setSource] = useState("TTC 职位系统");
   const [stage, setStage] = useState("面试中");
+  const [sort, setSort] = useState("recommended");
   const activeFilters = [source && `来源：${source}`, stage && `状态：${stage}`].filter(Boolean);
   return <section className="filter-prototype-card">
-    <header><div><span>DECISION QUEUE</span><h2>待判断职位</h2><p>默认只展示今天需要你判断的职位。</p></div><strong>10 个</strong></header>
+    <header><div><span>DECISION QUEUE</span><h2>待判断职位</h2></div><strong>10 个</strong></header>
     <div className="filter-prototype-toolbar">
       <label><Search/><input aria-label="搜索职位或公司" placeholder="搜索职位、公司或关键词"/></label>
       <div className="filter-prototype-filter-wrap">
@@ -68,10 +70,17 @@ function FilterToolbarPrototype() {
           <footer><button type="button" onClick={() => { setSource(""); setStage(""); }}>清除筛选</button><button type="button" onClick={() => setFiltersOpen(false)}>查看结果</button></footer>
         </div>}
       </div>
-      <label className="filter-prototype-sort"><ArrowDownUp/><span>排序</span>
-        <select aria-label="职位排序"><option>推荐优先</option><option>最新信号</option>
-          <option>匹配度最高</option><option>证据最完整</option></select>
-      </label>
+      <FilterSelect
+        ariaLabel="职位排序"
+        value={sort}
+        onChange={setSort}
+        options={[
+          { value: "recommended", label: "推荐优先" },
+          { value: "latest", label: "最新信号" },
+          { value: "match", label: "匹配度最高" },
+          { value: "evidence", label: "证据最完整" },
+        ]}
+      />
     </div>
     {activeFilters.length > 0 && <div className="filter-prototype-chips"><span>已选条件</span>
       {source && <button type="button" onClick={() => setSource("")}>来源：{source}<X/></button>}
@@ -91,4 +100,13 @@ export const FilterToolbarProposal: Story = {
   name: "筛选栏方案预览",
   args: { mode: "offline" },
   render: () => <FilterToolbarPrototype/>,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: /筛选/ }));
+    const sourceOption = canvas.getByRole("button", { name: "驾驶舱" });
+    await userEvent.hover(sourceOption);
+    await userEvent.click(canvas.getByRole("button", { name: "职位排序" }));
+    await userEvent.click(canvas.getByRole("option", { name: "最新信号" }));
+    expect(canvas.getByRole("button", { name: "职位排序" })).toHaveTextContent("最新信号");
+  },
 };

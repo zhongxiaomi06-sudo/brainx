@@ -187,6 +187,7 @@ export async function bridgeOnce(db, { consultant_ids, execImpl = lark, api = { 
   const syncs = [];
   const errors = [];
   const skipped = [];
+  let sourcesOk = 0; // 成功抵达的数据源数（0 新增也算畅通；区别于「失败」）
   let changed = false;
 
   // 1) 职位盘点 Bitable（团队共享池）——2026-08-14 起默认关闭：TTC 已是职位权威源
@@ -207,6 +208,7 @@ export async function bridgeOnce(db, { consultant_ids, execImpl = lark, api = { 
       catch (e) { errors.push(`bitable_lark:${String(e.message).slice(0, 120)}`); }
     }
     if (payload) {
+      sourcesOk++; // Bitable 通道畅通（与是否有新行无关）
       for (const cid of cids) {
         const prev = db.prepare(`SELECT input_hash FROM sync_runs
           WHERE consultant_id=? AND source='bridge' ORDER BY started_at DESC LIMIT 1`).get(cid);
@@ -266,6 +268,7 @@ export async function bridgeOnce(db, { consultant_ids, execImpl = lark, api = { 
             .run('ttc_watermark', new Date(maxU).toISOString(), now());
         }
         if (ttcComplete) {
+          sourcesOk++; // TTC 通道畅通（0 新增也是成功：上游真的没变化）
           db.prepare(`INSERT INTO bridge_cursor (source, checkpoint, updated_at) VALUES (?,?,?)
             ON CONFLICT(source) DO UPDATE SET checkpoint=excluded.checkpoint, updated_at=excluded.updated_at`)
             .run(rrKey, String((rrIdx + 1) % withJwt.length), now());
@@ -351,7 +354,7 @@ export async function bridgeOnce(db, { consultant_ids, execImpl = lark, api = { 
     }
   }
   if (newMessages > 0) changed = true;
-  return { changed, syncs, new_messages: newMessages, matched: matchedTotal,
+  return { changed, syncs, sources_ok: sourcesOk, new_messages: newMessages, matched: matchedTotal,
            skipped, errors, at: now() };
 }
 
@@ -410,8 +413,10 @@ export function startBridge(db, bus, { intervalMs, recommendFn, consultantIdsFn,
             }
           }
         }
-        // 职位源全断 = 全员事故，广播；个人令牌失效只提醒本人
-        if (out.syncs.length === 0) {
+        // 判定依据 sources_ok：所有源都不可达才是失败（2026-08-26 修正——
+        // 「源畅通但零新增」曾被误判为全断，健康状态被无限退避 + 误报横幅）。
+        // 真实部分失败（errors 非空）仍走退避；仅令牌失效不算源失败。
+        if (out.sources_ok === 0 && out.errors.length === 0) {
           failed = true;
           bus?.emit({ type: 'sync_error', message: '职位源拉取失败（TTC 与 Bitable 均不可用）', at: now() });
         }

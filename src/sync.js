@@ -206,11 +206,14 @@ export function latestRealSync(db, consultant_id) {
     ORDER BY started_at DESC LIMIT 1`).get(consultant_id);
 }
 
-/** 最近一条 bridge-error（降级信号源）：比 afterIso 新才返回。 */
+/** 最近一条 bridge-error（降级信号源）：比 afterIso 新才返回。
+ * 2026-08-26：加 2h 时效——健康恢复后不再写新错误行，旧行若不过期会让
+ * 「同步失败中」横幅永久残留（源畅通但零新增时 sync_runs 无新行可刷新基准）。 */
 export function latestBridgeError(db, consultant_id, afterIso = '') {
+  const cutoff = new Date(Date.now() - 2 * 3600 * 1000).toISOString();
   return db.prepare(`SELECT errors, started_at FROM sync_runs
-    WHERE consultant_id=? AND source='bridge-error' AND started_at > ?
-    ORDER BY started_at DESC LIMIT 1`).get(consultant_id, afterIso || '');
+    WHERE consultant_id=? AND source='bridge-error' AND started_at > ? AND started_at > ?
+    ORDER BY started_at DESC LIMIT 1`).get(consultant_id, afterIso || '', cutoff);
 }
 
 /** bridge-error 的面向用户文案（2026-08-25）：banner 不暴露内部错误原文

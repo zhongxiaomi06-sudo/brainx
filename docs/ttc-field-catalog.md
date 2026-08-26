@@ -33,11 +33,29 @@ TTC 是 BrainX 的职位权威源。字段库只解决一件事：让正式页�
 4. 正式页面只能从字段库的默认列与能力状态生成表头；Storybook 使用同形脱敏数据。
 5. TTC 字段变化时先更新契约与回归测试，再调整正式页面，不允许前端独立猜测。
 
+## API 与覆盖率报告
+
+`GET /api/v1/radar` 返回三层内容：
+
+- `items`：每条职位同时包含 `cities[]`、`pipeline_steps`、`owner_name`，并保留旧的 `city`、`pipeline` 摘要以兼容现有调用方；
+- `field_capabilities`：针对当前顾问可见职位计算八个主字段的覆盖率，以及能否展示、能否筛选；
+- `field_report`：该顾问最近一次 TTC 同步时留下的完整字段质量快照。
+
+每个新的 TTC `sync_runs` 批次都会在同一事务内写入一条 `ttc_field_reports`。报告记录同步批次、字段库版本、读入行数、完整性、错误、警告以及每个字段的覆盖率。同步失败时不会留下“看似成功”的独立报告；事务回滚时两者一起回滚。
+
+报告可以通过以下接口核对：
+
+- `GET /api/v1/ttc/field-report`：本人最近一次 TTC 字段报告；
+- `GET /api/v1/sync-runs/:id`：指定本人同步批次，并内嵌对应 `field_report`；
+- `GET /api/v1/radar`：正式职位表消费的当前能力与最近报告。
+
+迁移前的历史同步不会补造当时覆盖率；部署后下一次 TTC 同步开始持续生成报告。
+
 ## 验证
 
 运行：
 
-    node --test tests/ttc-field-catalog.test.mjs
+    node --test tests/ttc-field-catalog.test.mjs tests/radar.test.mjs
 
 完整交付仍遵守[上传前完整验证](standards/PRE_PUSH_VERIFICATION.md)与[内部 Storybook 组件库](storybook-component-library.md)。
 

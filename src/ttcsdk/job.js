@@ -80,11 +80,13 @@ export function toJobRow(j) {
   const blurred = j.need_blur === 1 || j.need_blur === true;
   const company = (blurred && j.company_name_for_c) ? j.company_name_for_c : (j.company_name || '');
   const steps = j.pipeline_info?.pipeline_step_count || {};
+  const cities = Array.isArray(j.cities) ? j.cities.map((city) => String(city).trim()).filter(Boolean) : [];
   const pipe = Object.entries(steps).map(([k, v]) => `${k}×${v}`).join(' ');
   return {
     project_id: j.unique_id,              // 真 ATS project_id（替换 P-FIX 占位）
     company, role: j.name || '职位待定',
-    city: (j.cities || []).join('、') || null,
+    city: cities.join('、') || null,
+    cities,
     pipeline: pipe || null,               // 真 Pipeline（"Sourcing×1 二面×2" 摘要）
     hc: j.head_count ?? null,             // 真 HC
     active_state: j.status === 1 ? 'OPEN' : j.status === 0 ? 'COOLING' : 'UNKNOWN',
@@ -98,7 +100,7 @@ export function toJobRow(j) {
     source_url: `ttc://job/${j.unique_id}`,
     captured_at: j.update_time ? new Date(Number(j.update_time)).toISOString() : undefined,
     ttc: { schema_version: TTC_FIELD_SCHEMA_VERSION, field_errors: fieldCheck.errors,
-           field_warnings: fieldCheck.warnings, pipeline_steps: steps,
+           field_warnings: fieldCheck.warnings, cities, pipeline_steps: steps,
            company_unique_id: j.company_unique_id, cooperation: j.cooperation || '',
            status_tags: j.status_tags || [], group_chat_id: j.group_chat?.id || '',
            participants: (j.participants || []).map((p) => p.name) },

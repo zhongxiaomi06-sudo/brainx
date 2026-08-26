@@ -6,6 +6,8 @@ import {
   eligibilityOf,
   factsOf,
   groupOf,
+  getRadar,
+  getTtcFieldReport,
   mapClientRow,
   mapEvents,
   mapOutcomes,
@@ -191,7 +193,10 @@ test("maps backend radar rows without inventing operational metrics", () => {
     company: "蝴蝶梦境",
     role: "海外增长负责人",
     city: "上海",
+    cities: ["上海市", "北京市"],
     pipeline: "推荐 3 · 面试 1",
+    pipeline_steps: { recommendation: 3, interview: 1 },
+    owner_name: "Mia 钟笑咪",
     hc: null,
     active_state: "OPEN",
     relation: "TEAM_SHARED",
@@ -203,11 +208,44 @@ test("maps backend radar rows without inventing operational metrics", () => {
   assert.equal(row.status, "活跃");
   assert.equal(row.source, "市场信号");
   assert.equal(row.hc, null); // UNKNOWN 原样为 null，绝不写 0
+  assert.deepEqual(row.cities, ["上海市", "北京市"]);
+  assert.deepEqual(row.pipelineSteps, { recommendation: 3, interview: 1 });
+  assert.equal(row.ownerName, "Mia 钟笑咪");
   assert.equal(row.score, null);
   assert.equal(row.recommended, null);
   assert.equal(row.pm, "团队共享");
   assert.match(row.reason, /Pipeline/);
   assert.equal(row.positionType, "商业化");
+});
+
+test("normalizes radar field capabilities and sync report for the frontend", async () => {
+  const backendReport = {
+    sync_id: "sync-1", consultant_id: "mia", created_at: "2026-08-26T00:00:00Z",
+    schema_version: "ttc-job-search-2026-08-26", total_rows: 1,
+    rows_expected: 1, rows_read: 1, complete: true, errors: [], warnings: [],
+    fields: [{ key: "city", label: "城市", kind: "text-list", populated: 1, coverage: 1,
+      display_available: true, filter_available: true }],
+  };
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (path) => new Response(JSON.stringify(String(path).includes("field-report")
+    ? { report: backendReport }
+    : {
+        schema_version: backendReport.schema_version,
+        items: [{ project_id: "p-1", cities: ["上海市"], pipeline_steps: { Interview: 1 }, owner_name: "Mia" }],
+        field_capabilities: backendReport.fields,
+        field_report: backendReport,
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+  try {
+    const radar = await getRadar();
+    assert.equal(radar.schemaVersion, backendReport.schema_version);
+    assert.equal(radar.fieldCapabilities[0].filterAvailable, true);
+    assert.equal(radar.fieldReport.syncId, "sync-1");
+    const report = await getTtcFieldReport();
+    assert.equal(report.totalRows, 1);
+    assert.equal(report.fields[0].displayAvailable, true);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("maps cockpit radar rows as 驾驶舱导入 with cockpit context", () => {

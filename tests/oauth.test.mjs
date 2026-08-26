@@ -81,7 +81,8 @@ test('OAuth HTTP 流：authorize 302 + 回调换身份 + 花名册 fail-closed +
 
   // 3. 带合法 cookie 访问 workbench → 200
   const r3 = await fetch(`${base}/api/v1/workbench`, { headers: { Cookie: `brainx_session=${token}` } });
-  assert.equal(r3.status, 200);
+  const r3Body = await r3.text();
+  assert.equal(r3.status, 200, r3Body);
 
   // 4. 坏 state → /login?error=bad_state
   const r4 = await fetch(`${base}/api/v1/oauth/callback?code=abc&state=bad`, { redirect: 'manual' });

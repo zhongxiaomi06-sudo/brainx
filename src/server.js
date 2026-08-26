@@ -28,7 +28,7 @@ import { confirmMembership } from './membership.js';
 import { startOpenmaiTask, getOpenmaiResult } from './openmai-task.js';
 import { radarPayload, clientRows } from './radar.js';
 import { ttcFieldReportForSync } from './ttc-field-report.js';
-import { ttcRoutes } from './ttc-routes.js';
+import { ttcAuthStatus, ttcRoutes } from './ttc-routes.js';
 import { syncTalentsFromCsv, listTalents as listTalentsRepo, getTalent, talentBackendStatus, ingestResume, syncTalentsFromResumes, listResumes, talentHealth } from './talent.js';
 import { talentSupplyForJob, talentSupplyEnabled } from './talent-supply.js';
 import { effectiveJob, effectiveFactPayload, updateFactOverrides } from './facts.js';

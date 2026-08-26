@@ -3,6 +3,8 @@ import { body, err, json } from './server-http.js';
 import { loadConsultants } from './recommend.js';
 import { latestTtcFieldReport } from './ttc-field-report.js';
 import { validateJwt, saveTtcToken, ttcAuthStatus } from './ttcsdk/auth.js';
+
+export { ttcAuthStatus };
 import { quota as ttcQuota } from './ttcsdk/user.js';
 import { TtcApiError } from './ttcsdk/http.js';
 

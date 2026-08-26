@@ -260,8 +260,10 @@ export async function bridgeOnce(db, { consultant_ids, execImpl = lark, api = { 
         (source, checkpoint, updated_at) VALUES (?,?,?) ON CONFLICT(source) DO UPDATE SET
         checkpoint=excluded.checkpoint, updated_at=excluded.updated_at`).run(source, checkpoint, now());
       try {
+        // TTC 的限流响应会消费本次请求携带的 cursor；同轮继续翻页后再重试会报 -111。
+        // 因此每 tick 只取一页，先持久化下一页 cursor，下个 tick 再继续。
         const { jobs, complete: ttcComplete, nextCursor } = await searchSince(jwt,
-          { sinceMs, initialCursor, paceMs: TTC_PAGE_PACE_MS }, fetchImpl);
+          { sinceMs, initialCursor, paceMs: TTC_PAGE_PACE_MS, maxPages: 1 }, fetchImpl);
         for (const j of jobs) {
           if (!j.unique_id || j.has_permission === false) continue;
           if (!union.has(j.unique_id)) union.set(j.unique_id, toJobRow(j));
@@ -285,6 +287,9 @@ export async function bridgeOnce(db, { consultant_ids, execImpl = lark, api = { 
         }
       } catch (e) {
         if (e instanceof TtcApiError && e.authInvalid) markTtcReauth(db, cid);
+        if (e instanceof TtcApiError && e.code === -111 && initialCursor) {
+          db.prepare('DELETE FROM bridge_cursor WHERE source IN (?,?)').run(cursorKey, highKey);
+        }
         ttcErrs.push(`${cid}:${String(e.message).slice(0, 60)}`);
         if (isRateLimited(e)) ttcErrs.push('限流 fail-fast：本轮放弃其余顾问');
       }

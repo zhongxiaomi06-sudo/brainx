@@ -173,17 +173,13 @@ test('bridgeOnce：首次全量遇限流后按 cursor 续传，不用时间水�
   saveTtcToken(db, 'backfill', jwt, validateJwt(jwt));
   const newer = { ...TTC_JOB, unique_id: 'BF-NEW', update_time: 2000 };
   const older = { ...TTC_JOB, unique_id: 'BF-OLD', update_time: 1000 };
-  let limited = false;
+  let calls = 0;
   const fetchImpl = async (_url, options) => {
+    calls++;
     const body = JSON.parse(options.body);
     if (!body.cursor) return new Response(JSON.stringify({ code: 0,
       data: { jobs: [newer], has_more: true, cursor: 'resume-old' } }),
     { status: 200, headers: { 'Content-Type': 'application/json' } });
-    if (!limited) {
-      limited = true;
-      return new Response(JSON.stringify({ code: -90429, msg: '服务繁忙' }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } });
-    }
     assert.equal(body.cursor, 'resume-old');
     return new Response(JSON.stringify({ code: 0,
       data: { jobs: [older], has_more: false, cursor: '' } }),
@@ -192,9 +188,11 @@ test('bridgeOnce：首次全量遇限流后按 cursor 续传，不用时间水�
   const larkStub = () => ({ data: { fields: [], data: [], record_id_list: [] } });
   const first = await bridgeOnce(db, { consultant_ids: ['backfill'], execImpl: larkStub, api: { fetchImpl } });
   assert.equal(first.sources_ok, 1, '拿到一页即视为有进展，不触发指数退避');
+  assert.equal(calls, 1, '每轮只请求一页，避免第二页主动撞限流并消费 cursor');
   assert.equal(db.prepare('SELECT checkpoint FROM bridge_cursor WHERE source=?')
     .get('ttc_scan_cursor@backfill').checkpoint, 'resume-old');
   await bridgeOnce(db, { consultant_ids: ['backfill'], execImpl: larkStub, api: { fetchImpl } });
+  assert.equal(calls, 2, '第二轮从已保存 cursor 请求下一页');
   assert.equal(db.prepare(`SELECT COUNT(*) n FROM job_facts WHERE project_id IN ('BF-NEW','BF-OLD')`).get().n, 2);
   assert.equal(db.prepare('SELECT checkpoint FROM bridge_cursor WHERE source=?')
     .get('ttc_backfill_done@backfill').checkpoint, '1');

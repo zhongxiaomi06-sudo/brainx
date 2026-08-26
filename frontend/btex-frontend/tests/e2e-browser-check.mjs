@@ -50,12 +50,39 @@ async function waitForApp(url, child) {
   throw new Error(`BrainX 启动超时\n${output.join("").slice(-4000)}`);
 }
 
+async function waitForFrontend(page, url, child) {
+  const deadline = Date.now() + 60_000;
+  let lastTitle = "";
+  let lastError = "";
+  while (Date.now() < deadline) {
+    if (child.exitCode !== null) {
+      throw new Error(`BrainX 提前退出 code=${child.exitCode}\n${output.join("").slice(-4000)}`);
+    }
+    try {
+      await page.goto(url, { waitUntil: "domcontentloaded", timeout: 10_000 });
+      lastTitle = await page.title();
+      if (lastTitle === "B-tex · 职位决策工作台"
+        && await page.getByRole("main").count()) return;
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error);
+    }
+    await sleep(500);
+  }
+  throw new Error(`前端启动超时 title=${JSON.stringify(lastTitle)} error=${lastError}\n${output.join("").slice(-4000)}`);
+}
+
 async function stopApp(child) {
   if (!child || child.exitCode !== null) return;
-  child.kill("SIGTERM");
+  const signal = (name) => {
+    if (process.platform === "win32") child.kill(name);
+    else {
+      try { process.kill(-child.pid, name); } catch { child.kill(name); }
+    }
+  };
+  signal("SIGTERM");
   await Promise.race([
     new Promise((resolveExit) => child.once("exit", resolveExit)),
-    sleep(5_000).then(() => child.kill("SIGKILL")),
+    sleep(5_000).then(() => signal("SIGKILL")),
   ]);
 }
 
@@ -86,6 +113,7 @@ try {
       BRAINX_MYSQL_DATABASE: "",
     },
     stdio: ["ignore", "pipe", "pipe"],
+    detached: process.platform !== "win32",
   });
   app.stdout.on("data", remember);
   app.stderr.on("data", remember);
@@ -110,7 +138,10 @@ try {
     }
   });
 
-  await page.goto(base, { waitUntil: "networkidle" });
+  await waitForFrontend(page, base, app);
+  pageErrors.length = 0;
+  consoleErrors.length = 0;
+  failedResponses.length = 0;
   assert.equal(await page.title(), "B-tex · 职位决策工作台");
   await assert.doesNotReject(() => page.getByRole("main").waitFor({ state: "visible" }));
   assert.match(await page.locator("body").innerText(), /演示模式/);

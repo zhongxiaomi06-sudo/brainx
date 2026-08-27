@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { X } from "lucide-react";
+import { JobDetailCard, type JobDetailReviewData } from "./job-detail-card-review";
 import {
   TtcJobsTable,
   type TtcFieldCapability,
@@ -12,6 +12,13 @@ import { ClientInsightsReview, type ClientFactRow } from "./client-insights-revi
 import type { BackendClientRow, BackendRadarRow, RadarFieldCapability } from "./brainx-api";
 
 const filterKeys = new Set<TtcFieldCapability["key"]>(["company", "city", "active_state", "hc", "owner_name"]);
+const relationLabels: Record<string, string> = {
+  MY_JOB: "我的职位",
+  PRIMARY_PM: "我是主 PM",
+  TEAM_SHARED: "团队共享",
+  OTHER_CONSULTANT: "其他顾问主做",
+  NOT_JOINED: "未加入",
+};
 
 function jobStatus(value?: string | null): TtcJobStatus {
   if (value === "OPEN") return "OPEN";
@@ -44,6 +51,35 @@ export function toTtcCapability(field: RadarFieldCapability): TtcFieldCapability
   };
 }
 
+export function toJobDetail(row: BackendRadarRow): JobDetailReviewData {
+  return {
+    projectId: row.project_id,
+    role: row.role || "职位待确认",
+    company: row.company || "公司待确认",
+    cities: row.cities || (row.city ? row.city.split("、").filter(Boolean) : []),
+    activeState: jobStatus(row.active_state),
+    hc: row.hc ?? null,
+    pipeline: row.pipeline_steps || null,
+    ownerName: row.owner_name || null,
+    capturedAt: row.captured_at || null,
+    relation: relationLabels[row.relation || ""] || null,
+    companyType: row.company_type || null,
+    currentStage: row.cockpit?.current_stage || null,
+    nextAction: row.cockpit?.next_action || null,
+    inMyProjects: row.relation === "MY_JOB" || row.relation === "PRIMARY_PM",
+  };
+}
+
+function safeSourceUrl(value?: string | null) {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
 export function toClientFact(row: BackendClientRow): ClientFactRow {
   return {
     company: row.company,
@@ -57,23 +93,14 @@ export function toClientFact(row: BackendClientRow): ClientFactRow {
   };
 }
 
-function JobFactDetail({ row, onClose }: { row: TtcJobTableRow; onClose: () => void }) {
-  const pipeline = row.pipeline
-    ? Object.entries(row.pipeline).filter(([, value]) => value > 0).map(([stage, value]) => `${stage} ${value}`).join(" · ")
-    : "待确认";
-  return <><button className="client-detail-backdrop" type="button" aria-label="关闭职位事实" onClick={onClose} /><aside className="client-detail" aria-label={`${row.role} 职位事实`}>
-    <header><div><span>TTC JOB FACT</span><h2>{row.role}</h2><p>{row.company}</p></div><button type="button" aria-label="关闭职位事实" onClick={onClose}><X /></button></header>
-    <dl><div><dt>项目编号</dt><dd>{row.projectId}</dd></div><div><dt>城市</dt><dd>{row.cities.join("、") || "待确认"}</dd></div><div><dt>HC</dt><dd>{row.hc ?? "待确认"}</dd></div><div><dt>主做顾问</dt><dd>{row.ownerName || "待确认"}</dd></div></dl>
-    <section><h3>Pipeline</h3><p>{pipeline}</p></section>
-    <div className="client-detail-note"><p>这里只展示 TTC 可核验职位事实；推荐判断和承接动作仍从“今日决策”或“我的项目”进入。</p></div>
-  </aside></>;
-}
-
-function WorkbenchJobsPage({ items, capabilities, company }: { items: BackendRadarRow[]; capabilities: RadarFieldCapability[]; company?: string | null }) {
+function WorkbenchJobsPage({ items, capabilities, company, onAddToProjects }: { items: BackendRadarRow[]; capabilities: RadarFieldCapability[]; company?: string | null; onAddToProjects: (projectId: string) => void }) {
   const rows = useMemo(() => items.map(toTtcJobRow).filter(row => !company || row.company === company), [company, items]);
   const fields = useMemo(() => capabilities.map(toTtcCapability).filter((field): field is TtcFieldCapability => field !== null), [capabilities]);
-  const [selected, setSelected] = useState<TtcJobTableRow | null>(null);
-  return <>{company && <div className="ttc-filter-context">正在查看客户“{company}”的职位</div>}<TtcJobsTable rows={rows} capabilities={fields} onOpen={projectId => setSelected(rows.find(row => row.projectId === projectId) || null)} />{selected && <JobFactDetail row={selected} onClose={() => setSelected(null)} />}</>;
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selectedSource = selectedId ? items.find(row => row.project_id === selectedId) || null : null;
+  const selected = selectedSource ? toJobDetail(selectedSource) : null;
+  const sourceUrl = safeSourceUrl(selectedSource?.cockpit?.source_url);
+  return <>{company && <div className="ttc-filter-context">正在查看客户“{company}”的职位</div>}<TtcJobsTable rows={rows} capabilities={fields} onOpen={setSelectedId} />{selected && <JobDetailCard job={selected} onClose={() => setSelectedId(null)} onAddToProjects={onAddToProjects} onOpenSource={sourceUrl ? () => window.open(sourceUrl, "_blank", "noopener,noreferrer") : undefined} />}</>;
 }
 
 function WorkbenchClientsPage({ items, onOpenJobs }: { items: BackendClientRow[]; onOpenJobs: (company: string) => void }) {

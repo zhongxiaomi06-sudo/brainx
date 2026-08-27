@@ -17,7 +17,7 @@ import {
   X,
 } from "lucide-react";
 import {
-  JobDetailCardReview,
+  JobDetailCard,
   type JobDetailEvent,
   type JobDetailRecommendation,
 } from "./job-detail-card-review";
@@ -217,7 +217,7 @@ export function JobsWorkspaceReview({
         </div>
       </section>
       {selected && (
-        <JobDetailCardReview
+        <JobDetailCard
           job={{
             projectId: selected.projectId,
             role: selected.role,

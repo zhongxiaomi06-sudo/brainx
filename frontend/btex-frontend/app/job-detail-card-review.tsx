@@ -50,12 +50,12 @@ export type JobDetailReviewData = {
   inMyProjects?: boolean;
 };
 
-export type JobDetailCardReviewProps = {
+export type JobDetailCardProps = {
   job: JobDetailReviewData;
   onClose: () => void;
-  onAddToProjects: (projectId: string) => void;
-  onDismiss: (projectId: string) => void;
-  onOpenSource: (projectId: string) => void;
+  onAddToProjects?: (projectId: string) => void;
+  onDismiss?: (projectId: string) => void;
+  onOpenSource?: (projectId: string) => void;
 };
 
 const stateLabels = {
@@ -109,13 +109,13 @@ function Fact({ label, value }: { label: string; value: string | number | null |
   return <div><dt>{label}</dt><dd className={displayValue(value) === "待确认" ? "is-missing" : ""}>{displayValue(value)}</dd></div>;
 }
 
-export function JobDetailCardReview({
+export function JobDetailCard({
   job,
   onClose,
   onAddToProjects,
   onDismiss,
   onOpenSource,
-}: JobDetailCardReviewProps) {
+}: JobDetailCardProps) {
   const dialogRef = useRef<HTMLElement>(null);
   const pipeline = pipelineItems(job.pipeline);
   const recommendation = job.recommendation?.reasons.length ? job.recommendation : null;
@@ -196,14 +196,14 @@ export function JobDetailCardReview({
           <section className="job-detail-review-source">
             <Database />
             <span><b>TTC CRM 职位快照</b><small>最近同步 {displayDate(job.capturedAt)} · 缺失字段保持待确认</small></span>
-            <button type="button" onClick={() => onOpenSource(job.projectId)}>查看来源<ExternalLink /></button>
+            {onOpenSource && <button type="button" onClick={() => onOpenSource(job.projectId)}>查看来源<ExternalLink /></button>}
           </section>
         </div>
 
-        <footer className="job-detail-review-actions">
-          <button type="button" className="is-dismiss" onClick={() => onDismiss(job.projectId)}>暂不考虑</button>
-          <button type="button" className="is-primary" disabled={job.inMyProjects} onClick={() => onAddToProjects(job.projectId)}>{job.inMyProjects ? "已加入我的项目" : "加入我的项目"}</button>
-        </footer>
+        {(onDismiss || onAddToProjects) && <footer className={`job-detail-review-actions${onDismiss && onAddToProjects ? "" : " is-single"}`}>
+          {onDismiss && <button type="button" className="is-dismiss" onClick={() => onDismiss(job.projectId)}>暂不考虑</button>}
+          {onAddToProjects && <button type="button" className="is-primary" disabled={job.inMyProjects} onClick={() => onAddToProjects(job.projectId)}>{job.inMyProjects ? "已加入我的项目" : "加入我的项目"}</button>}
+        </footer>}
       </section>
     </div>
   );

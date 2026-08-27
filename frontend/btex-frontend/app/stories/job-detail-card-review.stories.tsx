@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, userEvent, within } from "storybook/test";
 import {
-  JobDetailCardReview,
+  JobDetailCard,
   type JobDetailReviewData,
 } from "../job-detail-card-review";
 
@@ -57,7 +57,7 @@ const openSource = fn();
 
 const meta = {
   title: "业务组件/居中职位事实卡审核稿",
-  component: JobDetailCardReview,
+  component: JobDetailCard,
   args: {
     job: completeJob,
     onClose: close,
@@ -66,7 +66,7 @@ const meta = {
     onOpenSource: openSource,
   },
   parameters: { bare: true, layout: "fullscreen" },
-} satisfies Meta<typeof JobDetailCardReview>;
+} satisfies Meta<typeof JobDetailCard>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -129,7 +129,7 @@ function EntryHarness({ mode, initialJob = completeJob }: { mode: "today" | "all
         {notice && <p role="status" style={{ color: "#17856f" }}>{notice}</p>}
       </div>
       {selected && (
-        <JobDetailCardReview
+        <JobDetailCard
           job={selected}
           onClose={() => setSelected(null)}
           onAddToProjects={add}

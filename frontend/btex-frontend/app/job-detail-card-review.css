@@ -83,6 +83,7 @@
 .job-detail-review-source button { display: inline-flex; align-items: center; gap: 5px; border: 0; background: transparent; color: var(--detail-accent); font: 650 10px inherit; cursor: pointer; }
 .job-detail-review-source button svg { width: 12px; }
 .job-detail-review-actions { display: grid; grid-template-columns: minmax(120px,.45fr) minmax(220px,1fr); gap: 10px; padding: 14px 26px 20px; border-top: 1px solid var(--detail-line); background: rgba(252,253,252,.97); }
+.job-detail-review-actions.is-single { grid-template-columns: 1fr; }
 .job-detail-review-actions button { height: 44px; border: 1px solid #dbe3df; border-radius: 12px; background: #fff; color: #50615b; font: 650 12px inherit; cursor: pointer; }
 .job-detail-review-actions button:hover { background: #f5f8f7; }
 .job-detail-review-actions button.is-primary { border-color: var(--detail-accent); background: var(--detail-accent); color: #fff; }

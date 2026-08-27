@@ -191,6 +191,11 @@ test("uses TTC facts and field capabilities without restoring fake job filters",
   assert.match(workbench, /row\.owner_name/);
   assert.match(workbench, /field\.filterAvailable/);
   assert.match(workbench, /<TtcJobsTable rows=\{rows\} capabilities=\{fields\}/);
+  assert.match(workbench, /<JobDetailCard job=\{selected\}/);
+  assert.match(workbench, /relation:\s*relationLabels\[row\.relation/);
+  assert.match(workbench, /onAddToProjects=\{onAddToProjects\}/);
+  assert.match(workbench, /updateOpportunityMembership\(jobId,"MY_JOB"/);
+  assert.doesNotMatch(workbench, /function JobFactDetail|aria-label=\{`\$\{row\.role\} 职位事实`\}/);
   assert.match(workbench, /Promise\.allSettled\(\[\s*getRadar\(\)\.then/);
   assert.match(workbench, /visibleRows\.slice\(0, rowLimit\)/);
   assert.match(workbench, /visible\.slice\(0, rowLimit\)/);

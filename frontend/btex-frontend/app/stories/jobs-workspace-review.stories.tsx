@@ -12,12 +12,13 @@ const rows: JobsWorkspaceReviewRow[] = [
 
 const sync = fn();
 const follow = fn();
+const dismiss = fn();
 const openSource = fn();
 
 const meta = {
   title: "组合场景/现代职位工作区审核稿",
   component: JobsWorkspaceReview,
-  args: { rows, initialSelectedId: "TTC-EXAMPLE-001", onSync: sync, onFollow: follow, onOpenSource: openSource },
+  args: { rows, initialSelectedId: null, onSync: sync, onFollow: follow, onDismiss: dismiss, onOpenSource: openSource },
   parameters: { bare: true, layout: "fullscreen" },
 } satisfies Meta<typeof JobsWorkspaceReview>;
 
@@ -28,12 +29,15 @@ export const DesktopReview: Story = {
   name: "桌面端主审核稿",
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByRole("heading", { name: "高级算法工程师" })).toBeInTheDocument();
-    await expect(canvas.getByText("字段来自 TTC 真实职位快照")).toBeInTheDocument();
-    await expect(canvas.queryByText(/AI 匹配分/)).not.toBeInTheDocument();
+    await expect(canvas.queryByRole("dialog")).not.toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: "同步职位" }));
     await expect(sync).toHaveBeenCalledOnce();
-    await userEvent.click(canvas.getByRole("button", { name: "加入跟进" }));
+    await userEvent.click(canvas.getByRole("button", { name: /高级算法工程师/ }));
+    await expect(canvas.getByRole("heading", { name: "高级算法工程师" })).toBeInTheDocument();
+    await expect(canvas.getByRole("dialog", { name: "高级算法工程师" })).toBeInTheDocument();
+    await expect(canvas.getByText("脱敏审核数据 · 字段结构对齐 TTC 职位快照")).toBeInTheDocument();
+    await expect(canvas.queryByText(/AI 匹配分/)).not.toBeInTheDocument();
+    await userEvent.click(canvas.getByRole("button", { name: "加入我的项目" }));
     await expect(follow).toHaveBeenCalledWith("TTC-EXAMPLE-001");
     await userEvent.click(canvas.getByRole("button", { name: "查看来源" }));
     await expect(openSource).toHaveBeenCalledWith("TTC-EXAMPLE-001");
@@ -50,6 +54,8 @@ export const FilteringAndSelection: Story = {
     await expect(canvas.queryByText("企业服务产品总监")).not.toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: /解决方案架构师/ }));
     await expect(canvas.getByRole("heading", { name: "解决方案架构师" })).toBeInTheDocument();
+    await userEvent.click(canvas.getByRole("button", { name: "关闭职位详情" }));
+    await expect(canvas.queryByRole("dialog")).not.toBeInTheDocument();
     await userEvent.selectOptions(canvas.getByRole("combobox", { name: "筛选城市" }), "杭州市");
     await expect(canvas.getByText("没有符合条件的职位")).toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: "清除条件" }));

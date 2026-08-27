@@ -4,13 +4,10 @@ import { useMemo, useState } from "react";
 import {
   ArrowDownUp,
   BriefcaseBusiness,
-  Check,
   ChevronDown,
   CircleDot,
   ClipboardCheck,
   Command,
-  Database,
-  ExternalLink,
   Filter,
   RefreshCw,
   Search,
@@ -19,6 +16,11 @@ import {
   Users,
   X,
 } from "lucide-react";
+import {
+  JobDetailCardReview,
+  type JobDetailEvent,
+  type JobDetailRecommendation,
+} from "./job-detail-card-review";
 import type { TtcJobStatus } from "./ttc-jobs-table";
 import "./jobs-workspace-review.css";
 
@@ -34,6 +36,14 @@ export type JobsWorkspaceReviewRow = {
   capturedAt: string | null;
   workflowState: "PENDING" | "FOLLOWING" | "WATCHING";
   newThisWeek?: boolean;
+  relation?: string | null;
+  companyType?: string | null;
+  priority?: string | null;
+  currentStage?: string | null;
+  nextAction?: string | null;
+  notes?: string | null;
+  recommendation?: JobDetailRecommendation | null;
+  events?: JobDetailEvent[];
 };
 
 type SavedView = "all" | "pending" | "following" | "new";
@@ -44,6 +54,7 @@ type JobsWorkspaceReviewProps = {
   initialSelectedId?: string | null;
   onSync?: () => void;
   onFollow?: (projectId: string) => void;
+  onDismiss?: (projectId: string) => void;
   onOpenSource?: (projectId: string) => void;
 };
 
@@ -81,21 +92,13 @@ function formatDate(value: string | null) {
   return new Intl.DateTimeFormat("zh-CN", { month: "2-digit", day: "2-digit" }).format(date);
 }
 
-function pipelineSummary(pipeline: JobsWorkspaceReviewRow["pipeline"]) {
-  if (!pipeline) return "暂无可核验进展";
-  const labels: Record<string, string> = { sourcing: "寻访", recommendation: "推荐", recommended: "推荐", interview: "面试", offer: "Offer", onboard: "入职" };
-  const values = Object.entries(pipeline)
-    .filter(([, value]) => Number.isFinite(value) && value > 0)
-    .map(([key, value]) => `${labels[key.toLowerCase()] || key} ${value}`);
-  return values.length ? values.join(" · ") : "暂无可核验进展";
-}
-
 export function JobsWorkspaceReview({
   rows,
   consultant = "Mia 钟笑咪",
   initialSelectedId,
   onSync,
   onFollow,
+  onDismiss,
   onOpenSource,
 }: JobsWorkspaceReviewProps) {
   const [savedView, setSavedView] = useState<SavedView>("all");
@@ -103,9 +106,7 @@ export function JobsWorkspaceReview({
   const [city, setCity] = useState("全部");
   const [status, setStatus] = useState("全部");
   const [tipVisible, setTipVisible] = useState(true);
-  const [selectedId, setSelectedId] = useState(
-    initialSelectedId === undefined ? rows[0]?.projectId || null : initialSelectedId,
-  );
+  const [selectedId, setSelectedId] = useState(initialSelectedId ?? null);
 
   const counts = useMemo(() => ({
     all: rows.length,
@@ -158,7 +159,7 @@ export function JobsWorkspaceReview({
           <button className="jobs-review-sync" type="button" onClick={onSync}><RefreshCw aria-hidden="true" />同步职位</button>
         </header>
 
-        <div className={`jobs-review-body${selected ? " has-detail" : ""}`}>
+        <div className="jobs-review-body">
           <main className="jobs-review-main">
             <div className="jobs-review-tabs" role="tablist" aria-label="职位视图">
               {views.map((view) => (
@@ -210,43 +211,42 @@ export function JobsWorkspaceReview({
                 </tbody>
               </table>
               {visibleRows.length === 0 && <div className="jobs-review-empty"><b>没有符合条件的职位</b><span>调整筛选条件后再试。</span></div>}
-              <footer><span>{visibleRows.length} 个结果</span><span>字段来自 TTC 真实职位快照</span></footer>
+              <footer><span>{visibleRows.length} 个结果</span><span>脱敏审核数据 · 字段结构对齐 TTC 职位快照</span></footer>
             </div>
           </main>
-
-          {selected && (
-            <aside className="jobs-review-detail" aria-label="职位详情">
-              <header>
-                <div><span className="jobs-review-company-mark large">{selected.company.trim().slice(0, 1) || "?"}</span><span><h2>{selected.role || "待确认"}</h2><p>{selected.company || "待确认"}</p></span></div>
-                <button type="button" aria-label="关闭职位详情" onClick={() => setSelectedId(null)}><X aria-hidden="true" /></button>
-              </header>
-              <div className="jobs-review-facts">
-                <span>{selected.cities.length ? selected.cities.join("、") : "城市待确认"}</span>
-                <span>HC {selected.hc ?? "待确认"}</span>
-                <span>{ttcStatusLabel[selected.activeState]}</span>
-              </div>
-              <nav aria-label="详情分区"><button className="active" type="button">概览</button><button type="button">动态</button><button type="button">来源</button></nav>
-              <section>
-                <h3>可核验事实</h3>
-                <dl>
-                  <div><dt>主做顾问</dt><dd>{selected.ownerName || "待确认"}</dd></div>
-                  <div><dt>Pipeline</dt><dd>{pipelineSummary(selected.pipeline)}</dd></div>
-                  <div><dt>最近更新</dt><dd>{formatDate(selected.capturedAt)}</dd></div>
-                  <div><dt>职位编号</dt><dd>{selected.projectId}</dd></div>
-                </dl>
-              </section>
-              <section className="jobs-review-provenance">
-                <h3>数据来源</h3>
-                <div><Database aria-hidden="true" /><span><b>TTC CRM 职位快照</b><small>这里只显示当前接口能够核验的字段</small></span><Check aria-label="已核验" /></div>
-              </section>
-              <footer>
-                <button className="primary" type="button" onClick={() => onFollow?.(selected.projectId)}>加入跟进</button>
-                <button type="button" onClick={() => onOpenSource?.(selected.projectId)}>查看来源<ExternalLink aria-hidden="true" /></button>
-              </footer>
-            </aside>
-          )}
         </div>
       </section>
+      {selected && (
+        <JobDetailCardReview
+          job={{
+            projectId: selected.projectId,
+            role: selected.role,
+            company: selected.company,
+            cities: selected.cities,
+            activeState: selected.activeState,
+            hc: selected.hc,
+            pipeline: selected.pipeline,
+            ownerName: selected.ownerName,
+            capturedAt: selected.capturedAt,
+            relation: selected.relation ?? null,
+            companyType: selected.companyType,
+            priority: selected.priority,
+            currentStage: selected.currentStage,
+            nextAction: selected.nextAction,
+            notes: selected.notes,
+            recommendation: selected.recommendation,
+            events: selected.events,
+            inMyProjects: selected.workflowState === "FOLLOWING",
+          }}
+          onClose={() => setSelectedId(null)}
+          onAddToProjects={(projectId) => onFollow?.(projectId)}
+          onDismiss={(projectId) => {
+            onDismiss?.(projectId);
+            setSelectedId(null);
+          }}
+          onOpenSource={(projectId) => onOpenSource?.(projectId)}
+        />
+      )}
     </div>
   );
 }

@@ -55,6 +55,7 @@ export function radarRows(db, consultant_id) {
       hc: j.hc ?? null,
       active_state: j.active_state ?? null,
       priority: j.priority ?? null,
+      notes: j.notes ?? null,
       company_type: j.company_type ?? null,
       source_url: j.source_url ?? null,
       captured_at: j.captured_at ?? null,

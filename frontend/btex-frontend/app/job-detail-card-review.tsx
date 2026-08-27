@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ArrowRight,
   BriefcaseBusiness,
@@ -19,15 +19,18 @@ export type JobDetailRecommendation = {
   action: "FOLLOW" | "WATCH" | "HOLD";
   reasons: string[];
   risks: string[];
-  generatedAt: string;
-  policyVersion: string;
+  generatedAt: string | null;
+  policyVersion: string | null;
 };
 
 export type JobDetailEvent = {
   id: string;
   label: string;
-  at: string;
+  at: string | null;
+  detail?: string | null;
 };
+
+export type JobDetailTab = "facts" | "judgement" | "engagement" | "trail" | "replay";
 
 export type JobDetailReviewData = {
   projectId: string;
@@ -47,6 +50,8 @@ export type JobDetailReviewData = {
   notes?: string | null;
   recommendation?: JobDetailRecommendation | null;
   events?: JobDetailEvent[];
+  sourceUrl?: string | null;
+  engagementState?: string | null;
   inMyProjects?: boolean;
 };
 
@@ -56,6 +61,11 @@ export type JobDetailCardProps = {
   onAddToProjects?: (projectId: string) => void;
   onDismiss?: (projectId: string) => void;
   onOpenSource?: (projectId: string) => void;
+  activeTab?: JobDetailTab;
+  initialTab?: JobDetailTab;
+  onTabChange?: (tab: JobDetailTab) => void;
+  detailContent?: ReactNode;
+  statusLabel?: string;
 };
 
 const stateLabels = {
@@ -83,7 +93,7 @@ const pipelineLabels: Record<string, string> = {
 function displayDate(value: string | null | undefined) {
   if (!value) return "待确认";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "待确认";
+  if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat("zh-CN", {
     year: "numeric",
     month: "2-digit",
@@ -115,11 +125,30 @@ export function JobDetailCard({
   onAddToProjects,
   onDismiss,
   onOpenSource,
+  activeTab,
+  initialTab = "facts",
+  onTabChange,
+  detailContent,
+  statusLabel,
 }: JobDetailCardProps) {
   const dialogRef = useRef<HTMLElement>(null);
+  const [localTab, setLocalTab] = useState<JobDetailTab>(initialTab);
+  const selectedTab = activeTab || localTab;
   const pipeline = pipelineItems(job.pipeline);
   const recommendation = job.recommendation?.reasons.length ? job.recommendation : null;
   const recentEvents = (job.events || []).slice(0, 3);
+  const tabs: { id: JobDetailTab; label: string }[] = [
+    { id: "facts", label: "职位事实" },
+    { id: "judgement", label: "判断" },
+    { id: "engagement", label: "承接与结果" },
+    { id: "trail", label: "决策轨迹" },
+    { id: "replay", label: "回放" },
+  ];
+  const selectTab = (tab: JobDetailTab) => {
+    if (tab === selectedTab) return;
+    if (!activeTab) setLocalTab(tab);
+    onTabChange?.(tab);
+  };
 
   useEffect(() => {
     dialogRef.current?.focus();
@@ -157,10 +186,15 @@ export function JobDetailCard({
           <span className={`is-${job.activeState.toLowerCase()}`}>{stateLabels[job.activeState]}</span>
           <span>HC {job.hc ?? "待确认"}</span>
           <span><Clock3 />{displayDate(job.capturedAt)}</span>
+          {statusLabel && <span className="is-workflow">{statusLabel}</span>}
         </div>
 
+        <nav className="job-detail-review-tabs" aria-label="职位详情视图">
+          {tabs.map(tab => <button key={tab.id} type="button" className={selectedTab === tab.id ? "active" : ""} aria-current={selectedTab === tab.id ? "page" : undefined} onClick={() => selectTab(tab.id)}>{tab.label}</button>)}
+        </nav>
+
         <div className="job-detail-review-scroll">
-          <section className="job-detail-review-section">
+          {selectedTab === "facts" ? <><section className="job-detail-review-section">
             <div className="job-detail-review-section-title"><span><BriefcaseBusiness /></span><div><h3>核心职位事实</h3><p>只展示 TTC 与 BrainX 当前可以核验的字段</p></div></div>
             <dl className="job-detail-review-facts">
               <Fact label="职位编号" value={job.projectId} />
@@ -175,29 +209,34 @@ export function JobDetailCard({
           <section className="job-detail-review-section">
             <div className="job-detail-review-section-title"><span><ArrowRight /></span><div><h3>招聘进展</h3><p>结构化 Pipeline；缺失不等于零</p></div></div>
             {pipeline.length ? <div className="job-detail-review-pipeline">{pipeline.map((item, index) => <div key={`${item.label}-${index}`}><span>{item.label}</span><b>{item.value}</b></div>)}</div> : <div className="job-detail-review-empty">暂无可核验进展</div>}
-            {(job.nextAction || job.notes) && <dl className="job-detail-review-facts is-wide">
+            {job.nextAction && <dl className="job-detail-review-facts is-wide">
               {job.nextAction && <Fact label="下一步动作" value={job.nextAction} />}
-              {job.notes && <Fact label="备注" value={job.notes} />}
             </dl>}
           </section>
 
-          {recommendation && <section className="job-detail-review-section is-recommendation">
-            <div className="job-detail-review-section-title"><span><Check /></span><div><h3>今日建议</h3><p>{actionLabels[recommendation.action]} · {displayDate(recommendation.generatedAt)}</p></div></div>
-            <ul>{recommendation.reasons.map((reason) => <li key={reason}>{reason}</li>)}</ul>
-            {recommendation.risks.length > 0 && <div className="job-detail-review-risks"><b>待确认</b>{recommendation.risks.map((risk) => <span key={risk}>{risk}</span>)}</div>}
-            <small>策略版本 {recommendation.policyVersion}</small>
-          </section>}
-
-          {recentEvents.length > 0 && <section className="job-detail-review-section">
-            <div className="job-detail-review-section-title"><span><Clock3 /></span><div><h3>最近动态</h3><p>最近三条真实操作记录</p></div></div>
-            <div className="job-detail-review-events">{recentEvents.map((event) => <div key={event.id}><i /><b>{event.label}</b><time>{displayDate(event.at)}</time></div>)}</div>
-          </section>}
+          <section className="job-detail-review-section">
+            <div className="job-detail-review-section-title"><span><BriefcaseBusiness /></span><div><h3>备注与职位描述</h3><p>完整保留原始上下文；长内容在弹窗内滚动</p></div></div>
+            {job.notes ? <p className="job-detail-review-notes">{job.notes}</p> : <div className="job-detail-review-empty">暂无备注或职位描述</div>}
+          </section>
 
           <section className="job-detail-review-source">
             <Database />
             <span><b>TTC CRM 职位快照</b><small>最近同步 {displayDate(job.capturedAt)} · 缺失字段保持待确认</small></span>
             {onOpenSource && <button type="button" onClick={() => onOpenSource(job.projectId)}>查看来源<ExternalLink /></button>}
           </section>
+          </> : detailContent || (selectedTab === "judgement" ? <section className="job-detail-review-section is-recommendation">
+            <div className="job-detail-review-section-title"><span><Check /></span><div><h3>当前判断</h3><p>{recommendation ? `${actionLabels[recommendation.action]} · ${displayDate(recommendation.generatedAt)}` : "尚未生成可核验判断"}</p></div></div>
+            {recommendation ? <><ul>{recommendation.reasons.map(reason => <li key={reason}>{reason}</li>)}</ul>{recommendation.risks.length > 0 && <div className="job-detail-review-risks"><b>待确认</b>{recommendation.risks.map(risk => <span key={risk}>{risk}</span>)}</div>}<small>策略版本 {recommendation.policyVersion || "待确认"}</small></> : <div className="job-detail-review-empty">这个职位尚无真实推荐结果</div>}
+          </section> : selectedTab === "engagement" ? <section className="job-detail-review-section">
+            <div className="job-detail-review-section-title"><span><ArrowRight /></span><div><h3>承接与结果</h3><p>项目关系、当前阶段和下一步动作</p></div></div>
+            <dl className="job-detail-review-facts"><Fact label="承接状态" value={job.engagementState} /><Fact label="与我的关系" value={job.relation} /><Fact label="当前阶段" value={job.currentStage} /><Fact label="下一步动作" value={job.nextAction} /></dl>
+          </section> : selectedTab === "trail" ? <section className="job-detail-review-section">
+            <div className="job-detail-review-section-title"><span><Clock3 /></span><div><h3>决策轨迹</h3><p>真实操作记录</p></div></div>
+            {recentEvents.length ? <div className="job-detail-review-events">{recentEvents.map(event => <div key={event.id}><i /><span><b>{event.label}</b>{event.detail && <small>{event.detail}</small>}</span><time>{displayDate(event.at)}</time></div>)}</div> : <div className="job-detail-review-empty">尚无操作记录</div>}
+          </section> : <section className="job-detail-review-section">
+            <div className="job-detail-review-section-title"><span><Database /></span><div><h3>决策回放</h3><p>只展示后端已经冻结的推荐快照</p></div></div>
+            <div className="job-detail-review-empty">尚无可回放的冻结决策</div>
+          </section>)}
         </div>
 
         {(onDismiss || onAddToProjects) && <footer className={`job-detail-review-actions${onDismiss && onAddToProjects ? "" : " is-single"}`}>

@@ -20,7 +20,10 @@ import {
 } from "./brainx-api";
 import { streamAssistant, type AssistantMessage } from "./brainx-assistant-api";
 import { actionSeed, clients, decisionGroupMeta, decisionJobs, DEFAULT_FOLDERS, engagementPrerequisite, events, initialEngagement, initialEvents, initialOutcomes, INITIAL_TRAY_IDS, legalActions, nextState, readSavedWorkbenchState, stateEvent, verificationJobs, type DecisionAction, type DecisionGroup, type DecisionJob, type MembershipRelation, type Page, type Panel, type PickFolder, type SourceMode } from "./workbench-model";
-import { DirectGlassSegment, DrawerSection, FilterSelect, Heading, StatusTag, type FilterSelectOption } from "./workbench-controls";
+import { DrawerSection, FilterSelect, Heading, StatusTag, type FilterSelectOption } from "./workbench-controls";
+import { JobDetailCard, type JobDetailReviewData, type JobDetailTab } from "./job-detail-card-review";
+import { mergeOpportunityDetail, toDecisionJobDetail } from "./job-detail-data";
+import { getOpportunityDetail } from "./brainx-opportunity-api";
 import { ManualFactSection } from "./workbench-facts";
 import { Rules } from "./workbench-rules";
 import { CommitmentLoopPanel } from "./engagement-loop";
@@ -139,7 +142,7 @@ export default function DecisionWorkbench({demo=false}:{demo?:boolean}={}){
  const addRadarJobToProjects=async(jobId:string)=>{try{await updateOpportunityMembership(jobId,"MY_JOB",makeIdempotencyKey(`radar-membership:${jobId}`));await loadBrainxSide.current();notify("已加入我的项目")}catch(error){notify(`加入项目失败：${error instanceof Error?error.message:"后端未响应"}`)}};
  const refreshBrainxJob=async(jobId:string)=>{if(brainxMode!=="connected")return;try{const detail=await fetchJobDetail(jobId);setEngagement(current=>({...current,[jobId]:detail.engagementState}));setDecisionEvents(current=>({...current,[jobId]:detail.events}));setOutcomes(current=>({...current,[jobId]:detail.outcomes}));setOpenmaiByJob(current=>({...current,[jobId]:detail.openmai}));setBrainxJobs(current=>current?current.map(job=>job.id===jobId?{...job,brainxLegal:detail.legal,brainxDecisionId:detail.decisionId||job.brainxDecisionId}:job):null)}catch{/* 详情刷新失败不打断交互，下次打开再试 */}};
  const rerunOpenmaiForJob=(jobId:string)=>{void(async()=>{try{await rerunOpenmai(jobId);const detail=await fetchJobDetail(jobId);setOpenmaiByJob(current=>({...current,[jobId]:detail.openmai}))}catch(error){notify(`重新找人失败：${error instanceof Error?error.message:"后端未响应"}`)}})()};
- const openDecision=(job:DecisionJob,tab:"judgement"|"engagement"|"trail"|"replay"="judgement")=>{if(panel?.kind==="job"&&panel.jobId===job.id&&panel.tab===tab&&panelMotion!=="closing"){closePanel();return}if(brainxMode==="connected")void brainxFetch<BackendEngagementResponse>(`/api/v1/opportunities/${encodeURIComponent(job.id)}/engagement`,{method:"POST",body:{action:"VIEW",idempotency_key:makeIdempotencyKey(`view:${job.id}`)}}).catch(()=>{});openPanel({kind:"job",jobId:job.id,tab})};
+ const openDecision=(job:DecisionJob,tab:JobDetailTab="facts")=>{if(panel?.kind==="job"&&panel.jobId===job.id&&panel.tab===tab&&panelMotion!=="closing"){closePanel();return}if(brainxMode==="connected")void brainxFetch<BackendEngagementResponse>(`/api/v1/opportunities/${encodeURIComponent(job.id)}/engagement`,{method:"POST",body:{action:"VIEW",idempotency_key:makeIdempotencyKey(`view:${job.id}`)}}).catch(()=>{});openPanel({kind:"job",jobId:job.id,tab})};
  const applyCommand=(job:DecisionJob,command:EngagementCommand,reason?:string)=>{if(brainxMode!=="connected"){const state=nextState(command);setEngagement(current=>({...current,[job.id]:state}));setDecisionEvents(current=>({...current,[job.id]:[{id:`evt-${Date.now()}`,type:stateEvent(command),at:new Date().toLocaleString("zh-CN",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}),reason},...(current[job.id]||[])]}));setPendingCommand(null);notify(`${job.company} · ${stateEvent(command)}`);return}const key=makeIdempotencyKey(`engage:${job.id}:${command}`);setPendingCommand(null);void(async()=>{try{const res=await brainxFetch<BackendEngagementResponse>(`/api/v1/opportunities/${encodeURIComponent(job.id)}/engagement`,{method:"POST",body:{action:command,confirm:command==="ACCEPT",reason,idempotency_key:key}});setEngagement(current=>({...current,[job.id]:res.state}));await refreshBrainxJob(job.id);notify(`${job.company} · ${stateEvent(command)}`)}catch(error){notify(`操作失败：${error instanceof Error?error.message:"后端未响应"}`)}})()};
  const requestCommand=(job:DecisionJob,command:EngagementCommand)=>{if(command==="ACCEPT"||command==="DISMISS"){setPendingCommand({job,command});return}applyCommand(job,command)};
  const recordOutcome=(job:DecisionJob,stage:Outcome["stage"],rating?:number,note?:string)=>{if(brainxMode!=="connected"){const item:Outcome={id:`out-${Date.now()}`,stage,rating,note,at:new Date().toLocaleString("zh-CN",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"})};setOutcomes(current=>({...current,[job.id]:[item,...(current[job.id]||[])]}));setDecisionEvents(current=>({...current,[job.id]:[{id:`evt-${Date.now()}`,type:"记录结果",at:item.at,reason:stage},...(current[job.id]||[])]}));notify(`已记录${stage}`);return}void(async()=>{try{await brainxFetch<BackendOutcomeResponse>("/api/v1/outcomes",{method:"POST",body:{project_id:job.id,stage,value:{rating,note},idempotency_key:makeIdempotencyKey(`outcome:${job.id}`)}});await refreshBrainxJob(job.id);notify(`已记录${stage}`)}catch(error){notify(`记录失败：${error instanceof Error?error.message:"后端未响应"}`)}})()};
@@ -201,7 +204,7 @@ function ChatbotDrawer({messages,input,setInput,busy,onSend,onStop,onClear,onClo
   </aside>
  </>}
 
-function AcceptedJobsView({jobs,total,query,open}:{jobs:DecisionJob[];total:number;query:string;open:(job:DecisionJob,tab?:"judgement"|"engagement"|"trail"|"replay")=>void}){
+function AcceptedJobsView({jobs,total,query,open}:{jobs:DecisionJob[];total:number;query:string;open:(job:DecisionJob,tab?:JobDetailTab)=>void}){
  const isFiltered=Boolean(query.trim());
  return <div className="decision-home accepted-home">
   <Heading code="ACCEPTED / ACTIVE DELIVERY" title="已确定" desc="这里集中显示你已经确认接单、正在推进的职位。"/>
@@ -217,7 +220,17 @@ function AcceptedJobsView({jobs,total,query,open}:{jobs:DecisionJob[];total:numb
 
 function DecisionMetric({label,value,emphasis,helpOpen,onHelpToggle}:{label:string;value:string|number;emphasis?:string;helpOpen?:boolean;onHelpToggle?:()=>void}){return <div className="decision-metric"><small>{label}</small>{onHelpToggle&&<button className="metric-help" type="button" onClick={onHelpToggle} aria-label={`解释${label}`} aria-expanded={helpOpen}>!</button>}<b className={emphasis}>{value}</b></div>}
 
-function WorkbenchPanel({panel,motion,job,commitmentJobs,auth,sync,notifications,engagement,events,outcomes,completed,openmaiResults,onRerunOpenmai,mode,legalMap,replayMap,dismissReasons,onReplay,onFactsUpdated,onMembership,onClose,onOpenJob,onAction,onCommand,onOutcome,onSync,onSetSync,onAuth,onNotification,notify}:{panel:Panel;motion:"idle"|"entering"|"open"|"closing";job:DecisionJob|null;commitmentJobs:DecisionJob[];auth:AuthStatus;sync:SyncStatus;notifications:Notification[];engagement:Record<string,EngagementState>;events:Record<string,DecisionEvent[]>;outcomes:Record<string,Outcome[]>;completed:string[];openmaiResults:Record<string,OpenmaiResult|null>;onRerunOpenmai:(jobId:string)=>void;mode:"connecting"|"connected"|"offline";legalMap:Record<string,EngagementCommand[]>;replayMap:Record<string,BrainxReplay>;dismissReasons:string[];onReplay:(jobId:string,data:BrainxReplay)=>void;onFactsUpdated:()=>Promise<void>;onMembership:(job:DecisionJob,relation:MembershipRelation)=>Promise<void>;onClose:()=>void;onOpenJob:(job:DecisionJob,tab?:"judgement"|"engagement"|"trail"|"replay")=>void;onAction:(job:DecisionJob,action:DecisionAction)=>void;onCommand:(job:DecisionJob,command:EngagementCommand)=>void;onOutcome:(job:DecisionJob,stage:Outcome["stage"],rating?:number,note?:string)=>void;onSync:()=>void;onSetSync:(sync:SyncStatus)=>void;onAuth:(auth:AuthStatus)=>void;onNotification:(notification:Notification)=>void;notify:(text:string)=>void}){
+function WorkbenchPanel({panel,motion,job,commitmentJobs,auth,sync,notifications,engagement,events,outcomes,completed,openmaiResults,onRerunOpenmai,mode,legalMap,replayMap,dismissReasons,onReplay,onFactsUpdated,onMembership,onClose,onOpenJob,onAction,onCommand,onOutcome,onSync,onSetSync,onAuth,onNotification,notify}:{panel:Panel;motion:"idle"|"entering"|"open"|"closing";job:DecisionJob|null;commitmentJobs:DecisionJob[];auth:AuthStatus;sync:SyncStatus;notifications:Notification[];engagement:Record<string,EngagementState>;events:Record<string,DecisionEvent[]>;outcomes:Record<string,Outcome[]>;completed:string[];openmaiResults:Record<string,OpenmaiResult|null>;onRerunOpenmai:(jobId:string)=>void;mode:"connecting"|"connected"|"offline";legalMap:Record<string,EngagementCommand[]>;replayMap:Record<string,BrainxReplay>;dismissReasons:string[];onReplay:(jobId:string,data:BrainxReplay)=>void;onFactsUpdated:()=>Promise<void>;onMembership:(job:DecisionJob,relation:MembershipRelation)=>Promise<void>;onClose:()=>void;onOpenJob:(job:DecisionJob,tab?:JobDetailTab)=>void;onAction:(job:DecisionJob,action:DecisionAction)=>void;onCommand:(job:DecisionJob,command:EngagementCommand)=>void;onOutcome:(job:DecisionJob,stage:Outcome["stage"],rating?:number,note?:string)=>void;onSync:()=>void;onSetSync:(sync:SyncStatus)=>void;onAuth:(auth:AuthStatus)=>void;onNotification:(notification:Notification)=>void;notify:(text:string)=>void}){
+ const [enrichedDetail,setEnrichedDetail]=useState<JobDetailReviewData|null>(null);
+ useEffect(()=>{
+  if(panel?.kind!=="job"||!job||mode!=="connected")return;
+  let active=true;
+  const base=toDecisionJobDetail(job,events[job.id]||[]);
+  void getOpportunityDetail(job.id)
+   .then(detail=>{if(active)setEnrichedDetail(mergeOpportunityDetail(base,detail))})
+   .catch(()=>{/* 推荐快照中的基础事实仍可展示，详情失败不伪造内容。 */});
+  return()=>{active=false};
+ },[panel?.kind,job,mode,events]);
  const [dragOffset,setDragOffset]=useState<number|null>(null);
  const panelDrag=useRef<{pointerId:number;startX:number;lastX:number;lastAt:number;velocity:number}|null>(null);
  const startPanelDrag=(event:React.PointerEvent<HTMLDivElement>)=>{
@@ -245,7 +258,31 @@ function WorkbenchPanel({panel,motion,job,commitmentJobs,auth,sync,notifications
   setDragOffset(null);
   if(projected>window.innerWidth*.3)onClose();
  };
- return <aside className={`decision-drawer workbench-panel panel-${motion}${dragOffset!==null?" is-dragging":""}`} style={{"--panel-drag-offset":`${dragOffset??0}px`} as React.CSSProperties} aria-label="工作台详情面板"><div className="drawer-drag-handle" aria-label="向右滑动关闭详情" onPointerDown={startPanelDrag} onPointerMove={movePanelDrag} onPointerUp={finishPanelDrag} onPointerCancel={finishPanelDrag}><i/></div><button className="drawer-close" onClick={onClose} aria-label="关闭详情"><X/></button>{panel?.kind==="job"&&job?<DecisionDrawer job={job} tab={panel.tab} completed={completed} engagement={engagement[job.id]||"NEW"} events={events[job.id]||[]} outcomes={outcomes[job.id]||[]} openmai={openmaiResults[job.id]||null} onRerunOpenmai={onRerunOpenmai} mode={mode} legalMap={legalMap} replayData={replayMap[job.id]} onReplay={onReplay} onFactsUpdated={onFactsUpdated} onMembership={onMembership} notify={notify} onTab={tab=>onOpenJob(job,tab)} onAction={onAction} onCommand={onCommand} onOutcome={onOutcome}/>:panel?.kind==="sync"?<SyncPanel sync={sync} onSync={onSync} onSetSync={onSetSync} notify={notify} mode={mode}/>:panel?.kind==="identity"?<IdentityPanel auth={auth} onAuth={onAuth} notify={notify} mode={mode}/>:panel?.kind==="commitments"?<CommitmentsPanel jobs={commitmentJobs} engagement={engagement} onOpen={job=>onOpenJob(job,"engagement")}/>:<NotificationPanel items={notifications} onOpen={onNotification} notify={notify}/>}</aside>
+ if(panel?.kind==="job"&&job){
+  const state=engagement[job.id]||"NEW";
+  const jobEvents=events[job.id]||[];
+  const legal=mode==="connected"?legalMap[job.id]||[]:legalActions(job,state);
+  const baseDetail=toDecisionJobDetail(job,jobEvents);
+  const detail=enrichedDetail?.projectId===job.id?enrichedDetail:baseDetail;
+  return <JobDetailCard
+   job={{...detail,engagementState:stateLabel[state]}}
+   activeTab={panel.tab}
+   onTabChange={tab=>onOpenJob(job,tab)}
+   onClose={onClose}
+   onAddToProjects={()=>{void onMembership(job,"MY_JOB")}}
+   onDismiss={legal.includes("DISMISS")?()=>onCommand(job,"DISMISS"):undefined}
+   statusLabel={`${stateLabel[state]} · ${decisionGroupMeta[job.group].title}`}
+   detailContent={<DecisionDrawer
+    job={job} tab={panel.tab==="facts"?"judgement":panel.tab} completed={completed}
+    engagement={state} events={jobEvents} outcomes={outcomes[job.id]||[]}
+    openmai={openmaiResults[job.id]||null} onRerunOpenmai={onRerunOpenmai}
+    mode={mode} legalMap={legalMap} replayData={replayMap[job.id]} onReplay={onReplay}
+    onFactsUpdated={onFactsUpdated} onMembership={onMembership} notify={notify}
+    onTab={tab=>onOpenJob(job,tab)} onAction={onAction} onCommand={onCommand} onOutcome={onOutcome}
+   />}
+  />
+ }
+ return <aside className={`decision-drawer workbench-panel panel-${motion}${dragOffset!==null?" is-dragging":""}`} style={{"--panel-drag-offset":`${dragOffset??0}px`} as React.CSSProperties} aria-label="工作台详情面板"><div className="drawer-drag-handle" aria-label="向右滑动关闭详情" onPointerDown={startPanelDrag} onPointerMove={movePanelDrag} onPointerUp={finishPanelDrag} onPointerCancel={finishPanelDrag}><i/></div><button className="drawer-close" onClick={onClose} aria-label="关闭详情"><X/></button>{panel?.kind==="sync"?<SyncPanel sync={sync} onSync={onSync} onSetSync={onSetSync} notify={notify} mode={mode}/>:panel?.kind==="identity"?<IdentityPanel auth={auth} onAuth={onAuth} notify={notify} mode={mode}/>:panel?.kind==="commitments"?<CommitmentsPanel jobs={commitmentJobs} engagement={engagement} onOpen={job=>onOpenJob(job,"engagement")}/>:<NotificationPanel items={notifications} onOpen={onNotification} notify={notify}/>}</aside>
 }
 
 function CommitmentsPanel({jobs,engagement,onOpen}:{jobs:DecisionJob[];engagement:Record<string,EngagementState>;onOpen:(job:DecisionJob)=>void}){return <><div className="panel-heading"><BriefcaseBusiness/><div><h1>我的承接</h1><p>关注、接单和需要继续处理的职位</p></div></div><div className="mobile-commitment-list">{jobs.length?jobs.map(job=><button key={job.id} onClick={()=>onOpen(job)}><span><b>{job.company} · {job.role}</b><small>{engagement[job.id]==="ACCEPTED"?"接单中 · 推进交付或记录结果":"关注中 · 评估后接单或取消关注"}</small></span><ChevronRight/></button>):<p>暂无承接职位。</p>}</div></>}
@@ -268,10 +305,17 @@ function DecisionDrawer({job,tab,completed,engagement,events,outcomes,openmai,on
  const requestFactEdit=()=>{setFactEditRequest(value=>value+1);onTab("judgement")};
  const verifyComplete=job.actions.some(action=>action.kind==="verify"&&completed.includes(`${job.id}:${action.id}`));
  useEffect(()=>{if(verifyComplete&&mode!=="connecting")requestFactEdit()},[job.id,verifyComplete,mode]);
- useEffect(()=>{if(mode!=="connected"||!job?.brainxDecisionId||replayData)return;let cancelled=false;setReplayLoading(true);brainxFetch<BackendReplay>(`/api/v1/decisions/${encodeURIComponent(job.brainxDecisionId)}/replay`).then(data=>{if(!cancelled)onReplay(job.id,mapReplayData(data))}).catch(()=>{}).finally(()=>{if(!cancelled)setReplayLoading(false)});return()=>{cancelled=true}},[mode,job?.id,job?.brainxDecisionId,replayData,onReplay]);
- const tabOptions=["judgement","engagement","trail","replay"] as const;
- const tabLabel={judgement:"判断",engagement:"承接与结果",trail:"决策轨迹",replay:"回放"} as const;
- return <><div className="drawer-title"><h1>{job.company} <span>·</span> {job.role}</h1><span className={`decision-state ${job.eligibility.toLowerCase()}`}>{stateLabel[engagement]} · {decisionGroupMeta[job.group].title}</span></div><DirectGlassSegment value={tab} options={tabOptions.map(value=>({value,label:tabLabel[value]}))} onChange={onTab} className="drawer-tabs" ariaLabel="职位详情视图"/>{tab==="judgement"?<><div className="drawer-metrics"><DecisionMetric label="项目推进" value={job.globalScore}/><DecisionMetric label="探索机会" value={job.explorationScore}/><DecisionMetric label="个人适配" value={job.personalScore}/><DecisionMetric label="最终得分" value={job.finalScore} emphasis="final"/></div><ManualFactSection job={job} mode={mode} onUpdated={onFactsUpdated} notify={notify} editRequest={factEditRequest}/><DrawerSection title="为什么现在做"><ul className="explanations">{job.scoreNotes.map(note=><li key={note}>{note}</li>)}</ul></DrawerSection>{job.risks.length>0&&<DrawerSection title="风险与缺失"><ul className="explanations risks">{job.risks.map(note=><li key={note}>{note}</li>)}</ul></DrawerSection>}<DrawerSection title="证据来源"><div className="evidence-list">{job.evidence.map(item=><span key={item}>{item}</span>)}</div></DrawerSection><TalentSupplySection job={job} mode={mode}/><DrawerSection title="当前建议"><div className="drawer-actions">{job.actions.map(action=>{const complete=completed.includes(`${job.id}:${action.id}`);return <button key={action.id} className={complete?"completed":""} onClick={()=>onAction(job,action)} disabled={complete}><span><b>{complete?"已记录：":""}{action.label}</b><small>{action.detail}</small></span>{complete?<Check/>:<ChevronRight/>}</button>})}</div></DrawerSection></>:tab==="engagement"?<><EngagementPanel job={job} state={engagement} outcomes={outcomes} mode={mode} legalMap={legalMap} onCommand={onCommand} onMembership={onMembership} onVerify={requestFactEdit} onUpdated={onFactsUpdated} notify={notify}/><OpenmaiPanel jobId={job.id} openmai={openmai} mode={mode} onRerun={onRerunOpenmai}/></>:tab==="trail"?<DrawerSection title="决策轨迹"><div className="trail-list">{events.length?events.map(event=><div key={event.id}><time>{event.at}</time><b>{event.type}</b><small>{event.reason||"顾问工作台"}</small></div>):<p className="muted">尚无操作记录</p>}</div></DrawerSection>:<ReplayPanel job={job} events={events} outcomes={outcomes} replayData={replayData} loading={replayLoading}/>}</>
+ useEffect(()=>{
+  if(tab!=="replay"||mode!=="connected"||!job?.brainxDecisionId||replayData)return;
+  let cancelled=false;
+  setReplayLoading(true);
+  brainxFetch<BackendReplay>(`/api/v1/decisions/${encodeURIComponent(job.brainxDecisionId)}/replay`)
+   .then(data=>{if(!cancelled)onReplay(job.id,mapReplayData(data))})
+   .catch(()=>{})
+   .finally(()=>{if(!cancelled)setReplayLoading(false)});
+  return()=>{cancelled=true};
+ },[tab,mode,job?.id,job?.brainxDecisionId,replayData,onReplay]);
+ return <>{tab==="judgement"?<><div className="drawer-metrics"><DecisionMetric label="项目推进" value={job.globalScore}/><DecisionMetric label="探索机会" value={job.explorationScore}/><DecisionMetric label="个人适配" value={job.personalScore}/><DecisionMetric label="最终得分" value={job.finalScore} emphasis="final"/></div><ManualFactSection job={job} mode={mode} onUpdated={onFactsUpdated} notify={notify} editRequest={factEditRequest}/><DrawerSection title="为什么现在做"><ul className="explanations">{job.scoreNotes.map(note=><li key={note}>{note}</li>)}</ul></DrawerSection>{job.risks.length>0&&<DrawerSection title="风险与缺失"><ul className="explanations risks">{job.risks.map(note=><li key={note}>{note}</li>)}</ul></DrawerSection>}<DrawerSection title="证据来源"><div className="evidence-list">{job.evidence.map(item=><span key={item}>{item}</span>)}</div></DrawerSection><TalentSupplySection job={job} mode={mode}/><DrawerSection title="当前建议"><div className="drawer-actions">{job.actions.map(action=>{const complete=completed.includes(`${job.id}:${action.id}`);return <button key={action.id} className={complete?"completed":""} onClick={()=>onAction(job,action)} disabled={complete}><span><b>{complete?"已记录：":""}{action.label}</b><small>{action.detail}</small></span>{complete?<Check/>:<ChevronRight/>}</button>})}</div></DrawerSection></>:tab==="engagement"?<><EngagementPanel job={job} state={engagement} outcomes={outcomes} mode={mode} legalMap={legalMap} onCommand={onCommand} onMembership={onMembership} onVerify={requestFactEdit} onUpdated={onFactsUpdated} notify={notify}/><OpenmaiPanel jobId={job.id} openmai={openmai} mode={mode} onRerun={onRerunOpenmai}/></>:tab==="trail"?<DrawerSection title="决策轨迹"><div className="trail-list">{events.length?events.map(event=><div key={event.id}><time>{event.at}</time><b>{event.type}</b><small>{event.reason||"顾问工作台"}</small></div>):<p className="muted">尚无操作记录</p>}</div></DrawerSection>:<ReplayPanel job={job} events={events} outcomes={outcomes} replayData={replayData} loading={replayLoading}/>}</>
 }
 
 function engagementStateMessage(state:EngagementState){

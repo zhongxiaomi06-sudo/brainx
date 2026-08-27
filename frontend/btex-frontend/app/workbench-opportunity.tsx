@@ -137,7 +137,7 @@ export function DecisionZone({
   isContext: boolean;
   completed: string[];
   engagement: Record<string, EngagementState>;
-  open: (job: DecisionJob, tab?: "judgement" | "engagement" | "trail" | "replay") => void;
+  open: (job: DecisionJob, tab?: "facts" | "judgement" | "engagement" | "trail" | "replay") => void;
   onAction: (job: DecisionJob, action: DecisionAction) => void;
   onFeedback: (job: DecisionJob, reason?: string) => void;
   tray: string[];
@@ -219,7 +219,7 @@ function OpportunityRow({
   job: DecisionJob;
   completed: string[];
   engagement: EngagementState;
-  open: (job: DecisionJob, tab?: "judgement" | "engagement" | "trail" | "replay") => void;
+  open: (job: DecisionJob, tab?: "facts" | "judgement" | "engagement" | "trail" | "replay") => void;
   onAction: (job: DecisionJob, action: DecisionAction) => void;
   onFeedback: (job: DecisionJob, reason?: string) => void;
   inTray: boolean;

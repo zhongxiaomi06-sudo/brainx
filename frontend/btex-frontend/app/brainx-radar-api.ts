@@ -11,6 +11,9 @@ export type BackendRadarRow = {
   owner_name?: string | null;
   hc?: number | null;
   active_state?: string | null;
+  priority?: string | null;
+  notes?: string | null;
+  source_url?: string | null;
   relation?: string | null;
   company_type?: string | null;
   captured_at?: string | null;

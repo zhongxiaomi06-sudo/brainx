@@ -100,6 +100,7 @@ test('雷达 API：返回城市数组、结构化 Pipeline、主做顾问、字�
   const normalized = toJobRow({
     unique_id: 'TTC-API-1', name: '平台研发负责人', company_name: '示例客户',
     cities: ['北京市', '上海市'], head_count: 2, status: 1, update_time: 1787732000000,
+    description: '负责平台研发与代码执行，备注必须完整保留。',
     pipeline_info: { pipeline_step_count: { Sourcing: 3, Interview: 1 } },
     managers: [{ name: 'Mia 钟笑咪' }],
   });
@@ -109,6 +110,7 @@ test('雷达 API：返回城市数组、结构化 Pipeline、主做顾问、字�
   assert.deepEqual(direct.items[0].cities, ['北京市', '上海市']);
   assert.deepEqual(direct.items[0].pipeline_steps, { Sourcing: 3, Interview: 1 });
   assert.equal(direct.items[0].owner_name, 'Mia 钟笑咪');
+  assert.equal(direct.items[0].notes, '负责平台研发与代码执行，备注必须完整保留。');
   assert.equal(direct.field_capabilities.find((field) => field.key === 'city').filter_available, true);
   assert.equal(direct.field_report.total_rows, 1);
 
@@ -123,6 +125,7 @@ test('雷达 API：返回城市数组、结构化 Pipeline、主做顾问、字�
     assert.deepEqual(payload.items[0].cities, ['北京市', '上海市']);
     assert.equal(payload.items[0].pipeline_steps.Sourcing, 3);
     assert.equal(payload.items[0].owner_name, 'Mia 钟笑咪');
+    assert.equal(payload.items[0].notes, '负责平台研发与代码执行，备注必须完整保留。');
     assert.equal(payload.field_capabilities.length, 8);
     assert.equal(payload.field_report.sync_id, direct.field_report.sync_id);
 

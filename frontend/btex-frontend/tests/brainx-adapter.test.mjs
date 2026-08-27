@@ -17,6 +17,7 @@ import {
   mapSyncStatus,
   BrainxApiError,
 } from "../app/brainx-api.ts";
+import { mergeOpportunityDetail, toDecisionJobDetail, toRadarJobDetail } from "../app/job-detail-data.ts";
 
 const sampleRec = {
   decision_id: "d-1",
@@ -216,6 +217,29 @@ test("maps backend radar rows without inventing operational metrics", () => {
   assert.equal(row.pm, "团队共享");
   assert.match(row.reason, /Pipeline/);
   assert.equal(row.positionType, "商业化");
+});
+
+test("keeps notes and merges one complete detail contract for both job entries", () => {
+  const base = toRadarJobDetail({
+    project_id: "P-DETAIL-1", company: "示例客户", role: "平台研发负责人",
+    cities: ["上海市"], active_state: "OPEN", hc: 1, relation: "TEAM_SHARED",
+    priority: "HIGH", notes: "必须完整保留的职位说明", source_url: "https://example.com/job/1",
+  });
+  assert.equal(base.notes, "必须完整保留的职位说明");
+  assert.equal(base.priority, "HIGH");
+
+  const merged = mergeOpportunityDetail(base, {
+    job: { project_id: "P-DETAIL-1", pipeline_steps: { Interview: 2 }, owner_name: "顾问甲", notes: "后端最新备注" },
+    relation: { relation: "TEAM_SHARED" }, engagement_state: "VIEWED", legal_actions: [], outcomes: [],
+    events: [{ event_type: "VIEWED", occurred_at: "2026-08-27T10:30:00Z", reason: "今日决策打开" }],
+    latest_recommendation: { decision_id: "D-1", score: 90, action: "RECOMMEND_ACCEPT", reasons: ["动能明确"], risks: [], evidence_refs: [], created_at: "2026-08-27T10:25:00Z" },
+  });
+  assert.equal(merged.notes, "后端最新备注");
+  assert.deepEqual(merged.pipeline, { Interview: 2 });
+  assert.equal(merged.events?.[0].detail, "今日决策打开");
+
+  const today = toDecisionJobDetail({ ...mapRecommendation({ ...sampleRec, job: { ...sampleRec.job, notes: "今日决策备注" } }) }, []);
+  assert.equal(today.notes, "今日决策备注");
 });
 
 test("normalizes radar field capabilities and sync report for the frontend", async () => {

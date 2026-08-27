@@ -374,7 +374,7 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
           evidence_coverage: rec.evidence_coverage,
           reasons: JSON.parse(rec.reasons_json), risks: JSON.parse(rec.risks_json),
           evidence_refs: JSON.parse(rec.evidence_refs_json),
-          breakdown: JSON.parse(rec.breakdown_json), policy_version: rec.policy_version } : null,
+          breakdown: JSON.parse(rec.breakdown_json), policy_version: rec.policy_version, created_at: rec.created_at } : null,
       });
     },
 

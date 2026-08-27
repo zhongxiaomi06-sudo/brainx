@@ -150,7 +150,13 @@ export const TodayDecisionEntry: Story = {
     await expect(canvas.getByRole("dialog", { name: completeJob.role })).toBeInTheDocument();
     await expect(canvas.getByText("核心职位事实")).toBeInTheDocument();
     await expect(canvas.getByText("寻访")).toBeInTheDocument();
+    await expect(canvas.getByText("备注与职位描述")).toBeInTheDocument();
+    await expect(canvas.getByText(completeJob.notes || "")).toBeInTheDocument();
+    await expect(canvas.getByRole("button", { name: "职位事实" })).toHaveAttribute("aria-current", "page");
     await expect(canvas.queryByText(/AI 匹配分|最终得分|探索价值|证据覆盖/)).not.toBeInTheDocument();
+    await userEvent.click(canvas.getByRole("button", { name: "判断" }));
+    await expect(canvas.getByText("当前判断")).toBeInTheDocument();
+    await userEvent.click(canvas.getByRole("button", { name: "职位事实" }));
     await userEvent.click(canvas.getByRole("button", { name: "加入我的项目" }));
     await expect(canvas.getByRole("button", { name: "已加入我的项目" })).toBeDisabled();
   },
@@ -164,6 +170,7 @@ export const AllPositionsEntry: Story = {
     await userEvent.click(canvas.getByRole("button", { name: /打开全部职位/ }));
     await expect(canvas.getByRole("dialog", { name: completeJob.role })).toBeInTheDocument();
     await expect(canvas.getByText("TTC CRM 职位快照")).toBeInTheDocument();
+    await expect(canvas.getByText("备注与职位描述")).toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: "暂不考虑" }));
     await expect(canvas.queryByRole("dialog")).not.toBeInTheDocument();
     await expect(canvas.getByText("当前列表没有待处理职位")).toBeInTheDocument();

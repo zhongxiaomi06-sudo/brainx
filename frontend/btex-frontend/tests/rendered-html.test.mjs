@@ -16,6 +16,8 @@ const workbenchSource = async () => (await Promise.all([
   source("app/workbench-entry.tsx"),
   source("app/workbench-today.tsx"),
   source("app/workbench-fact-pages.tsx"),
+  source("app/job-detail-data.ts"),
+  source("app/job-detail-card-review.tsx"),
   source("app/workbench-settings-page.tsx"),
   source("app/workspace-shell.tsx"),
   source("app/ttc-jobs-table.tsx"),
@@ -193,6 +195,10 @@ test("uses TTC facts and field capabilities without restoring fake job filters",
   assert.match(workbench, /<TtcJobsTable rows=\{rows\} capabilities=\{fields\}/);
   assert.match(workbench, /<JobDetailCard job=\{selected\}/);
   assert.match(workbench, /relation:\s*relationLabels\[row\.relation/);
+  assert.match(workbench, /notes:\s*row\.notes/);
+  assert.match(workbench, /mergeOpportunityDetail\(baseSelected, detail\)/);
+  assert.match(workbench, /备注与职位描述/);
+  assert.match(workbench, /activeTab=\{panel\.tab\}/);
   assert.match(workbench, /onAddToProjects=\{onAddToProjects\}/);
   assert.match(workbench, /updateOpportunityMembership\(jobId,"MY_JOB"/);
   assert.doesNotMatch(workbench, /function JobFactDetail|aria-label=\{`\$\{row\.role\} 职位事实`\}/);

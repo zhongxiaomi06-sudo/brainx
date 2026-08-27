@@ -29,11 +29,11 @@
 | `TtcJobsTable` 真实职位表 | 已完成 | 已通过 | 已接入 | 待确认 | 已验证（本地） | 正式应用代码已使用 |
 | `ClientInsightsReview` 客户事实索引 | 已完成 | 已通过 | 已接入 | 待确认 | 已验证（本地） | 正式应用代码已使用 |
 | `WorkspaceEntry` 真实数据入口三态 | 已完成 | 未单独审核 | 已接入 | 待确认 | 部分验证 | 连接、登录和异常入口已接入，仍归全链路验收 |
-| `JobDetailCard` 居中职位弹窗 | 已完成 | 已通过 | 部分接入 | 待确认 | 验证失败 | 仅“全部职位”使用；今日决策仍是旧抽屉，备注链路缺失 |
+| `JobDetailCard` 居中职位弹窗 | 已完成 | 已通过 | 已接入 | 待确认 | 部分验证 | 今日决策与全部职位共用五页签居中弹窗；备注和详情接口自动验证通过，待目标环境同职位复核 |
 | `JobsWorkspaceReview` 现代职位工作区 | 已完成 | 未审核 | 未接入 | 未发布 | 未验证 | Storybook-only 审核稿 |
 | `RecommendationPolicyReview` 推荐策略 | 已完成 | 未审核 | 未接入 | 未发布 | 未验证 | 缺少只读 dry-run 契约 |
 | `DirectionProfileReview` 方向画像与分类 | 已完成 | 未审核 | 未接入 | 未发布 | 未验证 | 缺少结构化保存和人工修订契约 |
-| `TodayDecisionQueue` 今日决策队列 | 已完成 | 未单独审核 | 已接入 | 待确认 | 部分验证 | 列表已接入，职位详情尚未统一到居中弹窗 |
+| `TodayDecisionQueue` 今日决策队列 | 已完成 | 已通过 | 已接入 | 待确认 | 部分验证 | 列表与职位详情均已接入；真实判断、承接、轨迹和回放保留在统一弹窗页签内 |
 
 ## 每次审核的强制流程
 
@@ -91,6 +91,7 @@
 ## 相关文档
 
 - [首次前端状态对齐审计](2026-08-28-baseline.md)
+- [统一职位详情正式接入审核记录](2026-08-28-job-detail-unification.md)
 - [前端真实数据重构施工清单](../frontend-refactor-construction-checklist.md)
 - [内部 Storybook 组件库](../storybook-component-library.md)
 - [前端交互架构](../frontend-interaction-architecture.md)

@@ -38,7 +38,17 @@
 .job-detail-review-summary span.is-cooling { border-color: #eadfca; background: #fff7e9; color: #9a6418; }
 .job-detail-review-summary span.is-closed { border-color: #ebd4d6; background: #fff0f1; color: #9c434a; }
 .job-detail-review-summary span.is-unknown { border-color: #e4e4e1; background: #f6f6f4; color: #747471; }
+.job-detail-review-summary span.is-workflow { border-color: #d5e4df; background: #f7faf8; color: #526761; }
 .job-detail-review-summary svg { width: 12px; }
+.job-detail-review-tabs {
+  display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 4px; margin: 0 26px;
+  padding: 4px; border: 1px solid #e1e8e5; border-radius: 13px; background: #f5f7f6;
+}
+.job-detail-review-tabs button {
+  min-width: 0; height: 32px; overflow: hidden; border: 0; border-radius: 9px; background: transparent;
+  color: #788680; font: 600 10px inherit; text-overflow: ellipsis; white-space: nowrap; cursor: pointer;
+}
+.job-detail-review-tabs button.active { background: #fff; color: #273a34; box-shadow: 0 2px 8px rgba(31,57,49,.08); }
 .job-detail-review-scroll { min-height: 0; overflow: auto; padding: 0 26px 8px; }
 .job-detail-review-section { padding: 22px 0; border-bottom: 1px solid var(--detail-line); }
 .job-detail-review-section-title { display: flex; align-items: center; gap: 10px; margin-bottom: 17px; }
@@ -55,6 +65,11 @@
 .job-detail-review-facts dd.is-missing { color: #9a752e; font-weight: 550; }
 .job-detail-review-facts.is-wide { grid-template-columns: 1fr; margin-top: 13px; }
 .job-detail-review-facts.is-wide dd { max-width: 68%; white-space: normal; }
+.job-detail-review-notes {
+  max-height: 260px; overflow: auto; margin: 0; padding: 16px; border: 1px solid #e0e8e5;
+  border-radius: 12px; background: #fbfcfb; color: #3f514b; font-size: 11px; line-height: 1.8;
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
 .job-detail-review-pipeline { display: flex; align-items: stretch; gap: 8px; overflow-x: auto; }
 .job-detail-review-pipeline div {
   position: relative; min-width: 92px; flex: 1; display: grid; gap: 8px; padding: 13px;
@@ -73,7 +88,9 @@
 .job-detail-review-events { display: grid; }
 .job-detail-review-events div { display: grid; grid-template-columns: 10px minmax(0,1fr) auto; align-items: center; gap: 9px; padding: 8px 0; }
 .job-detail-review-events i { width: 6px; height: 6px; border-radius: 50%; background: #46aa8e; }
+.job-detail-review-events span { min-width: 0; display: grid; gap: 2px; }
 .job-detail-review-events b { font-size: 11px; font-weight: 600; }
+.job-detail-review-events small { overflow: hidden; color: #7c8985; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
 .job-detail-review-events time { color: #85938e; font-size: 9px; }
 .job-detail-review-source { display: grid; grid-template-columns: 34px minmax(0,1fr) auto; align-items: center; gap: 10px; padding: 20px 0 16px; }
 .job-detail-review-source > svg { width: 34px; height: 34px; padding: 9px; border-radius: 10px; background: #edf7f3; color: var(--detail-accent); }
@@ -98,6 +115,7 @@
   .job-detail-review-mark { width: 44px; height: 44px; border-radius: 13px; }
   .job-detail-review-header h2 { font-size: 19px; }
   .job-detail-review-summary { padding: 0 17px 14px; }
+  .job-detail-review-tabs { margin: 0 17px; overflow-x: auto; grid-template-columns: repeat(5,minmax(88px,1fr)); }
   .job-detail-review-scroll { padding: 0 17px 6px; }
   .job-detail-review-facts { grid-template-columns: 1fr; }
   .job-detail-review-actions { grid-template-columns: 1fr 1.35fr; padding: 12px 17px calc(14px + env(safe-area-inset-bottom)); }

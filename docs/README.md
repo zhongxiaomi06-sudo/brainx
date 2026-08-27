@@ -63,6 +63,7 @@
 ### 验证与审计
 
 - [开发验证报告](VERIFICATION.md)
+- [统一职位详情正式接入审核记录（2026-08-28）](frontend-reviews/2026-08-28-job-detail-unification.md)
 - [网站完整任务错误点审计](2026-08-17-网站完整任务错误点审计.md)
 - [状态报告（2026-08-19）](status-report-2026-08-19.md)
 - [DeepSeek 审查规则提炼（2026-08-24）](audits/2026-08-24-deepseek-review-rule-extraction.md)

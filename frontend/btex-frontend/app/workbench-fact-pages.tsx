@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { JobDetailCard, type JobDetailReviewData } from "./job-detail-card-review";
+import { mergeOpportunityDetail, toRadarJobDetail } from "./job-detail-data";
 import {
   TtcJobsTable,
   type TtcFieldCapability,
@@ -9,17 +10,10 @@ import {
   type TtcJobTableRow,
 } from "./ttc-jobs-table";
 import { ClientInsightsReview, type ClientFactRow } from "./client-insights-review";
-import type { BackendClientRow, BackendRadarRow, RadarFieldCapability } from "./brainx-api";
+import { type BackendClientRow, type BackendRadarRow, type RadarFieldCapability } from "./brainx-api";
+import { getOpportunityDetail } from "./brainx-opportunity-api";
 
 const filterKeys = new Set<TtcFieldCapability["key"]>(["company", "city", "active_state", "hc", "owner_name"]);
-const relationLabels: Record<string, string> = {
-  MY_JOB: "我的职位",
-  PRIMARY_PM: "我是主 PM",
-  TEAM_SHARED: "团队共享",
-  OTHER_CONSULTANT: "其他顾问主做",
-  NOT_JOINED: "未加入",
-};
-
 function jobStatus(value?: string | null): TtcJobStatus {
   if (value === "OPEN") return "OPEN";
   if (value === "COOLING") return "COOLING";
@@ -52,22 +46,7 @@ export function toTtcCapability(field: RadarFieldCapability): TtcFieldCapability
 }
 
 export function toJobDetail(row: BackendRadarRow): JobDetailReviewData {
-  return {
-    projectId: row.project_id,
-    role: row.role || "职位待确认",
-    company: row.company || "公司待确认",
-    cities: row.cities || (row.city ? row.city.split("、").filter(Boolean) : []),
-    activeState: jobStatus(row.active_state),
-    hc: row.hc ?? null,
-    pipeline: row.pipeline_steps || null,
-    ownerName: row.owner_name || null,
-    capturedAt: row.captured_at || null,
-    relation: relationLabels[row.relation || ""] || null,
-    companyType: row.company_type || null,
-    currentStage: row.cockpit?.current_stage || null,
-    nextAction: row.cockpit?.next_action || null,
-    inMyProjects: row.relation === "MY_JOB" || row.relation === "PRIMARY_PM",
-  };
+  return toRadarJobDetail(row);
 }
 
 function safeSourceUrl(value?: string | null) {
@@ -97,9 +76,19 @@ function WorkbenchJobsPage({ items, capabilities, company, onAddToProjects }: { 
   const rows = useMemo(() => items.map(toTtcJobRow).filter(row => !company || row.company === company), [company, items]);
   const fields = useMemo(() => capabilities.map(toTtcCapability).filter((field): field is TtcFieldCapability => field !== null), [capabilities]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [enriched, setEnriched] = useState<JobDetailReviewData | null>(null);
   const selectedSource = selectedId ? items.find(row => row.project_id === selectedId) || null : null;
-  const selected = selectedSource ? toJobDetail(selectedSource) : null;
-  const sourceUrl = safeSourceUrl(selectedSource?.cockpit?.source_url);
+  const baseSelected = useMemo(() => selectedSource ? toJobDetail(selectedSource) : null, [selectedSource]);
+  const selected = enriched?.projectId === selectedId ? enriched : baseSelected;
+  const sourceUrl = safeSourceUrl(selected?.sourceUrl);
+  useEffect(() => {
+    if (!selectedId || !baseSelected) return;
+    let active = true;
+    void getOpportunityDetail(selectedId)
+      .then(detail => { if (active) setEnriched(mergeOpportunityDetail(baseSelected, detail)); })
+      .catch(() => { /* Radar 基础事实仍可展示，详情失败不伪造内容。 */ });
+    return () => { active = false; };
+  }, [baseSelected, selectedId]);
   return <>{company && <div className="ttc-filter-context">正在查看客户“{company}”的职位</div>}<TtcJobsTable rows={rows} capabilities={fields} onOpen={setSelectedId} />{selected && <JobDetailCard job={selected} onClose={() => setSelectedId(null)} onAddToProjects={onAddToProjects} onOpenSource={sourceUrl ? () => window.open(sourceUrl, "_blank", "noopener,noreferrer") : undefined} />}</>;
 }
 

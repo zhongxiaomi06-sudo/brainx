@@ -57,7 +57,6 @@ export type BrainxJob = {
   risks: string[]; evidence: string[]; actions: BrainxDecisionAction[];
   brainxLegal?: EngagementCommand[]; brainxDecisionId?: string;
 };
-
 export type BrainxSnapshot = {
   consultantId: string;
   jobs: BrainxJob[];
@@ -272,7 +271,7 @@ export function actionsOf(action: string, relation: string): BrainxDecisionActio
 }
 
 export function factsOf(
-  job: { relation?: string | null; active_state?: string | null; current_stage?: string | null; hc?: number | null; captured_at?: string | null; pipeline?: string | null; pipeline_snapshot?: string | null; city?: string | null; priority?: string | null; company_type?: string | null; next_action?: string | null; notes?: string | null },
+  job: { relation?: string | null; active_state?: string | null; current_stage?: string | null; hc?: number | null; captured_at?: string | null; pipeline?: string | null; pipeline_snapshot?: string | null; city?: string | null; priority?: string | null; company_type?: string | null; next_action?: string | null; notes?: string | null; owner_name?: string | null },
 ): Record<string, string> {
   const facts: Record<string, string> = {
     "职位关系": RELATION_LABELS[job.relation || ""] || job.relation || "UNKNOWN",
@@ -289,6 +288,7 @@ export function factsOf(
   if (job.company_type) facts["客户类型"] = job.company_type;
   if (job.next_action) facts["下一步动作"] = job.next_action;
   if (job.notes) facts["备注"] = job.notes;
+  if (job.owner_name) facts["主做顾问"] = job.owner_name;
   return facts;
 }
 

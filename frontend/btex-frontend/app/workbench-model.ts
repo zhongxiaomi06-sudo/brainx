@@ -59,7 +59,7 @@ export type DecisionJob = {
   brainxLegal?: EngagementCommand[];
   brainxDecisionId?: string;
 };
-export type Panel = { kind: "job"; jobId: string; tab: "judgement" | "engagement" | "trail" | "replay" } | { kind: "sync" } | { kind: "identity" } | { kind: "notifications" } | { kind: "commitments" } | null;
+export type Panel = { kind: "job"; jobId: string; tab: "facts" | "judgement" | "engagement" | "trail" | "replay" } | { kind: "sync" } | { kind: "identity" } | { kind: "notifications" } | { kind: "commitments" } | null;
 export type DirectSegmentOption<T extends string> = { value: T; label: React.ReactNode; ariaLabel?: string };
 
 export const decisionGroupMeta: Record<DecisionGroup, { title: string; subtitle: string }> = {

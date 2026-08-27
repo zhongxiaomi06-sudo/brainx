@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import { expect, fn, userEvent, within } from "storybook/test";
 import ErrorBoundary, { ErrorFallback } from "../error-boundary";
+import { SettingsCenterReview, type SettingsCenterData } from "../settings-center-review";
 import DecisionWorkbench from "../workbench";
 import { WorkspaceShell, type WorkspaceShellPage } from "../workspace-shell";
 
@@ -56,34 +57,27 @@ function TodayBlocks() {
   );
 }
 
-function SettingsBlocks() {
-  return (
-    <div className="shell-settings-page">
-      <header><p className="shell-review-kicker">SETTINGS</p><h1>设置中心</h1><p>低频配置集中管理，不再占用日常工作导航。</p></header>
-      <div className="shell-settings-grid">
-        {[
-          ["01", "个人与团队", "身份、顾问画像与团队权限"],
-          ["02", "数据连接", "TTC、飞书与人才库连接状态"],
-          ["03", "推荐策略", "推荐模式、权重与规则边界"],
-          ["04", "同步诊断", "字段覆盖率、快照完整度与异常"],
-        ].map(([index, title, description]) => <article className="shell-settings-card" key={title}><span>{index}</span><b>{title}</b><p>{description}</p></article>)}
-      </div>
-    </div>
-  );
-}
+const shellSettingsData: SettingsCenterData = {
+  profile: { consultantId: "mia", displayName: "Mia 钟笑咪", keywords: ["AI 应用", "企业服务"], note: "关注产品与商业化交叉方向。", feishuAuthorized: true, feishuNeedsReauth: false },
+  ttc: { connected: true, userName: "已验证顾问", expiresAt: "2026-09-02", needsReauth: false },
+  talent: { backend: "mysql", connected: true, schema: "ready", database: "reloop", host: null, degraded: null },
+  strategy: { policyVersion: "policy-1.1", customized: false },
+  sync: { state: "READY", rowsRead: 128, rowsExpected: 128, updatedAt: "2026-08-27", errors: [], fieldReport: { schemaVersion: "ttc-job-fields-v1", totalRows: 128, filterableFields: ["公司", "城市", "TTC 状态"], unavailableFilters: ["行业", "招聘意愿"] } },
+};
 
 function ShellReviewHarness() {
   const [page, setPage] = useState<WorkspaceShellPage>("today");
   const [assistantOpen, setAssistantOpen] = useState(false);
+  if (page === "settings") return <SettingsCenterReview data={shellSettingsData} onBack={() => setPage("today")} />;
   return (
     <WorkspaceShell
       activePage={page}
       onNavigate={setPage}
       assistantOpen={assistantOpen}
       onAssistantToggle={() => setAssistantOpen(value => !value)}
-      assistant={<div className="shell-assistant-preview"><p>助手按需出现，只读取当前页面上下文。</p><div>当前页面：{page === "today" ? "今日决策" : page === "settings" ? "设置中心" : page}</div></div>}
+      assistant={<div className="shell-assistant-preview"><p>助手按需出现，只读取当前页面上下文。</p><div>当前页面：{page === "today" ? "今日决策" : page}</div></div>}
     >
-      {page === "today" ? <TodayBlocks /> : page === "settings" ? <SettingsBlocks /> : (
+      {page === "today" ? <TodayBlocks /> : (
         <div className="shell-settings-page"><header><p className="shell-review-kicker">WORKSPACE</p><h1>{page === "jobs" ? "全部职位" : page === "projects" ? "我的项目" : "客户洞察"}</h1><p>{pageCopy[page]}</p></header><section className="shell-review-section">此阶段只审核页面归属和大板块，不改造内部业务组件。</section></div>
       )}
     </WorkspaceShell>
@@ -97,9 +91,12 @@ export const MainBlocksReview: Story = {
     await expect(canvas.getByRole("heading", { name: "今天只处理最值得推进的职位" })).toBeInTheDocument();
     await expect(canvas.queryByText(/已同步/)).not.toBeInTheDocument();
     await expect(canvas.queryByRole("button", { name: /提醒/ })).not.toBeInTheDocument();
-    await userEvent.click(canvas.getByRole("button", { name: "设置中心" }));
-    await expect(canvas.getByRole("heading", { name: "设置中心" })).toBeInTheDocument();
-    await expect(canvas.getByText("数据连接")).toBeInTheDocument();
+    await userEvent.click(canvas.getByRole("button", { name: "用户与设置" }));
+    await expect(canvas.getByText("工作台设置")).toBeInTheDocument();
+    await userEvent.click(canvas.getByRole("menuitem", { name: "工作台设置" }));
+    await expect(canvas.getByRole("heading", { name: "个人资料" })).toBeInTheDocument();
+    await expect(canvas.getByRole("button", { name: "数据连接" })).toBeInTheDocument();
+    await userEvent.click(canvas.getByRole("button", { name: "返回应用" }));
     await userEvent.click(canvas.getByRole("button", { name: "全部职位" }));
     await expect(canvas.getByRole("heading", { name: "全部职位" })).toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: "今日决策" }));

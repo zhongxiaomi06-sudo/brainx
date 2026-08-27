@@ -1,7 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, userEvent, within } from "storybook/test";
 import { SettingsCenterReview, type SettingsCenterData } from "../settings-center-review";
-import { WorkspaceShell } from "../workspace-shell";
 
 const healthyData: SettingsCenterData = {
   profile: {
@@ -59,27 +58,27 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 function SettingsStory({ data }: { data: SettingsCenterData }) {
-  return <WorkspaceShell activePage="settings" onNavigate={fn()} consultant={data.profile.displayName}>
-    <SettingsCenterReview data={data} onAction={action} />
-  </WorkspaceShell>;
+  return <SettingsCenterReview data={data} onBack={fn()} onAction={action} />;
 }
 
 export const ConnectedHealthy: Story = {
   render: args => <SettingsStory data={args.data} />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByRole("heading", { name: "设置中心" })).toBeInTheDocument();
+    await expect(canvas.getByRole("heading", { name: "个人资料" })).toBeInTheDocument();
     await expect(canvas.getByText("系统身份")).toBeInTheDocument();
+    await userEvent.click(canvas.getByRole("button", { name: "方向画像" }));
+    await expect(canvas.getByText("当前 scorer 实际读取并参与方向匹配")).toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: /数据连接/ }));
-    await expect(canvas.getByRole("heading", { name: "TTC 职位系统" })).toBeInTheDocument();
+    await expect(canvas.getByText("TTC 职位系统")).toBeInTheDocument();
     await expect(canvas.getByText("MySQL 已连接")).toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: /推荐策略/ }));
-    await expect(canvas.getByText("本轮不提前制作六维设置。")).toBeInTheDocument();
+    await expect(canvas.getByText(/后端尚无只读 dry-run 契约/)).toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: /同步诊断/ }));
     await expect(canvas.getByText("同步完整")).toBeInTheDocument();
-    await expect(canvas.getByText("招聘意愿")).toBeInTheDocument();
+    await expect(canvas.getByText(/招聘意愿/)).toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: /个人资料/ }));
-    await expect(canvas.getByRole("heading", { name: "登录身份" })).toBeInTheDocument();
+    await expect(canvas.getByRole("heading", { name: "身份" })).toBeInTheDocument();
   },
 };
 
@@ -89,7 +88,7 @@ export const NeedsAttention: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(canvas.getByRole("button", { name: /数据连接/ }));
-    await expect(canvas.getByRole("button", { name: "连接或更新凭证" })).toBeInTheDocument();
+    await expect(canvas.getByRole("button", { name: "更新凭证" })).toBeInTheDocument();
     await expect(canvas.getByText("降级运行")).toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: /同步诊断/ }));
     await expect(canvas.getByText("同步不完整")).toBeInTheDocument();

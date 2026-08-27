@@ -1,12 +1,13 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   BriefcaseBusiness,
-  ChevronRight,
+  ChevronUp,
   ClipboardCheck,
   Settings2,
   Sparkles,
+  UserRound,
   Users,
   X,
 } from "lucide-react";
@@ -52,6 +53,7 @@ export function WorkspaceShell({
 }: WorkspaceShellProps) {
   const meta = pageMeta[activePage];
   const initial = consultant.trim().slice(0, 1) || "M";
+  const [accountOpen, setAccountOpen] = useState(false);
 
   return (
     <div className={`workspace-shell${assistantOpen ? " assistant-is-open" : ""}`}>
@@ -81,17 +83,18 @@ export function WorkspaceShell({
           ))}
         </nav>
 
-        <button
-          className={`workspace-settings-entry${activePage === "settings" ? " active" : ""}`}
-          type="button"
-          aria-label="设置中心"
-          aria-current={activePage === "settings" ? "page" : undefined}
-          onClick={() => onNavigate("settings")}
-        >
-          <Settings2 aria-hidden="true" />
-          <span>设置中心</span>
-          <ChevronRight aria-hidden="true" />
-        </button>
+        <div className="workspace-account-anchor">
+          {accountOpen && <div className="workspace-account-menu" role="menu">
+            <header><span className="workspace-avatar" aria-hidden="true">{initial}</span><span><b>{consultant}</b><small>{role}</small></span></header>
+            <button type="button" role="menuitem" onClick={() => { setAccountOpen(false); onNavigate("settings"); }}><UserRound /><span>个人资料</span></button>
+            <button type="button" role="menuitem" onClick={() => { setAccountOpen(false); onNavigate("settings"); }}><Settings2 /><span>工作台设置</span></button>
+          </div>}
+          <button className="workspace-account-entry" type="button" aria-label="用户与设置" aria-expanded={accountOpen} onClick={() => setAccountOpen(open => !open)}>
+            <span className="workspace-avatar" aria-hidden="true">{initial}</span>
+            <span className="workspace-account-entry-copy"><b>{consultant}</b><small>{role}</small></span>
+            <ChevronUp aria-hidden="true" />
+          </button>
+        </div>
       </aside>
 
       <section className="workspace-stage">
@@ -99,13 +102,6 @@ export function WorkspaceShell({
           <div className="workspace-page-identity">
             <span>BrainX · {meta.title}</span>
             <small>{meta.description}</small>
-          </div>
-          <div className="workspace-account">
-            <span className="workspace-avatar" aria-hidden="true">{initial}</span>
-            <span className="workspace-account-copy">
-              <b>{consultant}</b>
-              <small>{role}</small>
-            </span>
           </div>
           <button
             className={`workspace-assistant-trigger${assistantOpen ? " active" : ""}`}

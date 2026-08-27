@@ -1,20 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   Activity,
   AlertTriangle,
+  ArrowLeft,
   CheckCircle2,
   Database,
   ExternalLink,
   RefreshCw,
+  Search,
   SlidersHorizontal,
+  Tags,
   UserRound,
 } from "lucide-react";
 import "./settings-center-review.css";
 
-export type SettingsSection = "profile" | "connections" | "strategy" | "diagnostics";
-
+export type SettingsSection = "profile" | "direction" | "connections" | "strategy" | "diagnostics";
 type ConnectionState = "healthy" | "attention" | "offline";
 
 export type SettingsCenterData = {
@@ -26,177 +28,138 @@ export type SettingsCenterData = {
     feishuAuthorized: boolean;
     feishuNeedsReauth: boolean;
   };
-  ttc: {
-    connected: boolean;
-    userName: string | null;
-    expiresAt: string | null;
-    needsReauth: boolean;
-  };
-  talent: {
-    backend: string;
-    connected: boolean;
-    schema: string;
-    database: string | null;
-    host: string | null;
-    degraded: string | null;
-  };
-  strategy: {
-    policyVersion: string | null;
-    customized: boolean;
-  };
+  ttc: { connected: boolean; userName: string | null; expiresAt: string | null; needsReauth: boolean };
+  talent: { backend: string; connected: boolean; schema: string; database: string | null; host: string | null; degraded: string | null };
+  strategy: { policyVersion: string | null; customized: boolean };
   sync: {
     state: "READY" | "INCOMPLETE" | "ERROR" | "EMPTY";
     rowsRead: number | null;
     rowsExpected: number | null;
     updatedAt: string | null;
     errors: string[];
-    fieldReport: {
-      schemaVersion: string;
-      totalRows: number;
-      filterableFields: string[];
-      unavailableFilters: string[];
-    } | null;
+    fieldReport: { schemaVersion: string; totalRows: number; filterableFields: string[]; unavailableFilters: string[] } | null;
   };
 };
 
 type SettingsCenterReviewProps = {
   data: SettingsCenterData;
   initialSection?: SettingsSection;
+  onBack?: () => void;
   onAction?: (action: "edit-profile" | "connect-ttc" | "reauthorize-feishu" | "open-strategy" | "refresh-diagnostics") => void;
 };
 
-const sections = [
-  { id: "profile", label: "个人资料", detail: "身份与方向画像", icon: UserRound },
-  { id: "connections", label: "数据连接", detail: "TTC、飞书与人才库", icon: Database },
-  { id: "strategy", label: "推荐策略", detail: "策略版本与画像依据", icon: SlidersHorizontal },
-  { id: "diagnostics", label: "同步诊断", detail: "快照与字段能力", icon: Activity },
+const sectionGroups = [
+  { label: "个人", items: [
+    { id: "profile", label: "个人资料", icon: UserRound },
+    { id: "direction", label: "方向画像", icon: Tags },
+  ] },
+  { label: "工作台", items: [
+    { id: "strategy", label: "推荐策略", icon: SlidersHorizontal },
+    { id: "connections", label: "数据连接", icon: Database },
+    { id: "diagnostics", label: "同步诊断", icon: Activity },
+  ] },
 ] as const;
+
+const sectionCopy: Record<SettingsSection, { title: string; description: string }> = {
+  profile: { title: "个人资料", description: "管理当前登录身份和顾问资料。" },
+  direction: { title: "方向画像", description: "查看真实参与推荐的关键词，以及仅供记录的画像备注。" },
+  connections: { title: "数据连接", description: "管理 TTC、飞书和人才库的真实连接状态。" },
+  strategy: { title: "推荐策略", description: "查看当前策略版本，并进入独立策略审核页面。" },
+  diagnostics: { title: "同步诊断", description: "核对职位快照、字段能力和最近同步异常。" },
+};
 
 function StatusPill({ state, children }: { state: ConnectionState; children: string }) {
   const Icon = state === "healthy" ? CheckCircle2 : AlertTriangle;
   return <span className={`settings-status ${state}`}><Icon aria-hidden="true" />{children}</span>;
 }
 
-function Fact({ label, value, muted = false }: { label: string; value: string; muted?: boolean }) {
-  return <div className="settings-fact"><dt>{label}</dt><dd className={muted ? "muted" : ""}>{value}</dd></div>;
+function SettingGroup({ title, children }: { title: string; children: ReactNode }) {
+  return <section className="settings-group"><h2>{title}</h2><div className="settings-rows">{children}</div></section>;
+}
+
+function SettingRow({ label, description, value, action }: { label: string; description?: string; value?: ReactNode; action?: ReactNode }) {
+  return <div className="settings-row"><div><b>{label}</b>{description && <p>{description}</p>}</div>{value && <div className="settings-row-value">{value}</div>}{action}</div>;
 }
 
 function ProfilePanel({ data, onAction }: SettingsCenterReviewProps) {
-  const feishuState = data.profile.feishuAuthorized && !data.profile.feishuNeedsReauth;
+  const authorized = data.profile.feishuAuthorized && !data.profile.feishuNeedsReauth;
   return <div className="settings-panel-stack">
-    <section className="settings-card">
-      <header><div><span className="settings-eyebrow">ACCOUNT</span><h2>登录身份</h2></div><StatusPill state={feishuState ? "healthy" : "attention"}>{feishuState ? "飞书已授权" : "需要重新授权"}</StatusPill></header>
-      <dl className="settings-facts two-columns">
-        <Fact label="显示名称" value={data.profile.displayName || "—"} />
-        <Fact label="系统身份" value={data.profile.consultantId || "—"} />
-      </dl>
-      {!feishuState && <button className="settings-button secondary" type="button" onClick={() => onAction?.("reauthorize-feishu")}><ExternalLink />重新授权飞书</button>}
-    </section>
-    <section className="settings-card">
-      <header><div><span className="settings-eyebrow">DIRECTION PROFILE</span><h2>方向画像</h2></div><button className="settings-text-button" type="button" onClick={() => onAction?.("edit-profile")}>编辑资料</button></header>
-      <div className="settings-keywords" aria-label="画像关键词">
-        {data.profile.keywords.length ? data.profile.keywords.map(keyword => <span key={keyword}>{keyword}</span>) : <em>尚未设置画像关键词</em>}
-      </div>
-      <div className="settings-note"><b>画像备注</b><p>{data.profile.note || "未填写；空值不会被当作推荐依据。"}</p></div>
-      <p className="settings-source-note">数据依据：GET /api/v1/profile</p>
-    </section>
+    <SettingGroup title="身份">
+      <SettingRow label="显示名称" description="工作台和协作记录中显示的姓名" value={data.profile.displayName || "—"} />
+      <SettingRow label="系统身份" description="后端用于隔离顾问数据的标识" value={data.profile.consultantId || "—"} />
+      <SettingRow label="飞书身份" description="用于登录、花名册校验和顾问数据隔离" value={<StatusPill state={authorized ? "healthy" : "attention"}>{authorized ? "已授权" : "需要重新授权"}</StatusPill>} action={!authorized && <button className="settings-inline-action" type="button" onClick={() => onAction?.("reauthorize-feishu")}><ExternalLink />重新授权</button>} />
+    </SettingGroup>
+    <SettingGroup title="资料操作">
+      <SettingRow label="编辑个人资料" description="修改显示名称、方向关键词和画像备注" action={<button className="settings-inline-action" type="button" onClick={() => onAction?.("edit-profile")}>打开编辑</button>} />
+    </SettingGroup>
   </div>;
 }
 
-function ConnectionCard({ title, description, state, status, facts, action }: {
-  title: string; description: string; state: ConnectionState; status: string;
-  facts: { label: string; value: string; muted?: boolean }[]; action?: React.ReactNode;
-}) {
-  return <section className="settings-card connection-card">
-    <header><div><span className="settings-eyebrow">LIVE CONNECTION</span><h2>{title}</h2></div><StatusPill state={state}>{status}</StatusPill></header>
-    <p className="settings-card-description">{description}</p>
-    <dl className="settings-facts">{facts.map(fact => <Fact key={fact.label} {...fact} />)}</dl>
-    {action}
-  </section>;
+function DirectionPanel({ data, onAction }: SettingsCenterReviewProps) {
+  return <div className="settings-panel-stack">
+    <SettingGroup title="当前生效">
+      <SettingRow label="方向关键词" description="当前 scorer 实际读取并参与方向匹配" value={<div className="settings-keywords">{data.profile.keywords.length ? data.profile.keywords.map(keyword => <span key={keyword}>{keyword}</span>) : <em>尚未设置</em>}</div>} />
+      <SettingRow label="画像备注" description="当前不进入 scorer，仅供顾问记录" value={data.profile.note || "—"} />
+    </SettingGroup>
+    <div className="settings-honesty-note"><AlertTriangle /><p><b>结构化偏好仍在审核。</b> 排除项和硬约束没有后端字段及评分语义，本页不会提前开放保存。</p></div>
+    <button className="settings-primary-action" type="button" onClick={() => onAction?.("edit-profile")}><Tags />进入方向画像审核</button>
+  </div>;
 }
 
 function ConnectionsPanel({ data, onAction }: SettingsCenterReviewProps) {
   const ttcHealthy = data.ttc.connected && !data.ttc.needsReauth;
-  const talentHealthy = data.talent.backend === "mysql" && data.talent.connected && !data.talent.degraded;
   const feishuHealthy = data.profile.feishuAuthorized && !data.profile.feishuNeedsReauth;
-  return <div className="settings-connection-grid">
-    <ConnectionCard title="TTC 职位系统" description="真实职位的权威来源。凭证只提交给后端，页面不会回显。" state={ttcHealthy ? "healthy" : "attention"} status={ttcHealthy ? "已连接" : "需要处理"} facts={[
-      { label: "TTC 用户", value: data.ttc.userName || "—", muted: !data.ttc.userName },
-      { label: "凭证有效期", value: data.ttc.expiresAt || "—", muted: !data.ttc.expiresAt },
-    ]} action={!ttcHealthy ? <button className="settings-button" type="button" onClick={() => onAction?.("connect-ttc")}><RefreshCw />连接或更新凭证</button> : undefined} />
-    <ConnectionCard title="飞书身份" description="用于登录身份、花名册校验和顾问数据隔离。" state={feishuHealthy ? "healthy" : "attention"} status={feishuHealthy ? "已授权" : "需要授权"} facts={[
-      { label: "当前顾问", value: data.profile.displayName || "—" },
-      { label: "授权状态", value: data.profile.feishuNeedsReauth ? "授权已失效" : data.profile.feishuAuthorized ? "有效" : "未授权" },
-    ]} action={!feishuHealthy ? <button className="settings-button" type="button" onClick={() => onAction?.("reauthorize-feishu")}><ExternalLink />前往飞书授权</button> : undefined} />
-    <ConnectionCard title="人才库" description="人才数据旁路，不替代 TTC 职位源。" state={talentHealthy ? "healthy" : data.talent.connected ? "attention" : "offline"} status={talentHealthy ? "MySQL 已连接" : data.talent.connected ? "降级运行" : "未连接"} facts={[
-      { label: "当前后端", value: data.talent.backend || "—" },
-      { label: "数据库", value: data.talent.database || "—", muted: !data.talent.database },
-      { label: "建表状态", value: data.talent.schema || "—" },
-      ...(data.talent.degraded ? [{ label: "诊断", value: data.talent.degraded, muted: true }] : []),
-    ]} />
-    <p className="settings-source-note settings-grid-note">数据依据：/api/v1/ttc/connect、/api/v1/profile、/api/v1/talent/health</p>
-  </div>;
+  const talentHealthy = data.talent.backend === "mysql" && data.talent.connected && !data.talent.degraded;
+  return <div className="settings-panel-stack"><SettingGroup title="已配置的数据源">
+    <SettingRow label="TTC 职位系统" description={`真实职位来源 · ${data.ttc.userName || "未识别用户"} · 凭证有效期 ${data.ttc.expiresAt || "—"}`} value={<StatusPill state={ttcHealthy ? "healthy" : "attention"}>{ttcHealthy ? "已连接" : "需要处理"}</StatusPill>} action={!ttcHealthy && <button className="settings-inline-action" type="button" onClick={() => onAction?.("connect-ttc")}><RefreshCw />更新凭证</button>} />
+    <SettingRow label="飞书身份" description="登录身份、花名册校验与顾问隔离" value={<StatusPill state={feishuHealthy ? "healthy" : "attention"}>{feishuHealthy ? "已授权" : "需要授权"}</StatusPill>} action={!feishuHealthy && <button className="settings-inline-action" type="button" onClick={() => onAction?.("reauthorize-feishu")}><ExternalLink />前往授权</button>} />
+    <SettingRow label="人才库" description={`${data.talent.backend || "—"} · ${data.talent.database || "未连接数据库"} · ${data.talent.schema}`} value={<StatusPill state={talentHealthy ? "healthy" : data.talent.connected ? "attention" : "offline"}>{talentHealthy ? "MySQL 已连接" : data.talent.connected ? "降级运行" : "未连接"}</StatusPill>} />
+  </SettingGroup>{data.talent.degraded && <div className="settings-honesty-note"><AlertTriangle /><p>{data.talent.degraded}</p></div>}</div>;
 }
 
 function StrategyPanel({ data, onAction }: SettingsCenterReviewProps) {
-  return <div className="settings-panel-stack">
-    <section className="settings-card strategy-summary">
-      <header><div><span className="settings-eyebrow">RECOMMENDATION POLICY</span><h2>当前推荐依据</h2></div><StatusPill state={data.strategy.policyVersion ? "healthy" : "attention"}>{data.strategy.policyVersion ? "策略已加载" : "版本待确认"}</StatusPill></header>
-      <dl className="settings-facts two-columns">
-        <Fact label="策略版本" value={data.strategy.policyVersion || "—"} muted={!data.strategy.policyVersion} />
-        <Fact label="权重状态" value={data.strategy.customized ? "自定义权重" : "系统基线"} />
-        <Fact label="画像关键词" value={data.profile.keywords.length ? `${data.profile.keywords.length} 个已设置` : "尚未设置"} muted={!data.profile.keywords.length} />
-        <Fact label="硬规则" value="不在此处修改" />
-      </dl>
-      <div className="settings-honesty-note"><AlertTriangle /><p><b>本轮不提前制作六维设置。</b><br />推荐模式、字段可用性和变化预览将在独立 Storybook 任务中审核，避免把尚未确认的数据能力包装成可用配置。</p></div>
-      <button className="settings-button secondary" type="button" onClick={() => onAction?.("open-strategy")}><SlidersHorizontal />查看后续审核范围</button>
-      <p className="settings-source-note">数据依据：工作台 current_policy_version 与 GET /api/v1/profile</p>
-    </section>
-  </div>;
+  return <div className="settings-panel-stack"><SettingGroup title="当前策略">
+    <SettingRow label="策略版本" description="当前工作台记录的推荐策略版本" value={data.strategy.policyVersion || "—"} />
+    <SettingRow label="权重状态" description="硬规则不会被个人权重覆盖" value={data.strategy.customized ? "自定义权重" : "系统基线"} />
+    <SettingRow label="画像输入" description="仅统计当前真实保存的方向关键词" value={`${data.profile.keywords.length} 个关键词`} />
+  </SettingGroup><div className="settings-honesty-note"><AlertTriangle /><p>后端尚无只读 dry-run 契约，正式接入前不能在这里直接保存策略变化。</p></div><button className="settings-primary-action" type="button" onClick={() => onAction?.("open-strategy")}><SlidersHorizontal />进入推荐策略审核</button></div>;
 }
 
 function DiagnosticsPanel({ data, onAction }: SettingsCenterReviewProps) {
   const complete = data.sync.state === "READY";
   const report = data.sync.fieldReport;
   return <div className="settings-panel-stack">
-    <section className="settings-card">
-      <header><div><span className="settings-eyebrow">SYNC SNAPSHOT</span><h2>最近职位快照</h2></div><StatusPill state={complete ? "healthy" : data.sync.state === "ERROR" ? "offline" : "attention"}>{complete ? "同步完整" : data.sync.state === "EMPTY" ? "暂无快照" : data.sync.state === "ERROR" ? "同步失败" : "同步不完整"}</StatusPill></header>
-      <dl className="settings-facts two-columns">
-        <Fact label="读取行数" value={data.sync.rowsRead == null ? "—" : String(data.sync.rowsRead)} muted={data.sync.rowsRead == null} />
-        <Fact label="预期行数" value={data.sync.rowsExpected == null ? "—" : String(data.sync.rowsExpected)} muted={data.sync.rowsExpected == null} />
-        <Fact label="最近更新" value={data.sync.updatedAt || "—"} muted={!data.sync.updatedAt} />
-        <Fact label="错误数量" value={String(data.sync.errors.length)} muted={!data.sync.errors.length} />
-      </dl>
-      {!!data.sync.errors.length && <ul className="settings-errors">{data.sync.errors.map(error => <li key={error}>{error}</li>)}</ul>}
-      <button className="settings-button secondary" type="button" onClick={() => onAction?.("refresh-diagnostics")}><RefreshCw />重新读取诊断</button>
-    </section>
-    <section className="settings-card">
-      <header><div><span className="settings-eyebrow">FIELD CAPABILITIES</span><h2>TTC 字段能力</h2></div>{report && <span className="settings-schema">Schema {report.schemaVersion}</span>}</header>
-      {!report ? <div className="settings-empty"><Database /><b>尚无字段报告</b><p>完成一次 TTC 同步后，这里才会展示可筛选字段。</p></div> : <>
-        <Fact label="报告职位数" value={String(report.totalRows)} />
-        <div className="settings-capability-group"><b>当前允许筛选</b><div>{report.filterableFields.map(field => <span className="available" key={field}>{field}</span>)}</div></div>
-        <div className="settings-capability-group"><b>当前不开放</b><div>{report.unavailableFilters.map(field => <span key={field}>{field}</span>)}</div></div>
-      </>}
-      <p className="settings-source-note">数据依据：GET /api/v1/ttc/field-report</p>
-    </section>
+    <SettingGroup title="最近职位快照">
+      <SettingRow label="同步状态" description={data.sync.updatedAt ? `最近更新 ${data.sync.updatedAt}` : "尚无更新时间"} value={<StatusPill state={complete ? "healthy" : data.sync.state === "ERROR" ? "offline" : "attention"}>{complete ? "同步完整" : data.sync.state === "EMPTY" ? "暂无快照" : data.sync.state === "ERROR" ? "同步失败" : "同步不完整"}</StatusPill>} />
+      <SettingRow label="读取进度" description="读取行数 / 预期行数" value={`${data.sync.rowsRead ?? "—"} / ${data.sync.rowsExpected ?? "—"}`} />
+      <SettingRow label="错误数量" value={String(data.sync.errors.length)} action={<button className="settings-inline-action" type="button" onClick={() => onAction?.("refresh-diagnostics")}><RefreshCw />重新读取</button>} />
+    </SettingGroup>
+    <SettingGroup title="TTC 字段能力">
+      {!report ? <SettingRow label="尚无字段报告" description="完成一次 TTC 同步后才会生成可筛选字段报告" value="—" /> : <><SettingRow label="报告版本" value={report.schemaVersion} /><SettingRow label="报告职位数" value={String(report.totalRows)} /><SettingRow label="允许筛选" value={report.filterableFields.join("、") || "—"} /><SettingRow label="暂不开放" value={report.unavailableFilters.join("、") || "—"} /></>}
+    </SettingGroup>
+    {!!data.sync.errors.length && <ul className="settings-errors">{data.sync.errors.map(error => <li key={error}>{error}</li>)}</ul>}
   </div>;
 }
 
-export function SettingsCenterReview({ data, initialSection = "profile", onAction }: SettingsCenterReviewProps) {
+export function SettingsCenterReview({ data, initialSection = "profile", onBack, onAction }: SettingsCenterReviewProps) {
   const [active, setActive] = useState<SettingsSection>(initialSection);
-  const props = { data, initialSection, onAction };
+  const [query, setQuery] = useState("");
+  const visibleGroups = useMemo(() => sectionGroups.map(group => ({ ...group, items: group.items.filter(item => item.label.includes(query.trim())) })).filter(group => group.items.length), [query]);
+  const props = { data, initialSection, onBack, onAction };
+  const copy = sectionCopy[active];
   return <div className="settings-center-review">
-    <header className="settings-page-heading"><span className="settings-eyebrow">SETTINGS CENTER</span><h1>设置中心</h1><p>身份、数据连接和系统诊断统一收口；只展示已有接口能够证明的状态。</p></header>
-    <div className="settings-layout">
-      <nav className="settings-section-nav" aria-label="设置分组">
-        {sections.map(({ id, label, detail, icon: Icon }) => <button key={id} type="button" className={active === id ? "active" : ""} aria-current={active === id ? "page" : undefined} onClick={() => setActive(id)}><Icon aria-hidden="true" /><span><b>{label}</b><small>{detail}</small></span></button>)}
-      </nav>
-      <div className="settings-section-content">
-        {active === "profile" && <ProfilePanel {...props} />}
-        {active === "connections" && <ConnectionsPanel {...props} />}
-        {active === "strategy" && <StrategyPanel {...props} />}
-        {active === "diagnostics" && <DiagnosticsPanel {...props} />}
-      </div>
-    </div>
+    <aside className="settings-sidebar">
+      <button className="settings-back" type="button" onClick={onBack}><ArrowLeft />返回应用</button>
+      <label className="settings-search"><Search /><span className="sr-only">搜索设置</span><input value={query} onChange={event => setQuery(event.target.value)} placeholder="搜索设置…" /></label>
+      <nav aria-label="设置分组">{visibleGroups.map(group => <section key={group.label}><h2>{group.label}</h2>{group.items.map(({ id, label, icon: Icon }) => <button key={id} type="button" className={active === id ? "active" : ""} aria-current={active === id ? "page" : undefined} onClick={() => setActive(id)}><Icon /><span>{label}</span></button>)}</section>)}</nav>
+      <div className="settings-sidebar-account"><span>{data.profile.displayName.trim().slice(0, 1) || "M"}</span><div><b>{data.profile.displayName}</b><small>{data.profile.consultantId}</small></div></div>
+    </aside>
+    <main className="settings-main"><header><span className="settings-eyebrow">SETTINGS</span><h1>{copy.title}</h1><p>{copy.description}</p></header><div className="settings-section-content">
+      {active === "profile" && <ProfilePanel {...props} />}
+      {active === "direction" && <DirectionPanel {...props} />}
+      {active === "connections" && <ConnectionsPanel {...props} />}
+      {active === "strategy" && <StrategyPanel {...props} />}
+      {active === "diagnostics" && <DiagnosticsPanel {...props} />}
+    </div></main>
   </div>;
 }

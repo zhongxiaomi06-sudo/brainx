@@ -3,7 +3,7 @@ import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import { openDb } from '../src/db.js';
-import { signState, verifyState, buildAuthorizeUrl } from '../src/oauth.js';
+import { signState, verifyState, buildAuthorizeUrl, redirectUri } from '../src/oauth.js';
 import { seedRoster, findByOpenId, listConsultants, upsertMembers } from '../src/roster.js';
 import { signSession, verifySession, sessionSecret } from '../src/session.js';
 import { createServer } from '../src/server.js';
@@ -40,6 +40,21 @@ test('oauth state：签发/校验/篡改/过期', () => {
   // 用旧时间戳重签一个"合法但过期"的 state
   const sig = createHmac('sha256', sessionSecret()).update(`oauth.${nonce}.${oldTs}`).digest('hex');
   assert.ok(!verifyState(`${nonce}.${oldTs}.${sig}`));      // 过期
+});
+
+test('OAuth 回调默认跟随工作台对外端口', () => {
+  const previousBase = process.env.BRAINX_BASE_URL;
+  const previousPort = process.env.BRAINX_PORT;
+  try {
+    delete process.env.BRAINX_BASE_URL;
+    process.env.BRAINX_PORT = '3456';
+    assert.equal(redirectUri(), 'http://127.0.0.1:3456/api/v1/oauth/callback');
+  } finally {
+    if (previousBase === undefined) delete process.env.BRAINX_BASE_URL;
+    else process.env.BRAINX_BASE_URL = previousBase;
+    if (previousPort === undefined) delete process.env.BRAINX_PORT;
+    else process.env.BRAINX_PORT = previousPort;
+  }
 });
 
 test('session：open_id 绑定 + 篡改拒绝', () => {

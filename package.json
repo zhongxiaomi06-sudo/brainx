@@ -11,10 +11,10 @@
   },
   "scripts": {
     "dev": "node src/server.js",
-    "dev:frontend-only": "cd frontend/btex-frontend && WRANGLER_LOG_PATH=.wrangler/wrangler.log ./node_modules/.bin/vinext dev --host 0.0.0.0 --port 3000",
+    "dev:frontend-only": "cd frontend/btex-frontend && WRANGLER_LOG_PATH=.wrangler/wrangler.log ./node_modules/.bin/vinext dev --host 127.0.0.1 --port 4321",
     "build": "cd frontend/btex-frontend && WRANGLER_LOG_PATH=.wrangler/wrangler.log ./node_modules/.bin/vinext build",
     "start": "node src/server.js",
-    "start:frontend-only": "cd frontend/btex-frontend && WRANGLER_LOG_PATH=.wrangler/wrangler.log ./node_modules/.bin/vinext start --host 0.0.0.0 --port 3000",
+    "start:frontend-only": "cd frontend/btex-frontend && WRANGLER_LOG_PATH=.wrangler/wrangler.log ./node_modules/.bin/vinext start --host 127.0.0.1 --port 4321",
     "frontend:install": "npm --prefix frontend/btex-frontend install",
     "sync": "node bin/brainx-sync.mjs",
     "ttc-sync": "node bin/brainx-ttc-sync.mjs",

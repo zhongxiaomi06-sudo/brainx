@@ -47,7 +47,11 @@ test('session：open_id 绑定 + 篡改拒绝', () => {
   const v = verifySession(t);
   assert.equal(v.consultant_id, 'felix');
   assert.equal(v.open_id, 'ou_3b30bc83806e157d9af0cd9188d7ab8d');
-  assert.equal(verifySession(t.replace('felix', 'miaxx')), null); // 改身份 → 签名不符
+  // 篡改签名段 → timingSafeEqual 拒；篡改 payload 段 → HMAC 不符
+  assert.equal(verifySession(t.slice(0, -2) + (t.endsWith('aa') ? 'bb' : 'aa')), null);
+  const seg = t.split('.');
+  seg[1] = Buffer.from('mia', 'utf8').toString('base64url');
+  assert.equal(verifySession(seg.join('.')), null);
   assert.equal(verifySession('felix..12345.deadbeef'), null);
 });
 

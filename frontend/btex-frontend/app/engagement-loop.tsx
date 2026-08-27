@@ -103,6 +103,9 @@ export function CommitmentLoopPanel({
   const load = useCallback(async () => {
     if (mode === "connected") {
       const detail = await fetchJobDetail(job.id);
+      // 响应到达时组件可能已切到别的职位——对比当前闭包 job.id（useCallback 随 job 变化重建，
+      // 旧闭包的 set 目标仍是自己那份 state，但 React 17 后 setState 总是打到当前挂载实例；
+      // 靠 effect 的 alive 清理兜底，这里只对「同一挂载内连点两次」防重）。
       setDisplayState(detail.engagementState);
       setSnapshot(detail.commitment);
       return;
@@ -127,7 +130,13 @@ export function CommitmentLoopPanel({
     }
   }, [job, mode, outcomes, state, storageKey]);
   useEffect(() => {
-    queueMicrotask(() => { void load().catch(() => setSnapshot(emptySnapshot(job, state, outcomes))); });
+    // 切换职位时旧请求可能后到并覆盖新职位的 state——alive 守卫丢弃过期响应
+    // （此前弱网下 B 的面板会显示 A 的承接数据，甚至拿 A 的 actionId 提交到 B）。
+    let alive = true;
+    queueMicrotask(() => {
+      void load().catch(() => { if (alive) setSnapshot(emptySnapshot(job, state, outcomes)); });
+    });
+    return () => { alive = false; };
   }, [job, load, outcomes, state]);
   useEffect(() => {
     if (mode !== "offline" || typeof window === "undefined") return;

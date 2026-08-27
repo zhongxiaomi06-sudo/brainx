@@ -65,7 +65,7 @@ export type BrainxSnapshot = {
   policyVersion: string | null;
   profileKeywords: string[];
   openmai: Record<string, OpenmaiResult | null>;
-  preferences: WorkbenchPreferences;
+  preferences: WorkbenchPreferences | null; // 拉取失败为 null（与「真空盘」区分，防空值回写覆盖服务端）
 };
 
 export type BrainxReplay = {
@@ -634,12 +634,15 @@ export async function updateOpportunityMembership(
 // 边界层返回任意 JSON 载荷：形状由各映射函数收敛为强类型，这里保留原样。
 export async function brainxFetch<T = unknown>(
   path: string,
-  options: { method?: string; body?: unknown } = {},
+  options: { method?: string; body?: unknown; timeoutMs?: number } = {},
 ): Promise<T> {
   const method = options.method || "GET";
+  // 默认 15s 超时：后端存活但事件循环阻塞/代理挂起时，此前初始探测永不返回，
+  // brainxMode 永久停在 connecting（无 offline 兜底，助手/事实编辑全锁）。
   const res = await fetch(path, {
     method,
     credentials: "same-origin",
+    signal: AbortSignal.timeout(options.timeoutMs ?? 15000),
     headers: options.body !== undefined ? { "Content-Type": "application/json" } : undefined,
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
   });
@@ -684,7 +687,9 @@ export async function getSnapshot(): Promise<BrainxSnapshot> {
     brainxFetch<BackendRecommendations>("/api/v1/recommendations?limit=20"),
     brainxFetch<BackendProfile>("/api/v1/profile"),
     brainxFetch<BackendDismissReasons>("/api/v1/dismiss-reasons").catch(() => ({ items: FALLBACK_DISMISS_REASONS })),
-    brainxFetch<WorkbenchPreferences>("/api/v1/workbench/preferences").catch(() => ({ tray: [], folders: [], folderMode: false, updatedAt: null })),
+    // 失败给 null 而不是空对象：空对象会被当成「用户真空盘」应用，随后被持久化
+    // effect 把空 tray/默认 folders PUT 回服务器——瞬时 500 就把用户偏好整个清空。
+    brainxFetch<WorkbenchPreferences>("/api/v1/workbench/preferences").catch(() => null),
   ]);
 
   const jobs = (recs.items || []).map(mapRecommendation) as BrainxJob[];

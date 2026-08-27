@@ -104,7 +104,7 @@ export default class ErrorBoundary extends Component<Props, State> {
               fontSize: 13,
               cursor: "pointer",
             }}
-            onClick={() => { try { localStorage.removeItem("decision-workbench"); } catch { /* ignore */ } location.reload(); }}
+            onClick={() => { try { localStorage.removeItem("decision-workbench"); localStorage.removeItem("brainx-assistant-history"); } catch { /* ignore */ } location.reload(); }}
           >
             清空本地缓存并刷新
           </button>

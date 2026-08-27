@@ -13,6 +13,7 @@ import { latestCompleteSnapshot, latestRealSync, latestBridgeError, friendlyBrid
 import { WEIGHTS, POLICY_VERSION, hardBlock, scoreJob, actionOf, bandOf, sortRecs, explain, normalizeWeights } from './scorer.js';
 import { listConsultants } from './roster.js';
 import { relationMap, deriveRelation } from './relations.js';
+import { currentState } from './engagement.js';
 import { effectiveJobs } from './facts.js';
 
 /** 花名册从 DB 读（0003 起 consultants 表为权威，fixtures 只是种子）。 */
@@ -209,7 +210,22 @@ export const publicRec = (r) => ({
 
 /** 读最新一轮推荐（工作台默认视图）。raw_json 不出网（原始负载只供库内/回放对照）。
  * 只认 COMPLETED 轮：节流产物的 SKIPPED_UNCHANGED 审计行没有冻结推荐，不可当最新轮。 */
-export function latestRun(db, consultant_id) {
+/** 消费侧承接态过滤（与 recommendation-batch.isHidden 同语义）：
+ * feedback 行 / ACCEPTED / DISMISSED / 关闭态职位不进 Top3、推送卡与推荐列表——
+ * 此前只在精选盘隐藏，已 × 的职位照样当 Top1 推给本人。 */
+export function hideEngagedItems(db, consultant_id, items) {
+  const fb = new Set(db.prepare(`SELECT project_id FROM recommendation_feedback
+    WHERE consultant_id=?`).all(consultant_id).map((r) => r.project_id));
+  return items.filter((it) => {
+    const pid = it.job?.project_id;
+    if (!pid || fb.has(pid)) return false;
+    const st = currentState(db, consultant_id, pid).state;
+    if (['ACCEPTED', 'DISMISSED'].includes(st)) return false;
+    return !['CLOSED', 'COMPLETED', 'COOLING'].includes(it.job?.active_state);
+  });
+}
+
+export function latestRun(db, consultant_id, { hideEngaged = false } = {}) {
   const run = db.prepare(`SELECT * FROM decision_runs WHERE consultant_id=? AND status='COMPLETED'
     ORDER BY created_at DESC LIMIT 1`).get(consultant_id);
   if (!run) return null;
@@ -217,15 +233,17 @@ export function latestRun(db, consultant_id) {
   const jobs = effectiveJobs(db, consultant_id);
   const jobMap = Object.fromEntries(jobs.map((j) => [j.project_id, j]));
   const relCtx = relationMap(db, consultant_id);
+  const raw = recs.map((r) => ({
+    decision_id: r.decision_id, rank: r.rank, action: r.action, score: r.score,
+    confidence_band: r.confidence_band, evidence_coverage: r.evidence_coverage,
+    reasons: JSON.parse(r.reasons_json), risks: JSON.parse(r.risks_json),
+    evidence_refs: JSON.parse(r.evidence_refs_json), breakdown: JSON.parse(r.breakdown_json),
+    job: { ...jobMap[r.project_id], raw_json: undefined,
+           relation: deriveRelation(relCtx, r.project_id) },
+  }));
+  const src = hideEngaged ? hideEngagedItems(db, consultant_id, raw) : raw;
   return {
     run,
-    items: recs.map((r) => ({
-      decision_id: r.decision_id, rank: r.rank, action: r.action, score: r.score,
-      confidence_band: r.confidence_band, evidence_coverage: r.evidence_coverage,
-      reasons: JSON.parse(r.reasons_json), risks: JSON.parse(r.risks_json),
-      evidence_refs: JSON.parse(r.evidence_refs_json), breakdown: JSON.parse(r.breakdown_json),
-      job: { ...jobMap[r.project_id], raw_json: undefined,
-             relation: deriveRelation(relCtx, r.project_id) },
-    })),
+    items: src,
   };
 }

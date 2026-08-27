@@ -69,13 +69,13 @@ export async function fetchBitablePayloadApi(token, fetchImpl = fetch) {
 
 /** 拉某群增量消息（游标之后；重叠由 message_id 主键去重）。lark-cli 通道（兼容保留）。
  * 冷启动（无游标）用 desc 拿最新一页建游标；有游标后 asc 向前走。 */
-export function fetchNewMessages(db, chat_id, execImpl = lark, consultant_id = null) {
+export async function fetchNewMessages(db, chat_id, execImpl = lark, consultant_id = null) {
   const key = cursorKey(chat_id, consultant_id);
   const cur = db.prepare('SELECT checkpoint FROM bridge_cursor WHERE source=?').get(key);
   const args = ['im', '+chat-messages-list', '--chat-id', chat_id,
     '--order', cur ? 'asc' : 'desc', '--page-size', '50', '--no-reactions', '--format', 'json'];
   if (cur) args.push('--start', toIso(cur.checkpoint));
-  const d = execImpl(args);
+  const d = await execImpl(args); // lark 是 async：缺 await 时 d 是 Promise，消息静默恒空
   const msgs = d?.data?.messages || [];
   return msgs.filter((m) => !m.deleted && m.message_id);
 }
@@ -257,15 +257,19 @@ export async function bridgeOnce(db, { consultant_ids, execImpl = lark, api = { 
           if (!j.unique_id || j.has_permission === false) continue;
           if (!union.has(j.unique_id)) union.set(j.unique_id, toJobRow(j));
         }
-        // 水位棘轮（2026-08-26）：降序前缀语义 → 无论是否爬完，只要抓到新数据就把
-        // 水位推进到前缀最大 update_time。已证限流窗口极紧（第 2 页即 -90429），
-        // 棘轮让每轮至少啃下一页进度， backlog 在多轮间单调收敛；不推进则每轮
-        // 重拉同样的第 1 页、水位卡死。ttc_rr 只在完整爬完才推进（同顾问补完再换人）。
-        const maxU = Math.max(sinceMs, ...jobs.map((j) => Number(j.update_time) || 0));
-        if (maxU > sinceMs) {
-          db.prepare(`INSERT INTO bridge_cursor (source, checkpoint, updated_at) VALUES (?,?,?)
-            ON CONFLICT(source) DO UPDATE SET checkpoint=excluded.checkpoint, updated_at=excluded.updated_at`)
-            .run('ttc_watermark', new Date(maxU).toISOString(), now());
+        // 水位推进纪律（2026-08-27 修正棘轮跳空）：降序分页 + 查询语义是
+        // 「update_time > sinceMs」，截断时把水位推进到已抓前缀最大值会永久跳过
+        // (旧水位, 已抓最小值] 区间的职位变更（searchSince 契约：sinceMs 不前进，
+        // 下轮自然补齐）。故只有完整爬完（ttcComplete）才推进水位；
+        // 截断轮次保留原水位，已抓前缀照常入库（降序前缀是新数据，安全），
+        // 代价是下轮重拉前缀（配额开销），但绝无数据跳空。
+        if (ttcComplete) {
+          const maxU = Math.max(sinceMs, ...jobs.map((j) => Number(j.update_time) || 0));
+          if (maxU > sinceMs) {
+            db.prepare(`INSERT INTO bridge_cursor (source, checkpoint, updated_at) VALUES (?,?,?)
+              ON CONFLICT(source) DO UPDATE SET checkpoint=excluded.checkpoint, updated_at=excluded.updated_at`)
+              .run('ttc_watermark', new Date(maxU).toISOString(), now());
+          }
         }
         if (ttcComplete) {
           sourcesOk++; // TTC 通道畅通（0 新增也是成功：上游真的没变化）
@@ -408,7 +412,10 @@ export function startBridge(db, bus, { intervalMs, recommendFn, consultantIdsFn,
           if (recommendFn) {
             for (const cid of cids) {
               try { recommendFn(cid); } catch { /* 阻断不致命 */ }
-              try { onRecommended?.(cid); } catch { /* 推卡失败不影响桥接 */ }
+              try {
+                const r = onRecommended?.(cid);
+                if (r && typeof r.catch === 'function') r.catch(() => {}); // async 闭包的 rejection 也要接住
+              } catch { /* 推卡失败不影响桥接 */ }
               bus?.emit({ type: 'recommend', consultant_id: cid, at: now() });
             }
           }
@@ -416,7 +423,9 @@ export function startBridge(db, bus, { intervalMs, recommendFn, consultantIdsFn,
         // 判定依据 sources_ok：所有源都不可达才是失败（2026-08-26 修正——
         // 「源畅通但零新增」曾被误判为全断，健康状态被无限退避 + 误报横幅）。
         // 真实部分失败（errors 非空）仍走退避；仅令牌失效不算源失败。
-        if (out.sources_ok === 0 && out.errors.length === 0) {
+        // 无人托管凭据（skipped 全员）≠ 源断：sources_ok=0 且零错误时静默跳过即可，
+        // 此前误报「TTC 与 Bitable 均不可用」并给每顾问写 bridge-error 行（表膨胀 + 误导）。
+        if (out.sources_ok === 0 && out.errors.length === 0 && out.skipped.length === 0) {
           failed = true;
           bus?.emit({ type: 'sync_error', message: '职位源拉取失败（TTC 与 Bitable 均不可用）', at: now() });
         }

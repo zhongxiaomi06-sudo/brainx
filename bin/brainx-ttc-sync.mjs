@@ -23,7 +23,7 @@ if (!jwt) {
 }
 
 console.log(`[ttc-sync] 顾问 ${consultant} · 拉取 TTC 职位…（max ${maxPages} 页）`);
-const jobs = await searchAll(jwt, {});
+const jobs = await searchAll(jwt, {}, undefined, { maxPages }); // 第 4 参才是 opts（第 3 参是 fetchImpl）——此前 --max-pages 解析后从不传入（死参数）
 console.log(`[ttc-sync] TTC 返回 ${jobs.length} 个职位`);
 
 if (!jobs.length) {

@@ -225,7 +225,7 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
     'GET /api/v1/workbench': (req, res, cid) => {
       const sync = latestRealSync(db, cid);
       const bridgeErr = latestBridgeError(db, cid, sync?.completed_at || '');
-      const run = latestRun(db, cid);
+      const run = latestRun(db, cid, { hideEngaged: true }); // Top3/推送/列表统一隐藏承接态与已 × 职位
       const c = commitmentSummary(db, cid);
       json(res, 200, {
         consultant_id: cid,
@@ -271,8 +271,11 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
     },
     'GET /api/v1/recommendations': (req, res, cid, q) => {
       const limit = Math.min(Number(q.get('limit')) || 10, 50);
-      const sync = latestSync(db, cid);
-      const run = latestRun(db, cid);
+      // latestRealSync：bridge-error 观测行（source='bridge-error'）不参与阻断判定——
+      // 与 recommend() 同一口径（2026-08-27 修正：曾用 latestSync，桥接每失败一次
+      // 本端点立即 blocked，限流窗口推荐列表持续空白而 workbench 显示 READY）。
+      const sync = latestRealSync(db, cid);
+      const run = latestRun(db, cid, { hideEngaged: true }); // Top3/推送/列表统一隐藏承接态与已 × 职位
       if (sync && !sync.complete) {
         return json(res, 200, { blocked: true, reason: '本次同步不完整，为避免误导，暂不生成正式推荐',
                                 run_id: null, items: [] });
@@ -280,8 +283,7 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       if (!run) return json(res, 200, { blocked: false, run_id: null, items: [], empty: true });
       json(res, 200, { blocked: false, run_id: run.run.run_id, snapshot_id: run.run.snapshot_id,
                        policy_version: run.run.policy_version, generated_at: run.run.created_at,
-                       items: run.items.filter((item) => !db.prepare(`SELECT 1 FROM recommendation_feedback
-                         WHERE consultant_id=? AND project_id=? LIMIT 1`).get(cid, item.job.project_id)).slice(0, limit) });
+                       items: run.items.slice(0, limit) });
     },
 
     'GET /api/v1/recommendations/pick-tray': (req, res, cid, q) => {
@@ -470,7 +472,12 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       const st = currentState(db, cid, id)?.state;
       if (!['ACCEPTED', 'COMPLETED'].includes(st)) return err(res, 404, 'NOT_FOUND', '职位不存在或未接单');
       const cur = getOpenmaiResult(db, cid, id);
-      if (cur.status === 'running') return err(res, 409, 'RUNNING', '找人在进行中，请等待完成后再试');
+      // 陈旧 running 放行：进程重启会丢内存任务集但留下 status='running' 行，
+      // 此前永久 409。任务单项最长 ~47min（12min 流 + 35min 轮询），超 60min 视为僵死。
+      const staleMs = Date.now() - Date.parse(cur.started_at || 0);
+      if (cur.status === 'running' && !(Number.isFinite(staleMs) && staleMs > 60 * 60 * 1000)) {
+        return err(res, 409, 'RUNNING', '找人在进行中，请等待完成后再试');
+      }
       const out = startOpenmaiTask(db, bus, cid, id, { force: true });
       json(res, 200, { ok: true, openmai: out });
     },
@@ -605,7 +612,7 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
     'POST /api/v1/push/preview': (req, res, cid) => {
       const sync = latestRealSync(db, cid);
       const snapshot = latestCompleteSnapshot(db, cid);
-      const run = latestRun(db, cid);
+      const run = latestRun(db, cid, { hideEngaged: true }); // Top3/推送/列表统一隐藏承接态与已 × 职位
       const c = commitmentSummary(db, cid);
       const name = loadConsultants(db).find((x) => x.consultant_id === cid)?.display_name || cid;
       const card = sync && !sync.complete
@@ -619,7 +626,7 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       const b = await body(req);
       const sync = latestRealSync(db, cid);
       const snapshot = latestCompleteSnapshot(db, cid);
-      const run = latestRun(db, cid);
+      const run = latestRun(db, cid, { hideEngaged: true }); // Top3/推送/列表统一隐藏承接态与已 × 职位
       const c = commitmentSummary(db, cid);
       const name = loadConsultants(db).find((x) => x.consultant_id === cid)?.display_name || cid;
       const kind = sync && !sync.complete ? 'SYNC_ALERT' : 'DAILY_TOP3';
@@ -725,7 +732,13 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   }
   const shutdown = () => {
     if (frontendProcess && !frontendProcess.killed) frontendProcess.kill('SIGTERM');
+    // SSE 长连接（25s 心跳，恒非 idle）会让 server.close 的回调永远等不到——
+    // 先全量结束 SSE 响应，再 closeAllConnections 兜底，最后 5s 强退保 Deadline。
+    for (const res of sseClients.keys()) { try { res.end(); } catch { /* 已断开 */ } }
+    sseClients.clear();
     server.close(() => process.exit(0));
+    server.closeAllConnections?.();
+    setTimeout(() => process.exit(0), 5000).unref();
   };
   process.once('SIGINT', shutdown);
   process.once('SIGTERM', shutdown);

@@ -1,9 +1,6 @@
-// brainx-api.ts — Brain X 后端（btex/brainx）HTTP 适配层。
-// 前端唯一数据通道：页面不得直接 fetch /api；全部请求与映射集中在这里。
-// 后端契约见 brainx/src/server.js 与 README「后端接入」章节。
-//
-// 纯函数映射器（map*/of*）不依赖浏览器环境，供 tests/brainx-adapter.test.mjs 直接单测。
-// 请求函数只在浏览器端调用；SSR（npm run build）期间不会触发任何网络请求。
+// brainx-api.ts — Brain X 后端 HTTP 适配层：前端唯一数据通道（契约见 brainx/src/server.js）。
+// 纯函数映射器不依赖浏览器环境，供 tests/brainx-adapter.test.mjs 直接单测；
+// 请求函数只在浏览器端调用，SSR 构建期不触发网络请求。
 import type {
   DecisionEvent,
   EngagementCommand,
@@ -65,7 +62,7 @@ export type BrainxSnapshot = {
   policyVersion: string | null;
   profileKeywords: string[];
   openmai: Record<string, OpenmaiResult | null>;
-  preferences: WorkbenchPreferences | null; // 拉取失败为 null（与「真空盘」区分，防空值回写覆盖服务端）
+  preferences: WorkbenchPreferences | null; // 拉取失败为 null（与「真空盘」区分）
 };
 
 export type BrainxReplay = {
@@ -637,8 +634,7 @@ export async function brainxFetch<T = unknown>(
   options: { method?: string; body?: unknown; timeoutMs?: number } = {},
 ): Promise<T> {
   const method = options.method || "GET";
-  // 默认 15s 超时：后端存活但事件循环阻塞/代理挂起时，此前初始探测永不返回，
-  // brainxMode 永久停在 connecting（无 offline 兜底，助手/事实编辑全锁）。
+  // 默认 15s 超时：后端挂起时初始探测曾永不返回，brainxMode 永久停在 connecting
   const res = await fetch(path, {
     method,
     credentials: "same-origin",
@@ -687,8 +683,7 @@ export async function getSnapshot(): Promise<BrainxSnapshot> {
     brainxFetch<BackendRecommendations>("/api/v1/recommendations?limit=20"),
     brainxFetch<BackendProfile>("/api/v1/profile"),
     brainxFetch<BackendDismissReasons>("/api/v1/dismiss-reasons").catch(() => ({ items: FALLBACK_DISMISS_REASONS })),
-    // 失败给 null 而不是空对象：空对象会被当成「用户真空盘」应用，随后被持久化
-    // effect 把空 tray/默认 folders PUT 回服务器——瞬时 500 就把用户偏好整个清空。
+    // 失败给 null 而非空对象：空对象会被当「真空盘」应用并被持久化 effect PUT 回服务器（清空偏好）
     brainxFetch<WorkbenchPreferences>("/api/v1/workbench/preferences").catch(() => null),
   ]);
 

@@ -53,6 +53,8 @@ test("uses the reference three-column shell and a single-column opportunity work
   assert.match(workbench, /type DecisionDirection = "paid"\s*\|\s*"growth"\s*\|\s*"marketing"/);
   assert.match(workbench, /id: "today", label: "今日决策", icon: Sparkles/);
   assert.match(workbench, /<WorkspaceShell activePage=\{shellPage\}/);
+  assert.match(workbench, /page==="settings"\?<WorkbenchSettingsPage/);
+  assert.doesNotMatch(workbench, /page==="settings"&&<WorkbenchSettingsPage/);
   assert.match(workbench, /精选盘/);
   assert.match(workbench, /function PickTray/);
   assert.match(workbench, /function DecisionZone/);

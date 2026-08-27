@@ -37,7 +37,7 @@ export function jobSnapshot(db, { updated_after, updated_before, status, limit }
 
   const cols = `project_id, company, role, city, pipeline, hc,
     active_state, priority, company_type, source_url, captured_at, owner_name`;
-  const lim = limit && Number(limit) > 0 ? ` LIMIT ${Number(limit)}` : '';
+  const lim = limit && Number.isFinite(Number(limit)) && Number(limit) > 0 ? ` LIMIT ${Number(limit)}` : '';
   const jobs = db.prepare(`SELECT ${cols} FROM job_facts${w} ORDER BY captured_at DESC${lim}`).all(...params);
   const total_count = db.prepare(`SELECT COUNT(*) AS c FROM job_facts${w}`).get(...params)?.c || 0;
   const meta = db.prepare('SELECT MAX(captured_at) as last_sync FROM job_facts').get();

@@ -417,6 +417,7 @@ export type SavedWorkbenchState = Partial<{
   extraTasks: string[];
   weights: number[];
   decisionActions: string[];
+  dismissedRecommendationIds: string[];
   membershipRelations: Record<string, MembershipRelation>;
   tray: string[];
   folders: PickFolder[];
@@ -431,7 +432,21 @@ export type SavedWorkbenchState = Partial<{
 export function readSavedWorkbenchState(): SavedWorkbenchState {
   if (typeof document === "undefined") return {};
   try {
-    return JSON.parse(localStorage.getItem("decision-workbench") || "{}");
+    const raw = JSON.parse(localStorage.getItem("decision-workbench") || "{}");
+    // 合法 JSON 但字段类型错误（tray:5、folders:"abc"…）会让渲染期 map 崩溃——
+    // 逐字段校验形状，脏字段丢弃回默认值，而不是整页进错误边界。
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+    const clean = {} as Record<string, unknown>;
+    const arr = (v: unknown) => (Array.isArray(v) ? v : undefined);
+    const obj = (v: unknown) => (v && typeof v === "object" && !Array.isArray(v) ? v : undefined);
+    const pick = (key: string, check: (v: unknown) => unknown) => {
+      const v = check(raw[key]); if (v !== undefined) clean[key] = v;
+    };
+    ["done", "snoozed", "extraTasks", "weights", "decisionActions", "tray", "folders",
+      "notifications", "dismissedRecommendationIds"].forEach((k) => pick(k, arr));
+    ["engagement", "events", "outcomes", "sync", "auth", "membershipRelations"].forEach((k) => pick(k, obj));
+    if (typeof raw.folderMode === "boolean") clean.folderMode = raw.folderMode;
+    return clean as SavedWorkbenchState;
   } catch {
     return {};
   }

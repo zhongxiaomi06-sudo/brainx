@@ -86,7 +86,7 @@ export function Rules({ notify, mode, policy, keywords, note, onRefresh, onProfi
     setSaving(true);
     try {
       await brainxFetch<ProfileUpdate>("/api/v1/profile", { method: "PUT", body: { weights: next || {} } });
-      const run = await brainxFetch<BackendRecommendationRun>("/api/v1/recommendations/run", { method: "POST" });
+      const run = await brainxFetch<BackendRecommendationRun>("/api/v1/recommendations/run", { method: "POST", timeoutMs: 120000 });
       await onRefresh();
       if (!next) { setWeights({ ...BASELINE }); setCustomized(false); }
       else setCustomized(true);

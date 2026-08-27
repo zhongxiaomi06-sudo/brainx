@@ -42,7 +42,8 @@ export function fetchFeishuJobs() {
     ...larkProfileArgs(),
     'base', '+record-list', '--base-token', BITABLE_BASE,
     '--table-id', BITABLE_TABLE, '--page-size', '100', '--format', 'json',
-  ], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
+  ], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024,
+        timeout: 60000, killSignal: 'SIGKILL' }); // lark-cli 实测会无限 hang——手动同步入口也要有上限
   const d = JSON.parse(out.slice(out.indexOf('{'))).data;
   return {
     as_of: now(),

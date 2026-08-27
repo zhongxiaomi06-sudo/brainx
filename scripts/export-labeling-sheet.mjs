@@ -62,7 +62,10 @@ export function exportSheet(db) {
 const HEADER = ['consultant', 'display_name', 'rank', 'project_id', 'company', 'role',
                 'active_state', 'score', 'existing_label', 'label', 'reason'];
 const csvCell = (v) => {
-  const s = String(v ?? '');
+  let s = String(v ?? '');
+  // 公式注入防护：company/role 来自 TTC/飞书（半可信源），= + - @ 开头会被
+  // Excel/WPS 当公式执行（=HYPERLINK 数据外渗型）——统一加前导单引号字面量化。
+  if (/^[=+\-@]/.test(s)) s = `'${s}`;
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 };
 

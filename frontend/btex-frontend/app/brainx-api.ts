@@ -1,9 +1,6 @@
-// brainx-api.ts — Brain X 后端（btex/brainx）HTTP 适配层。
-// 前端唯一数据通道：页面不得直接 fetch /api；全部请求与映射集中在这里。
-// 后端契约见 brainx/src/server.js 与 README「后端接入」章节。
-//
-// 纯函数映射器（map*/of*）不依赖浏览器环境，供 tests/brainx-adapter.test.mjs 直接单测。
-// 请求函数只在浏览器端调用；SSR（npm run build）期间不会触发任何网络请求。
+// brainx-api.ts — Brain X 后端 HTTP 适配层：前端唯一数据通道（契约见 brainx/src/server.js）。
+// 纯函数映射器不依赖浏览器环境，供 tests/brainx-adapter.test.mjs 直接单测；
+// 请求函数只在浏览器端调用，SSR 构建期不触发网络请求。
 import type {
   DecisionEvent,
   EngagementCommand,
@@ -65,7 +62,7 @@ export type BrainxSnapshot = {
   policyVersion: string | null;
   profileKeywords: string[];
   openmai: Record<string, OpenmaiResult | null>;
-  preferences: WorkbenchPreferences;
+  preferences: WorkbenchPreferences | null; // 拉取失败为 null（与「真空盘」区分）
 };
 
 export type BrainxReplay = {
@@ -634,12 +631,14 @@ export async function updateOpportunityMembership(
 // 边界层返回任意 JSON 载荷：形状由各映射函数收敛为强类型，这里保留原样。
 export async function brainxFetch<T = unknown>(
   path: string,
-  options: { method?: string; body?: unknown } = {},
+  options: { method?: string; body?: unknown; timeoutMs?: number } = {},
 ): Promise<T> {
   const method = options.method || "GET";
+  // 默认 15s 超时：后端挂起时初始探测曾永不返回，brainxMode 永久停在 connecting
   const res = await fetch(path, {
     method,
     credentials: "same-origin",
+    signal: AbortSignal.timeout(options.timeoutMs ?? 15000),
     headers: options.body !== undefined ? { "Content-Type": "application/json" } : undefined,
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
   });
@@ -684,7 +683,8 @@ export async function getSnapshot(): Promise<BrainxSnapshot> {
     brainxFetch<BackendRecommendations>("/api/v1/recommendations?limit=20"),
     brainxFetch<BackendProfile>("/api/v1/profile"),
     brainxFetch<BackendDismissReasons>("/api/v1/dismiss-reasons").catch(() => ({ items: FALLBACK_DISMISS_REASONS })),
-    brainxFetch<WorkbenchPreferences>("/api/v1/workbench/preferences").catch(() => ({ tray: [], folders: [], folderMode: false, updatedAt: null })),
+    // 失败给 null 而非空对象：空对象会被当「真空盘」应用并被持久化 effect PUT 回服务器（清空偏好）
+    brainxFetch<WorkbenchPreferences>("/api/v1/workbench/preferences").catch(() => null),
   ]);
 
   const jobs = (recs.items || []).map(mapRecommendation) as BrainxJob[];

@@ -96,9 +96,9 @@
     },
     {
       "path": "src/server.js",
-      "maxLines": 745,
+      "maxLines": 744,
       "owner": "backend",
-      "reason": "存量路由与启动编排尚未拆分；2026-08-25 登记 +5：浏览器端错误上报路由（client-error.js）与 friendlyBridgeError 降级文案",
+      "reason": "存量路由与启动编排尚未拆分；2026-08-27 收紧 -1：审计批次压缩注释块",
       "expiresOn": "2026-10-31"
     }
   ],

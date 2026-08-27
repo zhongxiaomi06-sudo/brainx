@@ -103,9 +103,7 @@ export function CommitmentLoopPanel({
   const load = useCallback(async () => {
     if (mode === "connected") {
       const detail = await fetchJobDetail(job.id);
-      setDisplayState(detail.engagementState);
-      setSnapshot(detail.commitment);
-      return;
+      setDisplayState(detail.engagementState); setSnapshot(detail.commitment); return;
     }
     if (mode === "offline" && typeof window !== "undefined") {
       try {
@@ -127,7 +125,9 @@ export function CommitmentLoopPanel({
     }
   }, [job, mode, outcomes, state, storageKey]);
   useEffect(() => {
-    queueMicrotask(() => { void load().catch(() => setSnapshot(emptySnapshot(job, state, outcomes))); });
+    let alive = true; // 切换职位时丢弃后到的旧响应
+    queueMicrotask(() => { void load().catch(() => { if (alive) setSnapshot(emptySnapshot(job, state, outcomes)); }); });
+    return () => { alive = false; };
   }, [job, load, outcomes, state]);
   useEffect(() => {
     if (mode !== "offline" || typeof window === "undefined") return;

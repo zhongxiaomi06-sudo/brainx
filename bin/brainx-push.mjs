@@ -12,7 +12,7 @@ const cid = arg('consultant', 'felix');
 const db = openDb();
 const sync = latestSync(db, cid);
 const snapshot = latestCompleteSnapshot(db, cid);
-const run = latestRun(db, cid);
+const run = latestRun(db, cid, { hideEngaged: true });
 const c = commitmentSummary(db, cid);
 const name = loadConsultants(db).find((x) => x.consultant_id === cid)?.display_name || cid;
 const kind = sync && !sync.complete ? 'SYNC_ALERT' : 'DAILY_TOP3';

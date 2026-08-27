@@ -50,7 +50,12 @@ export async function searchSince(jwt, { sinceMs = 0, paceMs = 0, maxPages = 100
     }
     const jobs = d?.jobs || [];
     // 缺 update_time 的异常行当新鲜处理（宁可多拉一页，不提前截断）
-    const tsOf = (j) => (j.update_time ? Number(j.update_time) : Number.POSITIVE_INFINITY);
+    const tsOf = (j) => {
+  const t = Number(j.update_time);
+  // 脏值（非数字）按 Infinity 兜底：NaN 会让该行被判「不新」，
+  // 既丢行又触发 fresh.length<jobs.length 提前停，单行脏数据截断整轮增量。
+  return Number.isFinite(t) ? t : Number.POSITIVE_INFINITY;
+};
     const fresh = sinceMs > 0 ? jobs.filter((j) => tsOf(j) > sinceMs) : jobs;
     out.push(...fresh);
     // 整页都不新（降序序列 → 后续页更老）→ 提前停；fresh < jobs 说明本页触达水位

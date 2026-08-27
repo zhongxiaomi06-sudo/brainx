@@ -88,8 +88,16 @@ export const proxyFrontend = (req, res, target) => {
   req.pipe(proxy);
 };
 
+const BODY_LIMIT = 8 * 1024 * 1024; // 8MB：简历/批量导入上限，防开放路由无限大 body 撑内存
 export async function body(req) {
-  let text = '';
-  for await (const chunk of req) text += chunk;
+  // 收集 Buffer 后一次解码：逐 chunk toString 会把跨边界的多字节 UTF-8 切成 U+FFFD（中文简历乱码）
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size > BODY_LIMIT) { req.destroy(); return null; }
+    chunks.push(chunk);
+  }
+  const text = Buffer.concat(chunks).toString('utf8');
   try { return JSON.parse(text || '{}'); } catch { return null; }
 }

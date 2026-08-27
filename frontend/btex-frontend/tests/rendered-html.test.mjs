@@ -23,6 +23,17 @@ const cssSource = async () => (await Promise.all([
   source("app/workbench-next.css"),
 ])).join("\n");
 
+test("keeps demo datasets behind the explicit demo mode", async () => {
+  const workbench = await source("app/workbench.tsx");
+
+  assert.match(workbench, /brainxMode==="connected"\?\(brainxRadar\?\?\[\]\):demo\?demoRadarJobs:\[\]/);
+  assert.match(workbench, /brainxJobs\?\?\(demo\?decisionJobs:\[\]\)/);
+  assert.match(workbench, /brainxMode==="connected"\?\(brainxClients\?\?\[\]\):demo\?clients:\[\]/);
+  assert.doesNotMatch(workbench, /brainxMode==="connected"&&brainxRadar\?brainxRadar:demoRadarJobs/);
+  assert.doesNotMatch(workbench, /brainxJobs\|\|decisionJobs/);
+  assert.doesNotMatch(workbench, /brainxMode==="connected"&&brainxClients\?brainxClients:clients/);
+});
+
 test("uses the reference three-column shell and a single-column opportunity workspace", async () => {
   const [page, workbench, css] = await Promise.all([
     source("app/page.tsx"),

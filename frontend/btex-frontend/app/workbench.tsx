@@ -70,7 +70,7 @@ export default function DecisionWorkbench({demo=false}:{demo?:boolean}={}){
  const mobileDrawerDrag=useRef<{pointerId:number;startX:number;startProgress:number;drawerWidth:number;lastX:number;lastAt:number;velocity:number;progress:number;moved:boolean}|null>(null);
  const mobileDrawerCloseTimer=useRef<number|null>(null);
  const [pendingCommand,setPendingCommand]=useState<{job:DecisionJob;command:EngagementCommand}|null>(null);
- // Brain X 后端连接态：connecting（探测中）→ connected（API 驱动）/ offline（演示模式回退）
+ // Brain X 后端连接态：connecting（探测中）→ connected（API 驱动）/ offline（真实数据不可用）；演示数据仅由 demo 属性显式开启
  const [brainxMode,setBrainxMode]=useState<"connecting"|"connected"|"offline">("connecting");
  const [workspaceIssue,setWorkspaceIssue]=useState<Exclude<WorkspaceEntryKind,"connecting">|null>(null);
  const [connectAttempt,setConnectAttempt]=useState(0);
@@ -117,7 +117,7 @@ export default function DecisionWorkbench({demo=false}:{demo?:boolean}={}){
  // SSE 实时通知：同步/推荐事件 → 去抖刷新快照并插入提醒；组件卸载关闭连接
  useEffect(()=>{if(brainxMode!=="connected")return;const sub=connectSSE(event=>{if(!event.type||event.type==="hello")return;if(event.type==="openmai_result"){const pid=String((event as {project_id?:string}).project_id||"");setNotifications(current=>[{id:`sse-om-${Date.now()}`,kind:"SYNC_ALERT",title:(event as {status?:string}).status==="done"?"自动找人完成":"自动找人失败",detail:pid,read:false},...current]);if(pid)window.setTimeout(()=>{void fetchJobDetail(pid).then(d=>setOpenmaiByJob(current=>({...current,[pid]:d.openmai}))).catch(()=>{})},600);return}const title=event.type==="sync_error"?"同步异常":event.type==="recommend"?"推荐已更新":"同步完成";setNotifications(current=>[{id:`sse-${Date.now()}`,kind:"SYNC_ALERT",title,detail:String(event.message||""),read:false},...current]);window.setTimeout(()=>{void loadBrainxSnapshot.current().catch(()=>{});void loadBrainxSide.current()},800)});return()=>sub.close()},[brainxMode]);
  const notify=(s:string,opts?:{actions?:{label:string;onClick:()=>void}[];input?:{placeholder:string;onSubmit:(text:string)=>void}},ms?:number)=>{if(toastTimerRef.current){clearTimeout(toastTimerRef.current);toastTimerRef.current=null}setToast({text:s,actions:opts?.actions,input:opts?.input});if(!opts?.input)toastTimerRef.current=setTimeout(()=>{setToast(null);toastTimerRef.current=null},ms??(opts?.actions?.length?6000:2200))};
- const radarJobs:Job[]=brainxMode==="connected"&&brainxRadar?brainxRadar:demoRadarJobs;
+ const radarJobs:Job[]=brainxMode==="connected"?(brainxRadar??[]):demo?demoRadarJobs:[];
  const filteredJobs=useMemo(()=>radarJobs.filter(job=>(status==="全部状态"||job.status===status)&&(`${job.name}${job.client}${job.city}${job.industry}${job.positionType}${job.source}`.includes(query))).sort((a,b)=>sort==="score"?(b.score??-1)-(a.score??-1):(b.hc??-1)-(a.hc??-1)),[query,status,sort,radarJobs]);
  const visibleActions=actionSeed.map((a,i)=>({a,i})).filter(x=>!done.includes(x.i)&&!snoozed.includes(x.i));
  const clearPanelMotion=()=>{if(typeof window==="undefined")return;if(panelAnimationFrame.current!==null){window.cancelAnimationFrame(panelAnimationFrame.current);panelAnimationFrame.current=null}if(panelCloseTimer.current!==null){window.clearTimeout(panelCloseTimer.current);panelCloseTimer.current=null}};
@@ -140,7 +140,7 @@ export default function DecisionWorkbench({demo=false}:{demo?:boolean}={}){
   if(done){notify(`已接单 ${done} 个职位`);const acc=lastAcceptedId?activeDecisionJobs.find(j=>j.id===lastAcceptedId):null;if(acc)openDecision(acc,"engagement")}
   if(acceptedIds.length)await Promise.all(acceptedIds.map(id=>refreshBrainxJob(id).catch(()=>{})));
   if(failReasons.length)notify(`未能接单：${failReasons.slice(0,2).join("；")}${failReasons.length>2?" 等":""}`)};
- const activeDecisionJobs=useMemo(()=>(brainxJobs||decisionJobs).map(job=>{const relation=membershipRelations[job.id];if(!relation)return job;return {...job,facts:{...job.facts,"职位关系":relation==="MY_JOB"?"我的职位":"团队共享"}}}),[brainxJobs,membershipRelations]);
+ const activeDecisionJobs=useMemo(()=>(brainxJobs??(demo?decisionJobs:[])).map(job=>{const relation=membershipRelations[job.id];if(!relation)return job;return {...job,facts:{...job.facts,"职位关系":relation==="MY_JOB"?"我的职位":"团队共享"}}}),[brainxJobs,demo,membershipRelations]);
  const confirmJobMembership=async(job:DecisionJob,relation:MembershipRelation)=>{if(brainxMode==="connected"){await updateOpportunityMembership(job.id,relation,makeIdempotencyKey(`membership:${job.id}`));await loadBrainxSnapshot.current()}else{setMembershipRelations(current=>({...current,[job.id]:relation}));const at=new Date().toLocaleString("zh-CN",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"});setDecisionEvents(current=>({...current,[job.id]:[{id:`evt-${Date.now()}`,type:"确认项目归属",at,reason:relation==="MY_JOB"?"我的职位":"团队共享"},...(current[job.id]||[])]}))}notify(`${job.company} · 已加入${relation==="MY_JOB"?"我的职位":"团队共享"}`)};
  const refreshBrainxJob=async(jobId:string)=>{if(brainxMode!=="connected")return;try{const detail=await fetchJobDetail(jobId);setEngagement(current=>({...current,[jobId]:detail.engagementState}));setDecisionEvents(current=>({...current,[jobId]:detail.events}));setOutcomes(current=>({...current,[jobId]:detail.outcomes}));setOpenmaiByJob(current=>({...current,[jobId]:detail.openmai}));setBrainxJobs(current=>current?current.map(job=>job.id===jobId?{...job,brainxLegal:detail.legal,brainxDecisionId:detail.decisionId||job.brainxDecisionId}:job):null)}catch{/* 详情刷新失败不打断交互，下次打开再试 */}};
  const rerunOpenmaiForJob=(jobId:string)=>{void(async()=>{try{await rerunOpenmai(jobId);const detail=await fetchJobDetail(jobId);setOpenmaiByJob(current=>({...current,[jobId]:detail.openmai}))}catch(error){notify(`重新找人失败：${error instanceof Error?error.message:"后端未响应"}`)}})()};
@@ -221,7 +221,7 @@ export default function DecisionWorkbench({demo=false}:{demo?:boolean}={}){
        setSelected={setSelected} openJob={setDetail} notify={notify}
       />}
       {page==="clients"&&<ClientsView
-       clients={(brainxMode==="connected"&&brainxClients?brainxClients:clients)
+       clients={(brainxMode==="connected"?(brainxClients??[]):demo?clients:[])
         .filter(c=>`${c.name}${c.industry}`.includes(query))}
        open={setClientDetail} notify={notify}
       />}

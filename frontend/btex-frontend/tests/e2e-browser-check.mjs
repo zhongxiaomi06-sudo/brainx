@@ -161,7 +161,9 @@ try {
   consoleErrors.length = 0;
   failedResponses.length = 0;
   await page.reload({ waitUntil: "networkidle" });
-  await page.getByRole("button", { name: /身份：Felix/ }).waitFor({ state: "visible" });
+  const accountEntry = page.getByRole("button", { name: "用户与设置" });
+  await accountEntry.waitFor({ state: "visible" });
+  assert.match(await accountEntry.innerText(), /Felix/);
 
   const workbenchStatus = await page.evaluate(async () => {
     const response = await fetch("/api/v1/workbench");
@@ -182,10 +184,13 @@ try {
   await page.getByRole("button", { name: "全部职位" }).click();
   await page.getByRole("button", { name: "客户洞察" }).click();
   await page.getByRole("heading", { name: "客户洞察" }).waitFor({ state: "visible" });
-  await page.getByRole("button", { name: "连接与数据" }).click();
-  await page.getByRole("heading", { name: "TTC 职位系统" }).waitFor({ state: "visible" });
-  await page.getByLabel("TTC 凭证（ottin-jwt-token-v2）").waitFor({ state: "visible" });
-  assert.match(await page.locator("main").innerText(), /真实职位的权威来源/);
+  await accountEntry.click();
+  await page.getByRole("menuitem", { name: "工作台设置" }).click();
+  await page.getByRole("button", { name: "数据连接" }).click();
+  await page.getByRole("heading", { name: "数据连接" }).waitFor({ state: "visible" });
+  await page.getByText("TTC 职位系统", { exact: true }).waitFor({ state: "visible" });
+  assert.match(await page.locator("main").innerText(), /真实职位来源/);
+  await page.getByRole("button", { name: "返回应用" }).click();
   await page.getByRole("button", { name: "今日决策", exact: true }).click();
   await page.getByRole("heading", { name: /待判断职位|还没有可判断的职位/ }).waitFor({ state: "visible" });
 

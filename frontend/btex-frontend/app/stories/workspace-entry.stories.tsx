@@ -5,7 +5,7 @@ import { WorkspaceEntry } from "../workbench-entry";
 const meta = {
   title: "组合场景/真实数据入口",
   component: WorkspaceEntry,
-  args: { onRetry: fn(), onOpenSources: fn() },
+  args: { onRetry: fn(), onCheckConnection: fn(async () => {}), onOpenSources: fn() },
   decorators: [(Story) => <div style={{ padding: 24, minHeight: "100vh", background: "#f4f6f7" }}><Story /></div>],
 } satisfies Meta<typeof WorkspaceEntry>;
 

@@ -80,14 +80,12 @@ export function createServer(db = openDb(), deps = {}) {
         .map((c) => ({ consultant_id: c.consultant_id, display_name: c.display_name })) });
     },
 
-    // —— 人才库（MySQL 人才库，异步；连不通自动内存回退）——
-    // 注意：人才库读写独立于 SQLite 决策库，绝不进入职位/客户基础评分。
+    // —— 人才库（MySQL 异步，连不通自动内存回退；读写独立于决策库，绝不进基础评分）——
     'GET /api/v1/talent/status': async (req, res, cid) => {
       try { json(res, 200, { ...(await talentBackendStatus()), supply_enabled: talentSupplyEnabled() }); }
       catch (e) { err(res, 502, 'TALENT_BACKEND_ERROR', String(e.message).slice(0, 200)); }
     },
     // 人才库健康自检：后端类型 + RDS 连通性 + 建表状态（凭据只出 host/库名，不出密码）。
-    // 填完 .env 的 BRAINX_MYSQL_* 后请求此路由即可确认是否真的切到了阿里云 RDS。
     'GET /api/v1/talent/health': async (req, res, cid) => {
       try { json(res, 200, await talentHealth()); }
       catch (e) { err(res, 502, 'TALENT_HEALTH_ERROR', String(e.message).slice(0, 200)); }
@@ -271,11 +269,9 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
     },
     'GET /api/v1/recommendations': (req, res, cid, q) => {
       const limit = Math.min(Number(q.get('limit')) || 10, 50);
-      // latestRealSync：bridge-error 观测行（source='bridge-error'）不参与阻断判定——
-      // 与 recommend() 同一口径（2026-08-27 修正：曾用 latestSync，桥接每失败一次
-      // 本端点立即 blocked，限流窗口推荐列表持续空白而 workbench 显示 READY）。
+      // latestRealSync：bridge-error 观测行不参与阻断（曾用 latestSync，桥接失败即 blocked）
       const sync = latestRealSync(db, cid);
-      const run = latestRun(db, cid, { hideEngaged: true }); // Top3/推送/列表统一隐藏承接态与已 × 职位
+      const run = latestRun(db, cid, { hideEngaged: true }); // Top3/列表隐藏承接态与已 × 职位
       if (sync && !sync.complete) {
         return json(res, 200, { blocked: true, reason: '本次同步不完整，为避免误导，暂不生成正式推荐',
                                 run_id: null, items: [] });
@@ -298,8 +294,7 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       const out = recommendationUndoFeedback(db, cid, await body(req));
       json(res, out.ok ? 200 : out.status || 422, out);
     },
-    // 一键反馈（F2，2026-08-24）：推送卡片按钮直写，HMAC 签名代替 session
-    // （open 路由，鉴权全在 verifyQuick）。顾问不登录工作台也能产标签。
+    // 一键反馈（F2）：卡片按钮直写，HMAC 签名代替 session（open 路由，鉴权在 verifyQuick）
     'GET /api/v1/feedback/quick': (req, res, cid, q) => {
       const p = Object.fromEntries(q);
       const page = (okFlag, text, status) => {
@@ -472,12 +467,9 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       const st = currentState(db, cid, id)?.state;
       if (!['ACCEPTED', 'COMPLETED'].includes(st)) return err(res, 404, 'NOT_FOUND', '职位不存在或未接单');
       const cur = getOpenmaiResult(db, cid, id);
-      // 陈旧 running 放行：进程重启会丢内存任务集但留下 status='running' 行，
-      // 此前永久 409。任务单项最长 ~47min（12min 流 + 35min 轮询），超 60min 视为僵死。
+      // 陈旧 running 放行：重启丢内存任务集但留 running 行曾致永久 409；超 60min 视为僵死
       const staleMs = Date.now() - Date.parse(cur.started_at || 0);
-      if (cur.status === 'running' && !(Number.isFinite(staleMs) && staleMs > 60 * 60 * 1000)) {
-        return err(res, 409, 'RUNNING', '找人在进行中，请等待完成后再试');
-      }
+      if (cur.status === 'running' && !(Number.isFinite(staleMs) && staleMs > 60 * 60 * 1000)) return err(res, 409, 'RUNNING', '找人在进行中，请等待完成后再试');
       const out = startOpenmaiTask(db, bus, cid, id, { force: true });
       json(res, 200, { ok: true, openmai: out });
     },
@@ -522,8 +514,7 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       json(res, out.ok ? 200 : (out.status || 400), out);
     },
 
-    // TTC 系统凭据托管（轻无感：~60 天粘贴一次自己的 ottin-jwt-token-v2）。
-    // 只许本人；JWT 先本地校验再活验证（调一次 user/quota）才落库；永不回显。
+    // TTC 凭据托管（~60 天贴一次 ottin-jwt-token-v2）；只许本人；JWT 校验+活验证才落库；永不回显。
     'GET /api/v1/ttc/connect': (req, res, cid) => json(res, 200, ttcAuthStatus(db, cid)),
     'PUT /api/v1/ttc/connect': async (req, res, cid) => {
       const b = await body(req);
@@ -545,10 +536,8 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       db.prepare('DELETE FROM ttc_tokens WHERE consultant_id=?').run(cid);
       json(res, 200, { ok: true, connected: false });
     },
-    // —— 浏览器扩展自动同步（顾问扫码 TTC 后扩展自动 POST，无需粘贴/登录）——
-    // 与 PUT /ttc/connect 同一验证链（validateJwt + quota 活验证），但免登录：
-    // 扩展无法持有 brainx session，凭「来源校验（扩展/本地） + JWT 本身有效」落库。
-    // 状态查询（安全视图，绝不出 JWT 本体）：凭证中心/扩展 popup 展示用。
+    // —— 浏览器扩展自动同步（免登录：来源校验 + JWT 本身有效，与 PUT /ttc/connect 同链）——
+    // 状态查询为安全视图，绝不出 JWT 本体。
     'GET /api/v1/ttc/status': (req, res, cid, q) => {
       const consultantId = q.get('consultant_id') || 'felix';
       if (!loadConsultants(db).some((c) => c.consultant_id === consultantId))
@@ -667,12 +656,10 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
                     // 人才库健康探测：纯状态（后端类型/连通性/建表），不含任何用户数据或密码，
                     // 允许未登录访问，以便数据源页无论登录与否都能显示真库连接状态。
                     'GET /api/v1/talent/health', 'GET /api/v1/talent/status',
-                    // 职位快照：外部系统（York AI worker 等）无 brainx session，凭 API Key 读取；
-                    // 鉴权在 handler 内自校验（verifySnapshotKey），未配置 key 时 fail-closed 全拒。
+                    // 职位快照：外部系统无 session 凭 API Key 读取（verifySnapshotKey，未配置 fail-closed）。
                     'GET /api/v1/jobs/snapshot', 'GET /api/v1/meta/guard',
                     'POST /api/v1/meta/client-error', // 浏览器端错误探针：未必有 session，只写聚合日志
-                    // 一键反馈：无 session，HMAC 签名即鉴权（verifyQuick fail-closed）
-                    'GET /api/v1/feedback/quick'];
+                    'GET /api/v1/feedback/quick']; // 一键反馈：签名即鉴权（verifyQuick fail-closed）
       const cid = open.includes(`${req.method} ${path}`) ? null : auth(req, res);
       if (open.includes(`${req.method} ${path}`) || cid) {
         try { return await handler(req, res, cid, u.searchParams, dynId); }
@@ -732,8 +719,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   }
   const shutdown = () => {
     if (frontendProcess && !frontendProcess.killed) frontendProcess.kill('SIGTERM');
-    // SSE 长连接（25s 心跳，恒非 idle）会让 server.close 的回调永远等不到——
-    // 先全量结束 SSE 响应，再 closeAllConnections 兜底，最后 5s 强退保 Deadline。
+    // SSE 恒非 idle 会让 server.close 永等——先结束 SSE，再 closeAllConnections，5s 强退保底
     for (const res of sseClients.keys()) { try { res.end(); } catch { /* 已断开 */ } }
     sseClients.clear();
     server.close(() => process.exit(0));

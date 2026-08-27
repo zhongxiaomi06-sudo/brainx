@@ -36,7 +36,7 @@ test('雷达：职位状态使用批量查询，不随职位数量产生 N+1', (
   const originalPrepare = db.prepare.bind(db);
   let stateQueries = 0;
   db.prepare = (sql) => {
-    if (String(sql).includes('current_engagement') || String(sql).includes("event_type='RECOMMENDED'")) {
+    if (String(sql).includes('FROM decision_events')) {
       stateQueries += 1;
     }
     return originalPrepare(sql);

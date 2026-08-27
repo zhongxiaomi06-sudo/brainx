@@ -51,8 +51,15 @@ export function currentState(db, consultant_id, project_id) {
  * 分别查询 current_engagement 与 decision_events，导致大职位池把主线程堵死。
  */
 export function currentStateMap(db, consultant_id) {
-  const states = new Map(db.prepare(`SELECT project_id, state, state_since
-    FROM current_engagement WHERE consultant_id=?`).all(consultant_id)
+  // current_engagement 是面向单职位读取的兼容视图；对整个职位池查询会触发
+  // 相关子查询。批量路径直接在该顾问事件上做一次窗口归并。
+  const states = new Map(db.prepare(`SELECT project_id, state, state_since FROM (
+    SELECT project_id, next_state AS state, occurred_at AS state_since,
+      ROW_NUMBER() OVER (PARTITION BY project_id ORDER BY occurred_at DESC, id DESC) AS position
+    FROM decision_events
+    WHERE actor=? AND event_type IN
+      ('VIEWED','WATCHED','ACCEPTED','DISMISSED','RELEASED','EXPIRED','COMPLETED')
+  ) WHERE position=1`).all(consultant_id)
     .map((row) => [row.project_id, { state: row.state, state_since: row.state_since }]));
   const recommended = db.prepare(`SELECT DISTINCT project_id FROM decision_events
     WHERE actor=? AND event_type='RECOMMENDED'`).all(consultant_id);

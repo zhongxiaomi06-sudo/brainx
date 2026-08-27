@@ -37,6 +37,7 @@
 .client-empty svg{width:22px}
 .client-empty b{font-size:12px}
 .client-empty p{margin:0;font-size:11px}
+.client-table-more{display:flex;align-items:center;justify-content:center;gap:14px;padding:18px;color:#64756f;font-size:13px}.client-table-more button{border:1px solid #b8e8da;border-radius:10px;background:#effbf7;color:#176451;padding:8px 14px;font-weight:700;cursor:pointer}
 .client-detail-backdrop{position:fixed;z-index:50;inset:0;border:0;background:rgba(27,40,35,.24)}
 .client-detail{position:fixed;z-index:51;top:0;right:0;width:min(430px,92vw);height:100vh;display:flex;flex-direction:column;gap:24px;padding:26px;border-left:1px solid #dce5e2;background:#fff;box-shadow:-18px 0 42px rgba(29,41,38,.12)}
 .client-detail>header{display:flex;justify-content:space-between;gap:16px;padding-bottom:18px;border-bottom:1px solid #e7ecea}

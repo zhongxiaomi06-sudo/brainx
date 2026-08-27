@@ -15,7 +15,6 @@ import type {
   SyncStatus,
 } from "./decision-demo";
 import { brainxFetch } from "./brainx-http.ts";
-
 export { brainxFetch, BrainxApiError } from "./brainx-http.ts";
 export {
   classifyRadarPositionType, getClients, getRadar, getTtcFieldReport, mapClientRow, mapRadarRow,
@@ -24,7 +23,6 @@ export type {
   BackendClientRow, BackendRadarRow, RadarClient, RadarFieldCapability, RadarFieldReport, RadarJob, RadarPayload,
   RadarPositionType,
 } from "./brainx-radar-api.ts";
-
 // —— 与 workbench.tsx 的 DecisionJob 结构一致的映射结果（结构类型，避免循环依赖）——
 export type BrainxDirection = "paid" | "growth" | "marketing";
 export type BrainxGroup =
@@ -61,6 +59,7 @@ export type BrainxJob = {
 };
 
 export type BrainxSnapshot = {
+  consultantId: string;
   jobs: BrainxJob[];
   engagement: Record<string, EngagementState>;
   events: Record<string, DecisionEvent[]>;
@@ -565,6 +564,7 @@ export async function getSnapshot(): Promise<BrainxSnapshot> {
   }
 
   return {
+    consultantId: profile.consultant_id || wb.consultant_id,
     jobs,
     engagement,
     events,

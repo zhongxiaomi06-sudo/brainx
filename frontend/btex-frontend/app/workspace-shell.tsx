@@ -38,6 +38,7 @@ type WorkspaceShellProps = {
   assistantOpen?: boolean;
   onAssistantToggle?: () => void;
   assistant?: ReactNode;
+  assistantPlacement?: "shell" | "overlay";
   children: ReactNode;
 };
 
@@ -49,6 +50,7 @@ export function WorkspaceShell({
   assistantOpen = false,
   onAssistantToggle,
   assistant,
+  assistantPlacement = "shell",
   children,
 }: WorkspaceShellProps) {
   const meta = pageMeta[activePage];
@@ -56,7 +58,7 @@ export function WorkspaceShell({
   const [accountOpen, setAccountOpen] = useState(false);
 
   return (
-    <div className={`workspace-shell${assistantOpen ? " assistant-is-open" : ""}`}>
+    <div className={`workspace-shell${assistantOpen && assistantPlacement === "shell" ? " assistant-is-open" : ""}`}>
       <aside className="workspace-sidebar" aria-label="主要导航">
         <button
           className="workspace-brand"
@@ -116,7 +118,7 @@ export function WorkspaceShell({
         <main className="workspace-content">{children}</main>
       </section>
 
-      {assistantOpen && (
+      {assistantOpen && assistantPlacement === "shell" && (
         <aside className="workspace-assistant" aria-label="BrainX 助手面板">
           <header>
             <div><small>CONTEXT ASSISTANT</small><b>BrainX 助手</b></div>

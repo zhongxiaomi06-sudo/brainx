@@ -30,7 +30,7 @@ export type SettingsCenterData = {
   };
   ttc: { connected: boolean; userName: string | null; expiresAt: string | null; needsReauth: boolean };
   talent: { backend: string; connected: boolean; schema: string; database: string | null; host: string | null; degraded: string | null };
-  strategy: { policyVersion: string | null; customized: boolean };
+  strategy: { policyVersion: string | null; customized: boolean | null };
   sync: {
     state: "READY" | "INCOMPLETE" | "ERROR" | "EMPTY";
     rowsRead: number | null;
@@ -44,6 +44,7 @@ export type SettingsCenterData = {
 type SettingsCenterReviewProps = {
   data: SettingsCenterData;
   initialSection?: SettingsSection;
+  review?: boolean;
   onBack?: () => void;
   onAction?: (action: "edit-profile" | "connect-ttc" | "reauthorize-feishu" | "open-strategy" | "refresh-diagnostics") => void;
 };
@@ -95,14 +96,14 @@ function ProfilePanel({ data, onAction }: SettingsCenterReviewProps) {
   </div>;
 }
 
-function DirectionPanel({ data, onAction }: SettingsCenterReviewProps) {
+function DirectionPanel({ data, onAction, review }: SettingsCenterReviewProps) {
   return <div className="settings-panel-stack">
     <SettingGroup title="当前生效">
       <SettingRow label="方向关键词" description="当前 scorer 实际读取并参与方向匹配" value={<div className="settings-keywords">{data.profile.keywords.length ? data.profile.keywords.map(keyword => <span key={keyword}>{keyword}</span>) : <em>尚未设置</em>}</div>} />
       <SettingRow label="画像备注" description="当前不进入 scorer，仅供顾问记录" value={data.profile.note || "—"} />
     </SettingGroup>
-    <div className="settings-honesty-note"><AlertTriangle /><p><b>结构化偏好仍在审核。</b> 排除项和硬约束没有后端字段及评分语义，本页不会提前开放保存。</p></div>
-    <button className="settings-primary-action" type="button" onClick={() => onAction?.("edit-profile")}><Tags />进入方向画像审核</button>
+    <div className="settings-honesty-note"><AlertTriangle /><p><b>{review ? "结构化偏好仍在审核。" : "结构化偏好尚未开放。"}</b> 排除项和硬约束没有后端字段及评分语义，本页不会提前开放保存。</p></div>
+    <button className="settings-primary-action" type="button" onClick={() => onAction?.("edit-profile")}><Tags />{review ? "进入方向画像审核" : "查看当前能力说明"}</button>
   </div>;
 }
 
@@ -117,12 +118,12 @@ function ConnectionsPanel({ data, onAction }: SettingsCenterReviewProps) {
   </SettingGroup>{data.talent.degraded && <div className="settings-honesty-note"><AlertTriangle /><p>{data.talent.degraded}</p></div>}</div>;
 }
 
-function StrategyPanel({ data, onAction }: SettingsCenterReviewProps) {
+function StrategyPanel({ data, onAction, review }: SettingsCenterReviewProps) {
   return <div className="settings-panel-stack"><SettingGroup title="当前策略">
     <SettingRow label="策略版本" description="当前工作台记录的推荐策略版本" value={data.strategy.policyVersion || "—"} />
-    <SettingRow label="权重状态" description="硬规则不会被个人权重覆盖" value={data.strategy.customized ? "自定义权重" : "系统基线"} />
+    <SettingRow label="权重状态" description="硬规则不会被个人权重覆盖" value={data.strategy.customized === null ? "待确认" : data.strategy.customized ? "自定义权重" : "系统基线"} />
     <SettingRow label="画像输入" description="仅统计当前真实保存的方向关键词" value={`${data.profile.keywords.length} 个关键词`} />
-  </SettingGroup><div className="settings-honesty-note"><AlertTriangle /><p>后端尚无只读 dry-run 契约，正式接入前不能在这里直接保存策略变化。</p></div><button className="settings-primary-action" type="button" onClick={() => onAction?.("open-strategy")}><SlidersHorizontal />进入推荐策略审核</button></div>;
+  </SettingGroup><div className="settings-honesty-note"><AlertTriangle /><p>后端尚无只读 dry-run 契约，当前不能在这里直接保存策略变化。</p></div><button className="settings-primary-action" type="button" onClick={() => onAction?.("open-strategy")}><SlidersHorizontal />{review ? "进入推荐策略审核" : "查看当前能力说明"}</button></div>;
 }
 
 function DiagnosticsPanel({ data, onAction }: SettingsCenterReviewProps) {
@@ -141,11 +142,11 @@ function DiagnosticsPanel({ data, onAction }: SettingsCenterReviewProps) {
   </div>;
 }
 
-export function SettingsCenterReview({ data, initialSection = "profile", onBack, onAction }: SettingsCenterReviewProps) {
+export function SettingsCenterReview({ data, initialSection = "profile", review = true, onBack, onAction }: SettingsCenterReviewProps) {
   const [active, setActive] = useState<SettingsSection>(initialSection);
   const [query, setQuery] = useState("");
   const visibleGroups = useMemo(() => sectionGroups.map(group => ({ ...group, items: group.items.filter(item => item.label.includes(query.trim())) })).filter(group => group.items.length), [query]);
-  const props = { data, initialSection, onBack, onAction };
+  const props = { data, initialSection, review, onBack, onAction };
   const copy = sectionCopy[active];
   return <div className="settings-center-review">
     <aside className="settings-sidebar">

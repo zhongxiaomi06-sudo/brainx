@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Database, Settings2 } from "lucide-react";
+import { Database } from "lucide-react";
 import { brainxFetch } from "./brainx-api";
-import { sourceNames } from "./workbench-model";
-import { Heading, StatusTag } from "./workbench-controls";
+import { Heading } from "./workbench-controls";
 
 type Notify = (message: string, options?: {
   actions?: { label: string; onClick: () => void }[];
@@ -108,17 +107,9 @@ function TtcSourceCard({ notify }: { notify: Notify }) {
 }
 
 function Sources({ notify }: { notify: Notify }) {
-  const demos = sourceNames.filter((name) => name !== "职位库");
-  return <><Heading code="DATA SOURCES" title="数据源" desc="人才库与 TTC 使用真实接口；其他来源仍为演示占位。" /><div className="source-grid">
+  return <><Heading code="DATA CONNECTIONS" title="数据连接" desc="只展示已经接入真实接口的数据源；其他设想不进入正式页面。" /><div className="source-grid">
     <TalentBackendCard />
     <TtcSourceCard notify={notify} />
-    {demos.map((name) => <section className="card source" key={name}>
-      <div className="source-head"><div className="source-icon"><Database /></div><StatusTag s="演示" /></div>
-      <h3>{name}</h3><p>演示状态 · 尚未接入 BrainX 数据源接口</p>
-      <div className="completeness"><span>数据完整度</span><b>—</b></div>
-      <div className="bar"><i style={{ width: "0%", background: "var(--orange)" }} /></div>
-      <button className="btn" style={{ marginTop: 14 }} onClick={() => notify("数据源字段查看仍为演示交互，不会写入真实系统")}><Settings2 />查看字段</button>
-    </section>)}
   </div></>;
 }
 

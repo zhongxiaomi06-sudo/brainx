@@ -60,7 +60,7 @@ const capabilities: TtcFieldCapability[] = [
 const meta = {
   title: "业务组件/TTC 真实职位表",
   component: TtcJobsTable,
-  args: { rows, capabilities, onOpen: fn() },
+  args: { rows, capabilities, onOpen: fn(), review: true },
   parameters: { layout: "fullscreen", surfaceClass: "ttc-jobs-story" },
 } satisfies Meta<typeof TtcJobsTable>;
 

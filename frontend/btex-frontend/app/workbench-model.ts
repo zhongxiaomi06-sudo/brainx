@@ -4,7 +4,7 @@ import type { ManualFactField } from "./brainx-api";
 import type { AuthStatus, DecisionEvent, EngagementCommand, EngagementState, Notification, Outcome, SyncStatus } from "./decision-demo";
 export { cockpitRadarJobs, demoRadarJobs, jobs } from "./workbench-radar-data";
 
-export type Page = "today" | "jobs" | "clients" | "alerts" | "rules" | "sources" | "accepted";
+export type Page = "today" | "jobs" | "clients" | "alerts" | "rules" | "sources" | "accepted" | "settings";
 export type Status = "待同步" | "新发布" | "升温" | "活跃" | "拥挤" | "降温" | "疑似失活" | "已关闭";
 export type PositionType = "技术" | "产品" | "运营" | "算法" | "设计" | "商业化";
 export type JobSource = "市场信号" | "驾驶舱导入";

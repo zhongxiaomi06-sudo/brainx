@@ -50,6 +50,7 @@ const pipelineLabel: Record<string, string> = {
   offer: "Offer",
   onboard: "入职",
 };
+const ROW_BATCH_SIZE = 100;
 
 function formatPipeline(pipeline: TtcJobTableRow["pipeline"]) {
   if (!pipeline) return "待确认";
@@ -127,15 +128,18 @@ export function TtcJobsTable({
   rows,
   capabilities = [],
   onOpen,
+  review = false,
 }: {
   rows: TtcJobTableRow[];
   capabilities?: TtcFieldCapability[];
   onOpen: (projectId: string) => void;
+  review?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState<FilterState>({});
   const [openFilter, setOpenFilter] = useState<FilterKey | null>(null);
   const [sort, setSort] = useState<{ key: SortKey; direction: "asc" | "desc" }>({ key: "capturedAt", direction: "desc" });
+  const [rowLimit, setRowLimit] = useState(ROW_BATCH_SIZE);
   const root = useRef<HTMLElement>(null);
   const capabilityByKey = useMemo(() => Object.fromEntries(capabilities.map((item) => [item.key, item])), [capabilities]);
 
@@ -187,19 +191,25 @@ export function TtcJobsTable({
       return sort.direction === "asc" ? delta : -delta;
     });
   }, [filters, query, rows, sort]);
+  const renderedRows = visibleRows.slice(0, rowLimit);
 
   const setFilter = (key: FilterKey, value?: string) => {
     setFilters((current) => ({ ...current, [key]: value }));
     setOpenFilter(null);
+    setRowLimit(ROW_BATCH_SIZE);
   };
   const reset = () => {
     setFilters({});
     setQuery("");
     setOpenFilter(null);
+    setRowLimit(ROW_BATCH_SIZE);
   };
-  const toggleSort = (key: SortKey) => setSort((current) => current.key === key
-    ? { key, direction: current.direction === "desc" ? "asc" : "desc" }
-    : { key, direction: "desc" });
+  const toggleSort = (key: SortKey) => {
+    setSort((current) => current.key === key
+      ? { key, direction: current.direction === "desc" ? "asc" : "desc" }
+      : { key, direction: "desc" });
+    setRowLimit(ROW_BATCH_SIZE);
+  };
   const sortIcon = (key: SortKey) => sort.key === key
     ? sort.direction === "desc" ? <ArrowDown aria-hidden="true" /> : <ArrowUp aria-hidden="true" />
     : null;
@@ -207,13 +217,13 @@ export function TtcJobsTable({
 
   return (
     <section className="ttc-jobs-table" ref={root}>
-      <div className="ttc-jobs-table-notice"><b>审核预览</b><span>示例已脱敏，字段形状与 TTC 职位库一致；正式工作台尚未接入。</span></div>
+      {review && <div className="ttc-jobs-table-notice"><b>审核预览</b><span>示例已脱敏，字段形状与 TTC 职位库一致；正式工作台尚未接入。</span></div>}
       <header className="ttc-jobs-table-heading">
         <div><span>TTC JOB FACTS</span><h2>全部职位</h2><p>只展示可以从职位源核验的核心事实</p></div>
         <strong>{visibleRows.length} / {rows.length}</strong>
       </header>
       <div className="ttc-jobs-table-toolbar">
-        <label><Search aria-hidden="true" /><input value={query} onChange={(event) => setQuery(event.target.value)} aria-label="搜索职位或公司" placeholder="搜索职位、公司、城市或顾问" /></label>
+        <label><Search aria-hidden="true" /><input value={query} onChange={(event) => { setQuery(event.target.value); setRowLimit(ROW_BATCH_SIZE); }} aria-label="搜索职位或公司" placeholder="搜索职位、公司、城市或顾问" /></label>
         {(query || activeFilters.length > 0) && <button type="button" onClick={reset}>清除全部</button>}
       </div>
       {activeFilters.length > 0 && (
@@ -236,7 +246,7 @@ export function TtcJobsTable({
             <th>操作</th>
           </tr></thead>
           <tbody>
-            {visibleRows.map((row) => <tr key={row.projectId}>
+            {renderedRows.map((row) => <tr key={row.projectId}>
               <td><b>{row.role || "待确认"}</b><small>{row.projectId}</small></td>
               <td>{row.company || "待确认"}</td>
               <td>{row.cities.length ? row.cities.join("、") : "待确认"}</td>
@@ -249,6 +259,7 @@ export function TtcJobsTable({
             </tr>)}
           </tbody>
         </table>
+        {renderedRows.length < visibleRows.length && <div className="ttc-jobs-table-more"><span>已显示 {renderedRows.length} / {visibleRows.length}</span><button type="button" onClick={() => setRowLimit((current) => current + ROW_BATCH_SIZE)}>继续加载</button></div>}
         {visibleRows.length === 0 && <div className="ttc-jobs-table-empty"><b>{rows.length ? "没有符合条件的职位" : "TTC 暂无职位"}</b><p>{rows.length ? "调整或清除条件后再查看。" : "同步完成后，真实职位会显示在这里。"}</p>{rows.length > 0 && <button type="button" onClick={reset}>清除条件</button>}</div>}
       </div>
     </section>

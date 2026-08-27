@@ -9,6 +9,37 @@
   color: #1d2d28;
 }
 
+.ttc-filter-context {
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border: 1px solid #bdeedf;
+  border-radius: 12px;
+  background: #f2fcf8;
+  color: #176451;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ttc-jobs-table-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 18px;
+  color: #64756f;
+  font-size: 13px;
+}
+
+.ttc-jobs-table-more button {
+  border: 1px solid #b8e8da;
+  border-radius: 10px;
+  background: #effbf7;
+  color: #176451;
+  padding: 8px 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .ttc-jobs-table-notice {
   display: flex;
   align-items: center;

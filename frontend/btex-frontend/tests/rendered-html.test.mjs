@@ -15,23 +15,31 @@ const workbenchSource = async () => (await Promise.all([
   source("app/workbench-sources.tsx"),
   source("app/workbench-entry.tsx"),
   source("app/workbench-today.tsx"),
+  source("app/workbench-fact-pages.tsx"),
+  source("app/workbench-settings-page.tsx"),
+  source("app/workspace-shell.tsx"),
+  source("app/ttc-jobs-table.tsx"),
+  source("app/client-insights-review.tsx"),
 ])).join("\n");
 const cssSource = async () => (await Promise.all([
   source("app/globals.css"),
   source("app/workbench-concept.css"),
   source("app/workbench-layout.css"),
   source("app/workbench-next.css"),
+  source("app/workspace-shell.css"),
+  source("app/ttc-jobs-table.css"),
+  source("app/client-insights-review.css"),
+  source("app/settings-center-review.css"),
 ])).join("\n");
 
 test("keeps demo datasets behind the explicit demo mode", async () => {
   const workbench = await source("app/workbench.tsx");
 
-  assert.match(workbench, /brainxMode==="connected"\?\(brainxRadar\?\?\[\]\):demo\?demoRadarJobs:\[\]/);
   assert.match(workbench, /brainxJobs\?\?\(demo\?decisionJobs:\[\]\)/);
-  assert.match(workbench, /brainxMode==="connected"\?\(brainxClients\?\?\[\]\):demo\?clients:\[\]/);
-  assert.doesNotMatch(workbench, /brainxMode==="connected"&&brainxRadar\?brainxRadar:demoRadarJobs/);
+  assert.match(workbench, /items=\{brainxRadar\?\.items\?\?\[\]\}/);
+  assert.match(workbench, /items=\{brainxClients\?\?\[\]\}/);
   assert.doesNotMatch(workbench, /brainxJobs\|\|decisionJobs/);
-  assert.doesNotMatch(workbench, /brainxMode==="connected"&&brainxClients\?brainxClients:clients/);
+  assert.doesNotMatch(workbench, /demoRadarJobs|brainxClients\?brainxClients:clients/);
 });
 
 test("uses the reference three-column shell and a single-column opportunity workspace", async () => {
@@ -43,7 +51,8 @@ test("uses the reference three-column shell and a single-column opportunity work
 
   assert.match(page, /import DecisionWorkbench from "\.\/workbench"/);
   assert.match(workbench, /type DecisionDirection = "paid"\s*\|\s*"growth"\s*\|\s*"marketing"/);
-  assert.match(workbench, /\["today",\s*"今日决策",\s*Sparkles\]/);
+  assert.match(workbench, /id: "today", label: "今日决策", icon: Sparkles/);
+  assert.match(workbench, /<WorkspaceShell activePage=\{shellPage\}/);
   assert.match(workbench, /精选盘/);
   assert.match(workbench, /function PickTray/);
   assert.match(workbench, /function DecisionZone/);
@@ -54,17 +63,16 @@ test("uses the reference three-column shell and a single-column opportunity work
   assert.match(workbench, /title="待判断职位"/);
   assert.match(workbench, /aria-label="精选盘"/);
   assert.match(css, /\.pick-tray/);
-  assert.match(css, /grid-template-columns:164px minmax\(640px,1fr\) 356px/);
-  assert.match(css, /rail-brand-logo\{width:108px/);
+  assert.match(css, /grid-template-columns:216px minmax\(0,1fr\)/);
   assert.match(css, /touch-action:manipulation/);
-  assert.match(css, /assistant-open \.assistant-trigger\{display:none\}/);
+  assert.match(workbench, /assistantPlacement="overlay"/);
   assert.match(css, /\.btex-app\.panel-motion-open \.decision-drawer\{filter:none;transition:transform \.30s/);
   assert.match(css, /\.btex-app\.decision-panel-open/);
-  assert.match(workbench, /BrainX 决策工作台/);
+  assert.match(workbench, /BrainX · \{meta\.title\}/);
   assert.doesNotMatch(workbench, /concept-workspace-menu/);
   assert.doesNotMatch(workbench, /aria-haspopup="menu"/);
   assert.doesNotMatch(workbench, /aria-label="打开设置"/);
-  assert.match(workbench, /\["rules",\s*"策略设置",\s*Settings2\]/);
+  assert.match(workbench, /onNavigate\("settings"\)[\s\S]*?工作台设置/);
   assert.match(css, /grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
   assert.match(workbench, /<Pencil aria-hidden="true"\s*\/>\s*编辑/);
   assert.doesNotMatch(workbench, /修正事实/);
@@ -173,21 +181,18 @@ test("manual tuning adjusts soft layers without bypassing hard rules", async () 
   assert.doesNotMatch(workbench, /globalScore\s*\*|explorationScore\s*\*|personalScore\s*\*/);
 });
 
-test("imports cockpit positions into the radar without inventing operational facts", async () => {
-  const [workbench, cockpit] = await Promise.all([
-    workbenchSource(),
-    source("app/cockpit-radar-data.ts"),
-  ]);
+test("uses TTC facts and field capabilities without restoring fake job filters", async () => {
+  const workbench = await workbenchSource();
 
-  assert.match(cockpit, /Generated from TTC驾驶舱全景图-副本 \(1\)\.xlsx/);
-  assert.match(cockpit, /"company": "Nooklab"/);
-  assert.match(workbench, /const cockpitRadarJobs:\s*Job\[\]/);
-  assert.match(workbench, /source:\s*"驾驶舱导入" as const/);
-  assert.match(workbench, /score:\s*null,[\s\S]*?hc:\s*null,[\s\S]*?feedback:\s*"待接入"/);
-  assert.match(workbench, /职位类型筛选/);
-  assert.match(workbench, /全部职位类型/);
-  assert.match(workbench, /CockpitJobDetail/);
-  assert.match(workbench, /等待后端同步后再参与职位判断/);
+  assert.match(workbench, /row\.cities/);
+  assert.match(workbench, /row\.pipeline_steps/);
+  assert.match(workbench, /row\.owner_name/);
+  assert.match(workbench, /field\.filterAvailable/);
+  assert.match(workbench, /<TtcJobsTable rows=\{rows\} capabilities=\{fields\}/);
+  assert.match(workbench, /Promise\.allSettled\(\[\s*getRadar\(\)\.then/);
+  assert.match(workbench, /visibleRows\.slice\(0, rowLimit\)/);
+  assert.match(workbench, /visible\.slice\(0, rowLimit\)/);
+  assert.doesNotMatch(workbench, /职位类型筛选|全部职位类型|综合分数 ↓|信号轨道/);
 });
 
 test("the corrected package has one workbench implementation", async () => {
@@ -204,5 +209,5 @@ test("exposes the real TTC job source without persisting its credential in the b
   assert.match(sources, /type="password"/);
   assert.match(sources, /autoComplete="off"/);
   assert.doesNotMatch(sources, /localStorage|sessionStorage/);
-  assert.match(sources, /name !== "职位库"/);
+  assert.doesNotMatch(sources, /演示状态|sourceNames|查看字段/);
 });

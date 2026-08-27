@@ -3,23 +3,23 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity, AlertTriangle, ArrowLeft, BarChart3, Bell, BriefcaseBusiness,
-  Check, ChevronDown, ChevronRight, CircleHelp, Clock3, Database, Filter, GitCompareArrows,
-  Infinity, ListFilter, MoreHorizontal, Plus, RotateCcw, Search, Settings2,
+  Check, ChevronDown, ChevronRight, CircleHelp, Clock3, Database, Filter,
+  MoreHorizontal, Plus, Search, Settings2,
   BellRing, CheckCircle2, CircleUserRound, ClipboardCheck, Send, ShieldCheck, SlidersHorizontal, Sparkles, Users, X, Zap,
 } from "lucide-react";
 import { actionLabel, seedAuth, seedNotifications, seedSync, stateLabel, type AuthStatus, type DecisionEvent, type EngagementCommand, type EngagementState, type Notification, type Outcome, type SyncStatus } from "./decision-demo";
 import {
   FALLBACK_DISMISS_REASONS, BrainxApiError, brainxFetch, connectSSE, fetchJobDetail,
-  getSnapshot, makeIdempotencyKey, mapReplayData, mapRadarRow, mapClientRow, getRadar,
+  getSnapshot, makeIdempotencyKey, mapReplayData, getRadar,
   getClients, getTalentSupply, updateWorkbenchPreferences, sendRecommendationFeedback,
   undoRecommendationFeedback, updateOpportunityMembership, rerunOpenmai,
   type TalentSupplySnapshot, type BackendConsultants, type BackendEngagementResponse,
   type BackendOutcomeResponse, type BackendRecommendationRun, type BackendReplay,
   type BackendSessionStatus, type BrainxReplay, type BrainxSnapshot, type OpenmaiResult,
-  type RadarJob, type RadarClient,
+  type BackendClientRow, type RadarPayload,
 } from "./brainx-api";
 import { streamAssistant, type AssistantMessage } from "./brainx-assistant-api";
-import { actionSeed, clients, cockpitRadarJobs, decisionGroupMeta, decisionJobs, DEFAULT_FOLDERS, demoRadarJobs, engagementPrerequisite, events, initialEngagement, initialEvents, initialOutcomes, INITIAL_TRAY_IDS, jobs, legalActions, nav, nextState, readSavedWorkbenchState, stateEvent, statusOrder, verificationJobs, type Client, type DecisionAction, type DecisionGroup, type DecisionJob, type Job, type MembershipRelation, type Page, type Panel, type PickFolder, type PositionType, type SourceMode } from "./workbench-model";
+import { actionSeed, clients, decisionGroupMeta, decisionJobs, DEFAULT_FOLDERS, engagementPrerequisite, events, initialEngagement, initialEvents, initialOutcomes, INITIAL_TRAY_IDS, legalActions, nextState, readSavedWorkbenchState, stateEvent, verificationJobs, type DecisionAction, type DecisionGroup, type DecisionJob, type MembershipRelation, type Page, type Panel, type PickFolder, type SourceMode } from "./workbench-model";
 import { DirectGlassSegment, DrawerSection, FilterSelect, Heading, StatusTag, type FilterSelectOption } from "./workbench-controls";
 import { ManualFactSection } from "./workbench-facts";
 import { Rules } from "./workbench-rules";
@@ -27,18 +27,15 @@ import { CommitmentLoopPanel } from "./engagement-loop";
 import Sources from "./workbench-sources";
 import { WorkspaceEntry, type WorkspaceEntryKind } from "./workbench-entry";
 import { TodayDecisionQueue } from "./workbench-today";
+import { WorkbenchClientsPage, WorkbenchJobsPage } from "./workbench-fact-pages";
+import { WorkspaceShell, type WorkspaceShellPage } from "./workspace-shell";
+import { WorkbenchSettingsPage } from "./workbench-settings-page";
 
 
 export default function DecisionWorkbench({demo=false}:{demo?:boolean}={}){
  const [hydrated,setHydrated]=useState(false);
  const [page,setPage]=useState<Page>("today");
  const [query,setQuery]=useState("");
- const [status,setStatus]=useState("全部状态");
- const [sort,setSort]=useState("score");
- const [view,setView]=useState<"list"|"rail">("list");
- const [selected,setSelected]=useState<Job["id"][]>([]);
- const [detail,setDetail]=useState<Job|null>(null);
- const [clientDetail,setClientDetail]=useState<typeof clients[number]|null>(null);
  const [drawer,setDrawer]=useState<string|null>(null);
  const [toast,setToast]=useState<{text:string;actions?:{label:string;onClick:()=>void}[];input?:{placeholder:string;onSubmit:(text:string)=>void}}|null>(null);
  const toastInputRef=useRef<HTMLInputElement>(null);
@@ -50,8 +47,6 @@ export default function DecisionWorkbench({demo=false}:{demo?:boolean}={}){
  const [tray,setTray]=useState<string[]>([]);
  const [folders,setFolders]=useState<PickFolder[]>(DEFAULT_FOLDERS);
  const [folderMode,setFolderMode]=useState(false);
- const [eventType,setEventType]=useState("客户反馈");
- const [hc,setHc]=useState(3);
  const [panel,setPanel]=useState<Panel>(null);
  const [panelMotion,setPanelMotion]=useState<"idle"|"entering"|"open"|"closing">("idle");
  const panelAnimationFrame=useRef<number|null>(null);
@@ -65,10 +60,6 @@ export default function DecisionWorkbench({demo=false}:{demo?:boolean}={}){
  const [sync,setSync]=useState<SyncStatus>(seedSync);
  const [auth,setAuth]=useState<AuthStatus>(seedAuth);
  const [notifications,setNotifications]=useState<Notification[]>(seedNotifications);
- const [mobileNavOpen,setMobileNavOpen]=useState(false);
- const [mobileDrawerProgress,setMobileDrawerProgress]=useState<number|null>(null);
- const mobileDrawerDrag=useRef<{pointerId:number;startX:number;startProgress:number;drawerWidth:number;lastX:number;lastAt:number;velocity:number;progress:number;moved:boolean}|null>(null);
- const mobileDrawerCloseTimer=useRef<number|null>(null);
  const [pendingCommand,setPendingCommand]=useState<{job:DecisionJob;command:EngagementCommand}|null>(null);
  // Brain X 后端连接态：connecting（探测中）→ connected（API 驱动）/ offline（真实数据不可用）；演示数据仅由 demo 属性显式开启
  const [brainxMode,setBrainxMode]=useState<"connecting"|"connected"|"offline">("connecting");
@@ -81,16 +72,21 @@ export default function DecisionWorkbench({demo=false}:{demo?:boolean}={}){
  const [assistantSettings,setAssistantSettings]=useState(false);
  const assistantAbort=useRef<AbortController|null>(null);
  const [brainxJobs,setBrainxJobs]=useState<DecisionJob[]|null>(null);
+ const [brainxConsultantId,setBrainxConsultantId]=useState("");
  const [brainxRun,setBrainxRun]=useState<{snapshotId:string|null;policyVersion:string|null}>({snapshotId:null,policyVersion:null});
  const [brainxDismissReasons,setBrainxDismissReasons]=useState<string[]>(FALLBACK_DISMISS_REASONS);
  const [brainxReplay,setBrainxReplay]=useState<Record<string,BrainxReplay>>({});
  const [brainxKeywords,setBrainxKeywords]=useState<string[]>([]);
  const [brainxNote,setBrainxNote]=useState("");
- const [brainxRadar,setBrainxRadar]=useState<Job[]|null>(null);
- const [brainxClients,setBrainxClients]=useState<Client[]|null>(null);
+ const [brainxRadar,setBrainxRadar]=useState<RadarPayload|null>(null);
+ const [brainxClients,setBrainxClients]=useState<BackendClientRow[]|null>(null);
+ const [jobCompanyFilter,setJobCompanyFilter]=useState<string|null>(null);
  const feedbackJob=(job:DecisionJob)=>{const doDelete=async(reason:string)=>{const clean=(reason||"").trim().slice(0,200);const snapshot=brainxJobs;try{if(brainxMode==="connected"){await sendRecommendationFeedback(job.id,clean,brainxRun.snapshotId,makeIdempotencyKey(`recommendation-feedback:${job.id}`))}setBrainxJobs(current=>current?current.filter(item=>item.id!==job.id):current);notify(brainxMode==="connected"?"已减少此类推荐":"演示模式已隐藏该职位（不会写入后端）",{actions:[{label:"撤销",onClick:()=>{setBrainxJobs(snapshot);if(brainxMode==="connected")void undoRecommendationFeedback(job.id).then(()=>notify("已撤销不感兴趣")).catch(error=>notify(`撤销已恢复本地显示，但后端删除失败：${error instanceof Error?error.message:"后端未响应"}`,undefined,4000));if(brainxMode!=="connected")notify("已撤销不感兴趣")}}]})}catch(error){notify(`反馈失败：${error instanceof Error?error.message:"后端未响应"}`)}};notify(`为什么删除「${job.company} · ${job.role}」？（必填）`,{input:{placeholder:"例如：方向不符 / 客户质量不足 / 当前没精力…",onSubmit:(text)=>{void doDelete(text)}}})};
- const loadBrainxSide=useRef(async()=>{try{const [radar,clientsData]=await Promise.all([getRadar(),getClients()]);setBrainxRadar(radar.items.map(mapRadarRow) as unknown as Job[]);setBrainxClients(clientsData.items.map(mapClientRow) as unknown as Client[])}catch{/* 雷达/洞察加载失败不阻断决策主链路 */}});
- const brainxApply=useRef((snapshot:BrainxSnapshot)=>{setBrainxJobs(snapshot.jobs as DecisionJob[]);setEngagement(snapshot.engagement);setOpenmaiByJob(snapshot.openmai||{});setDecisionEvents(snapshot.events);setOutcomes(snapshot.outcomes);setSync(snapshot.sync);setAuth(snapshot.auth);setNotifications(snapshot.notifications);setBrainxDismissReasons(snapshot.dismissReasons);setBrainxRun({snapshotId:snapshot.snapshotId,policyVersion:snapshot.policyVersion});setBrainxKeywords(snapshot.profileKeywords);setTray(snapshot.preferences.tray);setFolders(snapshot.preferences.folders.length?snapshot.preferences.folders:DEFAULT_FOLDERS);setFolderMode(!!snapshot.preferences.folderMode);setBrainxMode("connected")});
+ const loadBrainxSide=useRef(async()=>{await Promise.allSettled([
+  getRadar().then(radar=>setBrainxRadar(radar)),
+  getClients().then(clientsData=>setBrainxClients(clientsData.items)),
+ ])});
+ const brainxApply=useRef((snapshot:BrainxSnapshot)=>{setBrainxJobs(snapshot.jobs as DecisionJob[]);setBrainxConsultantId(snapshot.consultantId);setEngagement(snapshot.engagement);setOpenmaiByJob(snapshot.openmai||{});setDecisionEvents(snapshot.events);setOutcomes(snapshot.outcomes);setSync(snapshot.sync);setAuth(snapshot.auth);setNotifications(snapshot.notifications);setBrainxDismissReasons(snapshot.dismissReasons);setBrainxRun({snapshotId:snapshot.snapshotId,policyVersion:snapshot.policyVersion});setBrainxKeywords(snapshot.profileKeywords);setTray(snapshot.preferences.tray);setFolders(snapshot.preferences.folders.length?snapshot.preferences.folders:DEFAULT_FOLDERS);setFolderMode(!!snapshot.preferences.folderMode);setBrainxMode("connected")});
  const loadBrainxSnapshot=useRef(async()=>{const snapshot=await getSnapshot();brainxApply.current(snapshot)});
  useEffect(()=>{const savedState=readSavedWorkbenchState();setDone(savedState.done||[]);setSnoozed(savedState.snoozed||[]);setExtraTasks(savedState.extraTasks||[]);setWeights(savedState.weights?.length===3?savedState.weights:[60,25,15]);setDecisionActions(savedState.decisionActions||[]);setMembershipRelations(savedState.membershipRelations||{});setTray(savedState.tray??INITIAL_TRAY_IDS);setFolders(savedState.folders?.length?savedState.folders:DEFAULT_FOLDERS);setFolderMode(!!savedState.folderMode);setEngagement({...initialEngagement,...(savedState.engagement||{})});setDecisionEvents({...initialEvents,...(savedState.events||{})});setOutcomes({...initialOutcomes,...(savedState.outcomes||{})});setSync(savedState.sync||seedSync);setAuth(savedState.auth||seedAuth);setNotifications(savedState.notifications||seedNotifications);setHydrated(true)},[]);
  useEffect(()=>{const update=(event:Event)=>{const detail=(event as CustomEvent<{jobId:string;state:EngagementState}>).detail;if(detail?.jobId&&detail?.state)setEngagement(current=>({...current,[detail.jobId]:detail.state}))};window.addEventListener("brainx:commitment-updated",update);return()=>window.removeEventListener("brainx:commitment-updated",update)},[]);
@@ -117,16 +113,14 @@ export default function DecisionWorkbench({demo=false}:{demo?:boolean}={}){
  // SSE 实时通知：同步/推荐事件 → 去抖刷新快照并插入提醒；组件卸载关闭连接
  useEffect(()=>{if(brainxMode!=="connected")return;const sub=connectSSE(event=>{if(!event.type||event.type==="hello")return;if(event.type==="openmai_result"){const pid=String((event as {project_id?:string}).project_id||"");setNotifications(current=>[{id:`sse-om-${Date.now()}`,kind:"SYNC_ALERT",title:(event as {status?:string}).status==="done"?"自动找人完成":"自动找人失败",detail:pid,read:false},...current]);if(pid)window.setTimeout(()=>{void fetchJobDetail(pid).then(d=>setOpenmaiByJob(current=>({...current,[pid]:d.openmai}))).catch(()=>{})},600);return}const title=event.type==="sync_error"?"同步异常":event.type==="recommend"?"推荐已更新":"同步完成";setNotifications(current=>[{id:`sse-${Date.now()}`,kind:"SYNC_ALERT",title,detail:String(event.message||""),read:false},...current]);window.setTimeout(()=>{void loadBrainxSnapshot.current().catch(()=>{});void loadBrainxSide.current()},800)});return()=>sub.close()},[brainxMode]);
  const notify=(s:string,opts?:{actions?:{label:string;onClick:()=>void}[];input?:{placeholder:string;onSubmit:(text:string)=>void}},ms?:number)=>{if(toastTimerRef.current){clearTimeout(toastTimerRef.current);toastTimerRef.current=null}setToast({text:s,actions:opts?.actions,input:opts?.input});if(!opts?.input)toastTimerRef.current=setTimeout(()=>{setToast(null);toastTimerRef.current=null},ms??(opts?.actions?.length?6000:2200))};
- const radarJobs:Job[]=brainxMode==="connected"?(brainxRadar??[]):demo?demoRadarJobs:[];
- const filteredJobs=useMemo(()=>radarJobs.filter(job=>(status==="全部状态"||job.status===status)&&(`${job.name}${job.client}${job.city}${job.industry}${job.positionType}${job.source}`.includes(query))).sort((a,b)=>sort==="score"?(b.score??-1)-(a.score??-1):(b.hc??-1)-(a.hc??-1)),[query,status,sort,radarJobs]);
  const visibleActions=actionSeed.map((a,i)=>({a,i})).filter(x=>!done.includes(x.i)&&!snoozed.includes(x.i));
  const clearPanelMotion=()=>{if(typeof window==="undefined")return;if(panelAnimationFrame.current!==null){window.cancelAnimationFrame(panelAnimationFrame.current);panelAnimationFrame.current=null}if(panelCloseTimer.current!==null){window.clearTimeout(panelCloseTimer.current);panelCloseTimer.current=null}};
  const dismissPanelImmediately=()=>{clearPanelMotion();setPanel(null);setPanelMotion("idle")};
  const openPanel=(next:Panel)=>{if(!next)return;clearPanelMotion();if(panel&&panelMotion==="open"){setPanel(next);return}const animate=typeof window!=="undefined"&&window.matchMedia("(min-width: 961px)").matches;if(panelMotion==="closing"){setPanel(next);setPanelMotion("open");return}setPanel(next);if(!animate){setPanelMotion("open");return}setPanelMotion("entering");panelAnimationFrame.current=window.requestAnimationFrame(()=>{panelAnimationFrame.current=window.requestAnimationFrame(()=>{setPanelMotion("open");panelAnimationFrame.current=null})})};
  const closePanel=()=>{if(!panel)return;clearPanelMotion();const animate=typeof window!=="undefined"&&window.matchMedia("(min-width: 961px)").matches;if(!animate){dismissPanelImmediately();return}setPanelMotion("closing");panelCloseTimer.current=window.setTimeout(()=>{setPanel(null);setPanelMotion("idle");panelCloseTimer.current=null},380)};
- useEffect(()=>{const closeOnEscape=(event:KeyboardEvent)=>{if(event.key!=="Escape")return;closePanel();setPendingCommand(null);setDrawer(null);setDetail(null);setClientDetail(null);setMobileNavOpen(false)};window.addEventListener("keydown",closeOnEscape);return()=>window.removeEventListener("keydown",closeOnEscape)},[panel,panelMotion]);
+ useEffect(()=>{const closeOnEscape=(event:KeyboardEvent)=>{if(event.key!=="Escape")return;closePanel();setPendingCommand(null);setDrawer(null)};window.addEventListener("keydown",closeOnEscape);return()=>window.removeEventListener("keydown",closeOnEscape)},[panel,panelMotion]);
  useEffect(()=>()=>clearPanelMotion(),[]);
- const go=(p:Page)=>{setPage(p);setDetail(null);setClientDetail(null);dismissPanelImmediately();setDrawer(null);setMobileNavOpen(false)};
+ const go=(p:Page)=>{setPage(p);dismissPanelImmediately();setDrawer(null)};
  useEffect(()=>{try{const saved=localStorage.getItem("brainx-assistant-history");if(saved)setAssistantMessages(JSON.parse(saved))}catch{}},[]);
  useEffect(()=>{try{localStorage.setItem("brainx-assistant-history",JSON.stringify(assistantMessages.slice(-40)))}catch{}},[assistantMessages]);
  useEffect(()=>()=>assistantAbort.current?.abort(),[]);
@@ -158,80 +152,22 @@ export default function DecisionWorkbench({demo=false}:{demo?:boolean}={}){
   if(!keyword)return acceptedJobs;
   return acceptedJobs.filter(job=>`${job.company} ${job.role} ${job.recentSignal} ${Object.values(job.facts).join(" ")}`.toLocaleLowerCase().includes(keyword));
  },[acceptedJobs,query]);
- const panelPresent=!!panel;
- const clearMobileDrawerCloseTimer=()=>{if(mobileDrawerCloseTimer.current!==null){window.clearTimeout(mobileDrawerCloseTimer.current);mobileDrawerCloseTimer.current=null}};
- const closeMobileDrawer=(animate=true)=>{clearMobileDrawerCloseTimer();if(!animate){setMobileDrawerProgress(null);setMobileNavOpen(false);return}setMobileDrawerProgress(0);mobileDrawerCloseTimer.current=window.setTimeout(()=>{setMobileNavOpen(false);setMobileDrawerProgress(null);mobileDrawerCloseTimer.current=null},230)};
- const toggleMobileDrawer=()=>{if(mobileNavOpen){closeMobileDrawer();return}clearMobileDrawerCloseTimer();setMobileNavOpen(true);setMobileDrawerProgress(0);window.requestAnimationFrame(()=>setMobileDrawerProgress(null))};
- const beginMobileSwipe=(event:React.PointerEvent<HTMLDivElement>)=>{if(typeof window==="undefined"||window.innerWidth>720||event.button!==0||mobileNavOpen)return;if((event.target as Element).closest("button,a,input,select,textarea"))return;if(event.clientX>28)return;clearMobileDrawerCloseTimer();const drawerWidth=Math.min(window.innerWidth*.82,320);mobileDrawerDrag.current={pointerId:event.pointerId,startX:event.clientX,startProgress:0,drawerWidth,lastX:event.clientX,lastAt:event.timeStamp,velocity:0,progress:0,moved:false};if(!mobileNavOpen)setMobileNavOpen(true);setMobileDrawerProgress(0)};
- const moveMobileSwipe=(event:React.PointerEvent<HTMLDivElement>)=>{const drag=mobileDrawerDrag.current;if(!drag||drag.pointerId!==event.pointerId)return;const distance=Math.abs(event.clientX-drag.startX);if(!drag.moved&&distance<8)return;if(!drag.moved){drag.moved=true;event.currentTarget.setPointerCapture(event.pointerId)}const raw=drag.startProgress+(event.clientX-drag.startX)/drag.drawerWidth;const elapsed=event.timeStamp-drag.lastAt;if(elapsed>0)drag.velocity=(event.clientX-drag.lastX)/elapsed;drag.lastX=event.clientX;drag.lastAt=event.timeStamp;drag.progress=raw<0?raw*.24:raw>1?1+(raw-1)*.24:raw;setMobileDrawerProgress(drag.progress)};
- const endMobileSwipe=(event:React.PointerEvent<HTMLDivElement>,cancelled=false)=>{
-  const drag=mobileDrawerDrag.current;
-  if(!drag||drag.pointerId!==event.pointerId)return;
-  if(event.currentTarget.hasPointerCapture(event.pointerId))event.currentTarget.releasePointerCapture(event.pointerId);
-  const velocityProgress=drag.velocity/drag.drawerWidth;
-  const momentum=cancelled?0:Math.max(-.35,Math.min(.35,velocityProgress*140));
-  const projected=Math.min(1,Math.max(0,drag.progress+momentum));
-  if(projected>=.5){setMobileNavOpen(true);setMobileDrawerProgress(1);window.setTimeout(()=>setMobileDrawerProgress(null),230)}else closeMobileDrawer();
-  mobileDrawerDrag.current=null;
- };
- return <div className={`app btex-app concept-shell ${assistantOpen?"assistant-open":""} ${panelMotion==="open"?"decision-panel-open":""} ${panelPresent?"decision-panel-present decision-panel-compact":""} panel-motion-${panelMotion} ${mobileNavOpen?"mobile-nav-open":""} ${mobileDrawerDrag.current?"mobile-nav-swiping":""}`} style={{"--mobile-drawer-progress":mobileDrawerProgress??1} as React.CSSProperties} onPointerDown={beginMobileSwipe} onPointerMove={moveMobileSwipe} onPointerUp={event=>endMobileSwipe(event)} onPointerCancel={event=>endMobileSwipe(event,true)}>
-  <aside className="rail-nav" aria-label="主要导航">
-   <button className="rail-brand" onClick={()=>go("today")} aria-label="B-tex 首页"><img className="rail-brand-logo" src="/brand/btex-logo.png" alt="B-tex BrainX"/></button>
-   <nav className="rail-blocks">{nav.map(([id,label,Icon])=><button key={id} className={page===id?"active":""} onClick={()=>go(id)} aria-label={label} aria-current={page===id?"page":undefined}><span className="rail-ico"><Icon/></span><span className="rail-label">{label}</span>{id==="accepted"&&acceptedJobs.length>0&&<i className="rail-count">{acceptedJobs.length}</i>}</button>)}</nav>
-   <div className="rail-spacer"/>
-   <button className="rail-alert-trigger" onClick={()=>openPanel({kind:"notifications"})} aria-label="打开通知"><BellRing/>{notifications.filter(note=>!note.read).length>0&&<i>{notifications.filter(note=>!note.read).length}</i>}</button>
-   <button className="rail-person identity-trigger" onClick={()=>openPanel({kind:"identity"})} aria-label={`身份：${auth.consultant}`}><CircleUserRound/><span className="rail-person-dot"/></button>
-   <span className="rail-status" title={brainxMode==="connected"?"BrainX 已连接":brainxMode==="connecting"?"连接 BrainX…":demo?"Storybook 演示数据":"真实数据未连接"}><i className="pulse"/></span>
-  </aside>
-  <button className="mobile-nav-trigger" onClick={toggleMobileDrawer} aria-label={mobileNavOpen?"收起全部模块":"打开全部模块"} aria-expanded={mobileNavOpen}><Infinity aria-hidden="true"/><span>{mobileNavOpen?"收起模块":"全部模块"}</span></button>
-  {mobileNavOpen&&<button className="mobile-nav-backdrop" onClick={()=>closeMobileDrawer()} aria-label="关闭全部模块"/>}
-  <main className="main">
-   <header className="topbar">
-    <div className="concept-workspace-switcher">
-     <div className="concept-workspace-title static-title">
-      <b>BrainX 决策工作台</b><small>真实职位 · 顾问专属</small>
-     </div>
-    </div>
-    {page==="today"?<><button className="btex-person identity-trigger" onClick={()=>openPanel({kind:"identity"})}><span className="reference-avatar">{auth.consultant.slice(0,1)}</span><span><b>{auth.consultant}</b><small>Consultant</small></span></button><button className={`sync sync-trigger ${auth.needsReauth?"auth_expired":sync.state.toLowerCase()}`} onClick={()=>openPanel(auth.needsReauth?{kind:"identity"}:{kind:"sync"})}><i/> {auth.needsReauth?"飞书授权已过期":sync.state==="READY"?`已同步 · ${sync.updatedAt}`:sync.state==="RUNNING"?"同步中…":sync.state==="INCOMPLETE"?"同步不完整":sync.state==="AUTH_EXPIRED"?"授权过期":sync.state==="ERROR"?"同步失败":"尚未同步"}</button><button className="icon-btn notification-trigger" onClick={()=>openPanel({kind:"notifications"})} aria-label="今日提醒"><BellRing/>{notifications.filter(note=>!note.read).length>0&&<i>{notifications.filter(note=>!note.read).length}</i>}</button></>:<><div className="search"><Search/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="搜索客户、职位、PM…"/></div><button className="top-pill" onClick={()=>notify("全局筛选已展开")}><Filter/> 当前团队 <ChevronRight/></button><button className="icon-btn" onClick={()=>openPanel({kind:"notifications"})} aria-label="通知"><Bell/></button></>}
-    <button className={`assistant-trigger ${assistantOpen?"active":""}`} onClick={()=>setAssistantOpen(value=>!value)} aria-label="打开 BrainX 助手" aria-expanded={assistantOpen}><Sparkles/><span>BrainX 助手</span></button>
-   </header>
-   <div className="content">
-    {detail?<JobDetail job={detail} onBack={()=>setDetail(null)} weights={weights} eventType={eventType} setEventType={setEventType} hc={hc} setHc={setHc} notify={notify}/>:clientDetail?<ClientDetail c={clientDetail} onBack={()=>setClientDetail(null)} notify={notify}/>:<>
-     {["today","accepted","jobs","clients"].includes(page)&&(brainxMode==="connecting"||workspaceIssue)?
-      <WorkspaceEntry
-       kind={brainxMode==="connecting"?"connecting":workspaceIssue!}
-       onRetry={()=>setConnectAttempt(value=>value+1)}
-       onOpenSources={()=>go("sources")}
-      />:<>
-      {page==="today"&&<TodayDecisionQueue
-       activeJobId={panel?.kind==="job"&&panelMotion!=="closing"?panel.jobId:null}
-       completed={decisionActions} jobs={activeDecisionJobs} engagement={engagement} sync={sync}
-       open={openDecision} onAction={runDecisionAction} onFeedback={feedbackJob}
-       showVerification={demo} tray={tray} onToggleTray={toggleTray} onRemoveTray={removeTray}
-       onConfirmTray={confirmTray} folders={folders} folderMode={folderMode}
-       onFolderMode={()=>setFolderMode(v=>!v)} onAssignFolder={assignFolder}
-       onCreateFolder={createFolder} mode={brainxMode} onOpenSources={()=>go("sources")}
-      />}
-      {page==="accepted"&&<AcceptedJobsView
-       jobs={visibleAcceptedJobs} total={acceptedJobs.length} query={query} open={openDecision}
-      />}
-      {page==="jobs"&&<JobsView
-       jobs={filteredJobs} mode={brainxMode} status={status} setStatus={setStatus}
-       sort={sort} setSort={setSort} view={view} setView={setView} selected={selected}
-       setSelected={setSelected} openJob={setDetail} notify={notify}
-      />}
-      {page==="clients"&&<ClientsView
-       clients={(brainxMode==="connected"?(brainxClients??[]):demo?clients:[])
-        .filter(c=>`${c.name}${c.industry}`.includes(query))}
-       open={setClientDetail} notify={notify}
-      />}
-     </>}
-     {page==="alerts"&&<Alerts setExtraTasks={setExtraTasks} notify={notify} setDrawer={setDrawer}/>}
-     {page==="rules"&&<Rules key={`${brainxKeywords.join("|")}:${brainxNote}`} notify={notify} mode={brainxMode} policy={brainxRun.policyVersion} keywords={brainxKeywords} note={brainxNote} onRefresh={async()=>{await loadBrainxSnapshot.current();void loadBrainxSide.current()}} onProfileSaved={(nextKeywords,nextNote)=>{setBrainxKeywords(nextKeywords);setBrainxNote(nextNote)}}/>}
-     {page==="sources"&&<Sources notify={notify}/>}
-    </>}
-   </div>
-  </main>
+ const shellPage:WorkspaceShellPage=page==="accepted"?"projects":page==="clients"?"clients":page==="jobs"?"jobs":page==="today"?"today":"settings";
+ const navigateShell=(next:WorkspaceShellPage)=>{if(next==="jobs")setJobCompanyFilter(null);go(next==="projects"?"accepted":next==="settings"?"settings":next)};
+ return <div className="btex-app formal-workbench">
+  <WorkspaceShell activePage={shellPage} onNavigate={navigateShell} consultant={auth.consultant} assistantOpen={assistantOpen} onAssistantToggle={()=>setAssistantOpen(value=>!value)} assistantPlacement="overlay">
+   {["today","accepted","jobs","clients"].includes(page)&&(brainxMode==="connecting"||workspaceIssue)?
+    <WorkspaceEntry kind={brainxMode==="connecting"?"connecting":workspaceIssue!} onRetry={()=>setConnectAttempt(value=>value+1)} onOpenSources={()=>go("sources")} />:<>
+    {page==="today"&&<TodayDecisionQueue activeJobId={panel?.kind==="job"&&panelMotion!=="closing"?panel.jobId:null} completed={decisionActions} jobs={activeDecisionJobs} engagement={engagement} sync={sync} open={openDecision} onAction={runDecisionAction} onFeedback={feedbackJob} showVerification={demo} tray={tray} onToggleTray={toggleTray} onRemoveTray={removeTray} onConfirmTray={confirmTray} folders={folders} folderMode={folderMode} onFolderMode={()=>setFolderMode(value=>!value)} onAssignFolder={assignFolder} onCreateFolder={createFolder} mode={brainxMode} onOpenSources={()=>go("sources")} />}
+    {page==="accepted"&&<AcceptedJobsView jobs={visibleAcceptedJobs} total={acceptedJobs.length} query={query} open={openDecision} />}
+    {page==="jobs"&&<WorkbenchJobsPage items={brainxRadar?.items??[]} capabilities={brainxRadar?.fieldCapabilities??[]} company={jobCompanyFilter} />}
+   {page==="clients"&&<WorkbenchClientsPage items={brainxClients??[]} onOpenJobs={company=>{setJobCompanyFilter(company);go("jobs")}} />}
+   </>}
+   {page==="settings"&&<WorkbenchSettingsPage auth={auth} consultantId={brainxConsultantId||auth.consultant} keywords={brainxKeywords} note={brainxNote} policyVersion={brainxRun.policyVersion} sync={sync} fieldReport={brainxRadar?.fieldReport??null} onBack={()=>go("today")} onOpenConnections={()=>go("sources")} onRefresh={()=>{void loadBrainxSnapshot.current();void loadBrainxSide.current();notify("正在刷新同步诊断")}} notify={notify} />}
+   {page==="alerts"&&<Alerts setExtraTasks={setExtraTasks} notify={notify} setDrawer={setDrawer}/>}
+   {page==="rules"&&<Rules key={`${brainxKeywords.join("|")}:${brainxNote}`} notify={notify} mode={brainxMode} policy={brainxRun.policyVersion} keywords={brainxKeywords} note={brainxNote} onRefresh={async()=>{await loadBrainxSnapshot.current();void loadBrainxSide.current()}} onProfileSaved={(nextKeywords,nextNote)=>{setBrainxKeywords(nextKeywords);setBrainxNote(nextNote)}}/>}
+   {page==="sources"&&<Sources notify={notify}/>}
+  </WorkspaceShell>
      {panel&&<WorkbenchPanel panel={panel} motion={panelMotion} job={selectedDecisionJob} commitmentJobs={commitmentJobs} auth={auth} sync={sync} notifications={notifications} engagement={engagement} events={decisionEvents} outcomes={outcomes} completed={decisionActions} openmaiResults={openmaiByJob} onRerunOpenmai={rerunOpenmaiForJob} mode={brainxMode} legalMap={brainxJobs?Object.fromEntries(activeDecisionJobs.map(job=>[job.id,job.brainxLegal||[]])):{}} replayMap={brainxReplay} dismissReasons={brainxDismissReasons} onReplay={(jobId,data)=>setBrainxReplay(current=>({...current,[jobId]:data}))} onFactsUpdated={async()=>{await loadBrainxSnapshot.current();void loadBrainxSide.current()}} onMembership={confirmJobMembership} onClose={closePanel} onOpenJob={openDecision} onAction={runDecisionAction} onCommand={requestCommand} onOutcome={recordOutcome} onSync={runSync} onSetSync={setSync} onAuth={setAuth} onNotification={openNotification} notify={notify}/>}
   {assistantOpen&&<ChatbotDrawer messages={assistantMessages} input={assistantInput} setInput={setAssistantInput} busy={assistantBusy} onSend={sendAssistant} onStop={()=>assistantAbort.current?.abort()} onClear={()=>setAssistantMessages([])} onClose={()=>setAssistantOpen(false)} mode={brainxMode} page={page} settings={assistantSettings} setSettings={setAssistantSettings} contextJob={selectedDecisionJob}/>}
   {pendingCommand&&<CommandConfirm pending={pendingCommand} reasons={brainxDismissReasons} onClose={()=>setPendingCommand(null)} onConfirm={(reason?:string)=>applyCommand(pendingCommand.job,pendingCommand.command,reason)}/>}
@@ -410,64 +346,5 @@ function TalentSupplySection({job,mode}:{job:DecisionJob;mode:"connecting"|"conn
  </p>}
  </DrawerSection>;
 }
-
-function Today({actions,done,setDone,setSnoozed,extraTasks,setDrawer,openJob,openClient,notify}:any){
- return <><Heading code="TODAY / 07.29" title={<>今天有 <strong>3 个职位</strong>建议优先投入，<strong>1 个客户</strong>需要立即确认需求</>} desc="系统已综合 24 个职位、8 个客户和过去 48 小时的 37 条业务信号。"/>
- <div className="conclusion"><div className="spark"><Zap/></div><div><b>当前最值得投入：AI 广告销售负责人</b><p>星河科技反馈提速且新增 1 个 HC；建议今天补充 2 名高匹配人选。</p></div><button className="btn primary" style={{marginLeft:"auto"}} onClick={()=>openJob(jobs[0])}>进入职位 <ChevronRight/></button></div>
- <div className="grid g2">
-  <section className="card"><div className="card-head"><h2>今日优先动作</h2><span>{actions.length+extraTasks.length} 项待处理</span></div><div className="actions">{extraTasks.map((t:string,i:number)=><div className="action-row" key={t}><StatusTag s="预警转入"/><div className="action-main"><b>{t}</b><small>由动态预警转为今日任务</small></div><div className="impact"><strong>需今日处理</strong>避免风险扩大</div><button className="btn" onClick={()=>notify("任务已完成")}>完成</button></div>)}{actions.map(({a,i}:any)=><div className="action-row" key={i}><StatusTag s={a[0]}/><div className="action-main"><b>{a[1]} · {a[2]}</b><small>{a[3]}</small></div><div className="impact"><strong>{a[4]}</strong>预计影响</div><div className="row-actions"><button title="查看依据" className="icon-btn" onClick={()=>setDrawer(`${a[1]}：${a[3]}`)}><CircleHelp/></button><button title="完成" className="icon-btn" onClick={()=>{setDone([...done,i]);notify("已标记完成")}}><Check/></button><button title="稍后" className="icon-btn" onClick={()=>{setSnoozed((x:number[])=>[...x,i]);notify("已移至稍后处理")}}><Clock3/></button><button title="不采纳" className="icon-btn danger" onClick={()=>{setDone([...done,i]);notify("已记录不采纳，将用于优化建议")}}><X/></button></div></div>)}{actions.length===0&&extraTasks.length===0&&<div className="empty"><Check/>今日建议已处理完毕</div>}</div></section>
-  <section className="card"><div className="card-head"><h2>今日变化</h2><span>实时</span></div><div className="card-body timeline">{events.map(e=><div className="event" key={e[0]}><time>{e[0]}</time><i className="event-dot"/><div><b>{e[1]}</b><p>{e[2]}</p></div></div>)}</div></section>
- </div>
- <section className="card section"><div className="card-head"><h2>今日重点职位</h2><button className="link" onClick={()=>notify("已进入完整职位列表")}>查看全部 24 个</button></div><JobTable rows={jobs.slice(0,5)} open={openJob}/></section>
- <section className="card section"><div className="card-head"><h2>今日重点客户</h2><span>按综合优先级</span></div><ClientTable rows={clients.slice(0,5)} open={openClient}/></section></>
-}
-
-function JobsView({jobs,status,setStatus,sort,setSort,view,setView,selected,setSelected,openJob,notify,mode}:any){
- const [clientFilter,setClientFilter]=useState("全部客户");
- const [cityFilter,setCityFilter]=useState("全部城市");
- const [typeFilter,setTypeFilter]=useState("全部职位类型");
- const [sourceFilter,setSourceFilter]=useState("全部来源");
- const [compareOpen,setCompareOpen]=useState(false);
- const statusOptions:FilterSelectOption[]=[{value:"全部状态",label:"全部状态"},{value:"待同步",label:"待同步"},...statusOrder.map(value=>({value,label:value}))];
- const sortOptions:FilterSelectOption[]=[{value:"score",label:"综合分数 ↓"},{value:"hc",label:"HC ↓"}];
- const positionTypes:PositionType[]=["产品","运营","技术","算法","设计","商业化"];
- const clientOptions:FilterSelectOption[]=[{value:"全部客户",label:"全部客户"},...Array.from(new Set<string>(jobs.map((job:Job)=>job.client))).sort().map((value:string)=>({value,label:value}))];
- const cityOptions:FilterSelectOption[]=[{value:"全部城市",label:"全部城市"},...Array.from(new Set<string>(jobs.map((job:Job)=>job.city))).sort().map((value:string)=>({value,label:value}))];
- const typeOptions:FilterSelectOption[]=[{value:"全部职位类型",label:"全部职位类型"},...positionTypes.map(value=>({value,label:`${value} · ${jobs.filter((job:Job)=>job.positionType===value).length}`}))];
- const sourceOptions:FilterSelectOption[]=[{value:"全部来源",label:"全部来源"},{value:"驾驶舱导入",label:`驾驶舱导入 · ${jobs.filter((job:Job)=>job.source==="驾驶舱导入").length}`},{value:"市场信号",label:`市场信号 · ${jobs.filter((job:Job)=>job.source==="市场信号").length}`}];
- const visibleJobs=jobs.filter((job:Job)=>(clientFilter==="全部客户"||job.client===clientFilter)&&(cityFilter==="全部城市"||job.city===cityFilter)&&(typeFilter==="全部职位类型"||job.positionType===typeFilter)&&(sourceFilter==="全部来源"||job.source===sourceFilter));
- const comparedJobs=visibleJobs.filter((job:Job)=>selected.includes(job.id));
- const toggle=(id:Job["id"])=>{setCompareOpen(false);if(selected.includes(id))setSelected(selected.filter((value:Job["id"])=>value!==id));else if(selected.length<3)setSelected([...selected,id]);else notify("最多对比 3 个职位")};
- return <><Heading code="JOB SIGNAL RADAR" title="职位雷达" desc="把新鲜度、招聘意愿、反馈、转化与竞争信号放在同一决策面上。" action={<button className="btn primary" onClick={()=>notify("新建职位表单已准备（演示数据不写入真实系统）")}><Plus/>新增职位</button>}/>
- <div className="radar-source-summary"><Database/><span>{mode==="connected"?<><b>职位雷达数据池已接入 Brain X</b> · {jobs.filter((job:Job)=>job.source==="驾驶舱导入").length} 个驾驶舱条目 · {jobs.filter((job:Job)=>job.source==="市场信号").length} 个市场条目</>:<><b>驾驶舱全景图已导入</b> · {cockpitRadarJobs.length} 个职位条目来自 93 家公司</>}</span><small>{mode==="connected"?"关系、HC 与阶段来自后端事实；评分与转化指标待后端模型":"评分、HC 与流程指标待后端同步"}</small></div>
- <div className="toolbar"><FilterSelect value={status} onChange={setStatus} ariaLabel="职位状态" options={statusOptions}/><FilterSelect value={typeFilter} onChange={setTypeFilter} ariaLabel="职位类型筛选" options={typeOptions}/><FilterSelect value={sourceFilter} onChange={setSourceFilter} ariaLabel="数据来源筛选" options={sourceOptions}/><FilterSelect value={sort} onChange={setSort} ariaLabel="排序方式" options={sortOptions}/><FilterSelect value={clientFilter} onChange={setClientFilter} ariaLabel="客户筛选" options={clientOptions}/><FilterSelect value={cityFilter} onChange={setCityFilter} ariaLabel="城市筛选" options={cityOptions}/><DirectGlassSegment value={view} options={[{value:"list",label:<><ListFilter/>决策列表</>},{value:"rail",label:<><Activity/>信号轨道</>}]} onChange={setView} className="glass-seg" ariaLabel="职位视图"/>{comparedJobs.length>1&&<button className="btn primary" onClick={()=>setCompareOpen(true)}><GitCompareArrows/>对比 {comparedJobs.length}</button>}</div>
- <section className="card">{view==="list"?<div className="table-wrap"><table className="data-table"><thead><tr><th>对比</th><th>职位 / 客户</th><th>分数</th><th>状态与判断</th><th>HC</th><th>最近反馈</th><th>推荐</th><th>面试</th><th>Offer</th><th>操作</th></tr></thead><tbody>{visibleJobs.map((j:Job)=><tr key={j.id} className={j.source==="驾驶舱导入"?"cockpit-imported-row":""}><td><input type="checkbox" checked={selected.includes(j.id)} onChange={()=>toggle(j.id)} /></td><td className="name-cell"><b>{j.name}</b><small><em>{j.positionType}</em>{j.client} · {j.city}</small></td><td className="score">{j.score??"—"}</td><td><StatusTag s={j.status}/><div className="reason">{j.reason}</div></td><td className="mono">{j.hc??"—"}</td><td>{j.feedback}</td><td>{j.recommended??"—"}</td><td>{j.interview??"—"}</td><td>{j.offer??"—"}</td><td><button className="link" onClick={()=>openJob(j)}>详情 →</button></td></tr>)}</tbody></table>{visibleJobs.length===0&&<div className="empty"><Search/>没有符合当前筛选的职位</div>}</div>:<SignalRail jobs={visibleJobs} open={openJob}/>}</section>
- {compareOpen&&<Compare jobs={comparedJobs} close={()=>setCompareOpen(false)}/>}</>
-}
-function SignalRail({jobs,open}:{jobs:Job[];open:(j:Job)=>void}){return <div className="rail">{jobs.map(j=>{if(j.status==="待同步")return <div className="rail-row cockpit-rail-row" key={j.id}><div className="rail-name"><button className="link" onClick={()=>open(j)}><b>{j.name}</b></button><small>{j.positionType} · {j.client}</small></div><div className="cockpit-signal-pending"><Database/><span>驾驶舱岗位已导入，实时信号待同步</span></div><div className="reason">{j.industry}</div></div>;const ix=statusOrder.indexOf(j.status);const color=j.status==="已关闭"?"#b32636":j.status==="拥挤"||j.status==="降温"?"#7d8795":"#2FD3A7";return <div className="rail-row" key={j.id}><div className="rail-name"><button className="link" onClick={()=>open(j)}><b>{j.name}</b></button><small>{j.positionType} · {j.client} · 评分 {j.score??"—"}</small></div><div><div className="track" style={{"--progress":`${ix/(statusOrder.length-1)*100}%`,"--track-color":color} as React.CSSProperties}>{statusOrder.map((s,i)=><i key={s} className={`node ${i<=ix?"done":""} ${i===ix?"current":""}`} style={{left:`${i/(statusOrder.length-1)*100}%`}} title={s}/>)}</div><div className="track-labels">{statusOrder.map(s=><span key={s}>{s}</span>)}</div></div><div className="reason">{j.reason}</div></div>})}</div>}
-function Compare({jobs,close}:{jobs:Job[];close:()=>void}){const dims=["综合评分","职位新鲜度","招聘意愿","HC / 紧急程度","反馈速度","推荐→面试","面试→Offer","竞争程度","主要风险","建议动作"];const metric=(value:number|null)=>value===null?"—":value;return <><div className="drawer-backdrop" onClick={close}/><div className="modal"><div className="modal-head"><b>职位横向对比</b><button className="icon-btn" onClick={close}><X/></button></div><div className="modal-body compare-grid"><div></div>{jobs.map(j=><div key={j.id}><b>{j.name}</b></div>)}{dims.flatMap((d,i)=><><div key={d}>{d}</div>{jobs.map(j=><div key={`${d}${j.id}`}>{i===0?<span className="score">{metric(j.score)}</span>:i===1?j.score===null?"待同步":`${Math.max(7,j.score-72)}/15`:i===2?j.score===null?"待同步":`${Math.max(8,j.score-72)}/20`:i===3?j.hc===null?"待同步":`${j.hc} HC · ${j.hc>2?"紧急":"正常"}`:i===4?j.feedback:i===5?j.recommended&&j.interview?`${Math.round(j.interview/j.recommended*100)}%`:"—":i===6?j.interview&&j.offer!==null?`${Math.round(j.offer/j.interview*100)}%`:"—":i===7?j.status==="待同步"?"待同步":j.status==="拥挤"?"高":"中":i===8?j.reason:j.status==="待同步"?"先同步实时事实":j.status==="拥挤"?"提高推荐门槛":"优先推进"}</div>)}</>)}</div></div></>}
-
-function JobTable({rows,open}:{rows:Job[];open:(j:Job)=>void}){return <div className="table-wrap"><table className="data-table"><thead><tr><th>职位 / 客户</th><th>综合分</th><th>状态与原因</th><th>HC</th><th>最近反馈</th><th>推荐</th><th>面试</th><th>Offer</th><th>今日建议</th></tr></thead><tbody>{rows.map(j=><tr key={j.id}><td className="name-cell"><button className="link" onClick={()=>open(j)}><b>{j.name}</b></button><small>{j.client}</small></td><td className="score">{j.score}</td><td><StatusTag s={j.status}/><div className="reason">{j.reason}</div></td><td className="mono">{j.hc}</td><td>{j.feedback}</td><td>{j.recommended}</td><td>{j.interview}</td><td>{j.offer}</td><td>{j.status==="拥挤"?"提高标准":j.status==="降温"?"确认预算":"优先推进"}</td></tr>)}</tbody></table></div>}
-
-function CockpitJobDetail({job,onBack,notify}:{job:Job;onBack:()=>void;notify:(text:string)=>void}){return <><button className="back" onClick={onBack}><ArrowLeft/>返回职位雷达</button><div className="detail-top cockpit-detail-top"><div className="detail-title"><span className="eyebrow">COCKPIT IMPORT · {job.sourceColumn}</span><h1>{job.name}</h1><div className="meta"><span>{job.client}</span><span>{job.industry}</span><span>{job.city}</span><span>职位类型 · {job.positionType}</span></div></div><div className="imported-fact"><Database/><span>已导入</span></div></div><div className="conclusion"><div className="spark"><Database/></div><div><b>已从 TTC 驾驶舱全景图带入基础岗位信息</b><p>评分、HC、招聘阶段和转化数据当前没有来源，等待后端同步后再参与职位判断。</p></div></div><div className="grid g2"><section className="card"><div className="card-head"><h2>已导入字段</h2><span>原始工作簿</span></div><dl className="facts card-body"><div><dt>公司</dt><dd>{job.client}</dd></div><div><dt>业务方向</dt><dd>{job.industry}</dd></div><div><dt>地点</dt><dd>{job.city}</dd></div><div><dt>岗位分类</dt><dd>{job.sourceColumn}</dd></div><div><dt>职位类型</dt><dd>{job.positionType}</dd></div></dl></section><section className="card"><div className="card-head"><h2>待同步事实</h2><span>不做前端推断</span></div><div className="card-body side-list">{["当前 HC 与关闭状态","招聘流程及候选人漏斗","最近反馈与客户优先级","评分与推荐排序"].map((item,index)=><div className="mini-item" key={item}><span className="num">0{index+1}</span><div><b>{item}</b><p>等待后端数据适配层返回</p></div></div>)}</div></section></div><button className="btn primary cockpit-copy-action" onClick={()=>notify("岗位基础信息已复制到演示剪贴板")}>复制岗位基础信息 <ChevronRight/></button></>}
-
-function JobDetail({job,onBack,weights,eventType,setEventType,hc,setHc,notify}:any){
- if(job.source==="驾驶舱导入")return <CockpitJobDetail job={job} onBack={onBack} notify={notify}/>;
- const score=job.score??0;const remainingHc=job.hc??0;const recommended=job.recommended??0;const interview=job.interview??0;const offer=job.offer??0;
- const [events2,setEvents2]=useState(events.slice(0,3));
- const detailWeights=[20,15,15,15,10,10,10,5];
- const add=()=>{setEvents2([[new Date().toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit"}),eventType,eventType==="HC变化"?`HC更新为 ${hc}`:"用户新增项目事件"],...events2]);notify("事件已记录，状态与评分已重新计算")};
- return <><button className="back" onClick={onBack}><ArrowLeft/>返回职位雷达</button><div className="detail-top"><div className="detail-title"><span className="eyebrow">JOB / {String(job.id).padStart(4,"0")}</span><h1>{job.name}</h1><div className="meta"><span>{job.client}</span><span>PM · {job.pm}</span><span>{job.city}</span><span>{job.salary}</span><span>HC {remainingHc}</span><span>更新 {job.feedback}</span></div></div><div className="big-score" style={{"--score":score} as React.CSSProperties}><span>{score}</span></div></div>
- <div className="conclusion"><div className="spark"><Sparkles/></div><div><b>建议优先投入</b><p>{job.reason}。当前推荐到面试转化较高，主要风险是面试池逐渐拥挤，建议提高推荐标准。</p></div><StatusTag s={job.status}/></div>
- <div className="grid g2"><section className="card"><div className="card-head"><h2>评分依据</h2><span>规则计算 + AI推断</span></div><div className="card-body score-bars">{["客户真实招聘意愿","职位新鲜度","HC 和紧急程度","客户反馈速度","推荐到面试转化","面试到 Offer 转化","当前竞争程度","历史交付风险"].map((n,i)=><div className="score-line" key={n}><span>{n}</span><div className="bar"><i style={{width:`${Math.min(100,(detailWeights[i]-(i%3))*100/detailWeights[i])}%`}}/></div><strong>{detailWeights[i]-(i%3)} / {detailWeights[i]}</strong></div>)}</div></section><section className="card"><div className="card-head"><h2>建议动作</h2><span>按影响排序</span></div><div className="card-body side-list">{["向PM确认剩余HC","确认当前面试进度","提高推荐标准","48小时无反馈则降低优先级"].map((x,i)=><div className="mini-item" key={x}><span className="num">0{i+1}</span><div><b>{x}</b><p>{i<2?"今天完成 · 高影响":"本周完成 · 中影响"}</p></div><button className="icon-btn" onClick={()=>notify(`已完成：${x}`)}><Check/></button></div>)}</div></section></div>
- <section className="card section"><div className="card-head"><h2>职位信号轨道</h2><span>每次判断均可追溯</span></div><SignalRail jobs={[job]} open={()=>{}}/></section>
- <div className="grid g2 section"><section className="card"><div className="card-head"><h2>招聘漏斗</h2><span>近 90 天</span></div><div className="card-body funnel">{[["推荐",recommended],["客户查看",Math.max(1,recommended-2)],["初面",interview],["复试",Math.max(1,interview-1)],["终面",offer+1],["Offer",offer],["入职",0]].map(x=><div className="funnel-step" key={x[0]}><b>{x[1]}</b><small>{x[0]}</small></div>)}</div></section><section className="card"><div className="card-head"><h2>当前竞争</h2><span>趋势上升</span></div><div className="card-body g3 grid">{[["参与顾问","4"],["已推荐",recommended],["面试 / Offer",`${interview} / ${offer}`]].map(x=><div className="mini-item" key={x[0]}><div><p>{x[0]}</p><b className="score">{x[1]}</b></div></div>)}</div></section></div>
- <div className="grid g2 section"><section className="card"><div className="card-head"><h2>客户反馈摘要</h2><span>AI结构化提取</span></div><div className="card-body side-list">{["最近反馈：商业化经验通过，需验证团队管理跨度","高频淘汰：行业深度不足、英文沟通欠缺","重点关注：AI广告客户资源、0→1团队经验","待确认：剩余HC与下一轮面试排期"].map(x=><div className="mini-item" key={x}><Sparkles/><b>{x}</b></div>)}</div></section><section className="card"><div className="card-head"><h2>新增项目事件</h2><span>将触发重新计算</span></div><div className="card-body"><div className="toolbar"><FilterSelect value={eventType} onChange={setEventType} ariaLabel="项目事件类型" options={["客户反馈","HC变化","面试变化","Offer变化","职位暂停","职位恢复","职位关闭"].map(value=>({value,label:value}))}/>{eventType==="HC变化"&&<input className="field" type="number" min={0} value={hc} onChange={e=>setHc(+e.target.value)}/>}<button className="btn primary" onClick={add}><Plus/>记录并重算</button></div><div className="timeline">{events2.map((e:string[],i:number)=><div className="event" key={`${e[0]}${i}`}><time>{e[0]}</time><i className="event-dot"/><div><b>{e[1]}</b><p>{e[2]}</p></div></div>)}</div></div></section></div></>
-}
-
-function ClientsView({clients,open,notify}:any){const [compare,setCompare]=useState<string[]>([]);const [stateFilter,setStateFilter]=useState("全部合作状态");const [sortBy,setSortBy]=useState("score");const [compareOpen,setCompareOpen]=useState(false);const visibleClients=[...clients].filter((client:any)=>stateFilter==="全部合作状态"||client.state===stateFilter).sort((a:any,b:any)=>sortBy==="feedback"?parseInt(a.feedback)-parseInt(b.feedback):sortBy==="hc"?(b.hc??-1)-(a.hc??-1):(b.score??-1)-(a.score??-1));const comparedClients=visibleClients.filter((client:any)=>compare.includes(client.name));const toggle=(name:string)=>{setCompareOpen(false);if(compare.includes(name))setCompare(compare.filter(x=>x!==name));else if(compare.length<3)setCompare([...compare,name]);else notify("最多对比 3 个客户")};const reset=()=>{setStateFilter("全部合作状态");setSortBy("score");setCompare([]);setCompareOpen(false);notify("客户筛选已重置")};return <><Heading code="CLIENT INTELLIGENCE" title="客户洞察" desc="识别真实招聘窗口、合作温度与交付风险。" action={<button className="btn" onClick={reset}><RotateCcw/>重置筛选</button>}/><div className="toolbar"><FilterSelect value={stateFilter} onChange={setStateFilter} ariaLabel="合作状态筛选" options={["全部合作状态","招聘窗口期","稳定合作","反馈降温"].map(value=>({value,label:value}))}/><FilterSelect value={sortBy} onChange={setSortBy} ariaLabel="客户排序方式" options={[{value:"score",label:"优先级 ↓"},{value:"feedback",label:"反馈速度 ↑"},{value:"hc",label:"总 HC ↓"}]}/>{comparedClients.length>1&&<button className="btn primary" onClick={()=>setCompareOpen(true)}><GitCompareArrows/>对比 {comparedClients.length}</button>}</div><section className="card"><div className="table-wrap"><table className="data-table"><thead><tr><th>对比</th><th>客户 / 行业</th><th>合作状态</th><th>活跃职位</th><th>总HC</th><th>平均反馈</th><th>推荐→面试</th><th>面试→Offer</th><th>历史入职</th><th>意愿</th><th>优先级</th><th>主要风险</th></tr></thead><tbody>{visibleClients.map((c:any)=><tr key={c.name}><td><input type="checkbox" checked={compare.includes(c.name)} onChange={()=>toggle(c.name)}/></td><td className="name-cell"><button className="link" onClick={()=>open(c)}><b>{c.name}</b></button><small>{c.industry}</small></td><td><StatusTag s={c.state}/></td><td>{c.active}</td><td>{c.hc??"—"}</td><td>{c.feedback}</td><td>{c.r2i}</td><td>{c.i2o}</td><td>{c.hires??"—"}</td><td>{c.intent}</td><td className="score">{c.score??"—"}</td><td>{c.risk}</td></tr>)}</tbody></table>{visibleClients.length===0&&<div className="empty"><Search/>没有符合当前筛选的客户</div>}</div></section>{compareOpen&&<ClientCompare clients={comparedClients} close={()=>setCompareOpen(false)}/>}</>}
-function ClientCompare({clients,close}:{clients:any[];close:()=>void}){const dims:[string,(client:any)=>React.ReactNode][]=[["合作状态",client=>client.state],["活跃职位",client=>client.active],["总 HC",client=>client.hc??"待同步"],["平均反馈",client=>client.feedback],["推荐→面试",client=>client.r2i],["面试→Offer",client=>client.i2o],["历史入职",client=>client.hires??"—"],["招聘意愿",client=>client.intent],["优先级",client=><span className="score">{client.score??"—"}</span>],["主要风险",client=>client.risk]];return <><div className="drawer-backdrop" onClick={close}/><div className="modal"><div className="modal-head"><b>客户横向对比</b><button className="icon-btn" onClick={close} aria-label="关闭对比"><X/></button></div><div className="modal-body compare-grid"><div></div>{clients.map(client=><div key={client.name}><b>{client.name}</b></div>)}{dims.flatMap(([label,value])=><><div key={label}>{label}</div>{clients.map(client=><div key={`${label}${client.name}`}>{value(client)}</div>)}</>)}</div></div></>}
-function ClientTable({rows,open}:any){return <div className="table-wrap"><table className="data-table"><thead><tr><th>客户</th><th>状态</th><th>活跃职位</th><th>总 HC</th><th>平均反馈</th><th>招聘意愿</th><th>优先级</th><th>主要风险</th><th>建议动作</th></tr></thead><tbody>{rows.map((c:any)=><tr key={c.name}><td><button className="link" onClick={()=>open(c)}><b>{c.name}</b></button></td><td><StatusTag s={c.state}/></td><td>{c.active}</td><td>{c.hc??"—"}</td><td>{c.feedback}</td><td>{c.intent}</td><td className="score">{c.score??"—"}</td><td>{c.risk}</td><td>确认本周面试排期</td></tr>)}</tbody></table></div>}
-function ClientDetail({c,onBack,notify}:any){return <><button className="back" onClick={onBack}><ArrowLeft/>返回客户洞察</button><Heading code={`CLIENT / ${c.industry}`} title={c.name} desc={`优先级 ${c.score??"—"} · ${c.state} · 平均反馈 ${c.feedback}`} action={<button className="btn primary" onClick={()=>notify("客户反馈已记录并触发重新判断")}><Plus/>添加客户反馈</button>}/><div className="conclusion"><div className="spark"><Sparkles/></div><div><b>{c.name}当前处于集中招聘窗口期</b><p>近30天新增 {c.active} 个职位，平均反馈时间缩短至 {c.feedback}，建议提高交付优先级。</p></div></div><div className="grid g3">{[["活跃职位",c.active],["总 HC",c.hc??"—"],["历史入职",c.hires??"—"]].map(x=><div className="card card-body" key={x[0]}><span className="eyebrow">{x[0]}</span><div className="score" style={{fontSize:28,marginTop:8}}>{x[1]}</div></div>)}</div><div className="grid g2 section"><section className="card"><div className="card-head"><h2>当前活跃职位</h2><span>{c.active} 个</span></div><JobTable rows={jobs.filter(j=>j.client===c.name).concat(jobs.slice(0,Math.max(0,3-jobs.filter(j=>j.client===c.name).length)))} open={()=>notify("已打开关联职位")}/></section><section className="card"><div className="card-head"><h2>合作判断</h2><span>近6个月</span></div><div className="card-body side-list">{["人才偏好：头部AI商业化经验、团队从0到1","高频淘汰：缺少复杂销售经验","需求变更：近30天 2 次，处于可控范围","合作风险：面试标准近期小幅抬高","建议动作：锁定本周业务负责人面试档期"].map((x,i)=><div className="mini-item" key={x}><span className="num">0{i+1}</span><b>{x}</b></div>)}</div></section></div><section className="card section"><div className="card-head"><h2>客户事件时间线</h2><span>可追溯</span></div><div className="card-body timeline">{events.concat([["06-28","新增职位","新增 AI 解决方案销售，HC 3"],["06-04","需求变化","薪资上限提高 15%"]]).map(e=><div className="event" key={e[0]}><time>{e[0]}</time><i className="event-dot"/><div><b>{e[1]}</b><p>{e[2]}</p></div></div>)}</div></section></>}
 
 function Alerts({setExtraTasks,notify,setDrawer}:any){const alerts=["云帆智能连续7天未反馈","商业化增长经理转化率下降12%","海外增长负责人面试池已拥挤","星河科技进入招聘窗口期","Creator Partnership负责人新增2个HC","棱镜互动近14天需求变更3次","AI解决方案销售参与顾问增至6人","用户增长负责人产生Offer"];const [handled,setHandled]=useState<number[]>([]);const [riskFilter,setRiskFilter]=useState("全部风险等级");const [clientFilter,setClientFilter]=useState("全部客户");return <><Heading code="DYNAMIC ALERTS" title="动态预警" desc="聚合需要人工确认的机会、变化和失活信号。"/><div className="toolbar"><FilterSelect value={riskFilter} onChange={setRiskFilter} ariaLabel="预警风险等级" options={["全部风险等级","高风险","机会"].map(value=>({value,label:value}))}/><FilterSelect value={clientFilter} onChange={setClientFilter} ariaLabel="预警客户筛选" options={[{value:"全部客户",label:"全部客户"},...clients.map(client=>({value:client.name,label:client.name}))]}/></div><section className="card"><div className="actions">{alerts.map((x,i)=><div className="action-row" key={x} style={{opacity:handled.includes(i)?.5:1}}><StatusTag s={i%3===0?"高风险":i%3===1?"关注":"机会"}/><div className="action-main"><b>{x}</b><small>{i%2?"基于近7天业务事件变化":"超过预设阈值，建议今天确认"}</small></div><div className="impact"><strong>{i%3===2?"机会升温":"需人工确认"}</strong>置信度 {88+i}%</div><div className="row-actions"><button className="btn" onClick={()=>setDrawer(x)}>依据</button><button className="btn" onClick={()=>{setExtraTasks((v:string[])=>v.includes(x)?v:[...v,x]);notify("已转为今日任务")}}>转任务</button><button className="icon-btn" onClick={()=>{setHandled([...handled,i]);notify("预警已处理")}}><Check/></button></div></div>)}</div></section></>}

@@ -27,6 +27,8 @@
 
 `TtcJobsTable` 与 `ClientInsightsReview` 已进入正式工作台，分别消费 `GET /api/v1/radar` 和 `GET /api/v1/clients`。职位表只显示九个 TTC 主字段；客户表只显示客户名、客户类型、职位总数、活跃职位数、已知 HC、最近职位快照、顾问关系和职位状态。两者的搜索、筛选和排序都基于真实字段，首屏分批渲染 100 行以避免大数据量卡顿；客户侧栏不生成反馈速度、转化率、历史入职、招聘意愿、客户评分或经营风险，只提供跳转到该客户职位集合的下钻动作。
 
+`JobsWorkspaceReview` 是现代职位工作区的 Storybook-only 审核稿，视觉参考见 [职位工作区设计稿 v2](design/brainx-jobs-workspace-review-v2.png)。它用轻量侧栏、保存视图、紧凑筛选、真实职位表和右侧事实详情替代传统统计卡片后台；仅展示 TTC 与 BrainX 当前能够核验的职位、城市、状态、HC、Pipeline、顾问、更新时间和跟进状态。该组件尚未接入 `workbench.tsx` 或正式路由，审核通过前不得替换现有生产职位页。
+
 ## 使用命令
 
 从仓库根目录执行：

@@ -8,7 +8,7 @@
  *   cockpit_facts（驾驶舱导入）与 job_facts（职位市场）按 project_id 合并（外键保证存在）。
  */
 import { relationMap, deriveRelation } from './relations.js';
-import { currentState } from './engagement.js';
+import { currentStateMap } from './engagement.js';
 import { profileTtcFields, TTC_MAIN_COLUMNS } from './ttc-field-catalog.js';
 import { latestTtcFieldReport } from './ttc-field-report.js';
 
@@ -37,6 +37,7 @@ export function radarRows(db, consultant_id) {
   const cockpit = db.prepare('SELECT * FROM cockpit_facts').all();
   const cMap = Object.fromEntries(cockpit.map((c) => [c.project_id, c]));
   const relCtx = relationMap(db, consultant_id);
+  const engagementStates = currentStateMap(db, consultant_id);
   const rows = [];
   for (const j of jobs) {
     const relation = deriveRelation(relCtx, j.project_id);
@@ -59,7 +60,7 @@ export function radarRows(db, consultant_id) {
       captured_at: j.captured_at ?? null,
       owner_name: j.owner_name ?? null,
       relation,
-      engagement_state: currentState(db, consultant_id, j.project_id).state,
+      engagement_state: engagementStates.get(j.project_id)?.state || 'NEW',
       cockpit: c ? {
         membership_status: c.membership_status ?? null,
         current_stage: c.current_stage ?? null,

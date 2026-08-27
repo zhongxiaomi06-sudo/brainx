@@ -69,6 +69,24 @@ export function buildCtx(db, consultant_id, snapshot) {
 /** 自动轮次最小冻结间隔（方案 A，db-growth-governance-proposal）：输入未变时不重复全量冻结。 */
 const THROTTLE_MS = Number(process.env.BRAINX_RECOMMEND_THROTTLE_MS || 2 * 3600 * 1000);
 const SKIP_AUDIT_MS = Number(process.env.BRAINX_SKIP_AUDIT_MS || 60 * 60 * 1000);
+const PERSIST_LIMIT = Number(process.env.BRAINX_RECOMMEND_PERSIST_LIMIT || 200);
+const RETAIN_RUNS = Number(process.env.BRAINX_RECOMMEND_RETAIN_RUNS || 3);
+
+/**
+ * 推荐属于可再生成快照，不得无限累积。保留最近若干正式轮次；被结果记录引用的
+ * 推荐继续保留，避免破坏人工结果的证据链。decision_runs 本身很小，作为审计行保留。
+ */
+export function pruneRecommendationHistory(db, consultant_id, retainRuns = RETAIN_RUNS) {
+  const keep = Math.max(1, Number(retainRuns) || RETAIN_RUNS);
+  const stale = db.prepare(`SELECT run_id FROM decision_runs
+    WHERE consultant_id=? AND status='COMPLETED'
+    ORDER BY created_at DESC, rowid DESC LIMIT -1 OFFSET ?`).all(consultant_id, keep);
+  const remove = db.prepare(`DELETE FROM recommendations WHERE run_id=?
+    AND decision_id NOT IN (SELECT decision_id FROM job_outcomes WHERE decision_id IS NOT NULL)`);
+  let removed = 0;
+  for (const row of stale) removed += remove.run(row.run_id).changes;
+  return { stale_runs: stale.length, removed };
+}
 
 /**
  * 生成一轮推荐。硬约束：最近同步 complete=0 → blocked，不落推荐。
@@ -76,7 +94,9 @@ const SKIP_AUDIT_MS = Number(process.env.BRAINX_SKIP_AUDIT_MS || 60 * 60 * 1000)
  * 记一行 SKIPPED_UNCHANGED 审计轮并返回上轮 run_id（手动 run/事实修正重算不传，强制全量）。
  * 返回 { run_id, blocked, items[] }；dry_run 不落库。
  */
-export function recommend(db, consultant_id, { top = 20, dry_run = false, throttle = false } = {}) {
+export function recommend(db, consultant_id, {
+  top = 20, dry_run = false, throttle = false, persistLimit = PERSIST_LIMIT,
+} = {}) {
   // 阻断判定只看真实同步（2026-08-25）：bridge-error 观测行不参与 fail-closed，
   // 上游限流期间用最后完整快照继续推荐，并以 sync_warning 暴露降级状态。
   const last = latestRealSync(db, consultant_id);
@@ -165,8 +185,10 @@ export function recommend(db, consultant_id, { top = 20, dry_run = false, thrott
     db.exec('BEGIN');
     try {
       insRun.run(run_id, consultant_id, snapshot.sync_id, POLICY_VERSION, evaluated.length, 'COMPLETED', now());
-      // 冻结整轮候选池；Top20 只是默认展示窗口，换一批必须复用同一轮分数。
-      for (const r of evaluated) {
+      // 精选盘需要 Top20 之后的替补，但不能把数千候选在每轮全部永久冻结。
+      // 默认最多保留 200 条，足够十批替换；candidate_count 仍记录完整评估规模。
+      const persisted = evaluated.slice(0, Math.max(top, Number(persistLimit) || PERSIST_LIMIT));
+      for (const r of persisted) {
         insRec.run(r.decision_id, run_id, r.project_id, consultant_id, r.action, r.score,
                    r.confidence_band, r.evidence_coverage, JSON.stringify(r.reasons),
                    JSON.stringify(r.risks), JSON.stringify(r.evidence_refs),
@@ -174,6 +196,7 @@ export function recommend(db, consultant_id, { top = 20, dry_run = false, thrott
         if (r.rank <= top) insEvt.run(uuid(), 'RECOMMENDED', consultant_id, now(), r.project_id, r.decision_id,
                    POLICY_VERSION, `rec:${run_id}:${r.project_id}`, null, 'RECOMMENDED', '{}');
       }
+      pruneRecommendationHistory(db, consultant_id);
       db.exec('COMMIT');
     } catch (e) { db.exec('ROLLBACK'); throw e; }
   }

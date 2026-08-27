@@ -32,6 +32,24 @@ test('雷达：属主看到整个候选池，自己的策展关系被正确标�
   assert.ok(rows.every((r) => r.hc === null || r.hc >= 0));
 });
 
+test('雷达：职位状态使用批量查询，不随职位数量产生 N+1', () => {
+  const originalPrepare = db.prepare.bind(db);
+  let stateQueries = 0;
+  db.prepare = (sql) => {
+    if (String(sql).includes('current_engagement') || String(sql).includes("event_type='RECOMMENDED'")) {
+      stateQueries += 1;
+    }
+    return originalPrepare(sql);
+  };
+  try {
+    const rows = radarRows(db, 'felix');
+    assert.ok(rows.length > 20);
+    assert.equal(stateQueries, 2);
+  } finally {
+    db.prepare = originalPrepare;
+  }
+});
+
 test('雷达：无策展关系的顾问按团队池默认看到候选池（他人策展标注 OTHER_CONSULTANT）', () => {
   const rows = radarRows(db, 'mia');
   assert.equal(rows.length, poolCount('mia'));

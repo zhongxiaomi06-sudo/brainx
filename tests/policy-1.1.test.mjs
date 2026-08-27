@@ -57,6 +57,24 @@ test('A：手动 run（无 throttle）不受限；快照变化后自动轮重新
   assert.ok(!r2.skipped, '快照已变 → 不节流');
 });
 
+test('A：推荐快照只保留最近三轮，并限制每轮冻结规模', () => {
+  const local = openDb(':memory:');
+  try {
+    runSync(local, { source: 'fixture', consultant_id: CID });
+    for (let round = 0; round < 4; round += 1) {
+      recommend(local, CID, { top: 5, persistLimit: 5 });
+    }
+    assert.equal(
+      local.prepare('SELECT COUNT(*) n FROM recommendations WHERE consultant_id=?').get(CID).n,
+      15,
+      '仅保留最近三轮、每轮五条冻结记录',
+    );
+    assert.equal(latestRun(local, CID).items.length, 5);
+  } finally {
+    local.close();
+  }
+});
+
 // —— 反馈闭环：公司级记忆 ——
 test('1.1：负向公司记忆 direction -15，正向承接公司 +10', () => {
   const job = mkJob();

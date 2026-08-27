@@ -46,6 +46,24 @@ export function currentState(db, consultant_id, project_id) {
   return { state: rec ? 'RECOMMENDED' : 'NEW', state_since: null };
 }
 
+/**
+ * 批量读取顾问的职位状态。雷达/客户列表必须使用这一入口，避免为每个职位
+ * 分别查询 current_engagement 与 decision_events，导致大职位池把主线程堵死。
+ */
+export function currentStateMap(db, consultant_id) {
+  const states = new Map(db.prepare(`SELECT project_id, state, state_since
+    FROM current_engagement WHERE consultant_id=?`).all(consultant_id)
+    .map((row) => [row.project_id, { state: row.state, state_since: row.state_since }]));
+  const recommended = db.prepare(`SELECT DISTINCT project_id FROM decision_events
+    WHERE actor=? AND event_type='RECOMMENDED'`).all(consultant_id);
+  for (const row of recommended) {
+    if (!states.has(row.project_id)) {
+      states.set(row.project_id, { state: 'RECOMMENDED', state_since: null });
+    }
+  }
+  return states;
+}
+
 /** 冷却中的职位（DISMISSED 未超 30 天）。 */
 export function inCooldown(db, consultant_id, project_id, at = now()) {
   const d = db.prepare(`SELECT occurred_at FROM decision_events

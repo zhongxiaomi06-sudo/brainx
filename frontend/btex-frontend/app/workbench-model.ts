@@ -436,26 +436,17 @@ export function readSavedWorkbenchState(): SavedWorkbenchState {
     // 合法 JSON 但字段类型错误（tray:5、folders:"abc"…）会让渲染期 map 崩溃——
     // 逐字段校验形状，脏字段丢弃回默认值，而不是整页进错误边界。
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
-    const clean: SavedWorkbenchState = {};
-    const arr = (v: unknown) => Array.isArray(v) ? v : undefined;
-    const obj = (v: unknown) => (v && typeof v === "object" && !Array.isArray(v)) ? v : undefined;
-    if (arr(raw.done)) clean.done = raw.done;
-    if (arr(raw.snoozed)) clean.snoozed = raw.snoozed;
-    if (arr(raw.extraTasks)) clean.extraTasks = raw.extraTasks;
-    if (arr(raw.weights)) clean.weights = raw.weights;
-    if (arr(raw.decisionActions)) clean.decisionActions = raw.decisionActions;
-    if (arr(raw.tray)) clean.tray = raw.tray;
-    if (arr(raw.folders)) clean.folders = raw.folders;
+    const clean = {} as Record<string, unknown>;
+    const arr = (v: unknown) => (Array.isArray(v) ? v : undefined);
+    const obj = (v: unknown) => (v && typeof v === "object" && !Array.isArray(v) ? v : undefined);
+    const pick = (key: string, check: (v: unknown) => unknown) => {
+      const v = check(raw[key]); if (v !== undefined) clean[key] = v;
+    };
+    ["done", "snoozed", "extraTasks", "weights", "decisionActions", "tray", "folders",
+      "notifications", "dismissedRecommendationIds"].forEach((k) => pick(k, arr));
+    ["engagement", "events", "outcomes", "sync", "auth", "membershipRelations"].forEach((k) => pick(k, obj));
     if (typeof raw.folderMode === "boolean") clean.folderMode = raw.folderMode;
-    if (obj(raw.engagement)) clean.engagement = raw.engagement;
-    if (obj(raw.events)) clean.events = raw.events;
-    if (obj(raw.outcomes)) clean.outcomes = raw.outcomes;
-    if (obj(raw.sync)) clean.sync = raw.sync;
-    if (obj(raw.auth)) clean.auth = raw.auth;
-    if (arr(raw.notifications)) clean.notifications = raw.notifications;
-    if (obj(raw.membershipRelations)) clean.membershipRelations = raw.membershipRelations;
-    if (arr(raw.dismissedRecommendationIds)) clean.dismissedRecommendationIds = raw.dismissedRecommendationIds;
-    return clean;
+    return clean as SavedWorkbenchState;
   } catch {
     return {};
   }

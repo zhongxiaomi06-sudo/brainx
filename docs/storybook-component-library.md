@@ -1,6 +1,8 @@
 # BrainX 内部 Storybook 组件库
 
 > 上级目录：[BrainX 文档书](README.md)
+>
+> 审核与接入状态权威：[前端审核台账](frontend-reviews/README.md)
 
 本文是 BrainX 可复用前端组件的展示、交互验证和维护入口。组件库直接引用生产组件，不维护第二套演示实现，也不连接生产 API 或真实用户数据。
 
@@ -29,7 +31,7 @@
 
 `JobsWorkspaceReview` 是现代职位工作区的 Storybook-only 审核稿，视觉参考见 [职位工作区设计稿 v2](design/brainx-jobs-workspace-review-v2.png)。它用轻量侧栏、保存视图、紧凑筛选和真实职位表替代传统统计卡片后台；点击职位时复用 `JobDetailCard` 居中事实卡，主表保持全宽，不再因固定右栏受到挤压。审核稿仅展示 TTC 与 BrainX 当前能够核验的职位、城市、状态、HC、Pipeline、顾问、更新时间和跟进状态，并明确标注脱敏示例不是真实线上快照。该组件尚未接入 `workbench.tsx` 或正式路由，审核通过前不得替换现有生产职位页。
 
-`JobDetailCard` 是已通过审核的居中职位事实卡，Storybook 继续覆盖今日决策、全部职位、缺失字段和窄屏场景，正式“全部职位”页已经复用同一组件。卡内只展示 TTC/BrainX 已有的项目编号、城市、状态、HC、主做顾问、顾问关系、结构化 Pipeline，以及在对应接口真实存在时才展示的推荐理由、操作记录和来源入口；没有真实推荐时整段隐藏，不显示 AI 匹配分、最终得分、探索价值或抽象覆盖率。正式页的“加入我的项目”调用现有项目归属接口；Storybook 中的“暂不考虑”仅用于已审核交互，后端仍要求原因，因此尚未接入正式页。
+`JobDetailCard` 是已通过视觉审核的居中职位事实卡，Storybook 覆盖今日决策、全部职位、缺失字段和窄屏场景；正式代码目前只有“全部职位”复用该组件，今日决策仍调用旧 `DecisionDrawer`，因此整体状态是“部分接入”。组件能够展示备注，但正式 Radar API 与适配层尚未传入 `notes`；推荐理由、操作记录和来源入口也只能在对应接口真实存在时展示。正式“全部职位”的“加入我的项目”调用现有项目归属接口；Storybook 中的“暂不考虑”仅用于已审核交互，后端仍要求原因，因此尚未接入正式页。详细差异见[首次前端状态对齐审计](frontend-reviews/2026-08-28-baseline.md)。
 
 ## 使用命令
 
@@ -50,6 +52,7 @@
 5. Storybook 使用独立 Vite 配置，不加载 Vinext、React Server Components 或 Cloudflare 部署插件。
 6. 可访问性面板始终启用。现有浅色视觉体系的对比度问题暂记为警告；新增组件不得通过关闭 a11y 插件隐藏问题。
 7. 前端测试会自动扫描生产组件导出；新增组件没有被任何 story 引用时，质量门禁会直接失败。
+8. 每次用户审核后必须按[前端审核台账](frontend-reviews/README.md)创建审核记录；Storybook 完成、用户审核、正式接入、目标环境发布和真实数据验证必须分别登记。
 
 ## 验证与边界
 
@@ -59,6 +62,7 @@
 
 ## 相关文档
 
+- [前端审核台账](frontend-reviews/README.md)
 - [质量门禁操作手册](standards/QUALITY_GATE_OPERATIONS.md)
 - [上传前完整验证](standards/PRE_PUSH_VERIFICATION.md)
 - [BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md)

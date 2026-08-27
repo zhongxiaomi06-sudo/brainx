@@ -18,6 +18,7 @@
 | 产品范围、功能规划或验收标准 | [BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md) |
 | 任何代码、测试或配置改动 | [上传前完整验证](standards/PRE_PUSH_VERIFICATION.md)、[质量门禁操作手册](standards/QUALITY_GATE_OPERATIONS.md) |
 | 前端组件、视觉状态或交互样例 | [内部 Storybook 组件库](storybook-component-library.md)、[上传前完整验证](standards/PRE_PUSH_VERIFICATION.md) |
+| 前端审核、Storybook 确认、正式接入或发布状态 | [前端审核台账](frontend-reviews/README.md)、[内部 Storybook 组件库](storybook-component-library.md) |
 | 前端信息架构、页面流程或交互重构 | [前端交互架构](frontend-interaction-architecture.md)、[BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md) |
 | 前端重构排期、施工范围或阶段验收 | [前端真实数据重构施工清单](frontend-refactor-construction-checklist.md)、[前端交互架构](frontend-interaction-architecture.md) |
 | TTC 职位字段、筛选能力或字段变化 | [TTC 职位字段库](ttc-field-catalog.md)、[BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md) |
@@ -50,6 +51,7 @@
 
 ### 设计与数据
 
+- [前端审核台账](frontend-reviews/README.md)：前端审核、正式接入、发布与真实数据验证状态的唯一权威入口。
 - [前端交互架构](frontend-interaction-architecture.md)：BrainX 页面分层、状态诚实性和核心用户动作链。
 - [前端真实数据重构施工清单](frontend-refactor-construction-checklist.md)：TTC 主表、推荐策略、方向画像、导航设置与质量门禁的分阶段实施及审核边界。
 - [内部 Storybook 组件库](storybook-component-library.md)：生产组件的隔离展示、交互测试与维护规则。

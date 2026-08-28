@@ -18,7 +18,6 @@ const meta = {
     tray: [],
     onToggleTray: fn(),
     onRemoveTray: fn(),
-    onConfirmTray: fn(),
     folders: [],
     folderMode: false,
     onFolderMode: fn(),

@@ -23,7 +23,6 @@ type TodayDecisionQueueProps = {
   tray: string[];
   onToggleTray: (id: string) => void;
   onRemoveTray: (id: string) => void;
-  onConfirmTray: () => void;
   folders: PickFolder[];
   folderMode: boolean;
   onFolderMode: () => void;
@@ -36,7 +35,7 @@ type TodayDecisionQueueProps = {
 export function TodayDecisionQueue(props: TodayDecisionQueueProps) {
   const {
     activeJobId, completed, jobs, engagement, sync, open, onAction, onFeedback,
-    showVerification = true, tray, onToggleTray, onRemoveTray, onConfirmTray,
+    showVerification = true, tray, onToggleTray, onRemoveTray,
     folders, folderMode, onFolderMode, onAssignFolder, onCreateFolder, mode,
     onOpenSources,
   } = props;
@@ -111,11 +110,11 @@ export function TodayDecisionQueue(props: TodayDecisionQueueProps) {
         completed={completed} engagement={engagement} open={open} onAction={onAction}
         onFeedback={onFeedback} tray={tray} onToggleTray={onToggleTray} folderMode={folderMode}
         folders={folders} onAssignFolder={onAssignFolder} toolbar={toolbar}/>}
-      <details className="saved-picks"><summary><span>精选与批量接单</span>
-        <small>{trayJobs.length ? `已选 ${trayJobs.length} 个职位` : "从上方列表选择职位后，在这里统一确认"}</small>
+      <details className="saved-picks"><summary><span>精选盘</span>
+        <small>{trayJobs.length ? `已收藏 ${trayJobs.length} 个职位` : "从上方列表收藏职位，稍后逐个判断"}</small>
         <ChevronDown/></summary><PickTray trayJobs={trayJobs} featuredJobs={visiblePending.slice(0, 4)}
           allJobs={allJobs} folderMode={folderMode} onFolderMode={onFolderMode} folders={folders}
-          onRemoveTray={onRemoveTray} onToggleTray={onToggleTray} onConfirmTray={onConfirmTray}
+          onRemoveTray={onRemoveTray} onToggleTray={onToggleTray}
           onAssignFolder={onAssignFolder} onCreateFolder={onCreateFolder} open={open}/>
       </details>
     </>}

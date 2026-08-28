@@ -97,7 +97,6 @@ export function PickTray({
   folders,
   onRemoveTray,
   onToggleTray,
-  onConfirmTray,
   onAssignFolder,
   onCreateFolder,
   open,
@@ -110,7 +109,6 @@ export function PickTray({
   folders: PickFolder[];
   onRemoveTray: (id: string) => void;
   onToggleTray: (id: string) => void;
-  onConfirmTray: () => void;
   onAssignFolder: (jobId: string, folderId: string) => void;
   onCreateFolder: (name: string) => void;
   open: (job: DecisionJob) => void;
@@ -197,13 +195,6 @@ export function PickTray({
             title="文件夹模式"
           >
             <FolderOpen />
-          </button>
-          <button
-            className="btn primary"
-            onClick={onConfirmTray}
-            disabled={trayJobs.length === 0}
-          >
-            <Check />确定
           </button>
         </div>
       </div>

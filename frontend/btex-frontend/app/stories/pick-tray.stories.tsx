@@ -61,7 +61,6 @@ function PickTrayHarness({
       folders={folders}
       onRemoveTray={(id) => setIds((current) => current.filter((item) => item !== id))}
       onToggleTray={toggle}
-      onConfirmTray={() => undefined}
       onAssignFolder={assignFolder}
       onCreateFolder={(name) => setFolders((current) => [
         ...current,
@@ -81,6 +80,7 @@ export const SelectedJobs: Story = {
     await userEvent.click(remove);
     await expect(canvas.queryByText(company)).not.toBeInTheDocument();
     await expect(canvas.getByText("1 已收藏")).toBeInTheDocument();
+    await expect(canvas.queryByRole("button", { name: "确定" })).not.toBeInTheDocument();
   },
 };
 

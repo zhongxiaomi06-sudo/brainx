@@ -96,9 +96,9 @@
     },
     {
       "path": "src/server.js",
-      "maxLines": 744,
+      "maxLines": 739,
       "owner": "backend",
-      "reason": "存量路由与启动编排尚未拆分；2026-08-27 收紧 -1：审计批次压缩注释块",
+      "reason": "存量路由与启动编排尚未拆分；2026-08-28 收紧 -5：进程拆分 A 方案把桥接/调度/推送移出主进程（worker.js/worker-relay.js）",
       "expiresOn": "2026-10-31"
     }
   ],

@@ -2,6 +2,11 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-08-28｜refactor(process): 进程拆分 A 方案——批处理移出 API 主进程
+
+- 改动：新增 `src/worker.js`（bridge 常驻同步/自动推荐/定时推卡，支持独立进程或嵌入模式）与 `src/worker-relay.js`（SQLite `worker_events` 表跨进程 SSE 接力，API 侧 3s 泵 + 1h GC）；`server.js` 启动块改为 `BRAINX_EMBED_WORKER=0` 走拆分模式（只起 relay 泵），默认嵌入行为不变；质量门禁基线 `server.js` 上限按棘轮收紧 744→739。
+- 验证：`npm run verify:quick` 15/15 通过（含 ESLint、TypeScript、秘密扫描、行数棘轮）；提交后继续运行完整门禁。
+
 ## 2026-08-25｜fix(ci): 兼容 Node 22 加载 TypeScript 测试
 
 - 改动：为根目录与前端测试入口显式启用 Node.js 类型剥离，修复 GitHub Actions 在 Node 22.13.0 下直接导入 `.ts` 测试依赖时报 `ERR_UNKNOWN_FILE_EXTENSION`；新增清单级回归检查，防止兼容参数被误删。

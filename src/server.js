@@ -18,9 +18,8 @@ import { buildDailyCard, buildSyncAlertCard, pushCard } from './push.js';
 import { signSession, verifySession, cookieOf } from './session.js';
 import { signState, verifyState, buildAuthorizeUrl, exchangeCode, oauthConfigured } from './oauth.js';
 import { findByOpenId, updateProfile } from './roster.js';
-import { startBridge } from './bridge.js';
-import { startScheduler } from './scheduler.js';
-import { makeAutoPush } from './autopush.js';
+import { startWorkerTasks } from './worker.js';
+import { startRelayPump } from './worker-relay.js';
 import { saveUserTokens, tokenStatus } from './feishu.js';
 import { jobVisibleTo } from './visibility.js';
 import { relationOf } from './relations.js';
@@ -729,16 +728,12 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   process.once('SIGINT', shutdown);
   process.once('SIGTERM', shutdown);
   server.listen(port, host, () => console.log(`Brain X 工作台: http://${host}:${port}`));
-  // 桥接常驻：BRAINX_BRIDGE_INTERVAL_MS（默认 180s）；BRAINX_BRIDGE_OFF=1 关闭
-  if (process.env.BRAINX_BRIDGE_OFF !== '1') {
-    startBridge(db, server.bus, {
-      recommendFn: (cid) => recommend(db, cid, { top: 20, throttle: true }), // 方案 A：自动轮次快照未变<2h 跳过冻结
-      consultantIdsFn: () => loadConsultants(db).map((c) => c.consultant_id),
-      onRecommended: makeAutoPush(db), // 重大变化自动推卡；BRAINX_PUSH_AUTO=1 才真发
-    });
-    console.log(`桥接器已启动（间隔 ${Number(process.env.BRAINX_BRIDGE_INTERVAL_MS || 180000) / 1000}s）`);
+  if (process.env.BRAINX_EMBED_WORKER === '0') {
+    // 拆分模式（A 方案）：bridge/定时推送在独立 worker 进程（npm run worker），
+    // 本进程只跑 HTTP/SSE 永不阻塞；worker 事件经 worker_events 表泵回浏览器。
+    startRelayPump(db, server.bus);
+    console.log('拆分模式：批处理由独立 worker 进程承担（npm run worker）');
+  } else {
+    startWorkerTasks(db, server.bus); // 嵌入模式（默认）：行为与拆分前一致
   }
-  // 定时推送：每天 07:00 / 19:00（CST）给每位顾问发 Top3 卡；BRAINX_PUSH_SCHEDULE=0 关闭
-  startScheduler(db);
-  console.log('定时推送已启动（07:00 / 19:00 CST）');
 }

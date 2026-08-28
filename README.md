@@ -103,7 +103,8 @@ migrations/           20 个迁移：init / push_log / consultants / bridge / pe
                       / bitable_fields / agent12（1.2 三表）/ switch_app / ttc_tokens / ttc_owner
                       / drop_placeholder / chat_activity / recommendation_pick_tray
                       / openmai_results / manual_fact_overrides（0016，原 0012 重号改名，幂等安全）
-                      / commitment_loop + position_add_company + workbench_preferences（三文件同号 0017）/ database_growth_guard（0018）
+                      / commitment_loop（0017，含无保护 DDL 不幂等，保持原名不动）/ database_growth_guard（0018）
+                      / position_add_company（0019，纯注释占位）+ workbench_preferences（0020，IF NOT EXISTS 幂等）——2026-08-28 自 0017 重号理顺
 frontend/btex-frontend/  单一前端（React 19 + Vinext + TS；server.js 代理非 API 请求到此）
   app/                页面路由 + BrainX API adapter（connected 模式调真实接口，含 showcase）
   DELIVERY.md         交付说明与原型边界（demo 表面显式标记）

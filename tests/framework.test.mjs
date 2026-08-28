@@ -164,8 +164,8 @@ test('migrations：schema_migrations 逐文件记账，重开不重跑', () => {
                           '0013_chat_activity.sql', '0014_recommendation_pick_tray.sql',
                           '0015_openmai_results.sql', '0016_manual_fact_overrides.sql',
                           '0017_commitment_loop.sql',
-                          '0017_position_add_company.sql', '0017_workbench_preferences.sql',
-                          '0018_database_growth_guard.sql']);
+                          '0018_database_growth_guard.sql',
+                          '0019_position_add_company.sql', '0020_workbench_preferences.sql']);
 });
 
 const TMPDB = join(tmpdir(), `brainx-fw-${process.pid}.db`);

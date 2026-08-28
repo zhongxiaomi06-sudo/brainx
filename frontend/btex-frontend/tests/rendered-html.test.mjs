@@ -67,6 +67,7 @@ test("uses the reference three-column shell and a single-column opportunity work
   assert.doesNotMatch(workbench, /<div className="pick-card-rail"><div className="pick-card-publish"/);
   assert.match(workbench, /onClick=\{\(\)\s*=>\s*setTab\("market"\)\}/);
   assert.match(workbench, /<RecommendationQueueV2Review items=\{queueItems\}/);
+  assert.doesNotMatch(workbench, /today-brief|今天只处理最值得推进的职位|TODAY&apos;S DECISIONS/);
   assert.match(workbench, /onOpen=\{item => \{ const job = queueJobs\.get\(item\.projectId\); if \(job\) open\(job, "judgement"\); \}\}/);
   assert.match(workbench, /aria-label="精选盘"/);
   assert.match(css, /\.pick-tray/);

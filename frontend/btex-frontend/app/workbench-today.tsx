@@ -148,12 +148,6 @@ export function TodayDecisionQueue(props: TodayDecisionQueueProps) {
   </div>;
 
   return <div className="decision-home today-workspace">
-    <section className="today-brief"><div><span className="eyebrow">TODAY&apos;S DECISIONS</span>
-      <h1>今天只处理最值得推进的职位</h1><p>按真实推进信号和个人适配排序；先判断，再加入精选或接单。</p></div>
-      <dl><div><dt>待判断</dt><dd>{visiblePending.length}</dd></div>
-        <div><dt>待核验</dt><dd>{visiblePending.filter(job => job.eligibility === "VERIFY_REQUIRED").length}</dd></div>
-        <div><dt>我的项目</dt><dd>{acceptedJobs.length}</dd></div></dl>
-    </section>
     {mode === "connected" && jobs.length === 0 ? <section className="decision-empty-source"><Database/>
       <div><h2>还没有可判断的职位</h2><p>TTC 是真实职位的权威来源；RDS 只保存人才数据，不会自动产生职位。请检查 TTC 连接或等待下一次同步。</p></div>
       <button className="btn primary" onClick={onOpenSources}>检查职位连接</button>

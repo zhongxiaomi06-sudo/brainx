@@ -180,6 +180,7 @@ try {
   } else {
     await page.getByRole("heading", { name: "还没有可判断的职位" }).waitFor({ state: "visible" });
   }
+  assert.doesNotMatch(await page.locator("main").innerText(), /TODAY'S DECISIONS|今天只处理最值得推进的职位|待判断\s*\d+\s*待核验\s*\d+\s*我的项目/);
 
   await page.getByRole("button", { name: "全部职位" }).click();
   await page.getByRole("button", { name: "客户洞察" }).click();
@@ -192,7 +193,7 @@ try {
   assert.match(await page.locator("main").innerText(), /真实职位来源/);
   await page.getByRole("button", { name: "返回应用" }).click();
   await page.getByRole("button", { name: "今日决策", exact: true }).click();
-  await page.getByRole("heading", { name: /待判断职位|还没有可判断的职位/ }).waitFor({ state: "visible" });
+  await page.getByRole("heading", { name: /推荐队列|还没有可判断的职位/ }).waitFor({ state: "visible" });
 
   const mobile = await context.newPage();
   await mobile.setViewportSize({ width: 390, height: 844 });

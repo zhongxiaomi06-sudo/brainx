@@ -45,6 +45,9 @@ export const FormalV2CardIntegration: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    await expect(canvas.queryByText("TODAY'S DECISIONS")).not.toBeInTheDocument();
+    await expect(canvas.queryByRole("heading", { name: "今天只处理最值得推进的职位" })).not.toBeInTheDocument();
+    await expect(canvas.getByRole("heading", { name: "推荐队列" })).toBeInTheDocument();
     const card = canvas.getByRole("article", { name: `${decisionJobs[0].role} · ${decisionJobs[0].company}` });
     await expect(card).toHaveAttribute("tabindex", "0");
     await expect(Array.from(card.querySelectorAll(".recommendation-v2-actions button"), button => button.textContent?.trim()))

@@ -33,18 +33,6 @@ const pageCopy: Record<Exclude<WorkspaceShellPage, "today" | "settings">, string
 function TodayBlocks() {
   return (
     <div className="shell-review-page">
-      <section className="shell-review-hero">
-        <div>
-          <p className="shell-review-kicker">TODAY&apos;S DECISIONS</p>
-          <h1>今天只处理最值得推进的职位</h1>
-          <p>首屏只保留每日判断所需的摘要、筛选与队列。</p>
-        </div>
-        <dl className="shell-review-stats">
-          <div><dt>待判断</dt><dd>20</dd></div>
-          <div><dt>待核验</dt><dd>6</dd></div>
-          <div><dt>我的项目</dt><dd>3</dd></div>
-        </dl>
-      </section>
       <section className="shell-review-section">
         <header><div><p className="shell-review-kicker">DECISION QUEUE</p><h2>待判断职位</h2></div><span>按真实推进信号排序</span></header>
         <div className="shell-review-toolbar">搜索职位、公司或关键词</div>
@@ -88,7 +76,8 @@ export const MainBlocksReview: Story = {
   render: () => <ShellReviewHarness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByRole("heading", { name: "今天只处理最值得推进的职位" })).toBeInTheDocument();
+    await expect(canvas.queryByText("TODAY'S DECISIONS")).not.toBeInTheDocument();
+    await expect(canvas.getByRole("heading", { name: "待判断职位" })).toBeInTheDocument();
     await expect(canvas.queryByText(/已同步/)).not.toBeInTheDocument();
     await expect(canvas.queryByRole("button", { name: /提醒/ })).not.toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: "用户与设置" }));
@@ -100,7 +89,7 @@ export const MainBlocksReview: Story = {
     await userEvent.click(canvas.getByRole("button", { name: "全部职位" }));
     await expect(canvas.getByRole("heading", { name: "全部职位" })).toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: "今日决策" }));
-    await expect(canvas.getByRole("heading", { name: "今天只处理最值得推进的职位" })).toBeInTheDocument();
+    await expect(canvas.getByRole("heading", { name: "待判断职位" })).toBeInTheDocument();
   },
 };
 

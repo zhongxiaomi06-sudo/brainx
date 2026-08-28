@@ -119,23 +119,8 @@
 .workspace-assistant>header svg{width:17px}
 
 .shell-review-page{max-width:1360px;margin:0 auto;display:grid;gap:18px}
-.shell-review-hero{
-  display:flex;
-  align-items:flex-end;
-  justify-content:space-between;
-  gap:24px;
-  padding:26px 28px;
-  border:1px solid #dfe9e6;
-  border-radius:16px;
-  background:linear-gradient(112deg,#fff 58%,#eefaf6);
-}
 .shell-review-kicker{margin:0 0 9px;color:var(--shell-accent-dark);font:700 11px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.14em}
-.shell-review-hero h1,.shell-review-section h2,.shell-settings-page h1{margin:0;color:#202c28;letter-spacing:-.035em}
-.shell-review-hero h1{font-size:30px}
-.shell-review-hero p:not(.shell-review-kicker){margin:9px 0 0;color:var(--shell-muted);font-size:14px}
-.shell-review-stats{display:grid;grid-template-columns:repeat(3,94px);gap:10px}
-.shell-review-stats div{padding:13px 14px;border:1px solid var(--shell-line);border-radius:12px;background:#fff}
-.shell-review-stats dt{color:var(--shell-muted);font-size:11px}.shell-review-stats dd{margin:5px 0 0;color:var(--shell-accent-dark);font:750 24px ui-monospace,SFMono-Regular,Menlo,monospace}
+.shell-review-section h2,.shell-settings-page h1{margin:0;color:#202c28;letter-spacing:-.035em}
 .shell-review-section{padding:22px;border:1px solid var(--shell-line);border-radius:16px;background:#fff}
 .shell-review-section>header{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:18px}
 .shell-review-section h2{font-size:20px}.shell-review-section header span{color:var(--shell-muted);font-size:12px}
@@ -169,7 +154,6 @@
   .workspace-topbar{height:64px;padding:0 14px}.workspace-page-identity small,.workspace-assistant-trigger span{display:none}
   .workspace-assistant-trigger{width:38px;padding:0;justify-content:center}
   .workspace-content{padding:14px 12px 28px}.workspace-assistant{position:fixed;z-index:30;inset:0 0 68px;height:auto}
-  .shell-review-hero{display:grid;padding:20px}.shell-review-hero h1{font-size:24px}.shell-review-stats{grid-template-columns:repeat(3,1fr)}
   .shell-review-section{padding:16px}.shell-review-section>header{align-items:flex-start;flex-direction:column}.shell-review-row{grid-template-columns:38px minmax(0,1fr)}.shell-review-action{grid-column:2}
   .shell-settings-grid{grid-template-columns:1fr}
 }

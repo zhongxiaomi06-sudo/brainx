@@ -41,20 +41,6 @@
 }
 .entry-error { color: #b13b48 !important; }
 .today-workspace { display: flex; flex-direction: column; gap: 18px; }
-.today-brief {
-  display: flex; justify-content: space-between; gap: 32px; align-items: flex-end;
-  padding: 24px 26px; border: 1px solid #e4e8eb; border-radius: 16px;
-  background: linear-gradient(130deg,#fff 55%,#eef8f4);
-}
-.today-brief h1 { font-size: 25px; line-height: 1.25; margin: 5px 0 8px; color: #202b33; }
-.today-brief p { margin: 0; color: #6b7680; }
-.today-brief dl { display: flex; margin: 0; gap: 10px; }
-.today-brief dl div {
-  min-width: 88px; padding: 12px 14px; border-radius: 12px;
-  background: rgba(255,255,255,.82); border: 1px solid rgba(29,122,94,.11);
-}
-.today-brief dt { font-size: 11px; color: #77818b; }
-.today-brief dd { margin: 3px 0 0; font: 700 22px/1 var(--font-mono); color: #1b6e58; }
 .decision-empty-source {
   min-height: 270px; border: 1px dashed #cfd8d7; border-radius: 16px;
   background: #fbfdfc; padding: 46px; display: grid;
@@ -81,9 +67,6 @@
 @media (max-width: 900px) {
   .workspace-entry { padding: 34px 24px; min-height: 380px; }
   .workspace-entry h1 { font-size: 24px; }
-  .today-brief { align-items: stretch; flex-direction: column; }
-  .today-brief dl { display: grid; grid-template-columns: repeat(3,1fr); }
-  .today-brief dl div { min-width: 0; }
   .decision-empty-source { grid-template-columns: 1fr; padding: 30px 24px; }
   .saved-picks > summary { align-items: flex-start; flex-wrap: wrap; }
   .saved-picks > summary small { order: 3; width: 100%; margin-left: 0; }

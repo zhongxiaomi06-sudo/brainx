@@ -2,6 +2,11 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-08-28｜fix(migrations): 理顺 0017 三文件重号为 0017/0019/0020
+
+- 改动：0017 曾被三个文件并列使用。0017_commitment_loop.sql 含无保护 DDL（CREATE TABLE 无 IF NOT EXISTS、ALTER ADD COLUMN 无守卫），按文件名记账一旦改名即重执行且必失败，故保持原名；0017_position_add_company.sql（纯注释占位）更名为 0019、0017_workbench_preferences.sql（IF NOT EXISTS 幂等）更名为 0020。旧库/生产库重执行两文件均安全；同步修正 tests/framework.test.mjs 记账断言与 README 迁移清单。
+- 验证：node --test tests/framework.test.mjs 全绿；verify:quick 通过（本地扫描路径存在用户 ttcopilot 产物除外）；本地库 schema_migrations 实查确认三个原名均已记账，无新增执行风险。
+
 ## 2026-08-28｜refactor(process): 进程拆分合入 main（PR #22）
 
 - 改动：feat/process-split（worker.js + worker-relay.js + server.js 嵌入模式）经 PR #22 squash 合入 main（a5a3a11）。main 分支保护要求 1 个 approve 且 backend-test/frontend-build 为已废弃 context 永不上报，故按仓库「main 只走 PR」流程使用 admin squash 合并；CI 实跑 quality-gate 与 docker-build 均通过。

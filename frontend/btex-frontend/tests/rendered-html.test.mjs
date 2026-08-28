@@ -16,6 +16,7 @@ const workbenchSource = async () => (await Promise.all([
   source("app/workbench-entry.tsx"),
   source("app/workbench-today.tsx"),
   source("app/workbench-fact-pages.tsx"),
+  source("app/jobs-workspace-review.tsx"),
   source("app/job-detail-data.ts"),
   source("app/job-detail-card-review.tsx"),
   source("app/workbench-settings-page.tsx"),
@@ -30,6 +31,7 @@ const cssSource = async () => (await Promise.all([
   source("app/workbench-next.css"),
   source("app/workspace-shell.css"),
   source("app/ttc-jobs-table.css"),
+  source("app/jobs-workspace-review.css"),
   source("app/client-insights-review.css"),
   source("app/settings-center-review.css"),
 ])).join("\n");
@@ -192,18 +194,20 @@ test("uses TTC facts and field capabilities without restoring fake job filters",
   assert.match(workbench, /row\.pipeline_steps/);
   assert.match(workbench, /row\.owner_name/);
   assert.match(workbench, /field\.filterAvailable/);
-  assert.match(workbench, /<TtcJobsTable rows=\{rows\} capabilities=\{fields\}/);
-  assert.match(workbench, /<JobDetailCard job=\{selected\}/);
+  assert.match(workbench, /<JobsWorkspaceReview rows=\{rows\} embedded/);
+  assert.match(workbench, /dataLabel="真实职位数据 · 来自 TTC 同步快照"/);
+  assert.match(workbench, /loadDetail=\{loadDetail\}/);
+  assert.match(workbench, /filterCapabilities=\{filterCapabilities\}/);
   assert.match(workbench, /relation:\s*relationLabels\[row\.relation/);
   assert.match(workbench, /notes:\s*row\.notes/);
-  assert.match(workbench, /mergeOpportunityDetail\(baseSelected, detail\)/);
+  assert.match(workbench, /mergeOpportunityDetail\(toJobDetail\(source\), await getOpportunityDetail/);
   assert.match(workbench, /备注与职位描述/);
   assert.match(workbench, /activeTab=\{panel\.tab\}/);
-  assert.match(workbench, /onAddToProjects=\{onAddToProjects\}/);
+  assert.match(workbench, /onFollow=\{onAddToProjects\}/);
   assert.match(workbench, /updateOpportunityMembership\(jobId,"MY_JOB"/);
   assert.doesNotMatch(workbench, /function JobFactDetail|aria-label=\{`\$\{row\.role\} 职位事实`\}/);
   assert.match(workbench, /Promise\.allSettled\(\[\s*getRadar\(\)\.then/);
-  assert.match(workbench, /visibleRows\.slice\(0, rowLimit\)/);
+  assert.match(workbench, /filteredRows\.slice\(0, rowLimit\)/);
   assert.match(workbench, /visible\.slice\(0, rowLimit\)/);
   assert.doesNotMatch(workbench, /职位类型筛选|全部职位类型|综合分数 ↓|信号轨道/);
 });

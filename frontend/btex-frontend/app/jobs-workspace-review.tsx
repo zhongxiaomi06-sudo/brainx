@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowDownUp,
   BriefcaseBusiness,
@@ -8,7 +8,6 @@ import {
   CircleDot,
   ClipboardCheck,
   Command,
-  Filter,
   RefreshCw,
   Search,
   Settings2,
@@ -20,6 +19,7 @@ import {
   JobDetailCard,
   type JobDetailEvent,
   type JobDetailRecommendation,
+  type JobDetailReviewData,
 } from "./job-detail-card-review";
 import type { TtcJobStatus } from "./ttc-jobs-table";
 import "./jobs-workspace-review.css";
@@ -44,6 +44,8 @@ export type JobsWorkspaceReviewRow = {
   notes?: string | null;
   recommendation?: JobDetailRecommendation | null;
   events?: JobDetailEvent[];
+  sourceUrl?: string | null;
+  engagementState?: string | null;
 };
 
 type SavedView = "all" | "pending" | "following" | "new";
@@ -52,10 +54,15 @@ type JobsWorkspaceReviewProps = {
   rows: JobsWorkspaceReviewRow[];
   consultant?: string;
   initialSelectedId?: string | null;
+  embedded?: boolean;
+  dataLabel?: string;
+  tipText?: string;
+  filterCapabilities?: { city: boolean; activeState: boolean };
   onSync?: () => void;
   onFollow?: (projectId: string) => void;
   onDismiss?: (projectId: string) => void;
   onOpenSource?: (projectId: string) => void;
+  loadDetail?: (row: JobsWorkspaceReviewRow) => Promise<JobDetailReviewData>;
 };
 
 const ttcStatusLabel: Record<TtcJobStatus, string> = {
@@ -96,17 +103,25 @@ export function JobsWorkspaceReview({
   rows,
   consultant = "Mia 钟笑咪",
   initialSelectedId,
+  embedded = false,
+  dataLabel = "脱敏审核数据 · 字段结构对齐 TTC 职位快照",
+  tipText = "从同步真实职位开始，然后筛选并加入跟进",
+  filterCapabilities = { city: true, activeState: true },
   onSync,
   onFollow,
   onDismiss,
   onOpenSource,
+  loadDetail,
 }: JobsWorkspaceReviewProps) {
   const [savedView, setSavedView] = useState<SavedView>("all");
   const [query, setQuery] = useState("");
   const [city, setCity] = useState("全部");
   const [status, setStatus] = useState("全部");
+  const [sortDescending, setSortDescending] = useState(true);
+  const [rowLimit, setRowLimit] = useState(100);
   const [tipVisible, setTipVisible] = useState(true);
   const [selectedId, setSelectedId] = useState(initialSelectedId ?? null);
+  const [enrichedDetail, setEnrichedDetail] = useState<JobDetailReviewData | null>(null);
 
   const counts = useMemo(() => ({
     all: rows.length,
@@ -115,7 +130,7 @@ export function JobsWorkspaceReview({
     new: rows.filter((row) => row.newThisWeek).length,
   }), [rows]);
   const cities = useMemo(() => ["全部", ...new Set(rows.flatMap((row) => row.cities))], [rows]);
-  const visibleRows = useMemo(() => {
+  const filteredRows = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase("zh-CN");
     return rows.filter((row) => {
       if (savedView === "pending" && row.workflowState !== "PENDING") return false;
@@ -126,13 +141,25 @@ export function JobsWorkspaceReview({
       if (!normalized) return true;
       return [row.role, row.company, row.ownerName || "", ...row.cities]
         .join(" ").toLocaleLowerCase("zh-CN").includes(normalized);
+    }).sort((a, b) => {
+      const order = String(b.capturedAt || "").localeCompare(String(a.capturedAt || ""));
+      return sortDescending ? order : -order;
     });
-  }, [city, query, rows, savedView, status]);
+  }, [city, query, rows, savedView, sortDescending, status]);
+  const visibleRows = filteredRows.slice(0, rowLimit);
   const selected = selectedId ? rows.find((row) => row.projectId === selectedId) || null : null;
+  useEffect(() => {
+    if (!selected || !loadDetail) return;
+    let active = true;
+    void loadDetail(selected)
+      .then(detail => { if (active) setEnrichedDetail(detail); })
+      .catch(() => { /* Radar 基础事实仍可展示，详情失败不伪造内容。 */ });
+    return () => { active = false; };
+  }, [loadDetail, selected]);
 
   return (
-    <div className="jobs-review-shell">
-      <aside className="jobs-review-sidebar" aria-label="审核稿主要导航">
+    <div className={`jobs-review-shell${embedded ? " is-embedded" : ""}`}>
+      {!embedded && <aside className="jobs-review-sidebar" aria-label="审核稿主要导航">
         <div className="jobs-review-brand"><span>BX</span><b>BrainX</b></div>
         <nav>
           {navigation.map(({ label, icon: Icon, active }) => (
@@ -146,17 +173,17 @@ export function JobsWorkspaceReview({
           <span><b>{consultant}</b><small>高级顾问</small></span>
           <Settings2 aria-hidden="true" />
         </div>
-      </aside>
+      </aside>}
 
       <section className="jobs-review-workspace">
         <header className="jobs-review-topbar">
           <div className="jobs-review-breadcrumb"><span>职位</span><b>/</b><strong>全部职位</strong></div>
           <label className="jobs-review-search">
             <Search aria-hidden="true" />
-            <input aria-label="搜索职位工作区" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索职位、公司、城市或顾问" />
+            <input aria-label="搜索职位工作区" value={query} onChange={(event) => { setQuery(event.target.value); setRowLimit(100); }} placeholder="搜索职位、公司、城市或顾问" />
             <kbd><Command aria-hidden="true" /> K</kbd>
           </label>
-          <button className="jobs-review-sync" type="button" onClick={onSync}><RefreshCw aria-hidden="true" />同步职位</button>
+          {onSync && <button className="jobs-review-sync" type="button" onClick={onSync}><RefreshCw aria-hidden="true" />同步职位</button>}
         </header>
 
         <div className="jobs-review-body">
@@ -168,7 +195,7 @@ export function JobsWorkspaceReview({
                   role="tab"
                   aria-selected={savedView === view.id}
                   className={savedView === view.id ? "active" : ""}
-                  onClick={() => setSavedView(view.id)}
+                  onClick={() => { setSavedView(view.id); setRowLimit(100); }}
                   key={view.id}
                 >
                   {view.label}<span>{counts[view.id]}</span>
@@ -179,18 +206,17 @@ export function JobsWorkspaceReview({
             {tipVisible && (
               <div className="jobs-review-tip">
                 <CircleDot aria-hidden="true" />
-                <span>从同步真实职位开始，然后筛选并加入跟进</span>
+                <span>{tipText}</span>
                 <button type="button" onClick={() => setTipVisible(false)}>知道了</button>
                 <button type="button" aria-label="关闭使用提示" onClick={() => setTipVisible(false)}><X aria-hidden="true" /></button>
               </div>
             )}
 
             <div className="jobs-review-toolbar">
-              <label>城市<select aria-label="筛选城市" value={city} onChange={(event) => setCity(event.target.value)}>{cities.map((item) => <option key={item}>{item}</option>)}</select><ChevronDown aria-hidden="true" /></label>
-              <label>状态<select aria-label="筛选职位状态" value={status} onChange={(event) => setStatus(event.target.value)}>{["全部", "活跃", "冷却", "已关闭", "待确认"].map((item) => <option key={item}>{item}</option>)}</select><ChevronDown aria-hidden="true" /></label>
-              <button type="button"><Filter aria-hidden="true" />筛选</button>
-              <button type="button"><ArrowDownUp aria-hidden="true" />排序</button>
-              {(query || city !== "全部" || status !== "全部") && <button className="reset" type="button" onClick={() => { setQuery(""); setCity("全部"); setStatus("全部"); }}>清除条件</button>}
+              <label>城市<select aria-label="筛选城市" disabled={!filterCapabilities.city} value={city} onChange={(event) => { setCity(event.target.value); setRowLimit(100); }}>{cities.map((item) => <option key={item}>{item}</option>)}</select><ChevronDown aria-hidden="true" /></label>
+              <label>状态<select aria-label="筛选职位状态" disabled={!filterCapabilities.activeState} value={status} onChange={(event) => { setStatus(event.target.value); setRowLimit(100); }}>{["全部", "活跃", "冷却", "已关闭", "待确认"].map((item) => <option key={item}>{item}</option>)}</select><ChevronDown aria-hidden="true" /></label>
+              <button type="button" aria-label={`最近更新${sortDescending ? "降序" : "升序"}`} onClick={() => { setSortDescending(value => !value); setRowLimit(100); }}><ArrowDownUp aria-hidden="true" />最近更新{sortDescending ? " ↓" : " ↑"}</button>
+              {(query || city !== "全部" || status !== "全部") && <button className="reset" type="button" onClick={() => { setQuery(""); setCity("全部"); setStatus("全部"); setRowLimit(100); }}>清除条件</button>}
             </div>
 
             <div className="jobs-review-table-wrap">
@@ -198,8 +224,8 @@ export function JobsWorkspaceReview({
                 <thead><tr><th>职位名称</th><th>公司</th><th>城市</th><th>HC</th><th>最近更新</th><th>状态</th><th>负责人</th></tr></thead>
                 <tbody>
                   {visibleRows.map((row) => (
-                    <tr key={row.projectId} className={selected?.projectId === row.projectId ? "selected" : ""} onClick={() => setSelectedId(row.projectId)}>
-                      <td><button type="button" onClick={() => setSelectedId(row.projectId)}><span className="jobs-review-company-mark">{row.company.trim().slice(0, 1) || "?"}</span><span><b>{row.role || "待确认"}</b><small>{row.projectId}</small></span></button></td>
+                    <tr key={row.projectId} tabIndex={0} aria-label={`${row.role} · ${row.company}`} className={selected?.projectId === row.projectId ? "selected" : ""} onClick={() => setSelectedId(row.projectId)} onKeyDown={(event) => { if (event.key === "Enter") setSelectedId(row.projectId); }}>
+                      <td><span className="jobs-review-position"><span className="jobs-review-company-mark">{row.company.trim().slice(0, 1) || "?"}</span><span><b>{row.role || "待确认"}</b><small>{row.projectId}</small></span></span></td>
                       <td>{row.company || "待确认"}</td>
                       <td>{row.cities.length ? row.cities.join("、") : "待确认"}</td>
                       <td>{row.hc ?? "待确认"}</td>
@@ -211,14 +237,15 @@ export function JobsWorkspaceReview({
                 </tbody>
               </table>
               {visibleRows.length === 0 && <div className="jobs-review-empty"><b>没有符合条件的职位</b><span>调整筛选条件后再试。</span></div>}
-              <footer><span>{visibleRows.length} 个结果</span><span>脱敏审核数据 · 字段结构对齐 TTC 职位快照</span></footer>
+              <footer><span>已显示 {visibleRows.length} / {filteredRows.length} 个结果</span><span>{dataLabel}</span></footer>
+              {visibleRows.length < filteredRows.length && <button className="jobs-review-load-more" type="button" onClick={() => setRowLimit(limit => limit + 100)}>继续加载 100 条</button>}
             </div>
           </main>
         </div>
       </section>
       {selected && (
         <JobDetailCard
-          job={{
+          job={enrichedDetail?.projectId === selected.projectId ? enrichedDetail : {
             projectId: selected.projectId,
             role: selected.role,
             company: selected.company,
@@ -236,15 +263,17 @@ export function JobsWorkspaceReview({
             notes: selected.notes,
             recommendation: selected.recommendation,
             events: selected.events,
-            inMyProjects: selected.workflowState === "FOLLOWING",
+            sourceUrl: selected.sourceUrl,
+            engagementState: selected.engagementState,
+            inMyProjects: ["MY_JOB", "PRIMARY_PM"].includes(selected.relation || "") || selected.workflowState === "FOLLOWING",
           }}
           onClose={() => setSelectedId(null)}
-          onAddToProjects={(projectId) => onFollow?.(projectId)}
-          onDismiss={(projectId) => {
+          onAddToProjects={onFollow ? (projectId) => onFollow(projectId) : undefined}
+          onDismiss={onDismiss ? (projectId) => {
             onDismiss?.(projectId);
             setSelectedId(null);
-          }}
-          onOpenSource={(projectId) => onOpenSource?.(projectId)}
+          } : undefined}
+          onOpenSource={onOpenSource && (enrichedDetail?.projectId === selected.projectId ? enrichedDetail.sourceUrl : selected.sourceUrl) ? (projectId) => onOpenSource(projectId) : undefined}
         />
       )}
     </div>

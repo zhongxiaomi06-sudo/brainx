@@ -66,6 +66,7 @@
 
 - [开发验证报告](VERIFICATION.md)
 - [统一职位详情正式接入审核记录（2026-08-28）](frontend-reviews/2026-08-28-job-detail-unification.md)
+- [现代职位工作区正式接入审核记录（2026-08-28）](frontend-reviews/2026-08-28-jobs-workspace-integration.md)
 - [推荐队列与职位卡片 V2 产品架构审核记录（2026-08-28）](frontend-reviews/2026-08-28-recommendation-queue-v2.md)
 - [网站完整任务错误点审计](2026-08-17-网站完整任务错误点审计.md)
 - [状态报告（2026-08-19）](status-report-2026-08-19.md)

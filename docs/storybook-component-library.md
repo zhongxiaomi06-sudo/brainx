@@ -27,9 +27,9 @@
 
 `DirectionProfileReview` 是第四阶段方向画像与职位分类审核组件：当前生效区只把 `profile_keywords` 描述为推荐输入，并明确 `profile_note` 仅供记录；结构化偏好、排除项和硬约束在后端字段及评分语义补齐前禁止保存。职位分类区展示现有 `job_classifications` 的方向、管理属性、置信度、版本、命中与排除词和证据，同时直说 TTC 职位尚未统一进入分类链路、后端也没有人工修订契约。Storybook 的人工修订场景是脱敏契约示例，不代表线上已有能力。
 
-`TtcJobsTable` 与 `ClientInsightsReview` 已进入正式工作台，分别消费 `GET /api/v1/radar` 和 `GET /api/v1/clients`。职位表只显示九个 TTC 主字段；客户表只显示客户名、客户类型、职位总数、活跃职位数、已知 HC、最近职位快照、顾问关系和职位状态。两者的搜索、筛选和排序都基于真实字段，首屏分批渲染 100 行以避免大数据量卡顿；客户侧栏不生成反馈速度、转化率、历史入职、招聘意愿、客户评分或经营风险，只提供跳转到该客户职位集合的下钻动作。
+`JobsWorkspaceReview` 与 `ClientInsightsReview` 已进入正式工作台，分别消费 `GET /api/v1/radar` 和 `GET /api/v1/clients`。现代职位工作区只显示 TTC 与 BrainX 已有的职位事实；客户表只显示客户名、客户类型、职位总数、活跃职位数、已知 HC、最近职位快照、顾问关系和职位状态。两者的搜索、筛选和排序都基于真实字段，首屏分批渲染 100 行以避免大数据量卡顿；客户侧栏不生成反馈速度、转化率、历史入职、招聘意愿、客户评分或经营风险，只提供跳转到该客户职位集合的下钻动作。旧 `TtcJobsTable` 已退出正式入口，但保留为历史事实表与 Storybook 参考。
 
-`JobsWorkspaceReview` 是现代职位工作区的 Storybook-only 审核稿，视觉参考见 [职位工作区设计稿 v2](design/brainx-jobs-workspace-review-v2.png)。它用轻量侧栏、保存视图、紧凑筛选和真实职位表替代传统统计卡片后台；点击职位时复用 `JobDetailCard` 居中事实卡，主表保持全宽，不再因固定右栏受到挤压。审核稿仅展示 TTC 与 BrainX 当前能够核验的职位、城市、状态、HC、Pipeline、顾问、更新时间和跟进状态，并明确标注脱敏示例不是真实线上快照。该组件尚未接入 `workbench.tsx` 或正式路由，审核通过前不得替换现有生产职位页。
+`JobsWorkspaceReview` 是现代职位工作区的生产组件，视觉参考见 [职位工作区设计稿 v2](design/brainx-jobs-workspace-review-v2.png)。它用保存视图、紧凑筛选和真实职位表替代传统统计卡片后台；点击整行或按 Enter 时复用 `JobDetailCard` 居中事实卡，主表保持全宽，不再因固定右栏受到挤压。Storybook 的完整审核稿保留独立侧栏和脱敏样例；正式“全部职位”使用嵌入模式，复用正式应用外壳并消费 Radar、字段能力和 opportunity 详情，不加载审核数据。正式模式没有真实回调或来源 URL 时不显示相应动作，筛选能力不足时禁用控件而不伪装可用。接入证据见[现代职位工作区正式接入审核记录](frontend-reviews/2026-08-28-jobs-workspace-integration.md)。
 
 `JobDetailCard` 是已通过视觉审核并正式接入的统一居中职位详情弹窗。Storybook 覆盖今日决策、全部职位、缺失字段、窄屏、备注展示和页签切换；两个正式入口现在共用职位事实、判断、承接与结果、决策轨迹、回放五层结构。Radar 与 opportunity 详情共同提供备注、优先级、结构化 Pipeline、主做顾问、推荐理由、操作记录和来源，缺失字段保持待确认；今日决策原有的真实判断与动作面板作为统一弹窗内部内容保留。动作仍服从职位当前合法状态，不为追求视觉一致而伪造不可用操作。状态证据见[统一职位详情正式接入审核记录](frontend-reviews/2026-08-28-job-detail-unification.md)。
 

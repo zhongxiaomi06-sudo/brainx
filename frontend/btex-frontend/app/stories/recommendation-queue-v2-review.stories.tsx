@@ -72,18 +72,19 @@ export const FirstPage: Story = {
     await expect(canvas.getByText("岗位数量：", { exact: false })).toHaveTextContent("45");
     await expect(canvas.getByText("更新时间：", { exact: false })).toHaveTextContent("08/28");
     await expect(canvas.queryByText("DECISION QUEUE · V2")).not.toBeInTheDocument();
-    await expect(canvas.getAllByText("推荐理由")[0]).toBeInTheDocument();
+    await expect(canvas.getAllByText("为什么值得看")[0]).toBeInTheDocument();
     await expect(canvas.queryByText("AI 匹配分")).not.toBeInTheDocument();
     await expect(canvas.queryByText("探索价值")).not.toBeInTheDocument();
     const firstCard = canvas.getByRole("article", { name: "高级算法工程师 · 脱敏客户 A" });
-    await expect(within(within(firstCard).getByRole("heading", { name: "高级算法工程师" }).parentElement!).getByLabelText("今天推进，3格信号")).toBeInTheDocument();
+    await expect(within(firstCard).getByLabelText("今天推进，3格信号")).toBeInTheDocument();
+    await expect(within(firstCard).queryByRole("button", { name: "查看 高级算法工程师 判断" })).not.toBeInTheDocument();
     await expect(Array.from(firstCard.querySelectorAll(".recommendation-v2-actions button"), button => button.textContent?.trim())).toEqual(["暂不考虑", "观察", "加入我的项目"]);
     firstCard.focus();
     await userEvent.keyboard("{Enter}");
     await expect(open).toHaveBeenCalledWith(expect.objectContaining({ projectId: "J-REVIEW-001" }));
     await userEvent.click(within(firstCard).getByRole("button", { name: "加入我的项目" }));
     await expect(action).toHaveBeenCalledWith(expect.objectContaining({ projectId: "J-REVIEW-001" }), "ADD");
-    await expect(within(firstCard).getByRole("status")).toHaveTextContent("加入我的项目已记录");
+    await expect(within(firstCard).queryByText("加入我的项目已记录")).not.toBeInTheDocument();
   },
 };
 

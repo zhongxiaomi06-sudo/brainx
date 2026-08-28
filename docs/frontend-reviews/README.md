@@ -33,8 +33,8 @@
 | `JobsWorkspaceReview` 现代职位工作区 | 已完成 | 已通过 | 已接入 | 未发布 | 部分验证 | 正式“全部职位”复用嵌入模式和真实 Radar/详情接口；目标环境待验证 |
 | `RecommendationPolicyReview` 推荐策略 | 已完成 | 未审核 | 未接入 | 未发布 | 未验证 | 缺少只读 dry-run 契约 |
 | `DirectionProfileReview` 方向画像与分类 | 已完成 | 未审核 | 未接入 | 未发布 | 未验证 | 缺少结构化保存和人工修订契约 |
-| `TodayDecisionQueue` 今日决策队列 | 已完成 | 退回修改 | 已接入 | 待确认 | 部分验证 | 旧版已接入且已删除批量接单；正式页仍固定只取20条，卡片信息与动作反馈不满足V2架构 |
-| `RecommendationQueueV2` 完整推荐队列与卡片 | 待审核 | 退回修改 | 未接入 | 未发布 | 未验证 | 用户继续要求移动决策标签、压缩判断区并把操作收至右侧；修订稿等待再次审核 |
+| `TodayDecisionQueue` 今日决策队列 | 已完成 | 已通过 | 已接入 | 待确认 | 部分验证 | 正式入口已复用 V2 卡片并删除批量接单；当前仍固定读取20条，完整分页与后端契约待补齐 |
+| `RecommendationQueueV2` 完整推荐队列与卡片 | 已完成 | 已通过 | 部分接入 | 未发布 | 部分验证（本地） | 用户已授权正式“今日决策”复用 V2 卡片；整卡点击、Enter 和 hover 已接入并用本地真实20条验证，完整200条分页与后端契约仍待补齐 |
 
 ## 每次审核的强制流程
 
@@ -97,6 +97,7 @@
 - [推荐队列与职位卡片 V2 产品架构审核记录](2026-08-28-recommendation-queue-v2.md)
 - [推荐队列 V2 紧凑布局复审记录](2026-08-28-recommendation-queue-v2-density.md)
 - [推荐队列 V2 卡片位置复审记录](2026-08-28-recommendation-queue-v2-placement.md)
+- [推荐队列 V2 视觉重做复审记录](2026-08-28-recommendation-queue-v2-visual-reset.md)
 - [删除批量接单审核记录](2026-08-28-remove-batch-accept.md)
 - [推荐队列与职位决策产品架构](../recommendation-queue-product-architecture.md)
 - [前端真实数据重构施工清单](../frontend-refactor-construction-checklist.md)

@@ -3,7 +3,11 @@
 import { useState } from "react";
 import { AlertTriangle, ChevronDown, Database, Filter, Search } from "lucide-react";
 import type { EngagementState, SyncStatus } from "./decision-demo";
-import { DecisionZone } from "./workbench-opportunity";
+import {
+  RecommendationQueueV2Review,
+  type RecommendationCardAction,
+  type RecommendationQueueItem,
+} from "./recommendation-queue-v2-review";
 import { PickTray } from "./workbench-pick-tray";
 import {
   decisionGroupMeta, verificationJobs, type DecisionAction, type DecisionGroup,
@@ -32,9 +36,63 @@ type TodayDecisionQueueProps = {
   onOpenSources: () => void;
 };
 
+function numericFact(value: string | undefined) {
+  if (!value || value === "UNKNOWN") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function latestFactUpdate(job: DecisionJob) {
+  const updates = Object.values(job.factFields || {})
+    .map(field => field?.updated_at)
+    .filter((value): value is string => Boolean(value));
+  return updates.sort().at(-1) || null;
+}
+
+function toQueueItem(job: DecisionJob, engagement: EngagementState | undefined): RecommendationQueueItem {
+  const tier = job.eligibility === "VERIFY_REQUIRED" || job.eligibility === "BLOCKED"
+    ? "VERIFY" : ["RESULT_CLOSURE", "ACTIVE_ADVANCEMENT"].includes(job.group) ? "TODAY" : "WEEK";
+  const legalActions: RecommendationCardAction[] = [];
+  if (engagement === "ACCEPTED") legalActions.push("GO_PROJECT");
+  else {
+    if (job.brainxLegal?.includes("WATCH") || job.actions.some(action => action.kind === "watch")) legalActions.push("WATCH");
+    if (job.brainxLegal?.includes("ACCEPT")) legalActions.push("ADD");
+    if (job.brainxLegal?.includes("DISMISS") || !job.brainxLegal) legalActions.push("DISMISS");
+  }
+  return {
+    projectId: job.id,
+    rank: job.rank,
+    tier,
+    role: job.role,
+    company: job.company,
+    cities: job.facts["城市"] && job.facts["城市"] !== "UNKNOWN" ? job.facts["城市"].split(/[、,，]/).filter(Boolean) : [],
+    relation: job.facts["职位关系"] || null,
+    activeState: job.facts["职位状态"] || job.facts["当前状态"] || null,
+    hc: numericFact(job.facts["剩余 HC"]),
+    currentStage: job.facts["当前阶段"] || null,
+    recentActivity: job.facts["最近活动"] && job.facts["最近活动"] !== "UNKNOWN"
+      ? /^\d{4}-\d{2}-\d{2}/.test(job.facts["最近活动"])
+        ? { label: "职位事实更新", occurredAt: job.facts["最近活动"] }
+        : { label: job.facts["最近活动"], occurredAt: null }
+      : null,
+    pipeline: job.facts["历史 Pipeline"] || null,
+    reasons: job.scoreNotes.slice(0, 2).map((text, index) => ({
+      code: `FORMAL_REASON_${index + 1}`,
+      text,
+      evidence: job.evidence[index] || "推荐运行",
+      occurredAt: null,
+    })),
+    risk: job.risks[0] || null,
+    confidence: "PARTIAL",
+    factsUpdatedAt: latestFactUpdate(job),
+    engagementLabel: null,
+    legalActions,
+  };
+}
+
 export function TodayDecisionQueue(props: TodayDecisionQueueProps) {
   const {
-    activeJobId, completed, jobs, engagement, sync, open, onAction, onFeedback,
+    activeJobId, jobs, engagement, sync, open, onAction, onFeedback,
     showVerification = true, tray, onToggleTray, onRemoveTray,
     folders, folderMode, onFolderMode, onAssignFolder, onCreateFolder, mode,
     onOpenSources,
@@ -58,6 +116,8 @@ export function TodayDecisionQueue(props: TodayDecisionQueueProps) {
   const visiblePending = [...filteredPending].sort((left, right) => sort === "score"
     ? Number(right.finalScore) - Number(left.finalScore)
     : String(left.recentSignal).localeCompare(String(right.recentSignal)));
+  const queueItems = visiblePending.map(job => toQueueItem(job, engagement[job.id]));
+  const queueJobs = new Map(visiblePending.map(job => [job.id, job]));
   const allJobs = [...acceptedJobs, ...pendingShown];
   const trayJobs = tray.map(id => allJobs.find(job => job.id === id))
     .filter((job): job is DecisionJob => Boolean(job));
@@ -105,11 +165,17 @@ export function TodayDecisionQueue(props: TodayDecisionQueueProps) {
         <AlertTriangle/><div><b>{sync.state === "INCOMPLETE" ? "本次同步不完整" : "同步失败"}</b>
           <p>为避免误导，当前不展示新的项目判断。</p></div>
         {jobs[0] && <button className="btn" onClick={() => open(jobs[0], "judgement")}>查看上次快照</button>}
-      </section> : <DecisionZone anchorId="opportunity-list" tone="pending" title="待判断职位"
-        subtitle="按当前顾问可见范围与最新推进信号排序" jobs={visiblePending} isContext={isContext}
-        completed={completed} engagement={engagement} open={open} onAction={onAction}
-        onFeedback={onFeedback} tray={tray} onToggleTray={onToggleTray} folderMode={folderMode}
-        folders={folders} onAssignFolder={onAssignFolder} toolbar={toolbar}/>}
+      </section> : <section id="opportunity-list" className={`formal-recommendation-v2${isContext ? " is-context" : ""}`}>
+        {toolbar}
+        <RecommendationQueueV2Review items={queueItems} pageIndex={0} totalCount={queueItems.length}
+          evaluatedCount={queueItems.length} runId="current-formal-run" generatedAt={sync.updatedAt || "时间待确认"}
+          policyVersion="current" onOpen={item => { const job = queueJobs.get(item.projectId); if (job) open(job, "judgement"); }}
+          onAction={(item, action) => { const job = queueJobs.get(item.projectId); if (!job) return;
+            if (action === "DISMISS") { onFeedback(job); return; }
+            if (action === "WATCH") { const watch = job.actions.find(candidate => candidate.kind === "watch"); if (watch) onAction(job, watch); else open(job, "engagement"); return; }
+            open(job, "engagement");
+          }} />
+      </section>}
       <details className="saved-picks"><summary><span>精选盘</span>
         <small>{trayJobs.length ? `已收藏 ${trayJobs.length} 个职位` : "从上方列表收藏职位，稍后逐个判断"}</small>
         <ChevronDown/></summary><PickTray trayJobs={trayJobs} featuredJobs={visiblePending.slice(0, 4)}

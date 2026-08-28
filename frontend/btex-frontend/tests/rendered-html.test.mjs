@@ -66,7 +66,8 @@ test("uses the reference three-column shell and a single-column opportunity work
   assert.match(workbench, /function OpportunityRow/);
   assert.doesNotMatch(workbench, /<div className="pick-card-rail"><div className="pick-card-publish"/);
   assert.match(workbench, /onClick=\{\(\)\s*=>\s*setTab\("market"\)\}/);
-  assert.match(workbench, /title="待判断职位"/);
+  assert.match(workbench, /<RecommendationQueueV2Review items=\{queueItems\}/);
+  assert.match(workbench, /onOpen=\{item => \{ const job = queueJobs\.get\(item\.projectId\); if \(job\) open\(job, "judgement"\); \}\}/);
   assert.match(workbench, /aria-label="精选盘"/);
   assert.match(css, /\.pick-tray/);
   assert.match(css, /grid-template-columns:216px minmax\(0,1fr\)/);
@@ -104,9 +105,9 @@ test("splits candidates by their live engagement state and keeps verification jo
   assert.match(workbench, /const pendingJobs\s*=\s*\[\.\.\.jobs\.filter\(job\s*=>\s*engagement\[job\.id\]\s*!==\s*"ACCEPTED"\),\s*\.\.\.verificationJobs\]/);
   assert.match(workbench, /const pendingShown\s*=\s*showVerification/);
   assert.match(workbench, /const isContext\s*=\s*activeJobId\s*!==\s*null\s*&&\s*pendingShown\.some/);
-  assert.match(workbench, /isContext=\{isContext\}/);
+  assert.match(workbench, /className=\{`formal-recommendation-v2\$\{isContext \? " is-context" : ""\}`\}/);
   assert.match(workbench, /title="已确定"/);
-  assert.match(workbench, /title="待判断职位"/);
+  assert.match(workbench, /<RecommendationQueueV2Review items=\{queueItems\}/);
   assert.match(workbench, /"剩余 HC"\s*:\s*"UNKNOWN"/);
 });
 

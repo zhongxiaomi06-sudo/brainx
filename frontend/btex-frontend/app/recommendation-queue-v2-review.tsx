@@ -129,28 +129,31 @@ function RecommendationCard({ item, onOpen, onAction }: {
     onClick={() => onOpen(item)} onKeyDown={event => { if (event.key === "Enter" && event.target === event.currentTarget) onOpen(item); }}>
     <header>
       <div className="recommendation-v2-rank"><span>#{item.rank}</span><DecisionPriorityBadge tier={item.tier} /></div>
+      <div className="recommendation-v2-identity"><h3>{item.role || "职位待确认"}</h3><p><BriefcaseBusiness />{item.company || "公司待确认"}<span><MapPin />{item.cities.length ? item.cities.join("、") : "城市待确认"}</span></p></div>
       <button type="button" className="recommendation-v2-open" aria-label={`查看 ${item.role} 判断`} onClick={event => { event.stopPropagation(); onOpen(item); }}><ChevronRight /></button>
-      <h3>{item.role || "职位待确认"}</h3>
-      <p><BriefcaseBusiness />{item.company || "公司待确认"}<span><MapPin />{item.cities.length ? item.cities.join("、") : "城市待确认"}</span></p>
     </header>
 
-    <dl className="recommendation-v2-facts">
-      <div><dt>与我的关系</dt><dd>{display(item.relation)}</dd></div>
-      <div><dt>招聘状态</dt><dd>{display(item.activeState)}</dd></div>
-      <div><dt>剩余 HC</dt><dd>{display(item.hc)}</dd></div>
-      <div><dt>当前阶段</dt><dd>{display(item.currentStage)}</dd></div>
-      <div><dt>最近活动</dt><dd>{item.recentActivity ? `${item.recentActivity.label} · ${displayDate(item.recentActivity.occurredAt)}` : "待确认"}</dd></div>
-      <div><dt>历史 Pipeline</dt><dd>{display(item.pipeline)}</dd></div>
-    </dl>
+    <div className="recommendation-v2-body">
+      <dl className="recommendation-v2-facts">
+        <div><dt>关系</dt><dd>{display(item.relation)}</dd></div>
+        <div><dt>状态</dt><dd>{display(item.activeState)}</dd></div>
+        <div><dt>HC</dt><dd>{display(item.hc)}</dd></div>
+        <div><dt>阶段</dt><dd>{display(item.currentStage)}</dd></div>
+        <div><dt>最近活动</dt><dd>{item.recentActivity ? `${item.recentActivity.label} · ${displayDate(item.recentActivity.occurredAt)}` : "待确认"}</dd></div>
+        <div><dt>Pipeline</dt><dd>{display(item.pipeline)}</dd></div>
+      </dl>
 
-    <section className="recommendation-v2-reasons">
-      <h4>为什么排到这里</h4>
-      {reasons.length ? <ol>{reasons.map(reason => <li key={reason.code}><span>{reason.text}</span><small>{reason.code} · {reason.evidence} · {displayDate(reason.occurredAt)}</small></li>)}</ol> : <p>暂无已验证推荐理由</p>}
-      {reasons.length === 1 && <small className="recommendation-v2-missing">暂无第二条已验证理由</small>}
-    </section>
+      <section className="recommendation-v2-reasons">
+        <h4>推荐理由</h4>
+        {reasons.length ? <ol>{reasons.map(reason => <li key={reason.code}><span>{reason.text}</span><small>{reason.evidence} · {displayDate(reason.occurredAt)}</small></li>)}</ol> : <p>暂无已验证推荐理由</p>}
+        {reasons.length === 1 && <small className="recommendation-v2-missing">暂无第二条已验证理由</small>}
+      </section>
+    </div>
 
-    <div className={`recommendation-v2-risk${item.risk ? "" : " is-clear"}`}><AlertTriangle /><span><b>{item.risk ? "需要注意" : "风险检查"}</b>{risk}</span></div>
-    <div className="recommendation-v2-confidence"><ShieldCheck /><span><b>{confidenceLabel[item.confidence]}</b><small><Clock3 />事实更新于 {displayDate(item.factsUpdatedAt)}</small></span></div>
+    <div className="recommendation-v2-status-row">
+      <div className={`recommendation-v2-risk${item.risk ? "" : " is-clear"}`}><AlertTriangle /><span><b>{item.risk ? "需要注意" : "风险检查"}</b>{risk}</span></div>
+      <div className="recommendation-v2-confidence"><ShieldCheck /><span><b>{confidenceLabel[item.confidence]}</b><small><Clock3 />{displayDate(item.factsUpdatedAt)} 更新</small></span></div>
+    </div>
 
     <footer onClick={event => event.stopPropagation()}>
       <div className="recommendation-v2-actions">
@@ -166,7 +169,7 @@ function RecommendationCard({ item, onOpen, onAction }: {
 }
 
 export function RecommendationQueueV2Review({
-  items, pageIndex, totalCount, evaluatedCount, runId, generatedAt, policyVersion,
+  items, pageIndex, totalCount, generatedAt,
   loading = false, error = null, newRunAvailable = false, onPrevious, onNext,
   onRefreshRun, onOpen, onAction,
 }: RecommendationQueueV2ReviewProps) {
@@ -176,8 +179,8 @@ export function RecommendationQueueV2Review({
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
   return <section className="recommendation-v2-queue" aria-label="新版推荐队列审核稿">
     <header className="recommendation-v2-summary">
-      <div><span>DECISION QUEUE · V2</span><h2>完整推荐队列</h2><p>本轮评估 {evaluatedCount} 个可见职位，生成 {totalCount} 条冻结推荐；当前显示 {start}–{end} 条。</p></div>
-      <dl><div><dt>运行</dt><dd>{runId}</dd></div><div><dt>策略</dt><dd>{policyVersion}</dd></div><div><dt>生成时间</dt><dd>{displayDate(generatedAt)}</dd></div></dl>
+      <h2>推荐队列</h2>
+      <p><span>岗位数量：<b>{totalCount}</b></span><span>更新时间：<b>{displayDate(generatedAt)}</b></span></p>
     </header>
     {newRunAvailable && <div className="recommendation-v2-new-run" role="status"><RefreshCw /><span><b>有新一轮判断可用</b>当前页面仍保持原排序，不会静默刷新。</span><button type="button" onClick={onRefreshRun}>查看新一轮</button></div>}
     {error && <div className="recommendation-v2-page-error" role="alert"><AlertTriangle /><span><b>这一页没有加载成功</b>{error}</span><button type="button" onClick={onNext}>重试</button></div>}

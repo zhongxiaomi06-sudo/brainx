@@ -68,8 +68,11 @@ export const FirstPage: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getAllByRole("article")).toHaveLength(20);
-    await expect(canvas.getByText("当前显示 1–20 条。", { exact: false })).toBeInTheDocument();
-    await expect(canvas.getAllByText("为什么排到这里")[0]).toBeInTheDocument();
+    await expect(canvas.getByRole("heading", { name: "推荐队列" })).toBeInTheDocument();
+    await expect(canvas.getByText("岗位数量：", { exact: false })).toHaveTextContent("45");
+    await expect(canvas.getByText("更新时间：", { exact: false })).toHaveTextContent("08/28");
+    await expect(canvas.queryByText("DECISION QUEUE · V2")).not.toBeInTheDocument();
+    await expect(canvas.getAllByText("推荐理由")[0]).toBeInTheDocument();
     await expect(canvas.queryByText("AI 匹配分")).not.toBeInTheDocument();
     await expect(canvas.queryByText("探索价值")).not.toBeInTheDocument();
     const firstCard = canvas.getByRole("article", { name: "高级算法工程师 · 脱敏客户 A" });

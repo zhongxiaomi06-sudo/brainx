@@ -33,6 +33,8 @@
 
 `JobDetailCard` 是已通过视觉审核并正式接入的统一居中职位详情弹窗。Storybook 覆盖今日决策、全部职位、缺失字段、窄屏、备注展示和页签切换；两个正式入口现在共用职位事实、判断、承接与结果、决策轨迹、回放五层结构。Radar 与 opportunity 详情共同提供备注、优先级、结构化 Pipeline、主做顾问、推荐理由、操作记录和来源，缺失字段保持待确认；今日决策原有的真实判断与动作面板作为统一弹窗内部内容保留。动作仍服从职位当前合法状态，不为追求视觉一致而伪造不可用操作。状态证据见[统一职位详情正式接入审核记录](frontend-reviews/2026-08-28-job-detail-unification.md)。
 
+推荐队列与职位卡片 V2 已完成产品架构审核，但尚未形成新的 Storybook 组件。后续需更新或新增决策层级标签、包含真实理由与风险的推荐卡片、20条分页队列、加入项目反馈，以及 `TtcJobsTable` 整行和键盘打开详情场景；在视觉审核和后端契约补齐前不得宣称正式页面已完成。字段顺序和交互规则见[推荐队列与职位决策产品架构](recommendation-queue-product-architecture.md)，状态证据见[本轮审核记录](frontend-reviews/2026-08-28-recommendation-queue-v2.md)。
+
 ## 使用命令
 
 从仓库根目录执行：
@@ -66,4 +68,5 @@
 - [质量门禁操作手册](standards/QUALITY_GATE_OPERATIONS.md)
 - [上传前完整验证](standards/PRE_PUSH_VERIFICATION.md)
 - [BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md)
+- [推荐队列与职位决策产品架构](recommendation-queue-product-architecture.md)
 - [Agent Commit 记录](AGENT_COMMIT_LOG.md)

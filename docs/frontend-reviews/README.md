@@ -26,14 +26,15 @@
 |---|---|---|---|---|---|---|
 | `WorkspaceShell` 应用外壳 | 已完成 | 已通过 | 已接入 | 待确认 | 已验证（本地） | 正式应用代码已使用 |
 | `SettingsCenterReview` 设置中心 | 已完成 | 已通过 | 已接入 | 待确认 | 已验证（本地） | 正式应用代码已使用 |
-| `TtcJobsTable` 真实职位表 | 已完成 | 已通过 | 已接入 | 待确认 | 已验证（本地） | 正式应用代码已使用 |
+| `TtcJobsTable` 真实职位表 | 已完成 | 退回修改 | 已接入 | 待确认 | 已验证（本地） | 事实表已接入；整行与键盘打开详情尚未实现，当前仍只有末尾详情按钮 |
 | `ClientInsightsReview` 客户事实索引 | 已完成 | 已通过 | 已接入 | 待确认 | 已验证（本地） | 正式应用代码已使用 |
 | `WorkspaceEntry` 真实数据入口三态 | 已完成 | 未单独审核 | 已接入 | 待确认 | 部分验证 | 连接、登录和异常入口已接入，仍归全链路验收 |
 | `JobDetailCard` 居中职位弹窗 | 已完成 | 已通过 | 已接入 | 待确认 | 部分验证 | 今日决策与全部职位共用五页签居中弹窗；备注和详情接口自动验证通过，待目标环境同职位复核 |
 | `JobsWorkspaceReview` 现代职位工作区 | 已完成 | 未审核 | 未接入 | 未发布 | 未验证 | Storybook-only 审核稿 |
 | `RecommendationPolicyReview` 推荐策略 | 已完成 | 未审核 | 未接入 | 未发布 | 未验证 | 缺少只读 dry-run 契约 |
 | `DirectionProfileReview` 方向画像与分类 | 已完成 | 未审核 | 未接入 | 未发布 | 未验证 | 缺少结构化保存和人工修订契约 |
-| `TodayDecisionQueue` 今日决策队列 | 已完成 | 已通过 | 已接入 | 待确认 | 部分验证 | 列表与职位详情均已接入；真实判断、承接、轨迹和回放保留在统一弹窗页签内 |
+| `TodayDecisionQueue` 今日决策队列 | 已完成 | 退回修改 | 已接入 | 待确认 | 部分验证 | 旧版已接入，但正式页固定只取20条，卡片信息与动作反馈不满足V2架构 |
+| `RecommendationQueueV2` 完整推荐队列与卡片 | 未开始 | 部分通过 | 未接入 | 未发布 | 未验证 | 产品架构已确认；Storybook视觉、后端分页/分层/可信度契约和正式接入均待完成 |
 
 ## 每次审核的强制流程
 
@@ -92,6 +93,8 @@
 
 - [首次前端状态对齐审计](2026-08-28-baseline.md)
 - [统一职位详情正式接入审核记录](2026-08-28-job-detail-unification.md)
+- [推荐队列与职位卡片 V2 产品架构审核记录](2026-08-28-recommendation-queue-v2.md)
+- [推荐队列与职位决策产品架构](../recommendation-queue-product-architecture.md)
 - [前端真实数据重构施工清单](../frontend-refactor-construction-checklist.md)
 - [内部 Storybook 组件库](../storybook-component-library.md)
 - [前端交互架构](../frontend-interaction-architecture.md)

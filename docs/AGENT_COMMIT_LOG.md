@@ -2,6 +2,11 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-08-28｜docs(agents): 登记 main 只走 PR 规则
+
+- 改动：将用户 2026-08-26 明确指令写入 AGENTS.md——main 只接受 PR 合入，禁止一切直推与强推（含 owner 通道）；所有 Agent 标准路径为 feature 分支 → push → PR → 合入。自 docs/main-pr-only 分支重新落地（原提交与现日志文件冲突，仅取 AGENTS.md 规则段），随本记录一并入库。
+- 验证：AGENTS.md 改动干净套用（+2 行）；与现行分支保护配置（required_reviews=1、linear history）一致。
+
 ## 2026-08-28｜fix(migrations): 理顺 0017 三文件重号为 0017/0019/0020
 
 - 改动：0017 曾被三个文件并列使用。0017_commitment_loop.sql 含无保护 DDL（CREATE TABLE 无 IF NOT EXISTS、ALTER ADD COLUMN 无守卫），按文件名记账一旦改名即重执行且必失败，故保持原名；0017_position_add_company.sql（纯注释占位）更名为 0019、0017_workbench_preferences.sql（IF NOT EXISTS 幂等）更名为 0020。旧库/生产库重执行两文件均安全；同步修正 tests/framework.test.mjs 记账断言与 README 迁移清单。

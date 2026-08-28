@@ -128,8 +128,8 @@ function RecommendationCard({ item, onOpen, onAction }: {
   return <article className="recommendation-v2-card" tabIndex={0} aria-label={`${item.role} · ${item.company}`}
     onClick={() => onOpen(item)} onKeyDown={event => { if (event.key === "Enter" && event.target === event.currentTarget) onOpen(item); }}>
     <header>
-      <div className="recommendation-v2-rank"><span>#{item.rank}</span><DecisionPriorityBadge tier={item.tier} /></div>
-      <div className="recommendation-v2-identity"><h3>{item.role || "职位待确认"}</h3><p><BriefcaseBusiness />{item.company || "公司待确认"}<span><MapPin />{item.cities.length ? item.cities.join("、") : "城市待确认"}</span></p></div>
+      <span className="recommendation-v2-rank">#{item.rank}</span>
+      <div className="recommendation-v2-identity"><div className="recommendation-v2-title"><h3>{item.role || "职位待确认"}</h3><DecisionPriorityBadge tier={item.tier} /></div><p><BriefcaseBusiness />{item.company || "公司待确认"}<span><MapPin />{item.cities.length ? item.cities.join("、") : "城市待确认"}</span></p></div>
       <button type="button" className="recommendation-v2-open" aria-label={`查看 ${item.role} 判断`} onClick={event => { event.stopPropagation(); onOpen(item); }}><ChevronRight /></button>
     </header>
 
@@ -156,14 +156,14 @@ function RecommendationCard({ item, onOpen, onAction }: {
     </div>
 
     <footer onClick={event => event.stopPropagation()}>
-      <div className="recommendation-v2-actions">
-        {item.legalActions.includes("ADD") && <button type="button" className="primary" disabled={!!busy} onClick={() => void perform("ADD")}>{busy === "ADD" ? <RefreshCw className="spin" /> : <Check />}加入我的项目</button>}
-        {item.legalActions.includes("GO_PROJECT") && <button type="button" className="primary" disabled={!!busy} onClick={() => void perform("GO_PROJECT")}><ArrowRight />去我的项目</button>}
-        {item.legalActions.includes("WATCH") && <button type="button" disabled={!!busy} onClick={() => void perform("WATCH")}><Eye />观察</button>}
-        {item.legalActions.includes("DISMISS") && <button type="button" className="quiet" disabled={!!busy} onClick={() => void perform("DISMISS")}>暂不考虑</button>}
-      </div>
       {item.engagementLabel && <span className="recommendation-v2-engagement">{item.engagementLabel}</span>}
       {feedback && <p className={`recommendation-v2-feedback is-${feedback.tone}`} role="status">{feedback.text}</p>}
+      <div className="recommendation-v2-actions">
+        {item.legalActions.includes("DISMISS") && <button type="button" className="quiet" disabled={!!busy} onClick={() => void perform("DISMISS")}>暂不考虑</button>}
+        {item.legalActions.includes("WATCH") && <button type="button" disabled={!!busy} onClick={() => void perform("WATCH")}><Eye />观察</button>}
+        {item.legalActions.includes("ADD") && <button type="button" className="primary" disabled={!!busy} onClick={() => void perform("ADD")}>{busy === "ADD" ? <RefreshCw className="spin" /> : <Check />}加入我的项目</button>}
+        {item.legalActions.includes("GO_PROJECT") && <button type="button" className="primary" disabled={!!busy} onClick={() => void perform("GO_PROJECT")}><ArrowRight />去我的项目</button>}
+      </div>
     </footer>
   </article>;
 }

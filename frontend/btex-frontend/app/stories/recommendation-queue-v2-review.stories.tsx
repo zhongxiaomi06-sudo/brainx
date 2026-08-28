@@ -76,6 +76,8 @@ export const FirstPage: Story = {
     await expect(canvas.queryByText("AI 匹配分")).not.toBeInTheDocument();
     await expect(canvas.queryByText("探索价值")).not.toBeInTheDocument();
     const firstCard = canvas.getByRole("article", { name: "高级算法工程师 · 脱敏客户 A" });
+    await expect(within(within(firstCard).getByRole("heading", { name: "高级算法工程师" }).parentElement!).getByLabelText("今天推进，3格信号")).toBeInTheDocument();
+    await expect(Array.from(firstCard.querySelectorAll(".recommendation-v2-actions button"), button => button.textContent?.trim())).toEqual(["暂不考虑", "观察", "加入我的项目"]);
     firstCard.focus();
     await userEvent.keyboard("{Enter}");
     await expect(open).toHaveBeenCalledWith(expect.objectContaining({ projectId: "J-REVIEW-001" }));

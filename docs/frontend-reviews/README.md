@@ -34,7 +34,7 @@
 | `RecommendationPolicyReview` 推荐策略 | 已完成 | 未审核 | 未接入 | 未发布 | 未验证 | 缺少只读 dry-run 契约 |
 | `DirectionProfileReview` 方向画像与分类 | 已完成 | 未审核 | 未接入 | 未发布 | 未验证 | 缺少结构化保存和人工修订契约 |
 | `TodayDecisionQueue` 今日决策队列 | 已完成 | 退回修改 | 已接入 | 待确认 | 部分验证 | 旧版已接入，但正式页固定只取20条，卡片信息与动作反馈不满足V2架构 |
-| `RecommendationQueueV2` 完整推荐队列与卡片 | 待审核 | 退回修改 | 未接入 | 未发布 | 未验证 | 用户要求精简初始摘要并压缩卡片密度；修订稿已进入 Storybook，等待再次审核 |
+| `RecommendationQueueV2` 完整推荐队列与卡片 | 待审核 | 退回修改 | 未接入 | 未发布 | 未验证 | 用户继续要求移动决策标签、压缩判断区并把操作收至右侧；修订稿等待再次审核 |
 
 ## 每次审核的强制流程
 
@@ -96,6 +96,7 @@
 - [现代职位工作区正式接入审核记录](2026-08-28-jobs-workspace-integration.md)
 - [推荐队列与职位卡片 V2 产品架构审核记录](2026-08-28-recommendation-queue-v2.md)
 - [推荐队列 V2 紧凑布局复审记录](2026-08-28-recommendation-queue-v2-density.md)
+- [推荐队列 V2 卡片位置复审记录](2026-08-28-recommendation-queue-v2-placement.md)
 - [推荐队列与职位决策产品架构](../recommendation-queue-product-architecture.md)
 - [前端真实数据重构施工清单](../frontend-refactor-construction-checklist.md)
 - [内部 Storybook 组件库](../storybook-component-library.md)

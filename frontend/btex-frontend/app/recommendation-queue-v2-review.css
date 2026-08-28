@@ -22,8 +22,7 @@
 .recommendation-v2-card:hover,
 .recommendation-v2-card:focus-visible { transform: translateY(-1px); border-color: #91d9c5; box-shadow: 0 7px 22px rgba(28, 47, 41, .07); }
 .recommendation-v2-card > header { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 11px; min-width: 0; }
-.recommendation-v2-rank { display: grid; gap: 5px; justify-items: start; }
-.recommendation-v2-rank > span { color: #7b8a85; font: 700 10px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.recommendation-v2-rank { color: #7b8a85; font: 700 10px ui-monospace, SFMono-Regular, Menlo, monospace; }
 .recommendation-tier { display: inline-flex; align-items: center; gap: 6px; padding: 3px 6px; border-radius: 6px; font-size: 9px; }
 .recommendation-tier b { font-weight: 700; }
 .recommendation-tier i { display: flex; align-items: flex-end; gap: 2px; height: 9px; }
@@ -36,7 +35,8 @@
 .recommendation-tier.is-verify { background: #eef2f5; color: #617586; }
 
 .recommendation-v2-identity { min-width: 0; }
-.recommendation-v2-card h3 { margin: 0 0 4px; overflow: hidden; font-size: 15px; text-overflow: ellipsis; white-space: nowrap; }
+.recommendation-v2-title { display: flex; align-items: center; gap: 8px; min-width: 0; margin-bottom: 4px; }
+.recommendation-v2-card h3 { margin: 0; overflow: hidden; font-size: 15px; text-overflow: ellipsis; white-space: nowrap; }
 .recommendation-v2-identity p { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin: 0; color: #65756f; font-size: 11px; }
 .recommendation-v2-identity p svg { width: 12px; height: 12px; }
 .recommendation-v2-identity p span { display: inline-flex; align-items: center; gap: 3px; }
@@ -49,7 +49,7 @@
 .recommendation-v2-facts dt { display: inline; color: #87938f; font-size: 9px; }
 .recommendation-v2-facts dt::after { content: " · "; }
 .recommendation-v2-facts dd { display: inline; margin: 0; overflow: hidden; color: #354741; font-size: 10px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
-.recommendation-v2-reasons { min-width: 0; padding-left: 14px; border-left: 1px solid #edf1ef; }
+.recommendation-v2-reasons { min-width: 0; padding-left: 12px; border-left: 1px solid #edf1ef; }
 .recommendation-v2-reasons h4 { margin: 0 0 5px; color: #60716c; font-size: 10px; }
 .recommendation-v2-reasons ol { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
 .recommendation-v2-reasons li { min-width: 0; }
@@ -60,7 +60,7 @@
 
 .recommendation-v2-status-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .recommendation-v2-risk,
-.recommendation-v2-confidence { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 6px 8px; border-radius: 8px; background: #fff6f2; color: #8b4d42; }
+.recommendation-v2-confidence { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 5px 7px; border-radius: 7px; background: #fff6f2; color: #8b4d42; }
 .recommendation-v2-risk.is-clear { background: #f1faf6; color: #397360; }
 .recommendation-v2-confidence { margin-left: auto; background: #f4f8f7; color: #47645c; }
 .recommendation-v2-risk > svg,
@@ -72,15 +72,15 @@
 .recommendation-v2-confidence small { display: inline-flex; align-items: center; gap: 3px; color: #80908b; font-size: 8px; }
 .recommendation-v2-confidence small svg { width: 10px; }
 
-.recommendation-v2-card > footer { grid-column: 1 / -1; display: flex; align-items: center; gap: 9px; min-width: 0; padding-top: 9px; border-top: 1px solid #f0f3f2; }
-.recommendation-v2-actions { display: flex; gap: 6px; }
+.recommendation-v2-card > footer { grid-column: 1 / -1; display: flex; align-items: center; justify-content: flex-end; gap: 9px; min-width: 0; padding-top: 8px; border-top: 1px solid #f0f3f2; }
+.recommendation-v2-actions { display: flex; justify-content: flex-end; gap: 6px; }
 .recommendation-v2-actions button { display: inline-flex; align-items: center; gap: 4px; padding: 6px 9px; border: 1px solid #d9e5e1; border-radius: 7px; background: #fff; color: #426159; font-size: 10px; font-weight: 650; cursor: pointer; }
 .recommendation-v2-actions button.primary { border-color: #147e67; background: #147e67; color: #fff; }
 .recommendation-v2-actions button.quiet { border-color: transparent; color: #7c8985; }
 .recommendation-v2-actions button:disabled { cursor: wait; opacity: .55; }
 .recommendation-v2-actions svg { width: 12px; height: 12px; }
-.recommendation-v2-engagement { color: #6a7a75; font-size: 9px; }
-.recommendation-v2-feedback { margin: 0 0 0 auto; font-size: 10px; }
+.recommendation-v2-engagement { margin-right: auto; color: #6a7a75; font-size: 9px; }
+.recommendation-v2-feedback { margin: 0 auto 0 0; font-size: 10px; }
 .recommendation-v2-feedback.is-success { color: #147e67; }
 .recommendation-v2-feedback.is-error { color: #b5473c; }
 .spin { animation: recommendation-v2-spin .8s linear infinite; }
@@ -107,12 +107,13 @@
   .recommendation-v2-card { padding: 13px; }
   .recommendation-v2-body { grid-template-columns: 1fr; }
   .recommendation-v2-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .recommendation-v2-reasons { padding: 10px 0 0; border-top: 1px solid #edf1ef; border-left: 0; }
-  .recommendation-v2-status-row { align-items: stretch; flex-direction: column; }
-  .recommendation-v2-confidence { margin-left: 0; }
-  .recommendation-v2-card > footer { align-items: flex-start; flex-direction: column; }
-  .recommendation-v2-actions { flex-wrap: wrap; }
-  .recommendation-v2-feedback { margin-left: 0; }
+  .recommendation-v2-reasons { padding: 8px 0 0; border-top: 1px solid #edf1ef; border-left: 0; }
+  .recommendation-v2-status-row { align-items: stretch; flex-wrap: wrap; }
+  .recommendation-v2-risk { flex: 1 1 220px; }
+  .recommendation-v2-confidence { flex: 0 1 auto; margin-left: 0; }
+  .recommendation-v2-card > footer { flex-wrap: wrap; }
+  .recommendation-v2-actions { flex-wrap: wrap; margin-left: auto; }
+  .recommendation-v2-feedback { margin-right: auto; }
   .recommendation-v2-pagination { grid-template-columns: 1fr; }
   .recommendation-v2-pagination > div { justify-content: flex-start; }
 }

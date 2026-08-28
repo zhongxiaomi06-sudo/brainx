@@ -2,6 +2,16 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-08-28｜refactor(process): 进程拆分合入 main（PR #22）
+
+- 改动：feat/process-split（worker.js + worker-relay.js + server.js 嵌入模式）经 PR #22 squash 合入 main（a5a3a11）。main 分支保护要求 1 个 approve 且 backend-test/frontend-build 为已废弃 context 永不上报，故按仓库「main 只走 PR」流程使用 admin squash 合并；CI 实跑 quality-gate 与 docker-build 均通过。
+- 验证：npm run verify:quick 15/15、npm run verify 20/20、GitHub Actions quality-gate（44s）与 docker-build（1m34s）通过。
+
+## 2026-08-28｜docs(readme): 修正规模数字并补齐模块清单
+
+- 改动：README 规模口径与实际对齐（src 36→47 文件 ~6600 行、tests 18→30 文件 147→306 例、migrations 16→20 个）；目录清单补齐 worker.js、worker-relay.js、commitment.js、server-http.js、guard.js、membership.js、snapshot.js、quickfb.js、assistant-routes.js、client-error.js、weight-suggestion.js 共 11 个此前未收录模块的职责说明。
+- 验证：npm test 306/306 全绿；数字以 git ls-files 与测试实跑输出为准；README 保持 CRLF 行尾。
+
 ## 2026-08-28｜refactor(process): 进程拆分 A 方案——批处理移出 API 主进程
 
 - 改动：新增 `src/worker.js`（bridge 常驻同步/自动推荐/定时推卡，支持独立进程或嵌入模式）与 `src/worker-relay.js`（SQLite `worker_events` 表跨进程 SSE 接力，API 侧 3s 泵 + 1h GC）；`server.js` 启动块改为 `BRAINX_EMBED_WORKER=0` 走拆分模式（只起 relay 泵），默认嵌入行为不变；质量门禁基线 `server.js` 上限按棘轮收紧 744→739。

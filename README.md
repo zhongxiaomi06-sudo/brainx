@@ -5,7 +5,7 @@
 
 - **技术栈**：Node ≥22（`node:sqlite` + `node:http`）+ React/Vinext 前端，后端**零 npm 框架依赖**（仅 mysql2 一个）
 - **云版**：http://47.110.93.137:3100（systemd 常驻）· **本地版**：launchd 常驻 http://127.0.0.1:3100
-- 规模：src 36 文件 ~5200 行（含 ttcsdk/ 6 文件）+ tests 18 文件 147 例 + 前端 btex-frontend；含 1.2 LLM 适配器与 TTC 闭环
+- 规模：src 47 文件 ~6600 行（含 ttcsdk/ 6 文件）+ tests 30 文件 306 例 + migrations 20 个 + 前端 btex-frontend；含 1.2 LLM 适配器、TTC 闭环与进程拆分（worker）
 
 ## 数据库格式（大致）
 
@@ -56,8 +56,10 @@
 ## 目录与文件（全部内容）
 
 ```
-src/                  后端核心（36 文件，~5200 行）
+src/                  后端核心（47 文件，~6600 行）
   server.js           HTTP 路由 + SSE 总线（定向投递）+ btex-frontend 反代（isPathInside 防穿越）；入口 main
+  worker.js           【新】批处理进程（进程拆分 A 方案）：bridge 常驻 + 自动推荐 + 定时推卡，独立进程或嵌入模式
+  worker-relay.js     跨进程 SSE 接力：worker 事件写 worker_events 表，API 进程泵回 server.bus（泵每轮清 1h 前旧行）
   bridge.js           飞书桥接器：3 分钟一轮；Bitable 团队池 + 按人令牌读各自所在群 + TTC 职位源
   bitable.js          Bitable 字段解析层（唯一权威）：公司×单职能展开、priority 结构化、双通道拍平
   fixture_split.js    fixture 公司/职能拆分（复合行 → 公司×单职能多行，project_id 重算）
@@ -70,12 +72,20 @@ src/                  后端核心（36 文件，~5200 行）
   recommendation-batch.js  推荐分页：精选盘 pick tray + 下一批 + 不感兴趣反馈/撤销
   scorer.js           六维确定性评分（同批输入同排序，禁随机数；UNKNOWN 关系硬阻断）
   engagement.js       承接状态机 VIEW->WATCH->ACCEPT->COMPLETE/DISMISS（事件账本推导，无状态表）
+  commitment.js       承诺闭环：原子协调目标、行动、结果与状态（engagement 只管事件状态机）
+  membership.js       顾问确认职位归属：关系历史只关闭、只追加
   replay.js           冻结回放：只读 recommendations 冻结行，不重算
   autopush.js         重大变化检测（Top1 易主 / Top3 新 ACCEPT 档）-> 推卡钩子
   scheduler.js        定时任务（每日 07:00/19:00 CST 推卡）
   push.js             飞书 legacy v1 卡片构建 + lark-cli --as bot 发送（push_log 幂等）
   roster.js           顾问花名册（DB 权威，fixtures/roster.json 幂等播种）
   visibility.js       可见性单一权威（server.js 与 mcp 共用，fail-closed）
+  server-http.js      HTTP 原语层：静态 MIME/路径安全/body·json·err 工具（server.js 的承载层）
+  assistant-routes.js 助手 API 路由：聚合最新同步批次、最新推荐与承诺摘要
+  guard.js            看门狗数据面：60s 滚动桶聚合请求数与流量，经 /api/v1/meta/guard 暴露（无业务数据）
+  client-error.js     前端白屏/404/水合失败接收端：免登录落聚合日志 + guard 计数
+  weight-suggestion.js LLM 权重建议：chatJson 调用 + 归一化接 scorer 六维
+  quickfb.js          卡片一键反馈链接：免登录直接「关注/不感兴趣」，反馈不再依赖登录工作台
   db.js               node:sqlite 打开 + migrations 按文件名迁移 + 阿里云 RDS MySQL 人才库连接（懒加载）
   env.js              .env 加载
   csv.js              【1.2】零依赖 CSV 解析器：BOM/引号内嵌换行逗号/CRLF，忠实切成行×单元格
@@ -83,15 +93,17 @@ src/                  后端核心（36 文件，~5200 行）
   adapter.js          【1.2】CSV->标准库格式 LLM 适配器：两份脏 CSV -> job_facts/cockpit_facts/job_classifications/job_occupancy
   facts.js            人工事实覆盖层：6 字段人工修正优先于同步值（manual_fact_overrides）
   radar.js            雷达视图（机会扫描）
+  snapshot.js         职位快照只读出口：外部 worker 经此取已同步职位快照，免 N+1 跨云打 CRM
   talent.js           RDS 人才库完整读写闭环（upsert/匹配/简历/CSV 同步/内存回退）
   talent-supply.js    人才供给侧只读旁路（刻意不进评分，scorer 无 import）
   resume.js           简历侧能力
   openmai-task.js     接单自动找人（OpenMai 任务）
   ttcsdk/             TTC CRM SDK（6 文件）：auth(JWT 托管)/http/config/job/company/user
-migrations/           16 个迁移：init / push_log / consultants / bridge / per_user / framework
+migrations/           20 个迁移：init / push_log / consultants / bridge / per_user / framework
                       / bitable_fields / agent12（1.2 三表）/ switch_app / ttc_tokens / ttc_owner
                       / drop_placeholder / chat_activity / recommendation_pick_tray
                       / openmai_results / manual_fact_overrides（0016，原 0012 重号改名，幂等安全）
+                      / commitment_loop + position_add_company + workbench_preferences（三文件同号 0017）/ database_growth_guard（0018）
 frontend/btex-frontend/  单一前端（React 19 + Vinext + TS；server.js 代理非 API 请求到此）
   app/                页面路由 + BrainX API adapter（connected 模式调真实接口，含 showcase）
   DELIVERY.md         交付说明与原型边界（demo 表面显式标记）
@@ -101,9 +113,11 @@ bin/                  CLI：sync/adapter/recommend/replay/roster/push/web + inst
                       + com.brainx.web.plist（macOS）+ brainx.service（systemd，含 HOME 修复）
 fixtures/             职位种子（3 份真实飞书导出衍生）+ roster.json + _sources/
 scripts/build_fixture.mjs   fixture 重建；talent-health.mjs 人才库自检；e2e-talent-flow.mjs 端到端
-tests/                18 个测试文件 147 例：core/bridge/feishu/visibility/autopush/oauth
-                      /mcp(3)/framework(21)/adapter/scorer/talent/ttcsdk/ttcsync/radar
-                      /resume/facts/scheduler/data-quality
+tests/                30 个测试文件 306 例：core/bridge/feishu/visibility/autopush/oauth
+                      /mcp/framework/adapter/scorer/talent/ttcsdk/ttcsync/radar
+                      /resume/facts/scheduler/data-quality/commitment-loop/feedback-loop
+                      /state-machine/membership/snapshot/guard/weights/weight-suggestion
+                      /policy-1.1/quality-gate/ttc-pagination
 docs/VERIFICATION.md  16 节真机验证记录（每次大改的实测证据）
 docs/DEPLOYMENT.md    部署流程与生产安全清单
 docs/SECURITY.md      密钥备份/恢复、RDS 收紧 checklist、按人隔离激活路径

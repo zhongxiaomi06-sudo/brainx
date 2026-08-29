@@ -13,10 +13,13 @@ const meta = {
     activeJobId: null,
     completed: [],
     jobs: [],
+    projects: [],
     engagement: {},
     sync: seedSync,
     open,
     onAction: fn(),
+    onAddToProjects: fn(),
+    onGoToProject: fn(),
     onFeedback: fn(),
     tray: [],
     onToggleTray: fn(),
@@ -43,7 +46,7 @@ export const FormalV2CardIntegration: Story = {
     showVerification: false,
     jobs: [{ ...decisionJobs[0], brainxLegal: ["WATCH", "ACCEPT", "DISMISS"] }],
   },
-  play: async ({ canvasElement }) => {
+  play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
     await expect(canvas.queryByText("TODAY'S DECISIONS")).not.toBeInTheDocument();
     await expect(canvas.queryByRole("heading", { name: "今天只处理最值得推进的职位" })).not.toBeInTheDocument();
@@ -52,6 +55,8 @@ export const FormalV2CardIntegration: Story = {
     await expect(card).toHaveAttribute("tabindex", "0");
     await expect(Array.from(card.querySelectorAll(".recommendation-v2-actions button"), button => button.textContent?.trim()))
       .toEqual(["暂不考虑", "观察", "加入我的项目"]);
+    await userEvent.click(canvas.getByRole("button", { name: "加入我的项目" }));
+    await expect(args.onAddToProjects).toHaveBeenCalledWith(expect.objectContaining({ id: decisionJobs[0].id }));
     await userEvent.click(card);
     await expect(open).toHaveBeenCalledWith(expect.objectContaining({ id: decisionJobs[0].id }), "judgement");
   },

@@ -35,6 +35,7 @@
 | `DirectionProfileReview` 方向画像与分类 | 已完成 | 未审核 | 未接入 | 未发布 | 未验证 | 缺少结构化保存和人工修订契约 |
 | `TodayDecisionQueue` 今日决策队列 | 已完成 | 已通过 | 已接入 | 待确认 | 部分验证 | 正式入口已复用 V2 卡片，并按用户复审删除顶部概览区和批量接单；当前仍固定读取20条，完整分页与后端契约待补齐 |
 | `RecommendationQueueV2` 完整推荐队列与卡片 | 已完成 | 已通过 | 部分接入 | 未发布 | 部分验证（本地） | 用户已授权正式“今日决策”复用 V2 卡片；整卡点击、Enter 和 hover 已接入并用本地真实20条验证，完整200条分页与后端契约仍待补齐 |
+| “加入我的项目”闭环与 `ProjectsView` | 制作中 | 未审核 | 已接入 | 未发布 | 部分验证（隔离库） | 两个正式入口已共用 membership 动作，加入、幂等、刷新可见和去项目已接通；项目分组、异常恢复和目标环境验证待完成 |
 
 ## 每次审核的强制流程
 
@@ -100,6 +101,7 @@
 - [推荐队列 V2 视觉重做复审记录](2026-08-28-recommendation-queue-v2-visual-reset.md)
 - [删除今日决策概览区审核记录](2026-08-28-remove-today-overview.md)
 - [删除批量接单审核记录](2026-08-28-remove-batch-accept.md)
+- [加入我的项目闭环正式接入记录](2026-08-29-add-to-projects-closure.md)
 - [推荐队列与职位决策产品架构](../recommendation-queue-product-architecture.md)
 - [前端真实数据重构施工清单](../frontend-refactor-construction-checklist.md)
 - [内部 Storybook 组件库](../storybook-component-library.md)

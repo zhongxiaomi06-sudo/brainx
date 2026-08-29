@@ -8,6 +8,7 @@ import {
   type RecommendationCardAction,
   type RecommendationQueueItem,
 } from "./recommendation-queue-v2-review";
+import type { ProjectSummary } from "./brainx-projects-api";
 import { PickTray } from "./workbench-pick-tray";
 import {
   decisionGroupMeta, verificationJobs, type DecisionAction, type DecisionGroup,
@@ -18,10 +19,13 @@ type TodayDecisionQueueProps = {
   activeJobId: string | null;
   completed: string[];
   jobs: DecisionJob[];
+  projects: ProjectSummary[];
   engagement: Record<string, EngagementState>;
   sync: SyncStatus;
   open: (job: DecisionJob, tab?: "facts" | "judgement" | "engagement" | "trail" | "replay") => void;
   onAction: (job: DecisionJob, action: DecisionAction) => void;
+  onAddToProjects: (job: DecisionJob) => void;
+  onGoToProject: (projectId: string) => void;
   onFeedback: (job: DecisionJob, reason?: string) => void;
   showVerification?: boolean;
   tray: string[];
@@ -49,14 +53,14 @@ function latestFactUpdate(job: DecisionJob) {
   return updates.sort().at(-1) || null;
 }
 
-function toQueueItem(job: DecisionJob, engagement: EngagementState | undefined): RecommendationQueueItem {
+function toQueueItem(job: DecisionJob, engagement: EngagementState | undefined, joined: boolean): RecommendationQueueItem {
   const tier = job.eligibility === "VERIFY_REQUIRED" || job.eligibility === "BLOCKED"
     ? "VERIFY" : ["RESULT_CLOSURE", "ACTIVE_ADVANCEMENT"].includes(job.group) ? "TODAY" : "WEEK";
   const legalActions: RecommendationCardAction[] = [];
-  if (engagement === "ACCEPTED") legalActions.push("GO_PROJECT");
+  if (joined) legalActions.push("GO_PROJECT");
   else {
     if (job.brainxLegal?.includes("WATCH") || job.actions.some(action => action.kind === "watch")) legalActions.push("WATCH");
-    if (job.brainxLegal?.includes("ACCEPT")) legalActions.push("ADD");
+    if (job.eligibility !== "BLOCKED" && job.eligibility !== "EXCLUDED") legalActions.push("ADD");
     if (job.brainxLegal?.includes("DISMISS") || !job.brainxLegal) legalActions.push("DISMISS");
   }
   return {
@@ -92,7 +96,7 @@ function toQueueItem(job: DecisionJob, engagement: EngagementState | undefined):
 
 export function TodayDecisionQueue(props: TodayDecisionQueueProps) {
   const {
-    activeJobId, jobs, engagement, sync, open, onAction, onFeedback,
+    activeJobId, jobs, projects, engagement, sync, open, onAction, onAddToProjects, onGoToProject, onFeedback,
     showVerification = true, tray, onToggleTray, onRemoveTray,
     folders, folderMode, onFolderMode, onAssignFolder, onCreateFolder, mode,
     onOpenSources,
@@ -116,7 +120,8 @@ export function TodayDecisionQueue(props: TodayDecisionQueueProps) {
   const visiblePending = [...filteredPending].sort((left, right) => sort === "score"
     ? Number(right.finalScore) - Number(left.finalScore)
     : String(left.recentSignal).localeCompare(String(right.recentSignal)));
-  const queueItems = visiblePending.map(job => toQueueItem(job, engagement[job.id]));
+  const joinedProjects = new Set(projects.map(project => project.project_id));
+  const queueItems = visiblePending.map(job => toQueueItem(job, engagement[job.id], joinedProjects.has(job.id)));
   const queueJobs = new Map(visiblePending.map(job => [job.id, job]));
   const allJobs = [...acceptedJobs, ...pendingShown];
   const trayJobs = tray.map(id => allJobs.find(job => job.id === id))
@@ -167,6 +172,8 @@ export function TodayDecisionQueue(props: TodayDecisionQueueProps) {
           onAction={(item, action) => { const job = queueJobs.get(item.projectId); if (!job) return;
             if (action === "DISMISS") { onFeedback(job); return; }
             if (action === "WATCH") { const watch = job.actions.find(candidate => candidate.kind === "watch"); if (watch) onAction(job, watch); else open(job, "engagement"); return; }
+            if (action === "ADD") { onAddToProjects(job); return; }
+            if (action === "GO_PROJECT") { onGoToProject(job.id); return; }
             open(job, "engagement");
           }} />
       </section>}

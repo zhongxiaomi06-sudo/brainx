@@ -6,6 +6,7 @@ const root = new URL("../", import.meta.url);
 const source = (name) => readFile(new URL(name, root), "utf8");
 const workbenchSource = async () => (await Promise.all([
   source("app/workbench.tsx"),
+  source("app/brainx-projects-api.ts"),
   source("app/workbench-controls.tsx"),
   source("app/workbench-facts.tsx"),
   source("app/workbench-model.ts"),
@@ -102,12 +103,15 @@ test("splits candidates by their live engagement state and keeps verification jo
   assert.match(workbench, /"JS6ZVBW",\s*"Nooklab",\s*"DTC负责人",\s*"Offer 1 覆盖剩余 HC 1，入职未确认"/);
   assert.match(workbench, /eligibility:\s*"VERIFY_REQUIRED"/);
   assert.match(workbench, /const initialEngagement:\s*Record<string,\s*EngagementState>\s*=\s*\{[^}]*JU87P01:\s*"ACCEPTED"[^}]*JNDLIXO:\s*"ACCEPTED"[^}]*JVS2PHH:\s*"ACCEPTED"/);
-  assert.match(workbench, /const acceptedJobs=(?:activeDecisionJobs|jobs)\.filter\(job=>engagement\[job\.id\]==="ACCEPTED"\)/);
+  assert.match(workbench, /const acceptedJobs\s*=\s*jobs\.filter\(job\s*=>\s*engagement\[job\.id\]\s*===\s*"ACCEPTED"\)/);
   assert.match(workbench, /const pendingJobs\s*=\s*\[\.\.\.jobs\.filter\(job\s*=>\s*engagement\[job\.id\]\s*!==\s*"ACCEPTED"\),\s*\.\.\.verificationJobs\]/);
   assert.match(workbench, /const pendingShown\s*=\s*showVerification/);
   assert.match(workbench, /const isContext\s*=\s*activeJobId\s*!==\s*null\s*&&\s*pendingShown\.some/);
   assert.match(workbench, /className=\{`formal-recommendation-v2\$\{isContext \? " is-context" : ""\}`\}/);
-  assert.match(workbench, /title="已确定"/);
+  assert.match(workbench, /title="我的项目"/);
+  assert.match(workbench, /getProjects\(\)/);
+  assert.match(workbench, /onAddToProjects=\{job=>\{void addToMyProjects\(job\.id,job\.company\)\}\}/);
+  assert.match(workbench, /if \(action === "ADD"\) \{ onAddToProjects\(job\); return; \}/);
   assert.match(workbench, /<RecommendationQueueV2Review items=\{queueItems\}/);
   assert.match(workbench, /"剩余 HC"\s*:\s*"UNKNOWN"/);
 });

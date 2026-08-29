@@ -15,6 +15,7 @@ import type {
   SyncStatus,
 } from "./decision-demo";
 import { brainxFetch } from "./brainx-http.ts";
+import { getProjects, type ProjectSummary } from "./brainx-projects-api.ts";
 export { brainxFetch, BrainxApiError } from "./brainx-http.ts";
 export {
   classifyRadarPositionType, getClients, getRadar, getTtcFieldReport, mapClientRow, mapRadarRow,
@@ -74,6 +75,7 @@ export type BrainxSnapshot = {
   profileKeywords: string[];
   openmai: Record<string, OpenmaiResult | null>;
   preferences: WorkbenchPreferences;
+  projects: ProjectSummary[];
 };
 
 export type BrainxReplay = {
@@ -110,15 +112,11 @@ export type BackendSync = {
   state: string; updated_at?: string | null; rows_read?: number | null;
   rows_expected?: number | null; errors?: string[]; warning?: { at: string; message: string; detail?: string } | null;
 };
-export type BackendCommitment = {
-  project_id: string; state: EngagementState; state_since?: string | null;
-  company?: string | null; role?: string | null; active_state?: string | null; next_action?: string | null;
-};
 export type BackendWorkbench = {
   consultant_id: string; sync: BackendSync; feishu_auth?: { authorized?: boolean; needs_reauth?: boolean };
   ttc_auth?: Record<string, unknown>; current_policy_version?: string | null;
   watched_count?: number; watched_limit?: number; accepted_count?: number; cooldown_count?: number;
-  need_action_count?: number; commitments?: BackendCommitment[]; today_top3?: BackendRecommendation[];
+  need_action_count?: number; today_top3?: BackendRecommendation[];
   run_id?: string | null;
 };
 export type BackendRecommendations = {
@@ -163,7 +161,6 @@ export type BackendPickTray = { snapshot_id: string | null; batch_id: string | n
 export type BackendFeedbackResponse = { ok: boolean; already?: boolean; feedback_id?: string; replacement?: BackendPickTray };
 export type BackendOutcomeResponse = { ok: boolean; already?: boolean; outcome_id?: string | number };
 export type BackendProgressResponse = { ok: boolean; already?: boolean; state?: EngagementState; active_action?: BackendCommitmentAction; incorporated_into_next_decision?: boolean; backfilled?: boolean };
-export type BackendMembershipResponse = { ok: boolean; already?: boolean; relation: "MY_JOB"|"TEAM_SHARED"; legal_actions: EngagementCommand[]; recompute?: { blocked?: boolean; reason?: string } };
 export type BackendProfileUpdate = { ok: boolean; consultant_id: string; profile_keywords?: string[]; profile_note?: string };
 
 // —— 词典（与后端 src/*.js 的枚举对齐，前端仅用于展示标签，不做业务判断）——
@@ -481,16 +478,6 @@ export async function updateOpportunityFacts(id: string, update: ManualFactUpdat
   return brainxFetch(`/api/v1/opportunities/${encodeURIComponent(id)}/facts`, { method: "PATCH", body: update });
 }
 
-export async function updateOpportunityMembership(
-  id: string,
-  relation: "MY_JOB"|"TEAM_SHARED",
-  idempotencyKey: string,
-): Promise<BackendMembershipResponse> {
-  return brainxFetch(`/api/v1/opportunities/${encodeURIComponent(id)}/membership`, {
-    method: "PATCH", body: { relation, idempotency_key: idempotencyKey },
-  });
-}
-
 // —— 人才供给（旁路，只读展示；后端 GET /opportunities/:id/talent-supply）——
 export type TalentSupplySnapshot = {
   jobId: string;
@@ -512,9 +499,10 @@ export async function getTalentSupply(jobId: string): Promise<TalentSupplySnapsh
 /** 读取完整工作台快照：概览 + 推荐 + 逐职位详情（承接态/允许动作/事件/结果）+ 画像。
  *  会话未登录（401）时抛错，由调用方进入离线回退。 */
 export async function getSnapshot(): Promise<BrainxSnapshot> {
-  const [wb, recs, profile, dismiss, preferences] = await Promise.all([
+  const [wb, recs, projects, profile, dismiss, preferences] = await Promise.all([
     brainxFetch<BackendWorkbench>("/api/v1/workbench"),
     brainxFetch<BackendRecommendations>("/api/v1/recommendations?limit=20"),
+    getProjects(),
     brainxFetch<BackendProfile>("/api/v1/profile"),
     brainxFetch<BackendDismissReasons>("/api/v1/dismiss-reasons").catch(() => ({ items: FALLBACK_DISMISS_REASONS })),
     brainxFetch<WorkbenchPreferences>("/api/v1/workbench/preferences").catch(() => ({ tray: [], folders: [], folderMode: false, updatedAt: null })),
@@ -543,26 +531,10 @@ export async function getSnapshot(): Promise<BrainxSnapshot> {
     job.brainxLegal = legal[job.id];
   });
 
-  // 承接中但不在本轮 Top10 的职位（侧栏“我的承接”需要），用伪条目补进列表
-  for (const c of wb.commitments || []) {
-    if (engagement[c.project_id]) continue;
-    jobs.push({
-      id: c.project_id, rank: 99, company: c.company || "未知客户", role: c.role || "未知职位",
-      direction: directionOf(c.role || ""), sourceMode: "MARKET_ONLY",
-      group: "MAINTENANCE", eligibility: "ELIGIBLE",
-      globalScore: "—", explorationScore: "—", personalScore: "—", finalScore: "—",
-      evidenceCoverage: null,
-      recommendation: c.next_action || "承接中职位",
-      recentSignal: "",
-      facts: { "职位关系": "团队共享", "数据来源": "职位市场", "当前阶段": "UNKNOWN", "剩余 HC": "UNKNOWN", "最近活动": "UNKNOWN", "历史 Pipeline": "暂无记录" },
-      scoreNotes: [], risks: [], evidence: [], actions: [], brainxLegal: [],
-    });
-    engagement[c.project_id] = c.state as EngagementState;
-    events[c.project_id] = [];
-    outcomes[c.project_id] = [];
-    legal[c.project_id] = [];
+  for (const project of projects.items || []) {
+    engagement[project.project_id] = project.engagement_state;
+    legal[project.project_id] = project.legal_actions;
   }
-
   return {
     consultantId: profile.consultant_id || wb.consultant_id,
     jobs,
@@ -584,6 +556,7 @@ export async function getSnapshot(): Promise<BrainxSnapshot> {
     policyVersion: recs.policy_version || wb.current_policy_version || null,
     profileKeywords: profile.profile_keywords || [],
     preferences,
+    projects: projects.items || [],
   };
 }
 

@@ -18,6 +18,7 @@ import {
   BrainxApiError,
 } from "../app/brainx-api.ts";
 import { mergeOpportunityDetail, toDecisionJobDetail, toRadarJobDetail } from "../app/job-detail-data.ts";
+import { projectToDecisionJob } from "../app/brainx-projects-api.ts";
 
 const sampleRec = {
   decision_id: "d-1",
@@ -321,4 +322,20 @@ test("classifies radar position types from role text", () => {
   assert.equal(classifyRadarPositionType("产品经理"), "产品");
   assert.equal(classifyRadarPositionType("海外投放经理"), "商业化");
   assert.equal(classifyRadarPositionType("前端开发"), "技术");
+});
+
+test("maps a real project summary without inventing score or HC", () => {
+  const job = projectToDecisionJob({
+    project_id: "P-MY-1", relation: "MY_JOB", membership_source: "MANUAL_CONFIRMATION",
+    joined_at: "2026-08-29T00:00:00.000Z", company: "真实客户", role: "增长负责人",
+    city: "上海", active_state: "OPEN", hc: null, pipeline: "面试 2", current_stage: "面试",
+    pipeline_snapshot: null, next_action: null, owner_name: "Mia", captured_at: "2026-08-28T00:00:00.000Z",
+    engagement_state: "NEW", state_since: null, project_status: "PENDING_START", active_action: null,
+    legal_actions: ["WATCH", "ACCEPT", "DISMISS"],
+  });
+  assert.equal(job.id, "P-MY-1");
+  assert.equal(job.finalScore, "—");
+  assert.equal(job.facts["剩余 HC"], "UNKNOWN");
+  assert.equal(job.recentSignal, "面试");
+  assert.deepEqual(job.brainxLegal, ["WATCH", "ACCEPT", "DISMISS"]);
 });

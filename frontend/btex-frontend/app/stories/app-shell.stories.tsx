@@ -21,6 +21,9 @@ export const FullWorkbench: Story = {
     await expect(canvas.findByRole("main", {}, { timeout: 10_000 })).resolves.toBeInTheDocument();
     await expect(canvas.getByLabelText("主要导航")).toBeInTheDocument();
     await expect(canvas.getByRole("button", { name: "全部职位" })).toBeInTheDocument();
+    await userEvent.click(canvas.getByRole("button", { name: "我的项目" }));
+    await expect(canvas.getByRole("heading", { name: "我的项目" })).toBeInTheDocument();
+    await expect(canvas.getByText("还没有加入任何项目")).toBeInTheDocument();
   },
 };
 

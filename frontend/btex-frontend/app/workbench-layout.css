@@ -255,6 +255,7 @@
 .accepted-card h2{margin:0;font:600 19px var(--font-display);letter-spacing:.01em;color:var(--ink)}.accepted-card>p{margin:0;color:var(--muted);font-size:13px}
 .accepted-card-fact{display:flex;justify-content:space-between;gap:12px;padding-top:12px;border-top:1px dashed rgba(28,43,38,.14);font-size:11px}.accepted-card-fact span{color:var(--muted)}.accepted-card-fact b{color:var(--ink);font-weight:550;text-align:right}
 .accepted-card-action{display:flex;align-items:center;justify-content:space-between;margin-top:4px;padding:10px 0 0;border:0;border-top:1px solid rgba(28,43,38,.08);background:transparent;color:var(--mint-ink);font-size:12px;font-weight:650;cursor:pointer}.accepted-card-action svg{width:15px}
+.accepted-home>.concept-search{max-width:520px;margin:0 0 18px}.accepted-card.is-focused{border-color:rgba(26,153,118,.55);box-shadow:0 0 0 3px rgba(47,211,167,.12),var(--surface-shadow)}
 @media(max-width:720px){.accepted-summary{align-items:flex-start;flex-direction:column;gap:8px}.accepted-list{grid-template-columns:1fr}}
 
 /* Final green palette pass: keep all interactive and selected surfaces on the same accent. */

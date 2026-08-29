@@ -75,6 +75,7 @@
 - [推荐队列 V2 视觉重做复审记录（2026-08-28）](frontend-reviews/2026-08-28-recommendation-queue-v2-visual-reset.md)
 - [删除今日决策概览区审核记录（2026-08-28）](frontend-reviews/2026-08-28-remove-today-overview.md)
 - [删除批量接单审核记录（2026-08-28）](frontend-reviews/2026-08-28-remove-batch-accept.md)
+- [加入我的项目闭环正式接入记录（2026-08-29）](frontend-reviews/2026-08-29-add-to-projects-closure.md)
 - [网站完整任务错误点审计](2026-08-17-网站完整任务错误点审计.md)
 - [状态报告（2026-08-19）](status-report-2026-08-19.md)
 - [DeepSeek 审查规则提炼（2026-08-24）](audits/2026-08-24-deepseek-review-rule-extraction.md)

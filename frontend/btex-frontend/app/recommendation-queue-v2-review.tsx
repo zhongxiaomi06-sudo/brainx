@@ -158,7 +158,7 @@ function RecommendationCard({ item, onOpen, onAction }: {
 }
 
 export function RecommendationQueueV2Review({
-  items, pageIndex, totalCount, generatedAt,
+  items, pageIndex, totalCount, evaluatedCount, generatedAt,
   loading = false, error = null, newRunAvailable = false, onPrevious, onNext,
   onRefreshRun, onOpen, onAction,
 }: RecommendationQueueV2ReviewProps) {
@@ -178,7 +178,7 @@ export function RecommendationQueueV2Review({
       {!pageItems.length && !error && <div className="recommendation-v2-empty">这一页没有推荐岗位</div>}
     </div>
     <footer className="recommendation-v2-pagination">
-      <span>已显示 {start}–{end} / {totalCount}</span>
+      <span>参与计算 {evaluatedCount} · 已显示 {start}–{end} / {totalCount}</span>
       <b>第 {pageIndex + 1} / {totalPages} 页 · 每页 20 条</b>
       <div><button type="button" disabled={loading || pageIndex === 0 || !onPrevious} onClick={onPrevious}><ArrowLeft />上一页</button><button type="button" disabled={loading || end >= totalCount || !onNext} onClick={onNext}>下一页 · 20 条<ArrowRight /></button></div>
     </footer>

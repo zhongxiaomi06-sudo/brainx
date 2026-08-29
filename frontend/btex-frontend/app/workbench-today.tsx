@@ -38,6 +38,20 @@ type TodayDecisionQueueProps = {
   onCreateFolder: (name: string) => void;
   mode: "connecting" | "connected" | "offline";
   onOpenSources: () => void;
+  pagination?: {
+    pageIndex: number;
+    totalCount: number;
+    evaluatedCount: number;
+    runId: string;
+    generatedAt: string;
+    policyVersion: string;
+    loading: boolean;
+    error: string | null;
+    newRunAvailable: boolean;
+    onPrevious: () => void;
+    onNext: () => void;
+    onRefreshRun: () => void;
+  };
 };
 
 function numericFact(value: string | undefined) {
@@ -99,7 +113,7 @@ export function TodayDecisionQueue(props: TodayDecisionQueueProps) {
     activeJobId, jobs, projects, engagement, sync, open, onAction, onAddToProjects, onGoToProject, onFeedback,
     showVerification = true, tray, onToggleTray, onRemoveTray,
     folders, folderMode, onFolderMode, onAssignFolder, onCreateFolder, mode,
-    onOpenSources,
+    onOpenSources, pagination,
   } = props;
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<"score" | "recent">("score");
@@ -127,6 +141,12 @@ export function TodayDecisionQueue(props: TodayDecisionQueueProps) {
   const trayJobs = tray.map(id => allJobs.find(job => job.id === id))
     .filter((job): job is DecisionJob => Boolean(job));
   const isContext = activeJobId !== null && pendingShown.some(job => job.id === activeJobId);
+  const queuePagination = pagination || {
+    pageIndex: 0, totalCount: queueItems.length, evaluatedCount: queueItems.length,
+    runId: "storybook-preview", generatedAt: sync.updatedAt || "时间待确认", policyVersion: "storybook",
+    loading: false, error: null, newRunAvailable: false,
+    onPrevious: () => undefined, onNext: () => undefined, onRefreshRun: () => undefined,
+  };
 
   const toolbar = <div className="concept-filter-bar">
     <label className="concept-search"><Search/><input value={query}
@@ -166,9 +186,13 @@ export function TodayDecisionQueue(props: TodayDecisionQueueProps) {
         {jobs[0] && <button className="btn" onClick={() => open(jobs[0], "judgement")}>查看上次快照</button>}
       </section> : <section id="opportunity-list" className={`formal-recommendation-v2${isContext ? " is-context" : ""}`}>
         {toolbar}
-        <RecommendationQueueV2Review items={queueItems} pageIndex={0} totalCount={queueItems.length}
-          evaluatedCount={queueItems.length} runId="current-formal-run" generatedAt={sync.updatedAt || "时间待确认"}
-          policyVersion="current" onOpen={item => { const job = queueJobs.get(item.projectId); if (job) open(job, "judgement"); }}
+        <RecommendationQueueV2Review items={queueItems} pageIndex={queuePagination.pageIndex}
+          totalCount={queuePagination.totalCount} evaluatedCount={queuePagination.evaluatedCount}
+          runId={queuePagination.runId} generatedAt={queuePagination.generatedAt}
+          policyVersion={queuePagination.policyVersion} loading={queuePagination.loading} error={queuePagination.error}
+          newRunAvailable={queuePagination.newRunAvailable} onPrevious={queuePagination.onPrevious}
+          onNext={queuePagination.onNext} onRefreshRun={queuePagination.onRefreshRun}
+          onOpen={item => { const job = queueJobs.get(item.projectId); if (job) open(job, "judgement"); }}
           onAction={(item, action) => { const job = queueJobs.get(item.projectId); if (!job) return;
             if (action === "DISMISS") { onFeedback(job); return; }
             if (action === "WATCH") { const watch = job.actions.find(candidate => candidate.kind === "watch"); if (watch) onAction(job, watch); else open(job, "engagement"); return; }

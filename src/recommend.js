@@ -232,9 +232,12 @@ export const publicRec = (r) => ({
 
 /** 读最新一轮推荐（工作台默认视图）。raw_json 不出网（原始负载只供库内/回放对照）。
  * 只认 COMPLETED 轮：节流产物的 SKIPPED_UNCHANGED 审计行没有冻结推荐，不可当最新轮。 */
-export function latestRun(db, consultant_id) {
-  const run = db.prepare(`SELECT * FROM decision_runs WHERE consultant_id=? AND status='COMPLETED'
-    ORDER BY created_at DESC LIMIT 1`).get(consultant_id);
+export function recommendationRun(db, consultant_id, run_id = null) {
+  const run = run_id
+    ? db.prepare(`SELECT * FROM decision_runs
+      WHERE consultant_id=? AND run_id=? AND status='COMPLETED'`).get(consultant_id, run_id)
+    : db.prepare(`SELECT * FROM decision_runs WHERE consultant_id=? AND status='COMPLETED'
+      ORDER BY created_at DESC LIMIT 1`).get(consultant_id);
   if (!run) return null;
   const recs = db.prepare(`SELECT * FROM recommendations WHERE run_id=? ORDER BY rank`).all(run.run_id);
   const jobs = effectiveJobs(db, consultant_id);
@@ -251,4 +254,9 @@ export function latestRun(db, consultant_id) {
              relation: deriveRelation(relCtx, r.project_id) },
     })),
   };
+}
+
+/** 读最新一轮完整推荐。指定历史运行的分页读取使用 recommendationRun。 */
+export function latestRun(db, consultant_id) {
+  return recommendationRun(db, consultant_id);
 }

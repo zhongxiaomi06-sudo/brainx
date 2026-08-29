@@ -5,6 +5,7 @@ import { decisionJobs } from "../workbench-model";
 import { TodayDecisionQueue } from "../workbench-today";
 
 const open = fn();
+const nextPage = fn();
 
 const meta = {
   title: "业务组件/今日决策队列",
@@ -45,12 +46,19 @@ export const FormalV2CardIntegration: Story = {
     mode: "offline",
     showVerification: false,
     jobs: [{ ...decisionJobs[0], brainxLegal: ["WATCH", "ACCEPT", "DISMISS"] }],
+    pagination: {
+      pageIndex: 0, totalCount: 45, evaluatedCount: 5313, runId: "run-formal-1",
+      generatedAt: "2026-08-29T08:00:00Z", policyVersion: "baseline-1.1",
+      loading: false, error: null, newRunAvailable: false,
+      onPrevious: fn(), onNext: nextPage, onRefreshRun: fn(),
+    },
   },
   play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
     await expect(canvas.queryByText("TODAY'S DECISIONS")).not.toBeInTheDocument();
     await expect(canvas.queryByRole("heading", { name: "今天只处理最值得推进的职位" })).not.toBeInTheDocument();
     await expect(canvas.getByRole("heading", { name: "推荐队列" })).toBeInTheDocument();
+    await expect(canvas.getByText("参与计算 5313 · 已显示 1–1 / 45")).toBeInTheDocument();
     const card = canvas.getByRole("article", { name: `${decisionJobs[0].role} · ${decisionJobs[0].company}` });
     await expect(card).toHaveAttribute("tabindex", "0");
     await expect(Array.from(card.querySelectorAll(".recommendation-v2-actions button"), button => button.textContent?.trim()))
@@ -59,5 +67,7 @@ export const FormalV2CardIntegration: Story = {
     await expect(args.onAddToProjects).toHaveBeenCalledWith(expect.objectContaining({ id: decisionJobs[0].id }));
     await userEvent.click(card);
     await expect(open).toHaveBeenCalledWith(expect.objectContaining({ id: decisionJobs[0].id }), "judgement");
+    await userEvent.click(canvas.getByRole("button", { name: "下一页 · 20 条" }));
+    await expect(nextPage).toHaveBeenCalledOnce();
   },
 };

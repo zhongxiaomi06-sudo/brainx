@@ -34,6 +34,7 @@ import { talentSupplyForJob, talentSupplyEnabled } from './talent-supply.js';
 import { effectiveJob, effectiveFactPayload, updateFactOverrides } from './facts.js';
 import { assistantRoutes } from './assistant-routes.js';
 import { pickTray, nextBatch, feedback as recommendationFeedback, undoFeedback as recommendationUndoFeedback } from './recommendation-batch.js';
+import { recommendationPage } from './recommendation-page.js';
 import { verifyQuick, quickResultPage, QUICK_ACTIONS } from './quickfb.js';
 import { verifySnapshotKey, jobSnapshot } from './snapshot.js';
 import { createGuard } from './guard.js';
@@ -270,18 +271,9 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       json(res, 200, { ok: true, ...prefs, updatedAt });
     },
     'GET /api/v1/recommendations': (req, res, cid, q) => {
-      const limit = Math.min(Number(q.get('limit')) || 10, 50);
-      const sync = latestSync(db, cid);
-      const run = latestRun(db, cid);
-      if (sync && !sync.complete) {
-        return json(res, 200, { blocked: true, reason: '本次同步不完整，为避免误导，暂不生成正式推荐',
-                                run_id: null, items: [] });
-      }
-      if (!run) return json(res, 200, { blocked: false, run_id: null, items: [], empty: true });
-      json(res, 200, { blocked: false, run_id: run.run.run_id, snapshot_id: run.run.snapshot_id,
-                       policy_version: run.run.policy_version, generated_at: run.run.created_at,
-                       items: run.items.filter((item) => !db.prepare(`SELECT 1 FROM recommendation_feedback
-                         WHERE consultant_id=? AND project_id=? LIMIT 1`).get(cid, item.job.project_id)).slice(0, limit) });
+      const out = recommendationPage(db, cid, { cursor: q.get('cursor') });
+      if (out.ok === false) return err(res, out.status, out.code, out.message);
+      json(res, 200, out);
     },
 
     'GET /api/v1/recommendations/pick-tray': (req, res, cid, q) => {

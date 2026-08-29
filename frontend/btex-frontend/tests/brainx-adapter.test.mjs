@@ -19,6 +19,7 @@ import {
 } from "../app/brainx-api.ts";
 import { mergeOpportunityDetail, toDecisionJobDetail, toRadarJobDetail } from "../app/job-detail-data.ts";
 import { projectToDecisionJob } from "../app/brainx-projects-api.ts";
+import { mapRecommendationPage } from "../app/brainx-recommendation-pages-api.ts";
 
 const sampleRec = {
   decision_id: "d-1",
@@ -74,6 +75,28 @@ test("maps a backend recommendation into a workbench decision job", () => {
   assert.equal(job.scoreNotes.length, 2);
   assert.equal(job.evidence.length, 2);
   assert.equal(job.actions[0].kind, "advance");
+});
+
+test("maps run-bound recommendation page metadata and legal state", () => {
+  const page = mapRecommendationPage({
+    blocked: false,
+    run_id: "run-1",
+    snapshot_id: "snapshot-1",
+    policy_version: "baseline-1.1",
+    generated_at: "2026-08-29T08:00:00Z",
+    evaluated_count: 5313,
+    total_count: 45,
+    page_size: 20,
+    next_cursor: "cursor-20",
+    new_run_available: false,
+    items: [{ ...sampleRec, engagement_state: "WATCHED", legal_actions: ["VIEW", "UNWATCH", "ACCEPT"] }],
+  });
+  assert.equal(page.runId, "run-1");
+  assert.equal(page.totalCount, 45);
+  assert.equal(page.evaluatedCount, 5313);
+  assert.equal(page.nextCursor, "cursor-20");
+  assert.equal(page.engagement["P-FIX-E5FC611B"], "WATCHED");
+  assert.deepEqual(page.jobs[0].brainxLegal, ["UNWATCH", "ACCEPT"]);
 });
 
 test("treats null HC as UNKNOWN, never as 0", () => {

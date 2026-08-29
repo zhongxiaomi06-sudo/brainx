@@ -131,6 +131,11 @@ export function engage(db, consultant_id, project_id, action,
 
 export function legalActions(db, consultant_id, project_id) {
   const { state } = currentState(db, consultant_id, project_id);
+  return legalActionsForState(state);
+}
+
+/** 已批量取得状态时复用，避免列表逐职位重复查询状态视图。 */
+export function legalActionsForState(state) {
   return Object.entries(TRANSITIONS)
     .filter(([, t]) => t.from.includes(state)).map(([k]) => k);
 }

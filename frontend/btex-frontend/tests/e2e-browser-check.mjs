@@ -172,6 +172,45 @@ try {
   });
   assert.equal(workbenchStatus, 200, "登录后工作台 API 必须可用");
 
+  const recommendationFixture = await page.evaluate(async () => {
+    const sync = await fetch("/api/v1/sync-runs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source: "fixture" }),
+    });
+    const run = await fetch("/api/v1/recommendations/run", { method: "POST" });
+    const firstPage = await fetch("/api/v1/recommendations");
+    return {
+      syncStatus: sync.status,
+      runStatus: run.status,
+      pageStatus: firstPage.status,
+      page: await firstPage.json(),
+    };
+  });
+  assert.equal(recommendationFixture.syncStatus, 200, "浏览器夹具同步必须成功");
+  assert.equal(recommendationFixture.runStatus, 200, "浏览器夹具推荐必须成功");
+  assert.equal(recommendationFixture.pageStatus, 200, "推荐分页 API 必须可用");
+  assert(recommendationFixture.page.total_count > 20, "浏览器夹具必须覆盖至少两页推荐");
+  await page.reload({ waitUntil: "networkidle" });
+
+  const recommendationQueue = page.getByRole("region", { name: "推荐队列" });
+  await recommendationQueue.waitFor({ state: "visible" });
+  const recommendationCards = recommendationQueue.getByRole("article");
+  assert.equal(await recommendationCards.count(), 20, "正式首页必须固定显示 20 条推荐");
+  const firstCard = await recommendationCards.first().getAttribute("aria-label");
+  const nextPage = recommendationQueue.getByRole("button", { name: /下一页/ });
+  assert.equal(await nextPage.isEnabled(), true,
+    `正式首页应允许翻页，当前摘要：${await recommendationQueue.innerText()}`);
+  await nextPage.click();
+  await recommendationQueue.getByText(/第 2 \/ \d+ 页/).waitFor({ state: "visible" });
+  assert.equal(await recommendationCards.count(), 20, "正式第二页必须固定显示 20 条推荐");
+  assert.notEqual(await recommendationCards.first().getAttribute("aria-label"), firstCard,
+    "下一页不能重复显示首页首条推荐");
+  await recommendationQueue.getByRole("button", { name: "上一页" }).click();
+  await recommendationQueue.getByText(/第 1 \/ \d+ 页/).waitFor({ state: "visible" });
+  assert.equal(await recommendationCards.first().getAttribute("aria-label"), firstCard,
+    "返回上一页必须复用冻结页面，不应重新排序");
+
   const search = page.getByRole("textbox", { name: "搜索职位或公司" });
   if (await search.count()) {
     await search.fill("前端链路验证");
@@ -211,7 +250,7 @@ try {
   assert.deepEqual(pageErrors, [], `页面运行错误：${pageErrors.join(" | ")}`);
   assert.deepEqual(consoleErrors, [], `控制台错误：${consoleErrors.join(" | ")}`);
   assert.deepEqual(failedResponses, [], `静态资源或服务响应失败：${failedResponses.join(" | ")}`);
-  console.log("浏览器链路通过：桌面/移动端渲染、登录、工作台 API、搜索、导航、资源与控制台均正常");
+  console.log("浏览器链路通过：桌面/移动端、登录、推荐20条分页、返回不重排、搜索、导航和控制台均正常");
 } catch (error) {
   console.error(error.stack || error.message || error);
   console.error(output.join("").slice(-4000));

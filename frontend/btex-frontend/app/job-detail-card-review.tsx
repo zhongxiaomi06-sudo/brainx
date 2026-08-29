@@ -140,7 +140,7 @@ export function JobDetailCard({
   const tabs: { id: JobDetailTab; label: string }[] = [
     { id: "facts", label: "职位事实" },
     { id: "judgement", label: "判断" },
-    { id: "engagement", label: "承接与结果" },
+    { id: "engagement", label: "跟进与结果" },
     { id: "trail", label: "决策轨迹" },
     { id: "replay", label: "回放" },
   ];
@@ -228,8 +228,8 @@ export function JobDetailCard({
             <div className="job-detail-review-section-title"><span><Check /></span><div><h3>当前判断</h3><p>{recommendation ? `${actionLabels[recommendation.action]} · ${displayDate(recommendation.generatedAt)}` : "尚未生成可核验判断"}</p></div></div>
             {recommendation ? <><ul>{recommendation.reasons.map(reason => <li key={reason}>{reason}</li>)}</ul>{recommendation.risks.length > 0 && <div className="job-detail-review-risks"><b>待确认</b>{recommendation.risks.map(risk => <span key={risk}>{risk}</span>)}</div>}<small>策略版本 {recommendation.policyVersion || "待确认"}</small></> : <div className="job-detail-review-empty">这个职位尚无真实推荐结果</div>}
           </section> : selectedTab === "engagement" ? <section className="job-detail-review-section">
-            <div className="job-detail-review-section-title"><span><ArrowRight /></span><div><h3>承接与结果</h3><p>项目关系、当前阶段和下一步动作</p></div></div>
-            <dl className="job-detail-review-facts"><Fact label="承接状态" value={job.engagementState} /><Fact label="与我的关系" value={job.relation} /><Fact label="当前阶段" value={job.currentStage} /><Fact label="下一步动作" value={job.nextAction} /></dl>
+            <div className="job-detail-review-section-title"><span><ArrowRight /></span><div><h3>跟进与结果</h3><p>项目关系、当前阶段和下一步动作</p></div></div>
+            <dl className="job-detail-review-facts"><Fact label="跟进状态" value={job.engagementState} /><Fact label="与我的关系" value={job.relation} /><Fact label="当前阶段" value={job.currentStage} /><Fact label="下一步动作" value={job.nextAction} /></dl>
           </section> : selectedTab === "trail" ? <section className="job-detail-review-section">
             <div className="job-detail-review-section-title"><span><Clock3 /></span><div><h3>决策轨迹</h3><p>真实操作记录</p></div></div>
             {recentEvents.length ? <div className="job-detail-review-events">{recentEvents.map(event => <div key={event.id}><i /><span><b>{event.label}</b>{event.detail && <small>{event.detail}</small>}</span><time>{displayDate(event.at)}</time></div>)}</div> : <div className="job-detail-review-empty">尚无操作记录</div>}

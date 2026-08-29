@@ -148,7 +148,7 @@ test("preserves engagement, result recording, replay, sync and notifications", a
   assert.match(workbench, /function engagementStateMessage/);
   assert.match(workbench, /if \(state === "RELEASED"\) return \["WATCH", "DISMISS"\]/);
   assert.match(workbench, /if \(state === "DISMISSED"\) return \["WATCH"\]/);
-  assert.match(workbench, /已从当前工作区释放；如需继续推进，可重新关注后再接单。/);
+  assert.match(workbench, /已从当前工作区释放；如需继续推进，可重新关注后再开始跟进。/);
   assert.match(workbench, /CommitmentLoopPanel/);
   assert.match(workbench, /updateOpportunityMembership/);
   assert.match(workbench, /membershipRelations/);
@@ -162,6 +162,21 @@ test("preserves engagement, result recording, replay, sync and notifications", a
   assert.match(workbench, /const recordOutcome=/);
   assert.match(workbench, /localStorage\.setItem\("decision-workbench"/);
   assert.match(demo, /export type EngagementState = "NEW"\|"RECOMMENDED"\|"VIEWED"\|"WATCHED"\|"ACCEPTED"/);
+});
+
+test("uses 加入项目、关注 and 开始跟进 as separate user-facing concepts", async () => {
+  const [workbench, demo, editor, api] = await Promise.all([
+    workbenchSource(),
+    source("app/decision-demo.ts"),
+    source("app/engagement-loop-editor.tsx"),
+    source("app/brainx-api.ts"),
+  ]);
+  const visibleCopy = [workbench, demo, editor, api].join("\n");
+
+  assert.match(demo, /ACCEPT:"开始跟进"/);
+  assert.match(editor, /确认开始跟进/);
+  assert.match(api, /ACCEPTED: "已开始跟进"/);
+  assert.doesNotMatch(visibleCopy, /确认接单|已接单|交付列表|接单后|再接单/);
 });
 
 test("keeps the navigation permanently compact and retains the commitments panel", async () => {

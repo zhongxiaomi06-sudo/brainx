@@ -29,7 +29,7 @@ export const FullWorkbench: Story = {
 
 const pageCopy: Record<Exclude<WorkspaceShellPage, "today" | "settings">, string> = {
   jobs: "集中检索、筛选和核验 TTC 职位事实。",
-  projects: "跟进已经关注、承接和等待记录结果的项目。",
+  projects: "跟进已经关注、开始推进和等待记录结果的项目。",
   clients: "按客户聚合真实职位、HC 和最近变化。",
 };
 

@@ -7,12 +7,12 @@ import {
 } from "../engagement-loop-editor";
 
 const meta = {
-  title: "流程组件/承接编辑器",
+  title: "流程组件/项目跟进编辑器",
   parameters: {
     surfaceClass: "storybook-compact",
     docs: {
       description: {
-        component: "使用本地状态驱动真实 CommitmentEditor，集中展示承接流程的各个阶段。",
+        component: "使用本地状态驱动真实 CommitmentEditor，集中展示开始跟进、进展、阻塞、终局和释放。",
       },
     },
   },

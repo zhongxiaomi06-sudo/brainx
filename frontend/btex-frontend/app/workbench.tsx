@@ -191,7 +191,7 @@ export default function DecisionWorkbench({demo=false}:{demo?:boolean}={}){
 function evidenceCoveragePercent(coverage:number|null){return coverage===null?null:Math.round(coverage<=1?coverage*100:coverage)}
 function ChatbotDrawer({messages,input,setInput,busy,onSend,onStop,onClear,onClose,mode,page,settings,setSettings,contextJob}:{messages:AssistantMessage[];input:string;setInput:(value:string)=>void;busy:boolean;onSend:()=>void;onStop:()=>void;onClear:()=>void;onClose:()=>void;mode:"connecting"|"connected"|"offline";page:Page;settings:boolean;setSettings:(value:boolean)=>void;contextJob:DecisionJob|null}){
  const [tab,setTab]=useState<"profile"|"market">("profile");
- const contextLabel=contextJob?`${contextJob.company} · ${contextJob.role}`:page==="today"?"当前精选盘与未接单职位":"当前工作台页面";
+ const contextLabel=contextJob?`${contextJob.company} · ${contextJob.role}`:page==="today"?"当前精选盘与待判断职位":"当前工作台页面";
  const coverage=contextJob?evidenceCoveragePercent(contextJob.evidenceCoverage):null;
  const tags=contextJob?[decisionGroupMeta[contextJob.group].title,contextJob.facts["职位关系"],contextJob.sourceMode==="COCKPIT_CONTEXT"?"驾驶舱上下文":"职位市场"]:["推荐评分","顾问可见范围","实时同步"];
  const insights=contextJob?[contextJob.recommendation,...contextJob.risks].slice(0,3):["推荐基于当前顾问可见的职位、推荐和状态。","硬规则优先于综合评分，UNKNOWN 不会被当成 0。"];
@@ -212,7 +212,7 @@ function ProjectsView({projects,total,query,setQuery,focusedProjectId,open}:{pro
  useEffect(()=>{if(!focusedProjectId)return;document.getElementById(`project-${focusedProjectId}`)?.scrollIntoView({block:"center",behavior:"smooth"})},[focusedProjectId,projects]);
  return <div className="decision-home accepted-home">
   <Heading code="MY PROJECTS" title="我的项目" desc="加入后的职位先进入待开始；确认目标和第一行动后，转为持续跟进。"/>
-  <section className="accepted-summary"><div><span>{isFiltered?"当前显示":"项目总数"}</span><b>{isFiltered?`${projects.length}/${total}`:total}</b><small>{isFiltered?"个匹配项目":"个真实项目归属"}</small></div><p>项目状态、行动和截止时间都来自后端，不再用“已接单”代替加入项目。</p></section>
+  <section className="accepted-summary"><div><span>{isFiltered?"当前显示":"项目总数"}</span><b>{isFiltered?`${projects.length}/${total}`:total}</b><small>{isFiltered?"个匹配项目":"个真实项目归属"}</small></div><p>项目状态、行动和截止时间都来自后端，不再用跟进状态代替项目归属。</p></section>
   <label className="concept-search"><Search/><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="搜索项目、公司或当前行动" aria-label="搜索我的项目"/></label>
   <div className="accepted-list">{projects.length?projects.map(project=><article id={`project-${project.project_id}`} className={`accepted-card${focusedProjectId===project.project_id?" is-focused":""}`} key={project.project_id}>
    <div className="accepted-card-top"><span>{project.project_status==="PENDING_START"?"待开始":project.project_status==="IN_PROGRESS"?"跟进中":project.project_status==="NEEDS_ACTION"?"需处理":project.project_status==="COMPLETED"?"已完成":"已释放"}</span><strong>{project.relation==="MY_JOB"?"我的职位":"团队共享"}</strong></div>
@@ -291,13 +291,13 @@ function WorkbenchPanel({panel,motion,job,commitmentJobs,auth,sync,notifications
  return <aside className={`decision-drawer workbench-panel panel-${motion}${dragOffset!==null?" is-dragging":""}`} style={{"--panel-drag-offset":`${dragOffset??0}px`} as React.CSSProperties} aria-label="工作台详情面板"><div className="drawer-drag-handle" aria-label="向右滑动关闭详情" onPointerDown={startPanelDrag} onPointerMove={movePanelDrag} onPointerUp={finishPanelDrag} onPointerCancel={finishPanelDrag}><i/></div><button className="drawer-close" onClick={onClose} aria-label="关闭详情"><X/></button>{panel?.kind==="sync"?<SyncPanel sync={sync} onSync={onSync} onSetSync={onSetSync} notify={notify} mode={mode}/>:panel?.kind==="identity"?<IdentityPanel auth={auth} onAuth={onAuth} notify={notify} mode={mode}/>:panel?.kind==="commitments"?<CommitmentsPanel jobs={commitmentJobs} engagement={engagement} onOpen={job=>onOpenJob(job,"engagement")}/>:<NotificationPanel items={notifications} onOpen={onNotification} notify={notify}/>}</aside>
 }
 
-function CommitmentsPanel({jobs,engagement,onOpen}:{jobs:DecisionJob[];engagement:Record<string,EngagementState>;onOpen:(job:DecisionJob)=>void}){return <><div className="panel-heading"><BriefcaseBusiness/><div><h1>我的承接</h1><p>关注、接单和需要继续处理的职位</p></div></div><div className="mobile-commitment-list">{jobs.length?jobs.map(job=><button key={job.id} onClick={()=>onOpen(job)}><span><b>{job.company} · {job.role}</b><small>{engagement[job.id]==="ACCEPTED"?"接单中 · 推进交付或记录结果":"关注中 · 评估后接单或取消关注"}</small></span><ChevronRight/></button>):<p>暂无承接职位。</p>}</div></>}
+function CommitmentsPanel({jobs,engagement,onOpen}:{jobs:DecisionJob[];engagement:Record<string,EngagementState>;onOpen:(job:DecisionJob)=>void}){return <><div className="panel-heading"><BriefcaseBusiness/><div><h1>我的跟进</h1><p>关注中、跟进中和需要继续处理的职位</p></div></div><div className="mobile-commitment-list">{jobs.length?jobs.map(job=><button key={job.id} onClick={()=>onOpen(job)}><span><b>{job.company} · {job.role}</b><small>{engagement[job.id]==="ACCEPTED"?"跟进中 · 推进行动或记录结果":"关注中 · 评估后开始跟进或取消关注"}</small></span><ChevronRight/></button>):<p>暂无跟进职位。</p>}</div></>}
 
-/** 接单自动找人面板（engagement tab）：接单后自动触发，SSE/刷新回传结果；done 可显式重跑。 */
+/** 开始跟进后自动找人面板（engagement tab）：后端 ACCEPT 成功后触发，SSE/刷新回传结果。 */
 function OpenmaiPanel({jobId,openmai,mode,onRerun}:{jobId:string;openmai:OpenmaiResult|null;mode:"connecting"|"connected"|"offline";onRerun:(jobId:string)=>void}){
  if(mode!=="connected")return null;
  if(!openmai||openmai.status==="none")return null;
- return <DrawerSection title="OpenMai 自动找人（接单后自动触发）">
+ return <DrawerSection title="OpenMai 自动找人（开始跟进后触发）">
    {openmai.status==="running"&&<p className="muted" style={{margin:"0 0 10px"}}>找人中…约 1-2 分钟，完成后自动更新（也可关闭页面稍后回来看）。</p>}
    {openmai.status==="failed"&&<p className="muted" style={{margin:"0 0 10px",color:"#c64b59"}}>找人失败：{openmai.error||"未知错误"}</p>}
    {openmai.status==="done"&&<pre style={{margin:"0 0 10px",padding:"12px",borderRadius:"10px",background:"rgba(23,107,88,.05)",border:"1px solid rgba(23,107,88,.18)",whiteSpace:"pre-wrap",wordBreak:"break-word",fontSize:"12px",lineHeight:"1.7",maxHeight:"420px",overflow:"auto"}}>{openmai.result_text}</pre>}
@@ -326,21 +326,21 @@ function DecisionDrawer({job,tab,completed,engagement,events,outcomes,openmai,on
 
 function engagementStateMessage(state:EngagementState){
  return ({
-  NEW:"尚未纳入个人承接；可先关注，或在判断面板核验后再处理。",
+  NEW:"尚未加入我的项目；可先关注，或在判断面板核验后再处理。",
   RECOMMENDED:"已获得推荐；可先关注，或在判断面板核验后再处理。",
   VIEWED:"已查看当前判断；可加入关注或暂不考虑。",
-  WATCHED:"已保留关注位；评估完成后可接单。",
-  ACCEPTED:"已进入你的交付列表；请持续推进并回写结果。",
-  DISMISSED:"已记录暂不考虑；如出现新信号，可重新关注并回到承接流程。",
-  RELEASED:"已从当前工作区释放；如需继续推进，可重新关注后再接单。",
-  COMPLETED:"本轮承接已完成；结果已归档，可在回放中查看完整过程。",
+  WATCHED:"已保留关注位；评估完成后可开始跟进。",
+  ACCEPTED:"项目正在跟进；请持续推进当前行动并回写结果。",
+  DISMISSED:"已记录暂不考虑；如出现新信号，可重新关注并回到跟进流程。",
+  RELEASED:"已从当前工作区释放；如需继续推进，可重新关注后再开始跟进。",
+  COMPLETED:"本轮跟进已完成；结果已归档，可在回放中查看完整过程。",
   EXPIRED:"关注超过 90 天无动作，已自动过期；可重新关注后继续评估。",
  } satisfies Record<EngagementState,string>)[state];
 }
 
 function engagementCommandLabel(command:EngagementCommand,state:EngagementState){
  if(command==="WATCH"&&(state==="RELEASED"||state==="DISMISSED"))return "重新关注";
- if(command==="RELEASE"&&state==="ACCEPTED")return "退出承接";
+ if(command==="RELEASE"&&state==="ACCEPTED")return "结束跟进";
  return actionLabel[command];
 }
 
@@ -355,9 +355,9 @@ function SyncPanel({sync,onSync,onSetSync,notify,mode}:{sync:SyncStatus;onSync:(
 
 function IdentityPanel({auth,onAuth,notify,mode}:{auth:AuthStatus;onAuth:(auth:AuthStatus)=>void;notify:(text:string)=>void;mode:"connecting"|"connected"|"offline"}){const [consultants,setConsultants]=useState<{consultant_id:string;display_name:string}[]|null>(null);const [loginBusy,setLoginBusy]=useState<string|null>(null);useEffect(()=>{brainxFetch<BackendConsultants>("/api/v1/consultants").then(d=>setConsultants(d.items||[])).catch(()=>setConsultants([]))},[]);const devLogin=(consultantId:string)=>void(async()=>{setLoginBusy(consultantId);try{await brainxFetch<null>("/api/v1/session",{method:"POST",body:{consultant_id:consultantId}});notify("已登录 Brain X，正在加载后端快照…");window.setTimeout(()=>window.location.reload(),600)}catch(error){notify(`登录失败：${error instanceof Error?error.message:"后端未响应"}`);setLoginBusy(null)}})();const logout=()=>void(async()=>{try{await brainxFetch<null>("/api/v1/session",{method:"DELETE"})}catch{}notify("已退出 Brain X 会话");window.setTimeout(()=>window.location.reload(),400)})();return <><div className="panel-heading"><CircleUserRound/><div><h1>{auth.consultant}</h1><p>{mode==="connected"?"Brain X 顾问会话与数据授权":"本地演示身份与后端登录"}</p></div></div><DrawerSection title="账户状态"><dl className="facts"><div><dt>登录状态</dt><dd>{mode==="connected"?"Brain X 已登录":mode==="connecting"?"正在探测后端…":"演示模式（未连接后端）"}</dd></div><div><dt>飞书授权</dt><dd className={auth.needsReauth?"unknown":""}>{mode==="connected"?auth.needsReauth?"已过期":"正常":"—"}</dd></div></dl></DrawerSection>{mode==="connected"?<div className="drawer-actions"><button onClick={logout}><span><b>退出登录</b><small>清除 Brain X 会话并回到演示模式</small></span><ChevronRight/></button></div>:<><DrawerSection title="飞书扫码登录（正式入口）"><p className="panel-caption">跳转飞书统一授权页，用你自己的飞书账号扫码授权。需在顾问花名册内，否则会被拒绝。</p><div className="drawer-actions"><button onClick={()=>{window.location.href="/api/v1/oauth/authorize"}}><span><b>飞书扫码登录</b><small>跳转飞书授权页 · 登录 Brain X 工作台</small></span><ChevronRight/></button></div></DrawerSection><DrawerSection title="登录 Brain X 后端（开发后门）"><p className="panel-caption">后端需以 BRAINX_DEV_AUTH=1 启动；正式环境请使用飞书授权登录。</p><div className="drawer-actions">{consultants===null?<p className="muted">正在读取顾问花名册…</p>:consultants.length?consultants.map(c=><button key={c.consultant_id} onClick={()=>devLogin(c.consultant_id)} disabled={loginBusy!==null}><span><b>{loginBusy===c.consultant_id?"登录中…":c.display_name}</b><small>以该顾问身份进入 Brain X 工作台</small></span>{loginBusy===c.consultant_id?<Clock3/>:<ChevronRight/>}</button>):<p className="muted">后端不可达或花名册为空。</p>}</div></DrawerSection><DrawerSection title="演示状态"><div className="drawer-actions"><button onClick={()=>{onAuth({...auth,needsReauth:!auth.needsReauth,authorized:auth.needsReauth});notify(auth.needsReauth?"已恢复授权演示状态":"已切换为授权过期演示状态")}}><span><b>{auth.needsReauth?"恢复授权状态":"模拟授权过期"}</b><small>用于验证后端授权恢复入口</small></span><ShieldCheck/></button><button onClick={()=>notify("已退出演示会话；刷新页面将恢复本地演示身份")}><span><b>退出演示</b><small>不影响任何外部账号</small></span><ChevronRight/></button></div></DrawerSection></>}</>}
 
-function NotificationPanel({items,onOpen,notify}:{items:Notification[];onOpen:(item:Notification)=>void;notify:(text:string)=>void}){return <><div className="panel-heading"><BellRing/><div><h1>今日提醒</h1><p>同步、承接与每日推荐摘要</p></div></div><div className="notification-list">{items.map(item=><button key={item.id} className={item.read?"read":""} onClick={()=>onOpen(item)}><i/><span><b>{item.title}</b><small>{item.detail}</small></span><ChevronRight/></button>)}</div><DrawerSection title="推送预览"><div className="push-preview"><b>今日职位判断</b><span>Top 3 已生成 · 1 个承接待处理</span></div><button className="btn" onClick={()=>notify("已模拟发送到 Felix 的飞书提醒") }><Send/>模拟发送</button><p className="panel-caption">仅展示推送内容，不会发送到外部系统。</p></DrawerSection></>}
+function NotificationPanel({items,onOpen,notify}:{items:Notification[];onOpen:(item:Notification)=>void;notify:(text:string)=>void}){return <><div className="panel-heading"><BellRing/><div><h1>今日提醒</h1><p>同步、项目跟进与每日推荐摘要</p></div></div><div className="notification-list">{items.map(item=><button key={item.id} className={item.read?"read":""} onClick={()=>onOpen(item)}><i/><span><b>{item.title}</b><small>{item.detail}</small></span><ChevronRight/></button>)}</div><DrawerSection title="推送预览"><div className="push-preview"><b>今日职位判断</b><span>Top 3 已生成 · 1 个项目待处理</span></div><button className="btn" onClick={()=>notify("已模拟发送到 Felix 的飞书提醒") }><Send/>模拟发送</button><p className="panel-caption">仅展示推送内容，不会发送到外部系统。</p></DrawerSection></>}
 
-function CommandConfirm({pending,reasons,onClose,onConfirm}:{pending:{job:DecisionJob;command:EngagementCommand};reasons:string[];onClose:()=>void;onConfirm:(reason?:string)=>void}){const list=reasons&&reasons.length?reasons:["无资源","不符合方向","客户/职位质量不足","当前没精力","已有其他顾问推进","信息不完整","其他"];const [reason,setReason]=useState(list[0]);const dismiss=pending.command==="DISMISS";const reasonOptions:FilterSelectOption[]=list.map(value=>({value,label:value}));return <div className="command-mask" role="presentation"><section className="command-modal" role="dialog" aria-modal="true" aria-label="确认承接操作"><h2>{dismiss?"暂不考虑这个职位？":"确认接单？"}</h2><p>{dismiss?"选择原因后会记录到决策轨迹。":"接单后该职位将进入你的交付列表。"}</p>{dismiss&&<FilterSelect value={reason} onChange={setReason} ariaLabel="暂不考虑原因" options={reasonOptions}/>}<div><button className="btn" onClick={onClose}>取消</button><button className="btn primary" onClick={()=>onConfirm(dismiss?reason:undefined)}>{dismiss?"记录原因":"确认接单"}</button></div></section></div>}
+function CommandConfirm({pending,reasons,onClose,onConfirm}:{pending:{job:DecisionJob;command:EngagementCommand};reasons:string[];onClose:()=>void;onConfirm:(reason?:string)=>void}){const list=reasons&&reasons.length?reasons:["无资源","不符合方向","客户/职位质量不足","当前没精力","已有其他顾问推进","信息不完整","其他"];const [reason,setReason]=useState(list[0]);const dismiss=pending.command==="DISMISS";const reasonOptions:FilterSelectOption[]=list.map(value=>({value,label:value}));return <div className="command-mask" role="presentation"><section className="command-modal" role="dialog" aria-modal="true" aria-label="确认项目操作"><h2>{dismiss?"暂不考虑这个职位？":"确认开始跟进？"}</h2><p>{dismiss?"选择原因后会记录到决策轨迹。":"开始跟进前需要确认目标、第一行动和截止时间。"}</p>{dismiss&&<FilterSelect value={reason} onChange={setReason} ariaLabel="暂不考虑原因" options={reasonOptions}/>}<div><button className="btn" onClick={onClose}>取消</button><button className="btn primary" onClick={()=>onConfirm(dismiss?reason:undefined)}>{dismiss?"记录原因":"确认开始跟进"}</button></div></section></div>}
 
 // —— 候选供给（人才侧适配层的前端呈现）——
 // 数据形状对齐后端 talent-supply.js 的 TalentSupplySnapshot（GET /opportunities/:id/talent-supply）。

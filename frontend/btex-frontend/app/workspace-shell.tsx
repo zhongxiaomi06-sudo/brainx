@@ -23,9 +23,9 @@ const primaryNavigation = [
 ] as const;
 
 const pageMeta: Record<WorkspaceShellPage, { title: string; description: string }> = {
-  today: { title: "今日决策", description: "先判断，再加入精选或接单" },
+  today: { title: "今日决策", description: "先判断，再加入项目或开始跟进" },
   jobs: { title: "全部职位", description: "检索和核验 TTC 真实职位事实" },
-  projects: { title: "我的项目", description: "推进已关注和已承接的职位" },
+  projects: { title: "我的项目", description: "查看项目状态并推进下一行动" },
   clients: { title: "客户洞察", description: "按客户查看可核验的职位事实" },
   settings: { title: "设置中心", description: "管理身份、数据连接、推荐策略与同步诊断" },
 };

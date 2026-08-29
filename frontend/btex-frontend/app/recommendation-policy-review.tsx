@@ -56,7 +56,7 @@ type RecommendationPolicyReviewProps = {
 };
 
 const modeDefinitions: { id: Exclude<PolicyMode, "custom">; name: string; label: string; description: string; weights: Record<PolicyDimensionKey, number> }[] = [
-  { id: "steady", name: "稳健", label: "优先证据充分", description: "更重视方向、活跃度与当前承接容量。", weights: { direction: 30, activity: 25, similarity: 15, capacity: 20, outcomes: 5, exploration: 5 } },
+  { id: "steady", name: "稳健", label: "优先证据充分", description: "更重视方向、活跃度与当前跟进容量。", weights: { direction: 30, activity: 25, similarity: 15, capacity: 20, outcomes: 5, exploration: 5 } },
   { id: "balanced", name: "均衡", label: "沿用当前基线", description: "使用 baseline-1.1 已实现的六维比例。", weights: { direction: 25, activity: 20, similarity: 15, capacity: 15, outcomes: 15, exploration: 10 } },
   { id: "explore", name: "探索", label: "扩大新机会范围", description: "提高确定性探索配额，仍受硬规则约束。", weights: { direction: 20, activity: 15, similarity: 15, capacity: 15, outcomes: 5, exploration: 30 } },
 ];

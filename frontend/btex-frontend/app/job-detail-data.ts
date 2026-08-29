@@ -15,7 +15,7 @@ const eventLabels: Record<string, string> = {
   VIEWED: "已查看",
   RECOMMENDED: "已推荐",
   WATCHED: "已关注",
-  ACCEPTED: "已接单",
+  ACCEPTED: "已开始跟进",
   DISMISSED: "暂不考虑",
   RELEASED: "已释放",
   COMPLETED: "已完成",

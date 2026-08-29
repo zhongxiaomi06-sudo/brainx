@@ -30,7 +30,7 @@ function itemAt(index: number): RecommendationQueueItem {
       { code: "NEXT_ACTION_READY", text: "存在明确的下一步动作，可以直接开始推进。", evidence: "驾驶舱下一动作", occurredAt: "2026-08-28T09:00:00+08:00" },
       { code: "PIPELINE_RECENT", text: "近期 Pipeline 有可核验的真实变化。", evidence: "TTC Pipeline 快照", occurredAt: "2026-08-27T15:20:00+08:00" },
     ],
-    risk: rank % 6 === 0 ? "剩余 HC 尚未确认，承接前需要核验。" : null,
+    risk: rank % 6 === 0 ? "剩余 HC 尚未确认，开始跟进前需要核验。" : null,
     confidence: rank > 28 ? "INSUFFICIENT" : rank % 6 === 0 ? "PARTIAL" : "SUFFICIENT",
     factsUpdatedAt: "2026-08-28T09:00:00+08:00",
     engagementLabel: null,

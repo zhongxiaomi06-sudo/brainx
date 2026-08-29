@@ -15,7 +15,7 @@ const baseData: RecommendationPolicyData = {
     { key: "direction", label: "职位方向匹配", basis: "画像关键词；为空时使用历史主做项目文本", availability: "available", availabilityNote: "当前画像关键词可用。" },
     { key: "activity", label: "项目活跃度与 Pipeline", basis: "职位状态、优先级、Pipeline、更新与群活跃", availability: "available", availabilityNote: "当前快照具备活跃度输入。" },
     { key: "similarity", label: "历史项目相似度", basis: "历史 MY_JOB 的公司与职位文本", availability: "partial", availabilityNote: "仅部分历史项目已建立顾问关系。" },
-    { key: "capacity", label: "当前承接容量", basis: "关注数、接单数与顾问容量上限", availability: "available", availabilityNote: "顾问当前容量数据可用。" },
+    { key: "capacity", label: "当前跟进容量", basis: "关注数、跟进项目数与顾问容量上限", availability: "available", availabilityNote: "顾问当前容量数据可用。" },
     { key: "outcomes", label: "历史行为与交付结果", basis: "职位结果评分和人工标注", availability: "unavailable", availabilityNote: "当前顾问结果样本不足，不能证明调权效果。" },
     { key: "exploration", label: "探索额度", basis: "职位、顾问与日期的确定性哈希", availability: "available", availabilityNote: "每天可复现，不使用随机数。" },
   ],

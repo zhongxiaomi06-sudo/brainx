@@ -185,7 +185,7 @@ export const PRIORITY_LABELS: Record<string, string> = {
 };
 
 export const BACKEND_ACTION_LABELS: Record<string, string> = {
-  RECOMMEND_ACCEPT: "建议接单",
+  RECOMMEND_ACCEPT: "建议开始跟进",
   RECOMMEND_WATCH: "建议关注",
   OBSERVE: "先观察验证",
 };
@@ -194,7 +194,7 @@ export const EVENT_TYPE_LABELS: Record<string, string> = {
   VIEWED: "已查看",
   RECOMMENDED: "已推荐",
   WATCHED: "已关注",
-  ACCEPTED: "已接单",
+  ACCEPTED: "已开始跟进",
   DISMISSED: "暂不考虑",
   RELEASED: "已释放",
   COMPLETED: "已完成",
@@ -210,7 +210,7 @@ export const BACKEND_WEIGHTS: { dim: string; label: string; weight: string }[] =
   { dim: "direction", label: "职位方向匹配", weight: "25%" },
   { dim: "activity", label: "项目活跃度与 Pipeline", weight: "20%" },
   { dim: "similarity", label: "与历史项目相似度", weight: "15%" },
-  { dim: "capacity", label: "当前承接容量", weight: "15%" },
+  { dim: "capacity", label: "当前跟进容量", weight: "15%" },
   { dim: "outcomes", label: "历史行为与交付结果", weight: "15%" },
   { dim: "exploration", label: "探索额度", weight: "10%" },
 ];
@@ -241,7 +241,7 @@ export function directionOf(role: string): BrainxDirection {
 
 export function eligibilityOf(action: string, relation: string, hc: number | null, activeState: string): BrainxEligibility {
   if (hc === 0 || activeState === "CLOSED" || activeState === "COMPLETED") return "EXCLUDED";
-  // OTHER_CONSULTANT 不再阻塞接单（顾问接单互不影响，仅保留"他人主做"提示）
+  // OTHER_CONSULTANT 不再阻塞开始跟进（顾问之间互不排斥，仅保留“他人主做”提示）
   if (relation === "NOT_JOINED" || relation === "UNKNOWN") return "VERIFY_REQUIRED";
   if (action === "OBSERVE") return "VERIFY_REQUIRED";
   return "ELIGIBLE";
@@ -256,13 +256,13 @@ export function groupOf(action: string, hc: number | null, activeState: string):
 
 export function actionsOf(action: string, relation: string): BrainxDecisionAction[] {
   if (relation === "OTHER_CONSULTANT" || relation === "NOT_JOINED") {
-    return [{ id: "ownership", label: "确认项目归属", kind: "verify", detail: "确认是否允许承接，或先与其他顾问沟通认领" }];
+    return [{ id: "ownership", label: "确认项目归属", kind: "verify", detail: "确认是否允许跟进，或先与其他顾问沟通认领" }];
   }
   if (action === "RECOMMEND_ACCEPT") {
-    return [{ id: "advance", label: "进入项目推进", kind: "advance", detail: "接单后按客户反馈窗口持续回写信号" }];
+    return [{ id: "advance", label: "进入项目推进", kind: "advance", detail: "开始跟进后按客户反馈窗口持续回写信号" }];
   }
   if (action === "RECOMMEND_WATCH") {
-    return [{ id: "watch", label: "加入观察", kind: "watch", detail: "保留本周提醒，评估后再接单" }];
+    return [{ id: "watch", label: "加入观察", kind: "watch", detail: "保留本周提醒，评估后再开始跟进" }];
   }
   return [{ id: "verify", label: "核验关键事实", kind: "verify", detail: "补齐 HC 与阶段事实后再判断" }];
 }
@@ -414,7 +414,7 @@ export function buildNotifications(
     });
   }
   if (wb.need_action_count && wb.need_action_count > 0) {
-    notes.push({ id: "brainx-commit", kind: "COMMITMENT", title: `${wb.need_action_count} 个承接需要处理`, detail: "关注超过 7 天未推进，或接单后未回写结果", read: false });
+    notes.push({ id: "brainx-commit", kind: "COMMITMENT", title: `${wb.need_action_count} 个项目需要处理`, detail: "关注超过 7 天未推进，或开始跟进后未回写结果", read: false });
   }
   return notes;
 }
@@ -560,7 +560,7 @@ export async function getSnapshot(): Promise<BrainxSnapshot> {
   };
 }
 
-/** 接单自动找人结果（/api/v1/opportunities/:id 响应内嵌 openmai 字段）。 */
+/** 开始跟进后自动找人结果（/api/v1/opportunities/:id 响应内嵌 openmai 字段）。 */
 export type OpenmaiResult = {
   status: "none" | "running" | "done" | "failed";
   result_text?: string | null;

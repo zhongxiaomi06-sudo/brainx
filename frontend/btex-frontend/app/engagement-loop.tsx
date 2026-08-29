@@ -185,13 +185,13 @@ export function CommitmentLoopPanel({
           method: "POST",
           body: { action: "ACCEPT", goal: goal.trim(), action_title: actionTitle.trim(), due_at: toIso(dueAt), idempotency_key: makeIdempotencyKey(`accept:${job.id}`) },
         });
-        await refresh("已接单，第一条行动已建立");
+        await refresh("已开始跟进，第一条行动已建立");
         return;
       }
       const action: CommitmentAction = { actionId: `local-${Date.now()}`, title: actionTitle.trim(), dueAt: toIso(dueAt), status: "OPEN", source: "MANUAL", createdAt: new Date().toISOString() };
       setSnapshot({ goal: goal.trim(), activeAction: action, actionHistory: [], suggestedAction: null, terminalResultMissing: false, terminalResult: null });
       dispatchLocal("ACCEPTED");
-      notify("已接单");
+      notify("已开始跟进");
       setEditor(null);
     });
   const buildSuggestion = () =>
@@ -279,7 +279,7 @@ export function CommitmentLoopPanel({
             idempotency_key: makeIdempotencyKey(`terminal:${job.id}`),
           },
         });
-        await refresh(snapshot.terminalResultMissing ? "终局结果已补录" : "承接已完成，结果已归档");
+        await refresh(snapshot.terminalResultMissing ? "终局结果已补录" : "本轮跟进已完成，结果已归档");
         return;
       }
       const at = new Date().toISOString();
@@ -307,14 +307,14 @@ export function CommitmentLoopPanel({
           method: "POST",
           body: { action: "RELEASE", reason: releaseReason, summary: summary.trim(), idempotency_key: makeIdempotencyKey(`release:${job.id}`) },
         });
-        await refresh("承接已释放，当前行动已取消");
+        await refresh("跟进已结束，当前行动已取消");
         return;
       }
       const current = snapshot.activeAction;
       const cancelled = current ? { ...current, status: "CANCELLED" as const, completedAt: new Date().toISOString(), completionNote: `${releaseReason}：${summary.trim()}` } : null;
       setSnapshot((s) => ({ ...s, activeAction: null, actionHistory: cancelled ? [cancelled, ...s.actionHistory] : s.actionHistory }));
       dispatchLocal("RELEASED");
-      notify("承接已释放");
+      notify("跟进已结束");
       setEditor(null);
     });
   const deadlineButtons = (set: (value: string) => void) => (
@@ -382,11 +382,11 @@ export function CommitmentLoopPanel({
       {!membershipNeedsConfirmation && !requiresFactVerification && displayState !== "ACCEPTED" && displayState !== "COMPLETED" ? (
         <section className="commitment-onboarding">
           <span>{stateLabel[displayState]}</span>
-          <h2>承接设置</h2>
+          <h2>项目跟进</h2>
           <div className="commitment-command-row">
             {legal.includes("ACCEPT") && (
               <button className="primary" onClick={() => setEditor("accept")}>
-                接单并设定行动
+                开始跟进
               </button>
             )}
             {legal
@@ -422,7 +422,7 @@ export function CommitmentLoopPanel({
               <button
                 className="primary"
                 onClick={() => {
-                  setGoal(snapshot.goal || "继续当前承接");
+                  setGoal(snapshot.goal || "继续当前项目跟进");
                   setEditor("accept");
                 }}
               >
@@ -451,7 +451,7 @@ export function CommitmentLoopPanel({
               </button>
               <button onClick={() => setEditor("terminal")}>终局结果</button>
               <button className="quiet" onClick={() => setEditor("release")}>
-                释放承接
+                结束跟进
               </button>
             </div>
           )}

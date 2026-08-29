@@ -10,7 +10,7 @@ type View = "today" | "signal" | "trace";
 const views: Record<View, { label: string; eyebrow: string; title: string; summary: string; rows: [string, string, string, string][]; note: string }> = {
   today: {
     label: "今日判断", eyebrow: "TODAY / PRIORITY", title: "今天先做这 3 个职位", summary: "已先处理关闭、入职、HC 与项目重复，再按当前可推进性排序。",
-    rows: [["01", "39‑AI · 资深海外投放经理", "高动能推进", "推进 82"], ["02", "上海蝴蝶梦境 · 资深广告优化师", "需要核验", "探索 95"], ["03", "Aha.AI · B2B 投放专员", "已查看", "个人 71"]], note: "9 个有效机会 · 3 个待核验 · 2 个承接中",
+    rows: [["01", "39‑AI · 资深海外投放经理", "高动能推进", "推进 82"], ["02", "上海蝴蝶梦境 · 资深广告优化师", "需要核验", "探索 95"], ["03", "Aha.AI · B2B 投放专员", "已查看", "个人 71"]], note: "9 个有效机会 · 3 个待核验 · 2 个跟进中",
   },
   signal: {
     label: "关键事实", eyebrow: "SIGNAL / EVIDENCE", title: "判断先回到事实", summary: "未知、缺失与已确认信息分开表达，避免把历史或推测当成现在。",
@@ -18,7 +18,7 @@ const views: Record<View, { label: string; eyebrow: string; title: string; summa
   },
   trace: {
     label: "判断轨迹", eyebrow: "TRACE / REPLAY", title: "当时为什么这样判断", summary: "快照冻结当下的排名、证据与规则；后续动作只作为之后发生的信息。",
-    rows: [["01", "08.11 · 推荐快照", "Policy v1.2", "Final 80"], ["02", "确认 Offer 状态", "已记录", "08.12"], ["03", "接单并推进", "承接中", "下一步"]], note: "当前事实不会改写历史判断",
+    rows: [["01", "08.11 · 推荐快照", "Policy v1.2", "Final 80"], ["02", "确认 Offer 状态", "已记录", "08.12"], ["03", "开始跟进", "跟进中", "下一步"]], note: "当前事实不会改写历史判断",
   },
 };
 
@@ -45,11 +45,11 @@ export default function BtexShowcase() {
       </section>
     </section>
 
-    <section className="principles" id="principles"><div className="section-intro"><p>01 / THE DECISION</p><h2>少一点“信息”，<br />多一点<span>可以决定的事。</span></h2></div><div className="principle-list"><article><span>01</span><h3>先把事实收口</h3><p>关闭、入职、HC、项目归属与当前状态优先处理。UNKNOWN 就是 UNKNOWN，不写成看似确定的数字。</p></article><article><span>02</span><h3>再给出可信排序</h3><p>推进、探索、个人适配与判断可靠度并列呈现。分数是线索，而不是替代判断的答案。</p></article><article><span>03</span><h3>只展示允许的动作</h3><p>验证、关注、接单、完成，都由当前身份与事实决定。前端不擅自推断权限或补全缺失事实。</p></article></div></section>
+    <section className="principles" id="principles"><div className="section-intro"><p>01 / THE DECISION</p><h2>少一点“信息”，<br />多一点<span>可以决定的事。</span></h2></div><div className="principle-list"><article><span>01</span><h3>先把事实收口</h3><p>关闭、入职、HC、项目归属与当前状态优先处理。UNKNOWN 就是 UNKNOWN，不写成看似确定的数字。</p></article><article><span>02</span><h3>再给出可信排序</h3><p>推进、探索、个人适配与判断可靠度并列呈现。分数是线索，而不是替代判断的答案。</p></article><article><span>03</span><h3>只展示允许的动作</h3><p>验证、关注、开始跟进、完成，都由当前身份与事实决定。前端不擅自推断权限或补全缺失事实。</p></article></div></section>
 
     <section className="evidence-band"><div><p>02 / EXPLAINABLE BY DEFAULT</p><h2>每一次推荐，<br />都能回到它的来处。</h2></div><dl><div><dt>当前事实</dt><dd>职位关系、Offer、HC、最新活动</dd></div><div><dt>判断说明</dt><dd>评分拆解、风险与未知原因</dd></div><div><dt>冻结回放</dt><dd>当时快照与后续结果并列呈现</dd></div></dl></section>
 
-    <section className="scope" id="scope"><div><p>03 / THE CURRENT SURFACE</p><h2>为后端留好接口，<br />但不假装它已经接上。</h2></div><div className="scope-grid"><article><Check /><h3>今日判断</h3><p>按业务阶段组织 Top 3、核验与排除区。</p></article><article><PanelRight /><h3>并排详情</h3><p>判断、承接、轨迹与回放都留在同一工作流。</p></article><article><ShieldCheck /><h3>本地可演示</h3><p>同步、身份、通知与承接状态可完整走通。</p></article></div><p className="scope-note">当前是前端原型：真实排序、权限、同步与推送均等待后端适配层接入。</p></section>
+    <section className="scope" id="scope"><div><p>03 / THE CURRENT SURFACE</p><h2>为后端留好接口，<br />但不假装它已经接上。</h2></div><div className="scope-grid"><article><Check /><h3>今日判断</h3><p>按业务阶段组织 Top 3、核验与排除区。</p></article><article><PanelRight /><h3>并排详情</h3><p>判断、跟进、轨迹与回放都留在同一工作流。</p></article><article><ShieldCheck /><h3>本地可演示</h3><p>同步、身份、通知与跟进状态可完整走通。</p></article></div><p className="scope-note">当前是前端原型：真实排序、权限、同步与推送均等待后端适配层接入。</p></section>
 
     <section className="final-cta"><p>B‑TEX / FACTS BECOME ACTION</p><h2>下一步，不必靠记住。</h2><a href="/">打开职位决策台 <ArrowRight /></a><footer><span>B‑tex</span><span>职位决策工作台</span><span>2026</span></footer></section>
 

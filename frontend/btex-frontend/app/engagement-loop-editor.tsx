@@ -54,10 +54,10 @@ export function CommitmentEditor(props: Props) {
     releaseReason, setReleaseReason, submitAccept, buildSuggestion, submitProgress,
     submitTerminal, submitRelease, deadlineButtons,
   } = props;
-  const title = editor === "accept" ? "建立承接"
+  const title = editor === "accept" ? "开始跟进"
     : editor === "progress" ? (step === 1 ? "填写本次结果" : "确认下一行动")
     : editor === "blocked" ? (step === 1 ? "记录阻塞" : "确认下一行动")
-    : editor === "terminal" ? "记录终局结果" : "释放承接";
+    : editor === "terminal" ? "记录终局结果" : "结束跟进";
   return <section className="commitment-editor">
     <div className="commitment-editor-head"><h2>{title}</h2><button aria-label="关闭编辑" onClick={() => { setEditor(null); setError(""); }}>×</button></div>
     {editor === "accept" && <div className="commitment-fields">
@@ -65,7 +65,7 @@ export function CommitmentEditor(props: Props) {
       <label>第一条行动<input value={actionTitle} onChange={(event) => setActionTitle(event.target.value)} placeholder="下一步具体做什么" /></label>
       <label>截止时间<input type="datetime-local" value={dueAt} onChange={(event) => setDueAt(event.target.value)} /></label>
       {deadlineButtons(setDueAt)}
-      <button className="primary" disabled={busy} onClick={submitAccept}>{busy ? "保存中…" : "确认接单并建立行动"}</button>
+      <button className="primary" disabled={busy} onClick={submitAccept}>{busy ? "保存中…" : "确认开始跟进"}</button>
     </div>}
     {(editor === "progress" || editor === "blocked") && step === 1 && <div className="commitment-fields">
       <label>本次结果<textarea value={summary} onChange={(event) => setSummary(event.target.value)} placeholder={editor === "blocked" ? "卡在哪里、已做过什么" : "发生了什么、得到什么结论"} /></label>
@@ -88,7 +88,7 @@ export function CommitmentEditor(props: Props) {
       </div></label>
       {terminalStage === "关闭" && <label>关闭原因<select value={closeReason} onChange={(event) => setCloseReason(event.target.value)}>{closeReasons.map((value) => <option key={value}>{value}</option>)}</select></label>}
       <label>结果摘要<textarea value={summary} onChange={(event) => setSummary(event.target.value)} placeholder="记录最终发生了什么，以及必要的上下文" /></label>
-      <button className="primary" disabled={busy} onClick={submitTerminal}>{busy ? "提交中…" : "确认终局并完成承接"}</button>
+      <button className="primary" disabled={busy} onClick={submitTerminal}>{busy ? "提交中…" : "确认结果并完成跟进"}</button>
     </div>}
     {editor === "release" && <div className="commitment-fields">
       <label>释放原因<select value={releaseReason} onChange={(event) => setReleaseReason(event.target.value)}>{releaseReasons.map((value) => <option key={value}>{value}</option>)}</select></label>

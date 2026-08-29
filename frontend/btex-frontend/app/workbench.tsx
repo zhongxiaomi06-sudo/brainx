@@ -34,6 +34,7 @@ import { TodayDecisionQueue } from "./workbench-today";
 import { WorkbenchClientsPage, WorkbenchJobsPage } from "./workbench-fact-pages";
 import { WorkspaceShell, type WorkspaceShellPage } from "./workspace-shell";
 import { WorkbenchSettingsPage } from "./workbench-settings-page";
+import { ProjectsView } from "./projects-view";
 
 
 export default function DecisionWorkbench({demo=false}:{demo?:boolean}={}){
@@ -154,11 +155,6 @@ export default function DecisionWorkbench({demo=false}:{demo?:boolean}={}){
  const allDecisionJobs=useMemo(()=>[...activeDecisionJobs,...projectDecisionJobs.filter(project=>!activeDecisionJobs.some(job=>job.id===project.id))],[activeDecisionJobs,projectDecisionJobs]);
  const selectedDecisionJob=panel?.kind==="job"?[...allDecisionJobs,...verificationJobs].find(job=>job.id===panel.jobId)||null:null;
  const commitmentJobs=allDecisionJobs.filter(job=>["WATCHED","ACCEPTED"].includes(engagement[job.id]||"NEW"));
- const visibleProjects=useMemo(()=>{
-  const keyword=query.trim().toLocaleLowerCase();
-  if(!keyword)return brainxProjects;
-  return brainxProjects.filter(project=>`${project.company} ${project.role} ${project.current_stage||""} ${project.active_action?.title||""}`.toLocaleLowerCase().includes(keyword));
- },[brainxProjects,query]);
  const shellPage:WorkspaceShellPage=page==="accepted"?"projects":page==="clients"?"clients":page==="jobs"?"jobs":page==="today"?"today":"settings";
  const navigateShell=(next:WorkspaceShellPage)=>{if(next==="jobs")setJobCompanyFilter(null);if(next==="settings")setAssistantOpen(false);go(next==="projects"?"accepted":next==="settings"?"settings":next)};
  return <div className="btex-app formal-workbench">
@@ -167,7 +163,7 @@ export default function DecisionWorkbench({demo=false}:{demo?:boolean}={}){
    {["today","accepted","jobs","clients"].includes(page)&&(brainxMode==="connecting"||workspaceIssue)?
     <WorkspaceEntry kind={brainxMode==="connecting"?"connecting":workspaceIssue!} onRetry={()=>setConnectAttempt(value=>value+1)} onCheckConnection={async()=>{await brainxFetch<BackendSessionStatus>("/api/v1/oauth/status");const snapshot=await getSnapshot();brainxApply.current(snapshot);await loadBrainxSide.current()}} onOpenSources={()=>go("sources")} />:<>
     {page==="today"&&<TodayDecisionQueue activeJobId={panel?.kind==="job"&&panelMotion!=="closing"?panel.jobId:null} completed={decisionActions} jobs={activeDecisionJobs} projects={brainxProjects} engagement={engagement} sync={sync} open={openDecision} onAction={runDecisionAction} onAddToProjects={job=>{void addToMyProjects(job.id,job.company)}} onGoToProject={goToProject} onFeedback={feedbackJob} showVerification={demo} tray={tray} onToggleTray={toggleTray} onRemoveTray={removeTray} folders={folders} folderMode={folderMode} onFolderMode={()=>setFolderMode(value=>!value)} onAssignFolder={assignFolder} onCreateFolder={createFolder} mode={brainxMode} onOpenSources={()=>go("sources")} />}
-    {page==="accepted"&&<ProjectsView projects={visibleProjects} total={brainxProjects.length} query={query} setQuery={setQuery} focusedProjectId={focusedProjectId} open={project=>openDecision(projectToDecisionJob(project),"engagement")} />}
+    {page==="accepted"&&<ProjectsView projects={brainxProjects} query={query} setQuery={setQuery} focusedProjectId={focusedProjectId} open={project=>openDecision(projectToDecisionJob(project),"engagement")} />}
     {page==="jobs"&&<WorkbenchJobsPage items={brainxRadar?.items??[]} capabilities={brainxRadar?.fieldCapabilities??[]} company={jobCompanyFilter} onAddToProjects={jobId=>{void addRadarJobToProjects(jobId)}} />}
    {page==="clients"&&<WorkbenchClientsPage items={brainxClients??[]} onOpenJobs={company=>{setJobCompanyFilter(company);go("jobs")}} />}
    </>}
@@ -206,23 +202,6 @@ function ChatbotDrawer({messages,input,setInput,busy,onSend,onStop,onClear,onClo
    <form className="assistant-compose" onSubmit={event=>{event.preventDefault();onSend()}}><textarea value={input} onChange={event=>setInput(event.target.value)} placeholder="向 BrainX 助手提问…" rows={2} disabled={busy&&mode!=="connected"}/><div><button type="button" className="assistant-clear" onClick={onClear}>清空</button><button type="button" className="assistant-gear" onClick={()=>setSettings(!settings)} aria-label="模型设置"><Settings2/></button>{busy?<button type="button" className="btn" onClick={onStop}>停止</button>:<button type="submit" className="btn primary" disabled={!input.trim()||mode!=="connected"}><Send/>发送</button>}</div></form>
   </aside>
  </>}
-
-function ProjectsView({projects,total,query,setQuery,focusedProjectId,open}:{projects:ProjectSummary[];total:number;query:string;setQuery:(value:string)=>void;focusedProjectId:string|null;open:(project:ProjectSummary)=>void}){
- const isFiltered=Boolean(query.trim());
- useEffect(()=>{if(!focusedProjectId)return;document.getElementById(`project-${focusedProjectId}`)?.scrollIntoView({block:"center",behavior:"smooth"})},[focusedProjectId,projects]);
- return <div className="decision-home accepted-home">
-  <Heading code="MY PROJECTS" title="我的项目" desc="加入后的职位先进入待开始；确认目标和第一行动后，转为持续跟进。"/>
-  <section className="accepted-summary"><div><span>{isFiltered?"当前显示":"项目总数"}</span><b>{isFiltered?`${projects.length}/${total}`:total}</b><small>{isFiltered?"个匹配项目":"个真实项目归属"}</small></div><p>项目状态、行动和截止时间都来自后端，不再用跟进状态代替项目归属。</p></section>
-  <label className="concept-search"><Search/><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="搜索项目、公司或当前行动" aria-label="搜索我的项目"/></label>
-  <div className="accepted-list">{projects.length?projects.map(project=><article id={`project-${project.project_id}`} className={`accepted-card${focusedProjectId===project.project_id?" is-focused":""}`} key={project.project_id}>
-   <div className="accepted-card-top"><span>{project.project_status==="PENDING_START"?"待开始":project.project_status==="IN_PROGRESS"?"跟进中":project.project_status==="NEEDS_ACTION"?"需处理":project.project_status==="COMPLETED"?"已完成":"已释放"}</span><strong>{project.relation==="MY_JOB"?"我的职位":"团队共享"}</strong></div>
-   <h2>{project.company}</h2><p>{project.role}</p>
-   <div className="accepted-card-fact"><span>{project.active_action?"当前行动":"下一步"}</span><b>{project.active_action?.title||"确认目标并建立第一条行动"}</b></div>
-   {project.active_action&&<div className="accepted-card-fact"><span>截止时间</span><b>{project.active_action.due_at.slice(0,10)}</b></div>}
-   <button className="accepted-card-action" onClick={()=>open(project)}>{project.project_status==="PENDING_START"?"开始跟进":"打开项目"} <ChevronRight/></button>
-  </article>):<div className="empty accepted-empty"><Search/><b>{isFiltered?"没有匹配的项目":"还没有加入任何项目"}</b><p>{isFiltered?"试试输入公司名、职位名或当前行动。":"从今日决策或全部职位点击“加入我的项目”。"}</p></div>}</div>
- </div>;
-}
 
 function DecisionMetric({label,value,emphasis,helpOpen,onHelpToggle}:{label:string;value:string|number;emphasis?:string;helpOpen?:boolean;onHelpToggle?:()=>void}){return <div className="decision-metric"><small>{label}</small>{onHelpToggle&&<button className="metric-help" type="button" onClick={onHelpToggle} aria-label={`解释${label}`} aria-expanded={helpOpen}>!</button>}<b className={emphasis}>{value}</b></div>}
 

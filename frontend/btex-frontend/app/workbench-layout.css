@@ -247,16 +247,22 @@
 .rail-confirmed{border-top:1px solid rgba(28,43,38,.08);padding-top:12px;margin-top:8px}
 .rail-confirmed>button{position:relative}
 .rail-count{position:absolute;top:5px;right:6px;display:grid;min-width:16px;height:16px;place-items:center;border:2px solid #fff;border-radius:999px;background:var(--green);color:#fff;font:600 9px/1 var(--font-mono);font-style:normal}
-.accepted-summary{display:flex;align-items:center;justify-content:space-between;gap:20px;margin:0 0 24px;padding:18px 20px;border:1px solid rgba(47,211,167,.14);border-radius:16px;background:rgba(47,211,167,.055)}
-.accepted-summary>div{display:flex;align-items:baseline;gap:10px}.accepted-summary span{color:var(--muted);font-size:12px}.accepted-summary b{font:600 26px var(--font-mono);color:var(--mint-ink)}.accepted-summary small{color:var(--muted);font-size:11px}.accepted-summary p{margin:0;color:var(--muted);font-size:12px}
-.accepted-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px}
-.accepted-card{display:grid;gap:10px;padding:20px;border:1px solid rgba(28,43,38,.08);border-radius:18px;background:#fff;box-shadow:var(--surface-shadow)}
-.accepted-card-top{display:flex;align-items:center;justify-content:space-between;color:var(--mint-ink);font-size:11px}.accepted-card-top strong{font:600 20px var(--font-mono)}
-.accepted-card h2{margin:0;font:600 19px var(--font-display);letter-spacing:.01em;color:var(--ink)}.accepted-card>p{margin:0;color:var(--muted);font-size:13px}
-.accepted-card-fact{display:flex;justify-content:space-between;gap:12px;padding-top:12px;border-top:1px dashed rgba(28,43,38,.14);font-size:11px}.accepted-card-fact span{color:var(--muted)}.accepted-card-fact b{color:var(--ink);font-weight:550;text-align:right}
-.accepted-card-action{display:flex;align-items:center;justify-content:space-between;margin-top:4px;padding:10px 0 0;border:0;border-top:1px solid rgba(28,43,38,.08);background:transparent;color:var(--mint-ink);font-size:12px;font-weight:650;cursor:pointer}.accepted-card-action svg{width:15px}
-.accepted-home>.concept-search{max-width:520px;margin:0 0 18px}.accepted-card.is-focused{border-color:rgba(26,153,118,.55);box-shadow:0 0 0 3px rgba(47,211,167,.12),var(--surface-shadow)}
-@media(max-width:720px){.accepted-summary{align-items:flex-start;flex-direction:column;gap:8px}.accepted-list{grid-template-columns:1fr}}
+.projects-summary{display:flex;align-items:center;justify-content:space-between;gap:20px;margin:0 0 18px;padding:16px 18px;border:1px solid rgba(47,211,167,.18);border-radius:14px;background:rgba(47,211,167,.055)}
+.projects-summary>div{display:flex;align-items:baseline;gap:9px}.projects-summary span{color:var(--muted);font-size:12px}.projects-summary b{font:600 24px var(--font-mono);color:var(--mint-ink)}.projects-summary small{color:var(--muted);font-size:11px}.projects-summary p{margin:0;color:var(--muted);font-size:12px}
+.projects-toolbar{display:grid;grid-template-columns:minmax(260px,1fr) auto;gap:14px;align-items:center;margin-bottom:16px}
+.projects-toolbar>.concept-search{max-width:520px}.project-status-tabs{display:flex;gap:5px;padding:4px;border:1px solid rgba(28,43,38,.08);border-radius:12px;background:#f6f8f7}
+.project-status-tabs button{display:flex;align-items:center;gap:6px;border:0;border-radius:8px;padding:7px 9px;background:transparent;color:var(--muted);font-size:11px;cursor:pointer}
+.project-status-tabs button span{color:#87938f;font:10px var(--font-mono)}.project-status-tabs button.active{background:#fff;color:var(--mint-ink);box-shadow:0 1px 4px rgba(28,43,38,.1);font-weight:650}
+.project-action-list{display:grid;gap:10px}.project-action-card{display:grid;grid-template-columns:minmax(220px,1fr) minmax(260px,1.35fr) minmax(140px,.55fr);gap:20px;align-items:center;padding:17px 18px;border:1px solid rgba(28,43,38,.09);border-radius:14px;background:#fff;box-shadow:0 5px 18px rgba(31,49,43,.045);transition:border-color .16s,box-shadow .16s}
+.project-action-card:hover{border-color:rgba(47,211,167,.42);box-shadow:0 8px 24px rgba(31,49,43,.08)}.project-action-card.is-focused{border-color:rgba(26,153,118,.58);box-shadow:0 0 0 3px rgba(47,211,167,.12),0 8px 24px rgba(31,49,43,.08)}.project-action-card.status-needs_action{border-left:3px solid #d98b58}
+.project-identity{min-width:0}.project-identity>div{display:flex;align-items:center;gap:9px;margin-bottom:8px}.project-status{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:4px 8px;background:#e7f7f1;color:var(--mint-ink);font-size:10px;font-weight:700}
+.project-status svg{width:12px;height:12px}.status-needs_action .project-status{background:#fff0e8;color:#a55732}.status-completed .project-status,.status-released .project-status{background:#f0f2f1;color:#64706c}.project-identity small{color:var(--muted);font-size:10px}
+.project-identity h2{overflow:hidden;margin:0;color:var(--ink);font:600 15px var(--font-display);text-overflow:ellipsis;white-space:nowrap}.project-identity p{overflow:hidden;margin:5px 0 0;color:var(--muted);font-size:11px;text-overflow:ellipsis;white-space:nowrap}
+.project-action-copy{display:grid;min-width:0;gap:5px;padding-left:18px;border-left:1px solid rgba(28,43,38,.08)}.project-action-copy span{color:var(--muted);font-size:10px}.project-action-copy b{overflow:hidden;color:var(--ink);font-size:13px;font-weight:620;text-overflow:ellipsis;white-space:nowrap}.project-action-copy small{overflow:hidden;color:var(--muted);font-size:11px;text-overflow:ellipsis;white-space:nowrap}
+.project-action-side{display:grid;justify-items:end;gap:10px}.project-action-side>span{color:var(--muted);font:10px var(--font-mono)}.project-action-side>span.urgent{color:#a55732;font-weight:700}
+.project-action-side button{display:inline-flex;align-items:center;gap:5px;border:0;border-radius:9px;padding:8px 10px;background:var(--mint-soft);color:var(--mint-ink);font-size:11px;font-weight:700;cursor:pointer}.project-action-side button:hover{background:var(--mint)}.project-action-side svg{width:13px;height:13px}.projects-empty{min-height:220px}
+@media(max-width:960px){.projects-toolbar{grid-template-columns:1fr}.project-status-tabs{overflow-x:auto}.project-action-card{grid-template-columns:minmax(180px,.8fr) minmax(220px,1.2fr)}.project-action-side{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding-top:10px;border-top:1px solid rgba(28,43,38,.08)}}
+@media(max-width:720px){.projects-summary{align-items:flex-start;flex-direction:column;gap:8px}.project-status-tabs button{flex:none}.project-action-card{grid-template-columns:1fr;gap:13px}.project-action-copy{padding:12px 0 0;border-top:1px solid rgba(28,43,38,.08);border-left:0}.project-action-side{grid-column:auto}.project-action-copy b,.project-action-copy small{white-space:normal}}
 
 /* Final green palette pass: keep all interactive and selected surfaces on the same accent. */
 .btex-app .rail-blocks>button:hover{background:var(--mint-soft);color:var(--mint-ink)}
@@ -266,8 +272,8 @@
 .btex-app .pick-card.in-tray .pick-add{background:var(--green);border-color:var(--green)}
 .btex-app .decision-zone.accepted .decision-queue{box-shadow:0 8px 24px rgba(47,211,167,.045)}
 .btex-app .decision-zone .decision-row:hover{background:rgba(47,211,167,.05)}
-.btex-app .accepted-summary{border-color:rgba(47,211,167,.22);background:rgba(47,211,167,.07)}
-.btex-app .accepted-card-action,.btex-app .pick-card-action{color:var(--mint-ink)}
+.btex-app .projects-summary{border-color:rgba(47,211,167,.22);background:rgba(47,211,167,.07)}
+.btex-app .project-action-side button,.btex-app .pick-card-action{color:var(--mint-ink)}
 
 /* 候选供给卡片（人才侧适配层呈现）——迁移自 decision-workbench，配 btex 绿色调 */
 .supply-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}

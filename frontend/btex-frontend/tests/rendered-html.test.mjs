@@ -7,6 +7,7 @@ const source = (name) => readFile(new URL(name, root), "utf8");
 const workbenchSource = async () => (await Promise.all([
   source("app/workbench.tsx"),
   source("app/brainx-projects-api.ts"),
+  source("app/projects-view.tsx"),
   source("app/workbench-controls.tsx"),
   source("app/workbench-facts.tsx"),
   source("app/workbench-model.ts"),

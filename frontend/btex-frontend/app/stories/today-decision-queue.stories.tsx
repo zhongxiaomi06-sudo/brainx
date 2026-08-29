@@ -45,7 +45,13 @@ export const FormalV2CardIntegration: Story = {
   args: {
     mode: "offline",
     showVerification: false,
-    jobs: [{ ...decisionJobs[0], brainxLegal: ["WATCH", "ACCEPT", "DISMISS"] }],
+    jobs: [{ ...decisionJobs[0], brainxLegal: ["WATCH", "ACCEPT", "DISMISS"], facts: {
+      ...decisionJobs[0].facts,
+      "决策层级": "TODAY", "决策层级原因": "已有明确下一步",
+      "事实可信度": "SUFFICIENT", "事实可信度规则": "data-confidence-1.0",
+      "事实更新时间": "2026-08-29T08:00:00Z", "最近活动": "业务群活动",
+      "最近活动时间": "2026-08-29T07:30:00Z", "最近活动来源": "FEISHU_CHAT",
+    } }],
     pagination: {
       pageIndex: 0, totalCount: 45, evaluatedCount: 5313, runId: "run-formal-1",
       generatedAt: "2026-08-29T08:00:00Z", policyVersion: "baseline-1.1",
@@ -59,6 +65,9 @@ export const FormalV2CardIntegration: Story = {
     await expect(canvas.queryByRole("heading", { name: "今天只处理最值得推进的职位" })).not.toBeInTheDocument();
     await expect(canvas.getByRole("heading", { name: "推荐队列" })).toBeInTheDocument();
     await expect(canvas.getByText("参与计算 5313 · 已显示 1–1 / 45")).toBeInTheDocument();
+    await expect(canvas.getByLabelText("今天推进，3格信号")).toBeInTheDocument();
+    await expect(canvas.getByText("事实充分")).toBeInTheDocument();
+    await expect(canvas.getByText("业务群活动 · 08/29")).toBeInTheDocument();
     const card = canvas.getByRole("article", { name: `${decisionJobs[0].role} · ${decisionJobs[0].company}` });
     await expect(card).toHaveAttribute("tabindex", "0");
     await expect(Array.from(card.querySelectorAll(".recommendation-v2-actions button"), button => button.textContent?.trim()))

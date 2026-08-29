@@ -60,16 +60,11 @@ function numericFact(value: string | undefined) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function latestFactUpdate(job: DecisionJob) {
-  const updates = Object.values(job.factFields || {})
-    .map(field => field?.updated_at)
-    .filter((value): value is string => Boolean(value));
-  return updates.sort().at(-1) || null;
-}
-
 function toQueueItem(job: DecisionJob, engagement: EngagementState | undefined, joined: boolean): RecommendationQueueItem {
-  const tier = job.eligibility === "VERIFY_REQUIRED" || job.eligibility === "BLOCKED"
-    ? "VERIFY" : ["RESULT_CLOSURE", "ACTIVE_ADVANCEMENT"].includes(job.group) ? "TODAY" : "WEEK";
+  const tier = ["TODAY", "WEEK", "VERIFY"].includes(job.facts["决策层级"])
+    ? job.facts["决策层级"] as RecommendationQueueItem["tier"] : "VERIFY";
+  const confidence = ["SUFFICIENT", "PARTIAL", "INSUFFICIENT"].includes(job.facts["事实可信度"])
+    ? job.facts["事实可信度"] as RecommendationQueueItem["confidence"] : "INSUFFICIENT";
   const legalActions: RecommendationCardAction[] = [];
   if (joined) legalActions.push("GO_PROJECT");
   else {
@@ -89,9 +84,7 @@ function toQueueItem(job: DecisionJob, engagement: EngagementState | undefined, 
     hc: numericFact(job.facts["剩余 HC"]),
     currentStage: job.facts["当前阶段"] || null,
     recentActivity: job.facts["最近活动"] && job.facts["最近活动"] !== "UNKNOWN"
-      ? /^\d{4}-\d{2}-\d{2}/.test(job.facts["最近活动"])
-        ? { label: "职位事实更新", occurredAt: job.facts["最近活动"] }
-        : { label: job.facts["最近活动"], occurredAt: null }
+      ? { label: job.facts["最近活动"], occurredAt: job.facts["最近活动时间"] || null }
       : null,
     pipeline: job.facts["历史 Pipeline"] || null,
     reasons: job.scoreNotes.slice(0, 2).map((text, index) => ({
@@ -101,8 +94,9 @@ function toQueueItem(job: DecisionJob, engagement: EngagementState | undefined, 
       occurredAt: null,
     })),
     risk: job.risks[0] || null,
-    confidence: "PARTIAL",
-    factsUpdatedAt: latestFactUpdate(job),
+    confidence,
+    factsUpdatedAt: job.facts["事实更新时间"] && job.facts["事实更新时间"] !== "UNKNOWN"
+      ? job.facts["事实更新时间"] : null,
     engagementLabel: null,
     legalActions,
   };

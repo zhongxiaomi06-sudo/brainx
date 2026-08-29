@@ -10,6 +10,7 @@ import { chromium } from "playwright";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const temp = mkdtempSync(join(tmpdir(), "brainx-browser-gate-"));
+const validationDb = process.env.BRAINX_E2E_DB || "";
 const output = [];
 let app;
 let browser;
@@ -97,7 +98,7 @@ try {
     env: {
       ...process.env,
       BRAINX_ENV_FILE: join(temp, "missing.env"),
-      BRAINX_DB: join(temp, "brainx.db"),
+      BRAINX_DB: validationDb || join(temp, "brainx.db"),
       BRAINX_HOST: "127.0.0.1",
       BRAINX_PORT: String(backendPort),
       BRAINX_FRONTEND_HOST: "127.0.0.1",
@@ -172,23 +173,24 @@ try {
   });
   assert.equal(workbenchStatus, 200, "登录后工作台 API 必须可用");
 
-  const recommendationFixture = await page.evaluate(async () => {
-    const sync = await fetch("/api/v1/sync-runs", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+  const recommendationFixture = await page.evaluate(async (useExistingData) => {
+    const sync = useExistingData ? null : await fetch("/api/v1/sync-runs", {
+      method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ source: "fixture" }),
     });
-    const run = await fetch("/api/v1/recommendations/run", { method: "POST" });
+    const run = useExistingData ? null : await fetch("/api/v1/recommendations/run", { method: "POST" });
     const firstPage = await fetch("/api/v1/recommendations");
     return {
-      syncStatus: sync.status,
-      runStatus: run.status,
+      syncStatus: sync?.status || null,
+      runStatus: run?.status || null,
       pageStatus: firstPage.status,
       page: await firstPage.json(),
     };
-  });
-  assert.equal(recommendationFixture.syncStatus, 200, "浏览器夹具同步必须成功");
-  assert.equal(recommendationFixture.runStatus, 200, "浏览器夹具推荐必须成功");
+  }, Boolean(validationDb));
+  if (!validationDb) {
+    assert.equal(recommendationFixture.syncStatus, 200, "浏览器夹具同步必须成功");
+    assert.equal(recommendationFixture.runStatus, 200, "浏览器夹具推荐必须成功");
+  }
   assert.equal(recommendationFixture.pageStatus, 200, "推荐分页 API 必须可用");
   assert(recommendationFixture.page.total_count > 20, "浏览器夹具必须覆盖至少两页推荐");
   await page.reload({ waitUntil: "networkidle" });
@@ -198,6 +200,10 @@ try {
   const recommendationCards = recommendationQueue.getByRole("article");
   assert.equal(await recommendationCards.count(), 20, "正式首页必须固定显示 20 条推荐");
   const firstCard = await recommendationCards.first().getAttribute("aria-label");
+  const firstCardText = await recommendationCards.first().innerText();
+  assert.match(firstCardText, /今天推进|本周观察|待核验/, "正式卡片必须显示后端决策层级");
+  assert.match(firstCardText, /事实充分|部分事实待确认|事实不足/, "正式卡片必须显示规则化事实可信度");
+  assert.match(firstCardText, /职位事实更新|业务群活动|人工核验/, "正式卡片必须显示真实最近活动");
   const nextPage = recommendationQueue.getByRole("button", { name: /下一页/ });
   assert.equal(await nextPage.isEnabled(), true,
     `正式首页应允许翻页，当前摘要：${await recommendationQueue.innerText()}`);

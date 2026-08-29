@@ -10,10 +10,11 @@
  */
 import { now, uuid } from './db.js';
 import { latestCompleteSnapshot, latestRealSync, latestBridgeError, friendlyBridgeError } from './sync.js';
-import { WEIGHTS, POLICY_VERSION, hardBlock, scoreJob, actionOf, bandOf, sortRecs, explain, normalizeWeights } from './scorer.js';
+import { WEIGHTS, POLICY_VERSION, hardBlock, scoreJob, actionOf, sortRecs, explain, normalizeWeights } from './scorer.js';
 import { listConsultants } from './roster.js';
 import { relationMap, deriveRelation } from './relations.js';
 import { effectiveJobs } from './facts.js';
+import { dataConfidenceOf, presentationEvidence, recommendationPresentationOf } from './recommendation-presentation.js';
 
 /** 花名册从 DB 读（0003 起 consultants 表为权威，fixtures 只是种子）。 */
 export function loadConsultants(db) {
@@ -156,13 +157,16 @@ export function recommend(db, consultant_id, {
     const block = hardBlock(job, relation, true);
     if (block) { blockedCount++; continue; }
     const scored = scoreJob(job, relation, ctx);
+    const dataConfidence = dataConfidenceOf(job, relation, ctx.now);
+    const action = dataConfidence.band === 'INSUFFICIENT' ? 'OBSERVE' : actionOf(scored.score, scored.coverage);
+    const presentation = recommendationPresentationOf(job, relation, action, ctx.now, dataConfidence);
     const { reasons, risks, evidence_refs } = explain(job, relation, scored, ctx);
     evaluated.push({
       decision_id: uuid(), project_id: job.project_id, job, relation,
-      action: actionOf(scored.score, scored.coverage),
+      action,
       score: scored.score, evidence_coverage: scored.coverage,
-      confidence_band: bandOf(scored.coverage),
-      reasons, risks, evidence_refs, breakdown: scored.breakdown,
+      confidence_band: { SUFFICIENT: 'HIGH', PARTIAL: 'MEDIUM', INSUFFICIENT: 'LOW' }[dataConfidence.band],
+      reasons, risks, evidence_refs: [...evidence_refs, presentationEvidence(presentation)], breakdown: scored.breakdown,
     });
   }
   evaluated.sort(sortRecs);

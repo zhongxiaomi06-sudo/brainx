@@ -1,5 +1,6 @@
 import { currentStateMap, legalActionsForState } from './engagement.js';
 import { latestRun, recommendationRun } from './recommend.js';
+import { presentationForRecommendation } from './recommendation-presentation.js';
 import { latestRealSync } from './sync.js';
 
 export const RECOMMENDATION_PAGE_SIZE = 20;
@@ -90,7 +91,21 @@ export function recommendationPage(db, consultantId, { cursor = null } = {}) {
     new_run_available: latestRunId !== selected.run.run_id,
     items: items.map((item) => {
       const state = states.get(item.job.project_id)?.state || 'NEW';
-      return { ...item, engagement_state: state, legal_actions: legalActionsForState(state) };
+      const presentation = presentationForRecommendation(item, selected.run.created_at);
+      const risks = presentation.data_confidence.primary_risk
+        ? [presentation.data_confidence.primary_risk, ...item.risks.filter((risk) => risk !== presentation.data_confidence.primary_risk)]
+        : item.risks;
+      return {
+        ...item, risks,
+        decision_tier: presentation.decision_tier,
+        decision_tier_reason: presentation.decision_tier_reason,
+        data_confidence: presentation.data_confidence,
+        recent_activity: presentation.recent_activity,
+        presentation_version: presentation.version,
+        presentation_source: presentation.source,
+        engagement_state: state,
+        legal_actions: legalActionsForState(state),
+      };
     }),
   };
 }

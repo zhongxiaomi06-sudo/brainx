@@ -59,6 +59,27 @@ const sampleRec = {
   },
 };
 
+const samplePresentation = {
+  decision_tier: "VERIFY",
+  decision_tier_reason: { code: "FACTS_REQUIRE_VERIFICATION", text: "关键事实不足，先核验再推进" },
+  data_confidence: {
+    band: "INSUFFICIENT",
+    rule_version: "data-confidence-1.0",
+    missing_fields: ["HC", "当前阶段"],
+    latest_fact_at: "2026-08-07T00:40:00.000Z",
+    age_days: 22,
+    stale: false,
+    reasons: [{ code: "CRITICAL_FACTS_MISSING", text: "HC、当前阶段待确认" }],
+    primary_risk: "HC、当前阶段待确认，推进前请先核验。",
+  },
+  recent_activity: {
+    type: "JOB_FACT_UPDATED", label: "职位事实更新",
+    occurred_at: "2026-08-07T00:40:00.000Z", source: "SYNC", detail: null,
+  },
+  presentation_version: "recommendation-presentation-1.0",
+  presentation_source: "FROZEN",
+};
+
 test("maps a backend recommendation into a workbench decision job", () => {
   const job = mapRecommendation(sampleRec);
   assert.equal(job.id, "P-FIX-E5FC611B");
@@ -89,7 +110,8 @@ test("maps run-bound recommendation page metadata and legal state", () => {
     page_size: 20,
     next_cursor: "cursor-20",
     new_run_available: false,
-    items: [{ ...sampleRec, engagement_state: "WATCHED", legal_actions: ["VIEW", "UNWATCH", "ACCEPT"] }],
+    items: [{ ...sampleRec, ...samplePresentation,
+      engagement_state: "WATCHED", legal_actions: ["VIEW", "UNWATCH", "ACCEPT"] }],
   });
   assert.equal(page.runId, "run-1");
   assert.equal(page.totalCount, 45);
@@ -97,6 +119,11 @@ test("maps run-bound recommendation page metadata and legal state", () => {
   assert.equal(page.nextCursor, "cursor-20");
   assert.equal(page.engagement["P-FIX-E5FC611B"], "WATCHED");
   assert.deepEqual(page.jobs[0].brainxLegal, ["UNWATCH", "ACCEPT"]);
+  assert.equal(page.jobs[0].facts["决策层级"], "VERIFY");
+  assert.equal(page.jobs[0].facts["事实可信度"], "INSUFFICIENT");
+  assert.equal(page.jobs[0].facts["事实可信度规则"], "data-confidence-1.0");
+  assert.equal(page.jobs[0].facts["最近活动"], "职位事实更新");
+  assert.equal(page.jobs[0].facts["最近活动时间"], "2026-08-07T00:40:00.000Z");
 });
 
 test("treats null HC as UNKNOWN, never as 0", () => {

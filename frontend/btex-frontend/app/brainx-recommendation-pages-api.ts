@@ -7,6 +7,23 @@ import {
 import { brainxFetch } from "./brainx-http.ts";
 
 type BackendRecommendationPageItem = BackendRecommendation & {
+  decision_tier: "TODAY" | "WEEK" | "VERIFY";
+  decision_tier_reason: { code: string; text: string };
+  data_confidence: {
+    band: "SUFFICIENT" | "PARTIAL" | "INSUFFICIENT";
+    rule_version: string;
+    missing_fields: string[];
+    latest_fact_at: string | null;
+    age_days: number | null;
+    stale: boolean;
+    reasons: Array<{ code: string; text: string }>;
+    primary_risk: string | null;
+  };
+  recent_activity: {
+    type: string; label: string; occurred_at: string; source: string; detail: string | null;
+  } | null;
+  presentation_version: string;
+  presentation_source: "FROZEN" | "DERIVED_LEGACY";
   engagement_state?: EngagementState;
   legal_actions?: Array<EngagementCommand | "VIEW">;
 };
@@ -47,6 +64,20 @@ export function mapRecommendationPage(payload: BackendRecommendationPage): Recom
   const engagement: Record<string, EngagementState> = {};
   const jobs = payload.items.map(item => {
     const job = mapRecommendation(item);
+    job.facts = {
+      ...job.facts,
+      "决策层级": item.decision_tier,
+      "决策层级原因": item.decision_tier_reason.text,
+      "事实可信度": item.data_confidence.band,
+      "事实可信度规则": item.data_confidence.rule_version,
+      "事实更新时间": item.data_confidence.latest_fact_at || "UNKNOWN",
+      "最近活动": item.recent_activity?.label || "UNKNOWN",
+      "最近活动时间": item.recent_activity?.occurred_at || "UNKNOWN",
+      "最近活动来源": item.recent_activity?.source || "UNKNOWN",
+    };
+    job.recentSignal = item.recent_activity
+      ? `${item.recent_activity.label} · ${item.recent_activity.occurred_at.slice(0, 10)}`
+      : item.decision_tier_reason.text;
     if (item.legal_actions) job.brainxLegal = item.legal_actions
       .filter((action): action is EngagementCommand => action !== "VIEW");
     if (item.engagement_state) engagement[job.id] = item.engagement_state;

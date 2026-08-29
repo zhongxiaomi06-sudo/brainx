@@ -2,6 +2,8 @@
 
 > 上级入口：[BrainX 文档书](README.md)
 > 相关依据：[前端审核台账](frontend-reviews/README.md) · [前端交互架构](frontend-interaction-architecture.md) · [推荐队列与职位决策产品架构](recommendation-queue-product-architecture.md) · [TTC 职位字段库](ttc-field-catalog.md) · [内部 Storybook 组件库](storybook-component-library.md) · [BrainX v2.0 产品需求](prd-2026-08-24-brainx-v2.md)
+>
+> 跨前后端最终产品形态与后续总施工顺序，以[BrainX 最终交付蓝图与施工总清单](brainx-final-delivery-blueprint.md)为准；本文保留前期前端重构历史和细项。
 
 ## 1. 目标与施工边界
 

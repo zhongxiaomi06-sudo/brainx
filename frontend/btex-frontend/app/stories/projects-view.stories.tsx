@@ -4,6 +4,7 @@ import type { ProjectStatus, ProjectSummary } from "../brainx-projects-api";
 import { ProjectsView } from "../projects-view";
 
 const open = fn();
+const ignore = fn(async () => undefined);
 
 function project(projectId: string, status: ProjectStatus, overrides: Partial<ProjectSummary> = {}): ProjectSummary {
   const following = status === "IN_PROGRESS" || status === "NEEDS_ACTION";
@@ -52,7 +53,7 @@ const meta = {
   title: "业务组件/我的项目行动工作台",
   component: ProjectsView,
   parameters: { bare: true },
-  args: { projects, query: "", setQuery: fn(), focusedProjectId: null, open },
+  args: { projects, query: "", setQuery: fn(), focusedProjectId: null, open, onIgnore: ignore },
 } satisfies Meta<typeof ProjectsView>;
 
 export default meta;
@@ -73,6 +74,12 @@ export const AllStates: Story = {
 
 export const FocusedNewProject: Story = {
   args: { focusedProjectId: "P-PENDING" },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getAllByRole("button", { name: "忽略" })).toHaveLength(1);
+    await userEvent.click(canvas.getByRole("button", { name: "忽略" }));
+    await expect(ignore).toHaveBeenCalledWith(expect.objectContaining({ project_id: "P-PENDING" }));
+  },
 };
 
 export const Empty: Story = {

@@ -1,5 +1,5 @@
 /** project-routes.js — 项目归属写入与“我的项目”读取路由。 */
-import { confirmMembership } from './membership.js';
+import { confirmMembership, removeMembership } from './membership.js';
 import { listProjects } from './projects.js';
 import { relationOf } from './relations.js';
 import { jobVisibleTo } from './visibility.js';
@@ -29,6 +29,18 @@ export function projectRoutes(db) {
         });
       } catch (error) {
         err(res, 500, 'MEMBERSHIP_UPDATE_FAILED', String(error.message).slice(0, 300));
+      }
+    },
+    'DELETE /api/v1/opportunities/:id/membership': async (req, res, cid, q, id) => {
+      if (!jobVisibleTo(db, cid, id)) return err(res, 404, 'NOT_FOUND', '职位不存在');
+      const input = await body(req);
+      if (!input) return err(res, 400, 'BAD_JSON', '请求体不是合法 JSON');
+      try {
+        const result = removeMembership(db, cid, id, input);
+        if (!result.ok) return err(res, result.status || 422, 'MEMBERSHIP_REMOVE_REJECTED', result.error);
+        json(res, 200, result);
+      } catch (error) {
+        err(res, 500, 'MEMBERSHIP_REMOVE_FAILED', String(error.message).slice(0, 300));
       }
     },
   };

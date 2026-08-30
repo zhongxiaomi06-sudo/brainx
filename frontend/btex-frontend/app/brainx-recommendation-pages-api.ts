@@ -109,12 +109,13 @@ export async function getRecommendationPage(
   cursor?: string | null,
   search = "",
   sort: RecommendationSort = "priority",
+  signal?: AbortSignal,
 ): Promise<RecommendationPage> {
   const params = new URLSearchParams();
   if (cursor) params.set("cursor", cursor);
   if (search.trim()) params.set("q", search.trim());
   if (sort !== "priority") params.set("sort", sort);
   const query = params.size ? `?${params.toString()}` : "";
-  const payload = await brainxFetch<BackendRecommendationPage>(`/api/v1/recommendations${query}`);
+  const payload = await brainxFetch<BackendRecommendationPage>(`/api/v1/recommendations${query}`, { signal });
   return mapRecommendationPage(payload);
 }

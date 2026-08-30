@@ -138,3 +138,43 @@ test('HTTP：全部职位中的团队共享池职位可以直接加入我的项�
     db.close();
   }
 });
+
+test('HTTP：待开始项目可忽略并关闭归属历史，跟进中项目拒绝直接移除', async () => {
+  const db = openDb(':memory:');
+  runSync(db, { source: 'test', consultant_id: 'felix', payload: payload() });
+  const server = createServer(db);
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const port = server.address().port;
+  const base = `http://127.0.0.1:${port}/api/v1/opportunities/${PID}`;
+  const headers = { Cookie: `brainx_session=${encodeURIComponent(signSession('felix', 'ou_felix'))}`,
+    'Content-Type': 'application/json' };
+  try {
+    await fetch(`${base}/membership`, { method: 'PATCH', headers,
+      body: JSON.stringify({ relation: 'MY_JOB', idempotency_key: 'membership:remove:join' }) });
+    const removed = await fetch(`${base}/membership`, { method: 'DELETE', headers,
+      body: JSON.stringify({ idempotency_key: 'membership:remove:1' }) });
+    assert.equal(removed.status, 200);
+    assert.equal((await removed.json()).removed, true);
+    assert.equal(db.prepare(`SELECT COUNT(*) count FROM job_memberships
+      WHERE consultant_id='felix' AND project_id=? AND valid_to IS NULL
+        AND relation IN ('MY_JOB','TEAM_SHARED')`).get(PID).count, 0);
+
+    const duplicate = await fetch(`${base}/membership`, { method: 'DELETE', headers,
+      body: JSON.stringify({ idempotency_key: 'membership:remove:1' }) });
+    assert.equal((await duplicate.json()).already, true);
+
+    await fetch(`${base}/membership`, { method: 'PATCH', headers,
+      body: JSON.stringify({ relation: 'MY_JOB', idempotency_key: 'membership:remove:rejoin' }) });
+    const dueAt = new Date(Date.now() + 86400000).toISOString();
+    await fetch(`${base}/engagement`, { method: 'POST', headers,
+      body: JSON.stringify({ action: 'ACCEPT', confirm: true, goal: '继续推进',
+        action_title: '联系客户', due_at: dueAt, idempotency_key: 'membership:remove:accept' }) });
+    const blocked = await fetch(`${base}/membership`, { method: 'DELETE', headers,
+      body: JSON.stringify({ idempotency_key: 'membership:remove:blocked' }) });
+    assert.equal(blocked.status, 409);
+    assert.match((await blocked.json()).error.message, /结束当前动作/);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    db.close();
+  }
+});

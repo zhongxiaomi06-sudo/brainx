@@ -73,14 +73,16 @@ function matches(project: ProjectSummary, query: string) {
     .filter(Boolean).join(" ").toLocaleLowerCase().includes(keyword);
 }
 
-export function ProjectsView({ projects, query, setQuery, focusedProjectId, open }: {
+export function ProjectsView({ projects, query, setQuery, focusedProjectId, open, onIgnore }: {
   projects: ProjectSummary[];
   query: string;
   setQuery: (value: string) => void;
   focusedProjectId: string | null;
   open: (project: ProjectSummary) => void;
+  onIgnore: (project: ProjectSummary) => Promise<void>;
 }) {
   const [filter, setFilter] = useState<ProjectFilter>("ALL");
+  const [ignoringId, setIgnoringId] = useState<string | null>(null);
   const counts = useMemo(() => Object.fromEntries(filters.map(({ id }) => [id,
     id === "ALL" ? projects.length : projects.filter(project => project.project_status === id).length,
   ])) as Record<ProjectFilter, number>, [projects]);
@@ -115,6 +117,8 @@ export function ProjectsView({ projects, query, setQuery, focusedProjectId, open
       {visible.length ? visible.map(project => {
         const due = dueText(project);
         const urgent = project.project_status === "NEEDS_ACTION";
+        const canIgnore = project.project_status === "PENDING_START"
+          && ["NEW", "RECOMMENDED", "VIEWED", "EXPIRED"].includes(project.engagement_state);
         return <article id={`project-${project.project_id}`} className={`project-action-card status-${project.project_status.toLocaleLowerCase()}${focusedProjectId === project.project_id ? " is-focused" : ""}`} key={project.project_id} aria-label={`${project.role} · ${project.company}`}>
           <div className="project-identity">
             <div><span className="project-status">{urgent ? <AlertTriangle /> : project.project_status === "COMPLETED" ? <CheckCircle2 /> : <Clock3 />}{statusLabels[project.project_status]}</span><small>{project.relation === "MY_JOB" ? "我的职位" : "团队共享"}</small></div>
@@ -127,7 +131,14 @@ export function ProjectsView({ projects, query, setQuery, focusedProjectId, open
           </div>
           <div className="project-action-side">
             <span className={urgent ? "urgent" : ""}>{due || `更新于 ${dateText(project.state_since || project.joined_at)}`}</span>
-            <button type="button" onClick={() => open(project)}>{actionLabel(project)}<ChevronRight /></button>
+            <div className="project-card-actions">
+              {canIgnore && <button
+                type="button" className="is-ignore" disabled={ignoringId === project.project_id}
+                onClick={() => { setIgnoringId(project.project_id); void onIgnore(project).finally(() => setIgnoringId(null)); }}>
+                {ignoringId === project.project_id ? "忽略中…" : "忽略"}
+              </button>}
+              <button type="button" className="is-primary" onClick={() => open(project)}>{actionLabel(project)}<ChevronRight /></button>
+            </div>
           </div>
         </article>;
       }) : <div className="empty projects-empty"><Search /><b>{isFiltered ? "当前条件下没有项目" : "还没有加入任何项目"}</b><p>{isFiltered ? "切换状态或修改搜索内容。" : "从精选盘或全部职位点击“加入我的项目”。"}</p></div>}

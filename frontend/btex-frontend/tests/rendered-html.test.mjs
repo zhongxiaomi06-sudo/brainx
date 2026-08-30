@@ -189,15 +189,34 @@ test("searches the complete frozen recommendation queue instead of only the visi
   assert.match(workbench, /searchQuery:recommendationQueue\.searchQuery,onSearch:recommendationQueue\.search,sort:recommendationQueue\.sort,onSort:recommendationQueue\.changeSort/);
   assert.match(pagesApi, /params\.set\("q", search\.trim\(\)\)/);
   assert.match(pagesApi, /params\.set\("sort", sort\)/);
-  assert.match(pageHook, /getRecommendationPage\(current\.nextCursor, searchQuery, sort\)/);
+  assert.match(pageHook, /getRecommendationPage\(current\.nextCursor, searchQuery, sort, controller\.signal\)/);
   assert.match(pageHook, /const search = \(value: string\)/);
   assert.match(pageHook, /const changeSort = \(value: RecommendationSort\)/);
+  assert.match(pageHook, /new AbortController\(\)/);
+  assert.match(pageHook, /12_000/);
+  assert.match(pagesApi, /signal\?: AbortSignal/);
   assert.doesNotMatch(today, /aria-label="数据来源"/);
   assert.match(today, /综合推荐/);
   assert.match(today, /推进活跃/);
   assert.match(today, /最近活跃/);
   assert.match(today, /事实优先/);
   assert.match(today, /探索发现/);
+});
+
+test("removes attention from detail and exposes ignore only for pending projects", async () => {
+  const [loop, loopCss, projects, workbench, api, ignore] = await Promise.all([
+    source("app/engagement-loop.tsx"), source("app/engagement-loop.css"),
+    source("app/projects-view.tsx"), workbenchSource(), source("app/brainx-projects-api.ts"),
+    source("app/project-ignore-action.ts"),
+  ]);
+  assert.doesNotMatch(loop, />加入关注</);
+  assert.match(loop, /\.filter\(\(a\) => a === "DISMISS"\)/);
+  assert.match(loopCss, /\.commitment-idle-actions button/);
+  assert.match(projects, /project\.project_status === "PENDING_START"/);
+  assert.match(projects, /"忽略"/);
+  assert.match(workbench, /createProjectIgnore/);
+  assert.match(ignore, /removeOpportunityMembership/);
+  assert.match(api, /method: "DELETE"/);
 });
 
 test("uses 加入项目、关注 and 开始跟进 as separate user-facing concepts", async () => {

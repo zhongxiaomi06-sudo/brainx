@@ -1,6 +1,6 @@
 /** membership.js — 顾问确认职位归属；关系历史只关闭、只追加。 */
 import { now } from './db.js';
-import { legalActions } from './engagement.js';
+import { currentState, legalActions } from './engagement.js';
 
 const ALLOWED_RELATIONS = new Set(['MY_JOB', 'TEAM_SHARED']);
 const LOCKED_RELATIONS = new Set(['PRIMARY_PM', 'OTHER_CONSULTANT']);
@@ -49,4 +49,26 @@ export function confirmMembership(db, consultant_id, project_id, {
 
   return { ok: true, already: false, relation,
     legal_actions: legalActions(db, consultant_id, project_id).filter((action) => action !== 'VIEW') };
+}
+
+export function removeMembership(db, consultant_id, project_id, { idempotency_key = '' } = {}) {
+  if (!idempotency_key || typeof idempotency_key !== 'string') {
+    return { ok: false, status: 400, error: '缺 idempotency_key' };
+  }
+  if (idempotency_key.length > 200) {
+    return { ok: false, status: 400, error: 'idempotency_key 过长' };
+  }
+  const current = db.prepare(`SELECT id, relation FROM job_memberships
+    WHERE consultant_id=? AND project_id=? AND valid_to IS NULL
+      AND relation IN ('MY_JOB','TEAM_SHARED')
+    ORDER BY id DESC LIMIT 1`).get(consultant_id, project_id);
+  if (!current) return { ok: true, already: true, removed: false };
+
+  const state = currentState(db, consultant_id, project_id).state;
+  if (!['NEW', 'RECOMMENDED', 'VIEWED', 'EXPIRED'].includes(state)) {
+    return { ok: false, status: 409, error: '项目已有关注或跟进行动，请先在详情中结束当前动作' };
+  }
+  db.prepare('UPDATE job_memberships SET valid_to=? WHERE id=? AND valid_to IS NULL')
+    .run(now(), current.id);
+  return { ok: true, already: false, removed: true };
 }

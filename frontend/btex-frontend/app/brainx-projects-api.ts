@@ -46,6 +46,7 @@ export type MembershipResponse = {
   project: ProjectSummary | null;
   recompute?: { blocked?: boolean; deferred?: boolean; reason?: string };
 };
+export type RemoveMembershipResponse = { ok: boolean; already: boolean; removed: boolean };
 
 export function getProjects(): Promise<ProjectsResponse> {
   return brainxFetch<ProjectsResponse>("/api/v1/projects");
@@ -59,6 +60,16 @@ export function updateOpportunityMembership(
   return brainxFetch(`/api/v1/opportunities/${encodeURIComponent(id)}/membership`, {
     method: "PATCH",
     body: { relation, idempotency_key: idempotencyKey },
+  });
+}
+
+export function removeOpportunityMembership(
+  id: string,
+  idempotencyKey: string,
+): Promise<RemoveMembershipResponse> {
+  return brainxFetch(`/api/v1/opportunities/${encodeURIComponent(id)}/membership`, {
+    method: "DELETE",
+    body: { idempotency_key: idempotencyKey },
   });
 }
 

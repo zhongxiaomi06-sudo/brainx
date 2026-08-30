@@ -64,6 +64,7 @@
 - [精选盘卡片删除判断摘要区复审](frontend-reviews/2026-08-30-pick-card-remove-assessment.md)：列表卡片删除理由、风险、事实可信度与更新时间区，并保留详情数据边界。
 - [全部职位详情真实评分栏目审核](frontend-reviews/2026-08-31-job-detail-real-score.md)：旧版评分形式复用、真实六维冻结评分映射和缺失值边界。
 - [职位详情栏目切换尺寸复审](frontend-reviews/2026-08-31-job-detail-stable-size.md)：固定紧凑弹窗、内部滚动与底部动作尺寸回归。
+- [精选盘排序、详情动作与项目忽略复审](frontend-reviews/2026-08-31-sort-detail-project-ignore.md)：排序请求恢复、详情动作精简和待开始项目忽略闭环。
 - [主导航顺序调整复审](frontend-reviews/2026-08-30-main-navigation-order.md)：记录“我的项目”紧跟“精选盘”的正式外壳、审核稿与回归证据。
 - [前端真实数据重构施工清单](frontend-refactor-construction-checklist.md)：TTC 主表、推荐策略、方向画像、导航设置与质量门禁的分阶段实施及审核边界。
 - [内部 Storybook 组件库](storybook-component-library.md)：生产组件的隔离展示、交互测试与维护规则。

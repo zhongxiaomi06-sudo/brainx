@@ -37,8 +37,7 @@ import { WorkbenchSettingsPage } from "./workbench-settings-page";
 import { ProjectsView } from "./projects-view";
 import { getRecommendationPage } from "./brainx-recommendation-pages-api";
 import { useRecommendationPages } from "./use-recommendation-pages";
-
-
+import { createProjectIgnore } from "./project-ignore-action";
 export default function DecisionWorkbench({demo=false}:{demo?:boolean}={}){
  const [hydrated,setHydrated]=useState(false);
  const [page,setPage]=useState<Page>("today");
@@ -240,6 +239,8 @@ export default function DecisionWorkbench({demo=false}:{demo?:boolean}={}){
   notify(`${job.company} · 已加入团队共享`);
  };
  const addRadarJobToProjects=async(jobId:string)=>{const job=brainxRadar?.items.find(item=>item.project_id===jobId);await addToMyProjects(jobId,job?.company||"该职位")};
+ const ignoreProject=createProjectIgnore({mode:brainxMode,focusedProjectId,setFocusedProjectId,
+  setProjects:setBrainxProjects,setMemberships:setMembershipRelations,notify});
  const refreshBrainxJob=async(jobId:string,withProjects=false)=>{if(brainxMode!=="connected")return;try{
   const [detail,projects]=await Promise.all([fetchJobDetail(jobId),withProjects?getProjects():Promise.resolve(null)]);
   setEngagement(current=>({...current,[jobId]:detail.engagementState}));setDecisionEvents(current=>({...current,[jobId]:detail.events}));
@@ -278,7 +279,7 @@ export default function DecisionWorkbench({demo=false}:{demo?:boolean}={}){
    {["today","accepted","jobs","clients"].includes(page)&&(brainxMode==="connecting"||workspaceIssue)?
     <WorkspaceEntry kind={brainxMode==="connecting"?"connecting":workspaceIssue!} onRetry={()=>setConnectAttempt(value=>value+1)} onCheckConnection={async()=>{await brainxFetch<BackendSessionStatus>("/api/v1/oauth/status");await loadBrainxSnapshot.current();await loadBrainxSide.current()}} onOpenSources={()=>go("sources")} />:<>
     {page==="today"&&<TodayDecisionQueue activeJobId={panel?.kind==="job"&&panelMotion!=="closing"?panel.jobId:null} completed={decisionActions} jobs={activeDecisionJobs} projects={brainxProjects} engagement={engagement} sync={sync} open={openDecision} onAction={runDecisionAction} onAddToProjects={job=>addToMyProjects(job.id,job.company)} onGoToProject={goToProject} onFeedback={feedbackJob} showVerification={demo} tray={tray} onToggleTray={toggleTray} onRemoveTray={removeTray} folders={folders} folderMode={folderMode} onFolderMode={()=>setFolderMode(value=>!value)} onAssignFolder={assignFolder} onCreateFolder={createFolder} mode={brainxMode} onOpenSources={()=>go("sources")} pagination={recommendationPagination?{...recommendationPagination,searchQuery:recommendationQueue.searchQuery,onSearch:recommendationQueue.search,sort:recommendationQueue.sort,onSort:recommendationQueue.changeSort}:undefined} />}
-    {page==="accepted"&&<ProjectsView projects={brainxProjects} query={query} setQuery={setQuery} focusedProjectId={focusedProjectId} open={project=>openDecision(projectToDecisionJob(project),"engagement")} />}
+    {page==="accepted"&&<ProjectsView projects={brainxProjects} query={query} setQuery={setQuery} focusedProjectId={focusedProjectId} open={project=>openDecision(projectToDecisionJob(project),"engagement")} onIgnore={ignoreProject} />}
     {page==="jobs"&&<WorkbenchJobsPage items={brainxRadar?.items??[]} capabilities={brainxRadar?.fieldCapabilities??[]} projects={brainxProjects.map(project=>project.project_id)} company={jobCompanyFilter} onAddToProjects={addRadarJobToProjects} />}
    {page==="clients"&&<WorkbenchClientsPage items={brainxClients??[]} onOpenJobs={company=>{setJobCompanyFilter(company);go("jobs")}} />}
    </>}

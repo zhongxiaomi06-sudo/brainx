@@ -81,6 +81,7 @@
 - [完整推荐队列搜索修复复核（2026-08-30）](frontend-reviews/2026-08-30-recommendation-search.md)
 - [现代职位工作区搜索与筛选修复复核（2026-08-30）](frontend-reviews/2026-08-30-jobs-search-filter.md)
 - [决策轨迹时间顺序复核（2026-08-30）](frontend-reviews/2026-08-30-decision-trail-order.md)
+- [高频自动推荐与决策轨迹膨胀审计（2026-08-30）](audits/2026-08-30-recommendation-event-growth.md)
 - [网站完整任务错误点审计](2026-08-17-网站完整任务错误点审计.md)
 - [状态报告（2026-08-19）](status-report-2026-08-19.md)
 - [DeepSeek 审查规则提炼（2026-08-24）](audits/2026-08-24-deepseek-review-rule-extraction.md)

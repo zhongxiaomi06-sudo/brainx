@@ -41,8 +41,10 @@ export function currentState(db, consultant_id, project_id) {
   const row = db.prepare(`SELECT state, state_since FROM current_engagement
     WHERE consultant_id=? AND project_id=?`).get(consultant_id, project_id);
   if (row) return row;
-  const rec = db.prepare(`SELECT 1 FROM decision_events
-    WHERE actor=? AND project_id=? AND event_type='RECOMMENDED' LIMIT 1`).get(consultant_id, project_id);
+  const rec = db.prepare(`SELECT 1 FROM recommendations
+    WHERE consultant_id=? AND project_id=? LIMIT 1`).get(consultant_id, project_id)
+    || db.prepare(`SELECT 1 FROM decision_events
+      WHERE actor=? AND project_id=? AND event_type='RECOMMENDED' LIMIT 1`).get(consultant_id, project_id);
   return { state: rec ? 'RECOMMENDED' : 'NEW', state_since: null };
 }
 
@@ -61,8 +63,10 @@ export function currentStateMap(db, consultant_id) {
       ('VIEWED','WATCHED','ACCEPTED','DISMISSED','RELEASED','EXPIRED','COMPLETED')
   ) WHERE position=1`).all(consultant_id)
     .map((row) => [row.project_id, { state: row.state, state_since: row.state_since }]));
-  const recommended = db.prepare(`SELECT DISTINCT project_id FROM decision_events
-    WHERE actor=? AND event_type='RECOMMENDED'`).all(consultant_id);
+  const recommended = db.prepare(`SELECT DISTINCT project_id FROM recommendations
+    WHERE consultant_id=?
+    UNION SELECT DISTINCT project_id FROM decision_events
+    WHERE actor=? AND event_type='RECOMMENDED'`).all(consultant_id, consultant_id);
   for (const row of recommended) {
     if (!states.has(row.project_id)) {
       states.set(row.project_id, { state: 'RECOMMENDED', state_since: null });

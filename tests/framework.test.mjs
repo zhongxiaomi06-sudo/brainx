@@ -165,7 +165,8 @@ test('migrations：schema_migrations 逐文件记账，重开不重跑', () => {
                           '0015_openmai_results.sql', '0016_manual_fact_overrides.sql',
                           '0017_commitment_loop.sql',
                           '0017_position_add_company.sql', '0017_workbench_preferences.sql',
-                          '0018_database_growth_guard.sql', '0019_ttc_field_reports.sql']);
+                          '0018_database_growth_guard.sql', '0019_ttc_field_reports.sql',
+                          '0020_remove_recommendation_events.sql']);
 });
 
 const TMPDB = join(tmpdir(), `brainx-fw-${process.pid}.db`);
@@ -178,11 +179,19 @@ test('migrations：旧库 user_version=2 兼容——前 2 个文件标记已应
   for (const f of ['0001_init.sql', '0002_push_log.sql']) {
     legacy.exec(readFileSync(join(migDir, f), 'utf8'));
   }
+  legacy.exec(`INSERT INTO decision_events
+    (event_id, event_type, actor, occurred_at, project_id, idempotency_key, prev_state, next_state)
+    VALUES ('legacy-rec', 'RECOMMENDED', 'felix', '2026-08-10', 'P-LEGACY', 'legacy:rec', 'NEW', 'RECOMMENDED'),
+           ('legacy-view', 'VIEWED', 'felix', '2026-08-11', 'P-LEGACY', 'legacy:view', 'RECOMMENDED', 'VIEWED')`);
   legacy.exec('PRAGMA user_version = 2');
   legacy.close();
   const reopened = openDb(TMPDB);
   const rows = reopened.prepare('SELECT name FROM schema_migrations ORDER BY name').all().map((r) => r.name);
-  assert.equal(rows.length, 21); // 全部记账（含 0019 TTC 字段覆盖率报告）
+  assert.equal(rows.length, 22); // 全部记账（含 0020 机器推荐轨迹清理）
+  assert.equal(reopened.prepare(`SELECT COUNT(*) n FROM decision_events
+    WHERE event_type='RECOMMENDED'`).get().n, 0, '历史机器推荐轨迹已清理');
+  assert.equal(reopened.prepare(`SELECT COUNT(*) n FROM decision_events
+    WHERE event_type='VIEWED'`).get().n, 1, '人工操作轨迹完整保留');
   const view = reopened.prepare(`SELECT sql FROM sqlite_master WHERE type='view' AND name='current_engagement'`).get();
   assert.match(view.sql, /VIEWED/); // 0006 新视图已应用（含 VIEWED 推导）
   // 0007 扩列已生效

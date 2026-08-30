@@ -45,8 +45,8 @@ export function buildCtx(db, consultant_id, snapshot) {
   const posCompanies = db.prepare(`SELECT DISTINCT j.company FROM decision_events e
     JOIN job_facts j ON j.project_id=e.project_id
     WHERE e.actor=? AND e.event_type='ACCEPTED'`).all(consultant_id).map((r) => r.company);
-  const recRounds = Object.fromEntries(db.prepare(`SELECT project_id, COUNT(*) n FROM decision_events
-    WHERE actor=? AND event_type='RECOMMENDED' GROUP BY project_id`).all(consultant_id)
+  const recRounds = Object.fromEntries(db.prepare(`SELECT project_id, COUNT(DISTINCT run_id) n FROM recommendations
+    WHERE consultant_id=? GROUP BY project_id`).all(consultant_id)
     .map((r) => [r.project_id, r.n]));
   const engagedProjects = new Set(db.prepare(`SELECT DISTINCT project_id FROM decision_events
     WHERE actor=? AND event_type != 'RECOMMENDED'`).all(consultant_id).map((r) => r.project_id));
@@ -67,7 +67,7 @@ export function buildCtx(db, consultant_id, snapshot) {
   };
 }
 
-/** 自动轮次最小冻结间隔（方案 A，db-growth-governance-proposal）：输入未变时不重复全量冻结。 */
+/** 自动轮次最小冻结间隔：桥接输入变化也不得绕过，人工重算不受限制。 */
 const THROTTLE_MS = Number(process.env.BRAINX_RECOMMEND_THROTTLE_MS || 2 * 3600 * 1000);
 const SKIP_AUDIT_MS = Number(process.env.BRAINX_SKIP_AUDIT_MS || 60 * 60 * 1000);
 const PERSIST_LIMIT = Number(process.env.BRAINX_RECOMMEND_PERSIST_LIMIT || 200);
@@ -91,8 +91,8 @@ export function pruneRecommendationHistory(db, consultant_id, retainRuns = RETAI
 
 /**
  * 生成一轮推荐。硬约束：最近同步 complete=0 → blocked，不落推荐。
- * throttle=true（桥接等自动路径）：快照与上轮相同且距上轮 <2h → 跳过冻结，
- * 记一行 SKIPPED_UNCHANGED 审计轮并返回上轮 run_id（手动 run/事实修正重算不传，强制全量）。
+ * throttle=true（桥接等自动路径）：距上一正式轮 <2h → 跳过冻结，
+ * 记一行 SKIPPED_THROTTLED 审计轮并返回上轮 run_id（手动 run/事实修正重算不传，强制全量）。
  * 返回 { run_id, blocked, items[] }；dry_run 不落库。
  */
 export function recommend(db, consultant_id, {
@@ -116,31 +116,26 @@ export function recommend(db, consultant_id, {
     last_complete_at: snapshot.completed_at || null,
   } : null;
 
-  // 方案 A 节流（2026-08-24）：sync_id 每次同步都会变化，不能用它判断
-  // 数据是否变化；必须比较 sync_runs.input_hash。旧实现比较 snapshot_id，导致
-  // bridge 每 180s 对相同输入仍全量冻结，5 天产生 166 万 recommendations。
+  // 自动桥接的硬间隔：TTC 分页会让 input_hash 每轮变化，若只在哈希相同时节流，
+  // 就会每 1–3 分钟生成一次完整推荐。输入变化由下一轮基线吸收；人工重算不受限。
   if (throttle && !dry_run) {
-    const currentHash = db.prepare('SELECT input_hash FROM sync_runs WHERE sync_id=?')
-      .get(snapshot.sync_id)?.input_hash;
-    const lastRun = db.prepare(`SELECT dr.run_id, dr.snapshot_id, dr.created_at, sr.input_hash
-      FROM decision_runs dr
-      LEFT JOIN sync_runs sr ON sr.sync_id=dr.snapshot_id
-      WHERE dr.consultant_id=? AND dr.status='COMPLETED'
-      ORDER BY dr.created_at DESC LIMIT 1`).get(consultant_id);
-    if (lastRun && currentHash && lastRun.input_hash === currentHash
-        && Date.parse(now()) - Date.parse(lastRun.created_at) < THROTTLE_MS) {
+    const lastRun = db.prepare(`SELECT run_id, snapshot_id, created_at
+      FROM decision_runs
+      WHERE consultant_id=? AND status='COMPLETED'
+      ORDER BY created_at DESC LIMIT 1`).get(consultant_id);
+    if (lastRun && Date.parse(now()) - Date.parse(lastRun.created_at) < THROTTLE_MS) {
       // A 3-minute bridge used to create 480 skip rows/person/day.  Keep at most
       // one audit marker per hour; the returned result still reports every skip.
       const lastAudit = db.prepare(`SELECT created_at FROM decision_runs
-        WHERE consultant_id=? AND status='SKIPPED_UNCHANGED'
+        WHERE consultant_id=? AND status='SKIPPED_THROTTLED'
         ORDER BY created_at DESC LIMIT 1`).get(consultant_id);
       if (!lastAudit || Date.parse(now()) - Date.parse(lastAudit.created_at) >= SKIP_AUDIT_MS) {
         db.prepare(`INSERT INTO decision_runs
           (run_id, consultant_id, snapshot_id, policy_version, candidate_count, status, created_at)
           VALUES (?,?,?,?,?,?,?)`)
-          .run(uuid(), consultant_id, snapshot.sync_id, POLICY_VERSION, 0, 'SKIPPED_UNCHANGED', now());
+          .run(uuid(), consultant_id, snapshot.sync_id, POLICY_VERSION, 0, 'SKIPPED_THROTTLED', now());
       }
-      return { skipped: true, reason: '快照未变化且距上轮不足 2h，复用上轮', blocked: false,
+      return { skipped: true, reason: '自动推荐距上轮不足 2h，复用上轮', blocked: false,
                run_id: lastRun.run_id, items: null, sync_warning, generated_at: now() };
     }
   }
@@ -182,10 +177,6 @@ export function recommend(db, consultant_id, {
        evidence_coverage, reasons_json, risks_json, evidence_refs_json, breakdown_json,
        policy_version, rank, created_at)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
-    const insEvt = db.prepare(`INSERT INTO decision_events
-      (event_id, event_type, actor, occurred_at, project_id, decision_id, policy_version,
-       idempotency_key, prev_state, next_state, payload_json)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?)`);
     db.exec('BEGIN');
     try {
       insRun.run(run_id, consultant_id, snapshot.sync_id, POLICY_VERSION, evaluated.length, 'COMPLETED', now());
@@ -197,8 +188,6 @@ export function recommend(db, consultant_id, {
                    r.confidence_band, r.evidence_coverage, JSON.stringify(r.reasons),
                    JSON.stringify(r.risks), JSON.stringify(r.evidence_refs),
                    JSON.stringify(r.breakdown), POLICY_VERSION, r.rank, now());
-        if (r.rank <= top) insEvt.run(uuid(), 'RECOMMENDED', consultant_id, now(), r.project_id, r.decision_id,
-                   POLICY_VERSION, `rec:${run_id}:${r.project_id}`, null, 'RECOMMENDED', '{}');
       }
       pruneRecommendationHistory(db, consultant_id);
       db.exec('COMMIT');
@@ -235,7 +224,7 @@ export const publicRec = (r) => ({
 });
 
 /** 读最新一轮推荐（工作台默认视图）。raw_json 不出网（原始负载只供库内/回放对照）。
- * 只认 COMPLETED 轮：节流产物的 SKIPPED_UNCHANGED 审计行没有冻结推荐，不可当最新轮。 */
+ * 只认 COMPLETED 轮：节流产物的审计行没有冻结推荐，不可当最新轮。 */
 export function recommendationRun(db, consultant_id, run_id = null) {
   const run = run_id
     ? db.prepare(`SELECT * FROM decision_runs

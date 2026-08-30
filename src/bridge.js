@@ -420,7 +420,10 @@ export function startBridge(db, bus, { intervalMs, recommendFn, consultantIdsFn,
           }
           if (recommendFn) {
             for (const cid of cids) {
-              try { recommendFn(cid); } catch { /* 阻断不致命 */ }
+              let result = null;
+              try { result = await recommendFn(cid); } catch { /* 阻断不致命 */ }
+              // 节流/阻断只复用旧轮次，不得伪装成“推荐已更新”或重复推卡。
+              if (!result?.run_id || result.skipped || result.blocked) continue;
               try { onRecommended?.(cid); } catch { /* 推卡失败不影响桥接 */ }
               bus?.emit({ type: 'recommend', consultant_id: cid, at: now() });
             }

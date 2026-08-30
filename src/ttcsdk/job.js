@@ -53,7 +53,8 @@ export async function searchSince(jwt, {
     }
     const jobs = d?.jobs || [];
     // 缺 update_time 的异常行当新鲜处理（宁可多拉一页，不提前截断）
-    const tsOf = (j) => (j.update_time ? Number(j.update_time) : Number.POSITIVE_INFINITY);
+    // 脏值按 Infinity 兜底：NaN 会丢行并触发 fresh<jobs 提前停，单行脏数据截断整轮
+    const tsOf = (j) => (Number.isFinite(Number(j.update_time)) ? Number(j.update_time) : Number.POSITIVE_INFINITY);
     const fresh = sinceMs > 0 ? jobs.filter((j) => tsOf(j) > sinceMs) : jobs;
     out.push(...fresh);
     // 整页都不新（降序序列 → 后续页更老）→ 提前停；fresh < jobs 说明本页触达水位

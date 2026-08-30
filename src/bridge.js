@@ -258,9 +258,11 @@ export async function bridgeOnce(db, { consultant_ids, execImpl = lark, api = { 
       const savedCursor = resume?.checkpoint || '';
       const numericCursor = Number(savedCursor);
       const initialCursor = savedCursor && Number.isSafeInteger(numericCursor) ? numericCursor : savedCursor;
+      // checkpoint 一律按字符串绑定：node:sqlite（Node 22）把 JS number 绑成 REAL，
+      // TEXT affinity 转回文本时得科学计数串——读回精度漂移（...316 变 ...320）。
       const putCursor = (source, checkpoint) => db.prepare(`INSERT INTO bridge_cursor
         (source, checkpoint, updated_at) VALUES (?,?,?) ON CONFLICT(source) DO UPDATE SET
-        checkpoint=excluded.checkpoint, updated_at=excluded.updated_at`).run(source, checkpoint, now());
+        checkpoint=excluded.checkpoint, updated_at=excluded.updated_at`).run(source, String(checkpoint), now());
       try {
         // TTC 的限流响应会消费本次请求携带的 cursor；同轮继续翻页后再重试会报 -111。
         // 因此每 tick 只取一页，先持久化下一页 cursor，下个 tick 再继续。

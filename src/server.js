@@ -468,6 +468,8 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       json(res, out.ok ? 200 : (out.status || 400), out);
     },
 
+    // 旧客户端启动兼容：动作已下线，只返回空列表，避免恢复“暂不考虑”语义。
+    'GET /api/v1/dismiss-reasons': (req, res) => json(res, 200, { items: [] }),
     'GET /api/v1/commitment-options': (req, res) => json(res, 200, {
       release_reasons: RELEASE_REASONS, close_reasons: CLOSE_REASONS,
     }),

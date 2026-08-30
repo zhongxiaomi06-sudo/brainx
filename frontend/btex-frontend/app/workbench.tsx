@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";import { OpenmaiMarkdown } from "./openmai-markdown";
+import { useEffect, useMemo, useRef, useState } from "react";import { OpenmaiMarkdown, MarkdownBody } from "./openmai-markdown";
 import {
   Activity, AlertTriangle, ArrowLeft, BarChart3, Bell, BriefcaseBusiness,
   Check, ChevronDown, ChevronRight, CircleHelp, Clock3, Database, Filter,
@@ -301,23 +301,16 @@ export default function DecisionWorkbench({demo=false}:{demo?:boolean}={}){
  </div>
 }
 
-function evidenceCoveragePercent(coverage:number|null){return coverage===null?null:Math.round(coverage<=1?coverage*100:coverage)}
 function ChatbotDrawer({messages,input,setInput,busy,tool,onSend,onStop,onClear,onClose,mode,page,settings,setSettings,contextJob}:{messages:AssistantMessage[];input:string;setInput:(value:string)=>void;busy:boolean;tool:string|null;onSend:()=>void;onStop:()=>void;onClear:()=>void;onClose:()=>void;mode:"connecting"|"connected"|"offline";page:Page;settings:boolean;setSettings:(value:boolean)=>void;contextJob:DecisionJob|null}){
- const [tab,setTab]=useState<"profile"|"market">("profile");
  const messagesRef=useRef<HTMLDivElement>(null);
  useEffect(()=>{const el=messagesRef.current;if(el)el.scrollTop=el.scrollHeight},[messages,busy,tool]);// 新内容/工具活动变化滚到底,agent 回答长不滚看不到新文本
- const contextLabel=contextJob?`${contextJob.company} · ${contextJob.role}`:page==="today"?"当前精选盘与待判断职位":"当前工作台页面";
- const coverage=contextJob?evidenceCoveragePercent(contextJob.evidenceCoverage):null;
- const tags=contextJob?[decisionGroupMeta[contextJob.group].title,contextJob.facts["职位关系"],contextJob.sourceMode==="COCKPIT_CONTEXT"?"驾驶舱上下文":"职位市场"]:["推荐评分","顾问可见范围","实时同步"];
- const insights=contextJob?[contextJob.recommendation,...contextJob.risks].slice(0,3):["推荐基于当前顾问可见的职位、推荐和状态。","硬规则优先于综合评分，UNKNOWN 不会被当成 0。"];
+ const contextLabel=contextJob?`${contextJob.company} · ${contextJob.role}`:null;
  return <>
   <div className="assistant-backdrop" onClick={onClose}/>
   <aside className="assistant-drawer" aria-label="BrainX 助手">
    <header><div className="assistant-heading"><span className="assistant-heading-icon"><Sparkles/></span><div><span className="assistant-kicker">BRAINX ASSISTANT</span><h2>BrainX 助手</h2></div></div><button className="icon-btn" onClick={onClose} aria-label="关闭助手"><X/></button></header>
-   <div className="assistant-tabs" role="tablist" aria-label="BrainX 助手视图"><button className={tab==="profile"?"active":""} type="button" role="tab" aria-selected={tab==="profile"} onClick={()=>setTab("profile")}>岗位画像</button><button className={tab==="market"?"active":""} type="button" role="tab" aria-selected={tab==="market"} onClick={()=>setTab("market")}>职位市场</button></div>
-   <div className="assistant-insight" role="tabpanel">{tab==="profile"?<><h3>岗位画像概览</h3><div className="assistant-context-card"><div className="assistant-context-title"><b>核心目标</b><span>{mode==="connected"?"已连接":"演示模式"}</span></div><strong>{contextLabel}</strong><small>{contextJob?`最终匹配 ${contextJob.finalScore} · 推进 ${contextJob.globalScore} · 证据覆盖 ${coverage===null?"待确认":`${coverage}%`}`:"基于当前顾问可见的职位、推荐与状态"}</small><div className="assistant-context-section"><b>关键能力要求</b><div>{tags.filter(Boolean).map(tag=><span key={tag}>{tag}</span>)}</div></div><div className="assistant-context-section"><b>当前建议</b><ul>{insights.map(item=><li key={item}>{item}</li>)}</ul></div></div><section className="assistant-ai-insights"><h3>AI 洞察</h3><ul>{insights.map(item=><li key={item}>{item}</li>)}</ul></section></>:<><h3>职位市场</h3><div className="assistant-context-card market-card"><strong>{contextJob?contextJob.company:"当前职位市场"}</strong><small>{contextJob?`${contextJob.role} · ${contextJob.recentSignal}`:"切换职位后，可在这里查看当前职位的市场信号。"}</small><div className="assistant-context-section"><b>市场信号</b><div><span>{contextJob?.facts["数据来源"]||"职位市场"}</span><span>{contextJob?.facts["当前阶段"]||"待同步"}</span><span>{contextJob?.facts["剩余 HC"]||"UNKNOWN"} HC</span></div></div></div><section className="assistant-ai-insights"><h3>使用提示</h3><ul><li>点击职位卡可同步右侧的岗位画像。</li><li>可以在底部询问当前职位、评分或允许动作。</li></ul></section></>}</div>
    {settings&&<div className="assistant-settings"><div className="assistant-settings-title"><b>模型服务</b><button className="icon-btn" onClick={()=>setSettings(false)} aria-label="关闭设置"><X/></button></div><small>模型和密钥由 BrainX 服务器统一配置，浏览器不会读取或保存供应商密钥。</small></div>}
-   <div className="assistant-messages" aria-live="polite" ref={messagesRef}>{messages.map((message,index)=><div className={`assistant-message ${message.role}`} key={`${index}-${message.role}`}><span>{message.role==="user"?"你":"BrainX"}</span><p>{message.content||(busy&&index===messages.length-1?(tool?`正在查:${tool}…`:"正在思考…"):"")}</p></div>)}</div>
+   <div className="assistant-messages" aria-live="polite" ref={messagesRef}>{messages.length===0?<div className="assistant-empty">{contextLabel?<>当前上下文：{contextLabel}<br/>向 BrainX 助手提问，获取当前职位的判断建议。</>:"向 BrainX 助手提问，获取当前职位或工作台的判断建议。"}</div>:messages.map((message,index)=><div className={`assistant-message ${message.role}`} key={`${index}-${message.role}`}><span>{message.role==="user"?"你":"BrainX"}</span>{message.role==="assistant"&&message.content?<MarkdownBody text={message.content} className="assistant-md"/>:<p>{message.content||(busy&&index===messages.length-1?(tool?`正在查:${tool}…`:"正在思考…"):"")}</p>}</div>)}</div>
    <form className="assistant-compose" onSubmit={event=>{event.preventDefault();onSend()}}><textarea value={input} onChange={event=>setInput(event.target.value)} placeholder="向 BrainX 助手提问…" rows={2} disabled={busy&&mode!=="connected"}/><div><button type="button" className="assistant-clear" onClick={onClear}>清空</button><button type="button" className="assistant-gear" onClick={()=>setSettings(!settings)} aria-label="模型设置"><Settings2/></button>{busy?<button type="button" className="btn" onClick={onStop}>停止</button>:<button type="submit" className="btn primary" disabled={!input.trim()||mode!=="connected"}><Send/>发送</button>}</div></form>
   </aside>
  </>}

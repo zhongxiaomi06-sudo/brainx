@@ -48,6 +48,14 @@ export const FilteringAndSelection: Story = {
   name: "筛选、视图与详情联动",
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    await expect(canvas.queryByText("⌘K")).not.toBeInTheDocument();
+    const search = canvas.getByRole("textbox", { name: "搜索职位工作区" });
+    await userEvent.type(search, "企业服务");
+    await expect(canvas.getByText("高级算法工程师")).toBeInTheDocument();
+    await userEvent.click(canvas.getByRole("button", { name: "搜索" }));
+    await expect(canvas.getByText("企业服务产品总监")).toBeInTheDocument();
+    await expect(canvas.queryByText("高级算法工程师")).not.toBeInTheDocument();
+    await userEvent.click(canvas.getByRole("button", { name: "清除条件" }));
     await userEvent.click(canvas.getByRole("tab", { name: /跟进中/ }));
     await expect(canvas.getByText("解决方案架构师")).toBeInTheDocument();
     await expect(canvas.getByText("前端技术专家")).toBeInTheDocument();
@@ -56,9 +64,14 @@ export const FilteringAndSelection: Story = {
     await expect(canvas.getByRole("heading", { name: "解决方案架构师" })).toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: "关闭职位详情" }));
     await expect(canvas.queryByRole("dialog")).not.toBeInTheDocument();
-    await userEvent.selectOptions(canvas.getByRole("combobox", { name: "筛选城市" }), "杭州市");
+    await expect(canvas.getByRole("option", { name: "北京" })).toBeInTheDocument();
+    await expect(canvas.queryByRole("option", { name: "北京市" })).not.toBeInTheDocument();
+    await userEvent.selectOptions(canvas.getByRole("combobox", { name: "筛选城市" }), "杭州");
     await expect(canvas.getByText("没有符合条件的职位")).toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: "清除条件" }));
+    await userEvent.selectOptions(canvas.getByRole("combobox", { name: "筛选职位状态" }), "冷却");
+    await expect(canvas.getByText("解决方案架构师")).toBeInTheDocument();
+    await expect(canvas.queryByText("前端技术专家")).not.toBeInTheDocument();
   },
 };
 
@@ -92,6 +105,7 @@ export const FormalEmbeddedReview: Story = {
     const canvas = within(canvasElement);
     await expect(canvas.queryByRole("navigation", { name: "审核稿主要导航" })).not.toBeInTheDocument();
     await expect(canvas.queryByRole("button", { name: "同步职位" })).not.toBeInTheDocument();
+    await expect(canvas.getByRole("button", { name: "搜索" })).toBeInTheDocument();
     await expect(canvas.getByText("真实职位数据 · 来自 TTC 同步快照")).toBeInTheDocument();
     const row = canvas.getByRole("row", { name: /高级算法工程师/ });
     row.focus();

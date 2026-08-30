@@ -238,7 +238,9 @@ test("uses TTC facts and field capabilities without restoring fake job filters",
   assert.match(workbench, /row\.cities/);
   assert.match(workbench, /row\.pipeline_steps/);
   assert.match(workbench, /row\.owner_name/);
-  assert.match(workbench, /field\.filterAvailable/);
+  assert.match(workbench, /field\.displayAvailable/);
+  assert.match(workbench, /<button type="submit">搜索<\/button>/);
+  assert.doesNotMatch(workbench, /<kbd><Command/);
   assert.match(workbench, /<JobsWorkspaceReview rows=\{rows\} embedded/);
   assert.match(workbench, /dataLabel="真实职位数据 · 来自 TTC 同步快照"/);
   assert.match(workbench, /loadDetail=\{loadDetail\}/);

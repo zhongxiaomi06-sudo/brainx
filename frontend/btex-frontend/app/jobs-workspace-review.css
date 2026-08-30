@@ -63,7 +63,7 @@
 .jobs-review-breadcrumb strong { font-weight: 650; }
 .jobs-review-search {
   width: min(390px,36vw); height: 34px; display: flex; align-items: center; gap: 8px;
-  padding: 0 9px; border: 1px solid #dededb; border-radius: 7px;
+  padding: 0 4px 0 9px; border: 1px solid #dededb; border-radius: 7px;
   background: #fbfbfa; color: #8d8d8e;
 }
 .jobs-review-search > svg { width: 15px; }
@@ -71,12 +71,12 @@
   min-width: 0; flex: 1; border: 0; outline: 0; background: transparent;
   color: var(--jwr-ink); font: inherit;
 }
-.jobs-review-search kbd {
-  display: flex; align-items: center; gap: 2px; padding: 2px 5px;
-  border: 1px solid #e1e1de; border-radius: 5px; background: #fff;
-  color: #8b8b8c; font: 9px inherit;
+.jobs-review-search button {
+  height: 26px; flex: none; padding: 0 13px; border: 1px solid #14715e; border-radius: 6px;
+  background: var(--jwr-accent); color: #fff; font: 650 11px inherit; cursor: pointer;
 }
-.jobs-review-search kbd svg { width: 10px; }
+.jobs-review-search button:hover { background: #126f5e; }
+.jobs-review-search:focus-within { border-color: #9fcfc1; box-shadow: 0 0 0 3px rgba(23,133,111,.10); }
 .jobs-review-sync {
   height: 34px; display: inline-flex; align-items: center; gap: 7px; padding: 0 13px;
   border: 1px solid #14715e; border-radius: 7px; background: var(--jwr-accent);
@@ -208,7 +208,7 @@
   .jobs-review-topbar { padding: 0 12px; }
   .jobs-review-breadcrumb { display: none; }
   .jobs-review-search { width: auto; flex: 1; }
-  .jobs-review-search kbd { display: none; }
+  .jobs-review-search button { padding: 0 10px; }
   .jobs-review-sync { padding: 0 10px; }
   .jobs-review-body { height: auto; display: block; }
   .jobs-review-main { padding: 0 12px 18px; }

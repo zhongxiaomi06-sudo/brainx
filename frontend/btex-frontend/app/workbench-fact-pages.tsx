@@ -102,9 +102,9 @@ function WorkbenchJobsPage({ items, capabilities, projects, company, onAddToProj
   const rows = useMemo(() => items.map(toJobsWorkspaceRow).filter(row => !company || row.company === company), [company, items]);
   const fields = useMemo(() => capabilities.map(toTtcCapability).filter((field): field is TtcFieldCapability => field !== null), [capabilities]);
   const filterCapabilities = useMemo(() => ({
-    city: fields.find(field => field.key === "city")?.filterAvailable ?? false,
-    activeState: fields.find(field => field.key === "active_state")?.filterAvailable ?? false,
-  }), [fields]);
+    city: fields.find(field => field.key === "city")?.displayAvailable ?? rows.some(row => row.cities.length > 0),
+    activeState: fields.find(field => field.key === "active_state")?.displayAvailable ?? rows.length > 0,
+  }), [fields, rows]);
   const loadDetail = async (row: JobsWorkspaceReviewRow) => {
     const source = items.find(item => item.project_id === row.projectId);
     if (!source) throw new Error("职位已不在当前 Radar 快照中");

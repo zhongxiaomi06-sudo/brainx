@@ -79,6 +79,21 @@ test('评估：排序组形状与指标范围', () => {
   }
 });
 
+test('SYNC_ALERT：日窗口键——同日去重、次日可再发', async () => {
+  const { pushCard, buildSyncAlertCard, syncAlertKey } = await import('../src/push.js');
+  const card = buildSyncAlertCard({ complete: 0, source: 'ttc', errors: ['限流'], as_of: now(), started_at: now() });
+  const key1 = syncAlertKey('2026-08-30T02:00:00Z'); // CST 08-30
+  const r1 = await pushCard(db, { consultant_id: 'felix', kind: 'SYNC_ALERT', run_id: key1, card, target: 'oc_x', send: false });
+  assert.equal(r1.status, 'PREVIEW');
+  // 同日同键：重发被 SKIPPED_DUPLICATE（send=false → PREVIEW 行，再发预览也幂等）
+  const r2 = await pushCard(db, { consultant_id: 'felix', kind: 'SYNC_ALERT', run_id: key1, card, target: 'oc_x', send: false });
+  assert.equal(r2.status, 'SKIPPED_DUPLICATE');
+  // 次日新键：可以再发
+  const key2 = syncAlertKey('2026-08-30T17:00:00Z'); // CST 08-31
+  const r3 = await pushCard(db, { consultant_id: 'felix', kind: 'SYNC_ALERT', run_id: key2, card, target: 'oc_x', send: false });
+  assert.equal(r3.status, 'PREVIEW');
+});
+
 test('feedback 唯一索引：同三元组重复插入被拒', () => {
   assert.throws(() => {
     db.prepare(`INSERT INTO recommendation_feedback

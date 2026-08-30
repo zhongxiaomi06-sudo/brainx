@@ -14,7 +14,7 @@ import { engage, commitmentSummary, currentState, legalActions, DISMISS_REASONS 
 import { replay, recordOutcome } from './replay.js';
 import { acceptCommitment, commitmentDetails, recordProgress, recordTerminalResult,
   releaseCommitment, suggestedAction, RELEASE_REASONS, CLOSE_REASONS } from './commitment.js';
-import { buildDailyCard, buildSyncAlertCard, pushCard } from './push.js';
+import { buildDailyCard, buildSyncAlertCard, pushCard, syncAlertKey } from './push.js';
 import { signSession, verifySession, cookieOf } from './session.js';
 import { signState, verifyState, buildAuthorizeUrl, exchangeCode, oauthConfigured } from './oauth.js';
 import { findByOpenId, updateProfile } from './roster.js';
@@ -548,8 +548,8 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
                            commitments: c, sync, snapshot_id: snapshot?.sync_id });
       const target = b?.target || process.env.BRAINX_PUSH_TARGET || '';
       if (!target) return err(res, 400, 'NO_TARGET', '缺推送目标（chat_id/open_id 或 BRAINX_PUSH_TARGET）');
-      const out = await pushCard(db, { consultant_id: cid, kind, run_id: run?.run?.run_id || null,
-                                 card, target, send: true });
+      const rid = kind === 'SYNC_ALERT' ? syncAlertKey() : (run?.run?.run_id || null);
+      const out = await pushCard(db, { consultant_id: cid, kind, run_id: rid, card, target, send: true });
       json(res, out.ok ? 200 : 502, out);
     },
   };

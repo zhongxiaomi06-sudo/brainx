@@ -112,6 +112,13 @@ export function buildHeatingAlertCard({ change_label, item }) {
 /** 推送（幂等：consultant+kind+run_id 唯一；SENT 重复 → SKIPPED_DUPLICATE；FAILED 可重发并更新原行）。
  * run_id 为空统一落 '' 哨兵：SQLite UNIQUE 视 NULL 互不相等，NULL 时唯一键形同虚设
  * （SYNC_ALERT 恒无 run_id，修正前可并发重复插行）。存量 NULL 由 0006 迁移回填。 */
+/** SYNC_ALERT 去重键（CST 日窗口）：告警每天最多一张，但第二天必须能再发——
+ * 此前用冻结 run_id 做键，故障期间 run_id 不变 → 告警终身只发一次（最需要时哑掉）。 */
+export function syncAlertKey(at = now()) {
+  const cst = new Date(Date.parse(at) + 8 * 3600 * 1000);
+  return `syncalert:${cst.toISOString().slice(0, 10)}`;
+}
+
 export async function pushCard(db, { consultant_id, kind, run_id, card, target, send = false }) {
   const rid = run_id ?? '';
   const dup = db.prepare(`SELECT push_id, status FROM push_log

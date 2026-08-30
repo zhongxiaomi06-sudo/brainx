@@ -13,6 +13,8 @@ import '../src/env.js';
 import { openDb } from '../src/db.js';
 import { labelsForRun } from '../src/labels.js';
 import { loadConsultants } from '../src/recommend.js';
+import { loadShadowModel } from '../src/shadow-rank.js';
+import { featuresOf } from '../src/ltr-features.js';
 
 const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i > -1 ? process.argv[i + 1] : d; };
 const RUNS = Math.max(1, Number(arg('runs', '5')) || 5);
@@ -29,7 +31,7 @@ function ndcg(items, k) {
   return denom > 0 ? dcg(top.map((i) => i.label)) / denom : null;
 }
 
-export function evaluate(db, { runs = RUNS, consultant_ids = null } = {}) {
+export function evaluate(db, { runs = RUNS, consultant_ids = null, shadowModel = null } = {}) {
   const cids = consultant_ids || loadConsultants(db).map((c) => c.consultant_id);
   const groups = [];
   for (const cid of cids) {
@@ -42,6 +44,18 @@ export function evaluate(db, { runs = RUNS, consultant_ids = null } = {}) {
   }
   const per = [];
   for (const g of groups) {
+    // 影子对照（§7 阶段二）：模型分重排同批候选算 NDCG@10，与规则 rank 对照
+    if (shadowModel) {
+      const scored = g.items.map((it) => {
+        const rec = db.prepare(`SELECT decision_id, action, score, evidence_coverage, breakdown_json
+          FROM recommendations WHERE run_id=? AND project_id=?`).get(g.run_id, it.project_id);
+        const job = db.prepare('SELECT * FROM job_facts WHERE project_id=?').get(it.project_id);
+        const feat = rec ? featuresOf({ ...rec, breakdown: JSON.parse(rec.breakdown_json || '{}'), job },
+          { nowIso: g.created_at }) : null;
+        return { ...it, shadow: feat ? shadowModel.score(feat) : -1e9 };
+      }).sort((a, b) => b.shadow - a.shadow);
+      g.shadow_ndcg_at_10 = ndcg(scored, 10);
+    }
     const labeled = g.items.filter((i) => i.label !== null);
     const valuable = labeled.filter((i) => i.label >= 2);
     const recall50 = valuable.length
@@ -49,6 +63,7 @@ export function evaluate(db, { runs = RUNS, consultant_ids = null } = {}) {
     const top10 = g.items.slice(0, 10).filter((i) => i.label !== null);
     per.push({
       consultant_id: g.consultant_id, run_id: g.run_id, created_at: g.created_at,
+      shadow_ndcg_at_10: g.shadow_ndcg_at_10 ?? null,
       candidates: g.items.length, labeled: labeled.length, valuable: valuable.length,
       recall_at_50: recall50,
       ndcg_at_10: ndcg(g.items, 10),
@@ -64,6 +79,7 @@ export function evaluate(db, { runs = RUNS, consultant_ids = null } = {}) {
     metrics: {
       recall_at_50: avg('recall_at_50'), ndcg_at_10: avg('ndcg_at_10'),
       precision_at_10: avg('precision_at_10'),
+      ...(shadowModel ? { shadow_ndcg_at_10: avg('shadow_ndcg_at_10') } : {}),
     },
     note: '快照口径：标签取当前可见结果（未来演化未按时间切分隔离，仅作基线对照，不作上线判据）',
     groups_detail: per,
@@ -72,7 +88,10 @@ export function evaluate(db, { runs = RUNS, consultant_ids = null } = {}) {
 
 if (process.argv[1] && new URL(import.meta.url).pathname === process.argv[1]) {
   const db = openDb(arg('db', undefined));
-  const out = evaluate(db, { runs: RUNS });
+  const shadowPath = arg('shadow', null);
+  const shadowModel = shadowPath ? loadShadowModel(shadowPath) : null;
+  if (shadowPath && !shadowModel) console.error(`[shadow] 模型不可用：${shadowPath}`);
+  const out = evaluate(db, { runs: RUNS, shadowModel });
   if (process.argv.includes('--json')) console.log(JSON.stringify(out, null, 2));
   else {
     console.log(`排序组: ${out.groups}（近 ${RUNS} 轮/顾问）`);

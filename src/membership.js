@@ -65,7 +65,7 @@ export function removeMembership(db, consultant_id, project_id, { idempotency_ke
   if (!current) return { ok: true, already: true, removed: false };
 
   const state = currentState(db, consultant_id, project_id).state;
-  if (!['NEW', 'RECOMMENDED', 'VIEWED', 'EXPIRED'].includes(state)) {
+  if (!['NEW', 'RECOMMENDED', 'VIEWED', 'DISMISSED', 'RELEASED', 'EXPIRED'].includes(state)) {
     return { ok: false, status: 409, error: '项目已有关注或跟进行动，请先在详情中结束当前动作' };
   }
   db.prepare('UPDATE job_memberships SET valid_to=? WHERE id=? AND valid_to IS NULL')

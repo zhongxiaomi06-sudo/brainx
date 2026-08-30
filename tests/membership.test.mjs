@@ -165,10 +165,25 @@ test('HTTP：待开始项目可忽略并关闭归属历史，跟进中项目拒�
 
     await fetch(`${base}/membership`, { method: 'PATCH', headers,
       body: JSON.stringify({ relation: 'MY_JOB', idempotency_key: 'membership:remove:rejoin' }) });
-    const dueAt = new Date(Date.now() + 86400000).toISOString();
     await fetch(`${base}/engagement`, { method: 'POST', headers,
+      body: JSON.stringify({ action: 'DISMISS', reason: '当前没精力', idempotency_key: 'membership:remove:dismiss' }) });
+    const dismissed = await fetch(`${base}/membership`, { method: 'DELETE', headers,
+      body: JSON.stringify({ idempotency_key: 'membership:remove:dismissed' }) });
+    assert.equal(dismissed.status, 200);
+    assert.equal((await dismissed.json()).removed, true);
+
+    await fetch(`${base}/membership`, { method: 'PATCH', headers,
+      body: JSON.stringify({ relation: 'MY_JOB', idempotency_key: 'membership:remove:rejoin-follow' }) });
+    db.prepare('UPDATE decision_events SET occurred_at=? WHERE idempotency_key=?')
+      .run(new Date(Date.now() - 31 * 86400000).toISOString(), 'membership:remove:dismiss');
+    const watched = await fetch(`${base}/engagement`, { method: 'POST', headers,
+      body: JSON.stringify({ action: 'WATCH', idempotency_key: 'membership:remove:watch' }) });
+    assert.equal(watched.status, 200);
+    const dueAt = new Date(Date.now() + 86400000).toISOString();
+    const accepted = await fetch(`${base}/engagement`, { method: 'POST', headers,
       body: JSON.stringify({ action: 'ACCEPT', confirm: true, goal: '继续推进',
         action_title: '联系客户', due_at: dueAt, idempotency_key: 'membership:remove:accept' }) });
+    assert.equal(accepted.status, 200);
     const blocked = await fetch(`${base}/membership`, { method: 'DELETE', headers,
       body: JSON.stringify({ idempotency_key: 'membership:remove:blocked' }) });
     assert.equal(blocked.status, 409);

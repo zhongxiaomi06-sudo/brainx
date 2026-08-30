@@ -5,7 +5,7 @@
 }
 .job-detail-review-card {
   --detail-accent: #17856f; --detail-ink: #172723; --detail-muted: #697974; --detail-line: #e2e9e6;
-  width: min(820px, calc(100vw - 40px)); height: min(400px, calc(100dvh - 56px));
+  width: min(960px, calc(100vw - 40px)); height: min(600px, calc(100dvh - 56px));
   display: flex; flex-direction: column; overflow: hidden; outline: 0;
   border: 1px solid rgba(255,255,255,.72); border-radius: 24px; background: rgba(252,253,252,.97);
   color: var(--detail-ink); box-shadow: 0 30px 90px rgba(19,39,33,.24), 0 2px 12px rgba(19,39,33,.08);
@@ -131,6 +131,7 @@
 .job-detail-review-actions button.is-primary { border-color: var(--detail-accent); background: var(--detail-accent); color: #fff; }
 .job-detail-review-actions button.is-primary:hover { background: #126f5e; }
 .job-detail-review-actions button.is-primary:disabled { border-color: #c9ddd6; background: #dcebe6; color: #5d7a70; cursor: default; }
+.job-detail-review-actions button.is-ignore:hover { border-color: #e0c5c7; background: #fff5f5; color: #9c434a; }
 .job-detail-review-actions button.is-dismiss:hover { border-color: #e0c5c7; background: #fff5f5; color: #9c434a; }
 @keyframes job-detail-review-in { from { opacity: 0; transform: translateY(10px) scale(.985); } to { opacity: 1; transform: none; } }
 @media(max-width:640px) {

@@ -58,8 +58,10 @@ type JobsWorkspaceReviewProps = {
   tipText?: string;
   filterCapabilities?: { city: boolean; activeState: boolean };
   joinedProjectIds?: string[];
+  ignorableProjectIds?: string[];
   onSync?: () => void;
   onFollow?: (projectId: string) => Promise<void> | void;
+  onIgnore?: (projectId: string) => Promise<void> | void;
   onDismiss?: (projectId: string) => void;
   onOpenSource?: (projectId: string) => void;
   loadDetail?: (row: JobsWorkspaceReviewRow) => Promise<JobDetailReviewData>;
@@ -126,8 +128,10 @@ export function JobsWorkspaceReview({
   tipText = "从同步真实职位开始，然后筛选并加入跟进",
   filterCapabilities = { city: true, activeState: true },
   joinedProjectIds = [],
+  ignorableProjectIds = [],
   onSync,
   onFollow,
+  onIgnore,
   onDismiss,
   onOpenSource,
   loadDetail,
@@ -182,6 +186,7 @@ export function JobsWorkspaceReview({
   const visibleRows = filteredRows.slice(0, rowLimit);
   const selected = selectedId ? rows.find((row) => row.projectId === selectedId) || null : null;
   const joinedProjects = useMemo(() => new Set(joinedProjectIds), [joinedProjectIds]);
+  const ignorableProjects = useMemo(() => new Set(ignorableProjectIds), [ignorableProjectIds]);
   useEffect(() => {
     if (!selected || !loadDetail) return;
     let active = true;
@@ -308,6 +313,7 @@ export function JobsWorkspaceReview({
             ? enrichedDetail.inMyProjects : ["MY_JOB", "PRIMARY_PM"].includes(selected.relation || "") || selected.workflowState === "FOLLOWING")}}
           onClose={() => setSelectedId(null)}
           onAddToProjects={onFollow && selected.relation !== "OTHER_CONSULTANT" ? (projectId) => onFollow(projectId) : undefined}
+          onIgnore={onIgnore && ignorableProjects.has(selected.projectId) ? (projectId) => onIgnore(projectId) : undefined}
           onDismiss={onDismiss ? (projectId) => {
             onDismiss?.(projectId);
             setSelectedId(null);

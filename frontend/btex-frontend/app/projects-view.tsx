@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, ChevronRight, Clock3, Search } from "lucide-react";
 import type { ProjectStatus, ProjectSummary } from "./brainx-projects-api";
+import { canIgnoreProject } from "./project-ignore-action";
 import { Heading } from "./workbench-controls";
 
 type ProjectFilter = "ALL" | ProjectStatus;
@@ -117,8 +118,7 @@ export function ProjectsView({ projects, query, setQuery, focusedProjectId, open
       {visible.length ? visible.map(project => {
         const due = dueText(project);
         const urgent = project.project_status === "NEEDS_ACTION";
-        const canIgnore = project.project_status === "PENDING_START"
-          && ["NEW", "RECOMMENDED", "VIEWED", "EXPIRED"].includes(project.engagement_state);
+        const canIgnore = canIgnoreProject(project);
         return <article id={`project-${project.project_id}`} className={`project-action-card status-${project.project_status.toLocaleLowerCase()}${focusedProjectId === project.project_id ? " is-focused" : ""}`} key={project.project_id} aria-label={`${project.role} · ${project.company}`}>
           <div className="project-identity">
             <div><span className="project-status">{urgent ? <AlertTriangle /> : project.project_status === "COMPLETED" ? <CheckCircle2 /> : <Clock3 />}{statusLabels[project.project_status]}</span><small>{project.relation === "MY_JOB" ? "我的职位" : "团队共享"}</small></div>

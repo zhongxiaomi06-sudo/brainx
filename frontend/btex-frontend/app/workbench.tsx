@@ -37,7 +37,7 @@ import { WorkbenchSettingsPage } from "./workbench-settings-page";
 import { ProjectsView } from "./projects-view";
 import { getRecommendationPage } from "./brainx-recommendation-pages-api";
 import { useRecommendationPages } from "./use-recommendation-pages";
-import { createProjectIgnore } from "./project-ignore-action";
+import { canIgnoreProject, createProjectIgnore } from "./project-ignore-action";
 export default function DecisionWorkbench({demo=false}:{demo?:boolean}={}){
  const [hydrated,setHydrated]=useState(false);
  const [page,setPage]=useState<Page>("today");
@@ -280,14 +280,14 @@ export default function DecisionWorkbench({demo=false}:{demo?:boolean}={}){
     <WorkspaceEntry kind={brainxMode==="connecting"?"connecting":workspaceIssue!} onRetry={()=>setConnectAttempt(value=>value+1)} onCheckConnection={async()=>{await brainxFetch<BackendSessionStatus>("/api/v1/oauth/status");await loadBrainxSnapshot.current();await loadBrainxSide.current()}} onOpenSources={()=>go("sources")} />:<>
     {page==="today"&&<TodayDecisionQueue activeJobId={panel?.kind==="job"&&panelMotion!=="closing"?panel.jobId:null} completed={decisionActions} jobs={activeDecisionJobs} projects={brainxProjects} engagement={engagement} sync={sync} open={openDecision} onAction={runDecisionAction} onAddToProjects={job=>addToMyProjects(job.id,job.company)} onGoToProject={goToProject} onFeedback={feedbackJob} showVerification={demo} tray={tray} onToggleTray={toggleTray} onRemoveTray={removeTray} folders={folders} folderMode={folderMode} onFolderMode={()=>setFolderMode(value=>!value)} onAssignFolder={assignFolder} onCreateFolder={createFolder} mode={brainxMode} onOpenSources={()=>go("sources")} pagination={recommendationPagination?{...recommendationPagination,searchQuery:recommendationQueue.searchQuery,onSearch:recommendationQueue.search,sort:recommendationQueue.sort,onSort:recommendationQueue.changeSort}:undefined} />}
     {page==="accepted"&&<ProjectsView projects={brainxProjects} query={query} setQuery={setQuery} focusedProjectId={focusedProjectId} open={project=>openDecision(projectToDecisionJob(project),"engagement")} onIgnore={ignoreProject} />}
-    {page==="jobs"&&<WorkbenchJobsPage items={brainxRadar?.items??[]} capabilities={brainxRadar?.fieldCapabilities??[]} projects={brainxProjects.map(project=>project.project_id)} company={jobCompanyFilter} onAddToProjects={addRadarJobToProjects} />}
+    {page==="jobs"&&<WorkbenchJobsPage items={brainxRadar?.items??[]} capabilities={brainxRadar?.fieldCapabilities??[]} projects={brainxProjects} company={jobCompanyFilter} onAddToProjects={addRadarJobToProjects} onIgnoreProject={ignoreProject} />}
    {page==="clients"&&<WorkbenchClientsPage items={brainxClients??[]} onOpenJobs={company=>{setJobCompanyFilter(company);go("jobs")}} />}
    </>}
    {page==="alerts"&&<Alerts setExtraTasks={setExtraTasks} notify={notify} setDrawer={setDrawer}/>}
    {page==="rules"&&<Rules key={`${brainxKeywords.join("|")}:${brainxNote}`} notify={notify} mode={brainxMode} policy={brainxRun.policyVersion} keywords={brainxKeywords} note={brainxNote} onRefresh={async()=>{await loadBrainxSnapshot.current();void loadBrainxSide.current()}} onProfileSaved={(nextKeywords,nextNote)=>{setBrainxKeywords(nextKeywords);setBrainxNote(nextNote)}}/>}
    {page==="sources"&&<Sources notify={notify}/>}
   </WorkspaceShell>
-     {panel&&!pendingCommand&&<WorkbenchPanel panel={panel} motion={panelMotion} job={selectedDecisionJob} commitmentJobs={commitmentJobs} auth={auth} sync={sync} notifications={notifications} engagement={engagement} events={decisionEvents} outcomes={outcomes}
+   {panel&&!pendingCommand&&<WorkbenchPanel panel={panel} motion={panelMotion} job={selectedDecisionJob} projects={brainxProjects} onIgnoreProject={ignoreProject} commitmentJobs={commitmentJobs} auth={auth} sync={sync} notifications={notifications} engagement={engagement} events={decisionEvents} outcomes={outcomes}
       completed={decisionActions} openmaiResults={openmaiByJob} onRerunOpenmai={rerunOpenmaiForJob} mode={brainxMode} legalMap={Object.fromEntries(allDecisionJobs.map(job=>[job.id,job.brainxLegal||[]]))} replayMap={brainxReplay} dismissReasons={brainxDismissReasons} onReplay={(jobId,data)=>setBrainxReplay(current=>({...current,[jobId]:data}))} onFactsUpdated={async()=>{await loadBrainxSnapshot.current();void loadBrainxSide.current()}}
       onCommitmentUpdated={jobId=>refreshBrainxJob(jobId,true)} onMembership={confirmJobMembership} onClose={closePanel} onOpenJob={openDecision} onAction={runDecisionAction} onCommand={requestCommand} onOutcome={recordOutcome} onSync={runSync} onSetSync={setSync} onAuth={setAuth} onNotification={openNotification} notify={notify}/>}
   {assistantOpen&&<ChatbotDrawer messages={assistantMessages} input={assistantInput} setInput={setAssistantInput} busy={assistantBusy} onSend={sendAssistant} onStop={()=>assistantAbort.current?.abort()} onClear={()=>setAssistantMessages([])} onClose={()=>setAssistantOpen(false)} mode={brainxMode} page={page} settings={assistantSettings} setSettings={setAssistantSettings} contextJob={selectedDecisionJob}/>}
@@ -323,7 +323,7 @@ function ChatbotDrawer({messages,input,setInput,busy,onSend,onStop,onClear,onClo
 
 function DecisionMetric({label,value,emphasis,helpOpen,onHelpToggle}:{label:string;value:string|number;emphasis?:string;helpOpen?:boolean;onHelpToggle?:()=>void}){return <div className="decision-metric"><small>{label}</small>{onHelpToggle&&<button className="metric-help" type="button" onClick={onHelpToggle} aria-label={`解释${label}`} aria-expanded={helpOpen}>!</button>}<b className={emphasis}>{value}</b></div>}
 
-function WorkbenchPanel({panel,motion,job,commitmentJobs,auth,sync,notifications,engagement,events,outcomes,completed,openmaiResults,onRerunOpenmai,mode,legalMap,replayMap,dismissReasons,onReplay,onFactsUpdated,onCommitmentUpdated,onMembership,onClose,onOpenJob,onAction,onCommand,onOutcome,onSync,onSetSync,onAuth,onNotification,notify}:{panel:Panel;motion:"idle"|"entering"|"open"|"closing";job:DecisionJob|null;commitmentJobs:DecisionJob[];auth:AuthStatus;sync:SyncStatus;notifications:Notification[];engagement:Record<string,EngagementState>;events:Record<string,DecisionEvent[]>;outcomes:Record<string,Outcome[]>;completed:string[];openmaiResults:Record<string,OpenmaiResult|null>;onRerunOpenmai:(jobId:string)=>void;mode:"connecting"|"connected"|"offline";legalMap:Record<string,EngagementCommand[]>;replayMap:Record<string,BrainxReplay>;dismissReasons:string[];onReplay:(jobId:string,data:BrainxReplay)=>void;onFactsUpdated:()=>Promise<void>;onCommitmentUpdated:(jobId:string)=>Promise<void>;onMembership:(job:DecisionJob,relation:MembershipRelation)=>Promise<void>;onClose:()=>void;onOpenJob:(job:DecisionJob,tab?:JobDetailTab)=>void;onAction:(job:DecisionJob,action:DecisionAction)=>void;onCommand:(job:DecisionJob,command:EngagementCommand)=>void;onOutcome:(job:DecisionJob,stage:Outcome["stage"],rating?:number,note?:string)=>void;onSync:()=>void;onSetSync:(sync:SyncStatus)=>void;onAuth:(auth:AuthStatus)=>void;onNotification:(notification:Notification)=>void;notify:(text:string)=>void}){
+function WorkbenchPanel({panel,motion,job,projects,onIgnoreProject,commitmentJobs,auth,sync,notifications,engagement,events,outcomes,completed,openmaiResults,onRerunOpenmai,mode,legalMap,replayMap,dismissReasons,onReplay,onFactsUpdated,onCommitmentUpdated,onMembership,onClose,onOpenJob,onAction,onCommand,onOutcome,onSync,onSetSync,onAuth,onNotification,notify}:{panel:Panel;motion:"idle"|"entering"|"open"|"closing";job:DecisionJob|null;projects:ProjectSummary[];onIgnoreProject:(project:ProjectSummary)=>Promise<void>;commitmentJobs:DecisionJob[];auth:AuthStatus;sync:SyncStatus;notifications:Notification[];engagement:Record<string,EngagementState>;events:Record<string,DecisionEvent[]>;outcomes:Record<string,Outcome[]>;completed:string[];openmaiResults:Record<string,OpenmaiResult|null>;onRerunOpenmai:(jobId:string)=>void;mode:"connecting"|"connected"|"offline";legalMap:Record<string,EngagementCommand[]>;replayMap:Record<string,BrainxReplay>;dismissReasons:string[];onReplay:(jobId:string,data:BrainxReplay)=>void;onFactsUpdated:()=>Promise<void>;onCommitmentUpdated:(jobId:string)=>Promise<void>;onMembership:(job:DecisionJob,relation:MembershipRelation)=>Promise<void>;onClose:()=>void;onOpenJob:(job:DecisionJob,tab?:JobDetailTab)=>void;onAction:(job:DecisionJob,action:DecisionAction)=>void;onCommand:(job:DecisionJob,command:EngagementCommand)=>void;onOutcome:(job:DecisionJob,stage:Outcome["stage"],rating?:number,note?:string)=>void;onSync:()=>void;onSetSync:(sync:SyncStatus)=>void;onAuth:(auth:AuthStatus)=>void;onNotification:(notification:Notification)=>void;notify:(text:string)=>void}){
  const [enrichedDetail,setEnrichedDetail]=useState<JobDetailReviewData|null>(null);
  useEffect(()=>{
   if(panel?.kind!=="job"||!job||mode!=="connected")return;
@@ -366,14 +366,15 @@ function WorkbenchPanel({panel,motion,job,commitmentJobs,auth,sync,notifications
   const jobEvents=events[job.id]||[];
   const legal=mode==="connected"?legalMap[job.id]||[]:legalActions(job,state);
   const baseDetail=toDecisionJobDetail(job,jobEvents);
-  const detail=enrichedDetail?.projectId===job.id?enrichedDetail:baseDetail;
+  const detail=enrichedDetail?.projectId===job.id?enrichedDetail:baseDetail;const currentProject=projects.find(project=>project.project_id===job.id);const removableProject=currentProject&&canIgnoreProject(currentProject)?currentProject:null;
   return <JobDetailCard
-   job={{...detail,engagementState:stateLabel[state],inMyProjects:job.facts["职位关系"]==="我的职位"}}
+   job={{...detail,engagementState:stateLabel[state],inMyProjects:Boolean(currentProject)}}
    activeTab={panel.tab}
    onTabChange={tab=>onOpenJob(job,tab)}
    onClose={onClose}
-   onAddToProjects={panel.tab==="engagement"?undefined:()=>{void onMembership(job,"MY_JOB")}}
-   onDismiss={panel.tab!=="engagement"&&legal.includes("DISMISS")?()=>onCommand(job,"DISMISS"):undefined}
+   onAddToProjects={()=>onMembership(job,"MY_JOB")}
+   onIgnore={removableProject?()=>onIgnoreProject(removableProject):undefined}
+   onDismiss={legal.includes("DISMISS")?()=>onCommand(job,"DISMISS"):undefined}
    statusLabel={`${stateLabel[state]} · ${decisionGroupMeta[job.group].title}`}
    detailContent={<DecisionDrawer
     job={job} tab={panel.tab==="facts"?"judgement":panel.tab} completed={completed}

@@ -15,6 +15,11 @@ type IgnoreContext = {
   notify: (text: string, options?: undefined, duration?: number) => void;
 };
 
+export function canIgnoreProject(project: ProjectSummary) {
+  return project.project_status === "PENDING_START"
+    && ["NEW", "RECOMMENDED", "VIEWED", "DISMISSED", "RELEASED", "EXPIRED"].includes(project.engagement_state);
+}
+
 export function createProjectIgnore(context: IgnoreContext) {
   return async (project: ProjectSummary) => {
     try {

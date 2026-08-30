@@ -72,6 +72,7 @@ export type JobDetailCardProps = {
   job: JobDetailReviewData;
   onClose: () => void;
   onAddToProjects?: (projectId: string) => Promise<void> | void;
+  onIgnore?: (projectId: string) => Promise<void> | void;
   onDismiss?: (projectId: string) => void;
   onOpenSource?: (projectId: string) => void;
   activeTab?: JobDetailTab;
@@ -194,6 +195,7 @@ export function JobDetailCard({
   job,
   onClose,
   onAddToProjects,
+  onIgnore,
   onDismiss,
   onOpenSource,
   activeTab,
@@ -205,6 +207,7 @@ export function JobDetailCard({
   const dialogRef = useRef<HTMLElement>(null);
   const [localTab, setLocalTab] = useState<JobDetailTab>(initialTab);
   const [adding, setAdding] = useState(false);
+  const [ignoring, setIgnoring] = useState(false);
   const selectedTab = activeTab || localTab;
   const pipeline = pipelineItems(job.pipeline);
   const recommendation = job.recommendation
@@ -227,6 +230,11 @@ export function JobDetailCard({
     if (!onAddToProjects || adding || job.inMyProjects) return;
     setAdding(true);
     try { await onAddToProjects(job.projectId); } finally { setAdding(false); }
+  };
+  const ignoreProject = async () => {
+    if (!onIgnore || ignoring || !job.inMyProjects) return;
+    setIgnoring(true);
+    try { await onIgnore(job.projectId); } finally { setIgnoring(false); }
   };
 
   useEffect(() => {
@@ -315,8 +323,9 @@ export function JobDetailCard({
           </section>)}
         </div>
 
-        {(onDismiss || onAddToProjects) && <footer className={`job-detail-review-actions${onDismiss && onAddToProjects ? "" : " is-single"}`}>
+        {(onDismiss || onIgnore || onAddToProjects) && <footer className={`job-detail-review-actions${[onDismiss, onIgnore, onAddToProjects].filter(Boolean).length === 1 ? " is-single" : ""}`}>
           {onDismiss && <button type="button" className="is-dismiss" onClick={() => onDismiss(job.projectId)}>暂不考虑</button>}
+          {onIgnore && job.inMyProjects && <button type="button" className="is-ignore" disabled={ignoring} onClick={() => void ignoreProject()}>{ignoring ? "忽略中…" : "忽略"}</button>}
           {onAddToProjects && <button type="button" className="is-primary" disabled={job.inMyProjects || adding} onClick={() => void addToProjects()}>{job.inMyProjects ? "已加入我的项目" : adding ? "添加中…" : "加入我的项目"}</button>}
         </footer>}
       </section>

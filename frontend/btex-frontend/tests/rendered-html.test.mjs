@@ -167,7 +167,10 @@ test("preserves engagement, result recording, replay, sync and notifications", a
   assert.doesNotMatch(loop, /<h2>项目跟进<\/h2>/);
   assert.match(loop, /commitment-timeline[\s\S]*commitment-idle-actions/);
   assert.match(workbench, /panel&&!pendingCommand&&<WorkbenchPanel/);
-  assert.match(workbench, /panel\.tab!=="engagement"&&legal\.includes\("DISMISS"\)/);
+  assert.match(workbench, /onDismiss=\{legal\.includes\("DISMISS"\)/);
+  assert.match(workbench, /onAddToProjects=\{\(\)=>onMembership\(job,"MY_JOB"\)\}/);
+  assert.match(workbench, /onIgnore=\{removableProject/);
+  assert.doesNotMatch(workbench, /panel\.tab!=="engagement"/);
   assert.match(globalCss, /command-modal \.filter-select-menu\{[^}]*max-height:[^}]*overflow-y:auto/);
   assert.match(workbench, /function ReplayPanel/);
   assert.match(workbench, /function NotificationPanel/);
@@ -216,7 +219,15 @@ test("removes attention from detail and exposes ignore only for pending projects
   assert.match(projects, /"忽略"/);
   assert.match(workbench, /createProjectIgnore/);
   assert.match(ignore, /removeOpportunityMembership/);
+  assert.match(ignore, /"DISMISSED"/);
   assert.match(api, /method: "DELETE"/);
+});
+
+test("keeps the unified job detail large enough for working content", async () => {
+  const detailCss = await source("app/job-detail-card-review.css");
+  assert.match(detailCss, /width: min\(960px, calc\(100vw - 40px\)\)/);
+  assert.match(detailCss, /height: min\(600px, calc\(100dvh - 56px\)\)/);
+  assert.match(detailCss, /\.job-detail-review-scroll \{[^}]*overflow: auto/);
 });
 
 test("uses 加入项目、关注 and 开始跟进 as separate user-facing concepts", async () => {

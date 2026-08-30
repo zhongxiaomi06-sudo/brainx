@@ -94,6 +94,42 @@ test('SYNC_ALERT：日窗口键——同日去重、次日可再发', async () =
   assert.equal(r3.status, 'PREVIEW');
 });
 
+test('数据隔离：source_mode 唯一权威=cockpit_facts 行存在；报告含弱归属', async () => {
+  const { sourceModeOf, isolationReport } = await import('../src/data-isolation.js');
+  const pid = db.prepare(`SELECT project_id FROM recommendations
+    WHERE consultant_id='felix' ORDER BY rank LIMIT 1`).get().project_id;
+  assert.equal(sourceModeOf(db, pid).source_mode, 'MARKET_ONLY');
+  db.prepare(`INSERT INTO cockpit_facts (project_id, membership_status, cockpit_as_of, raw_json, updated_at)
+    VALUES (?, 'UNCONFIRMED', ?, '{}', ?)`).run(pid, now(), now());
+  assert.equal(sourceModeOf(db, pid).source_mode, 'COCKPIT_CONTEXT');
+  const rep = isolationReport(db);
+  assert.ok(rep.totals.cockpit_context >= 1 && rep.weak_ownership.count >= 1);
+  assert.equal(rep.same_company_shadow.count, 0);
+});
+
+test('影子日报：分歧 TopN 形状与位移计算', async () => {
+  const { divergenceTopN } = await import('../bin/brainx-shadow-daily.mjs');
+  const { loadShadowModel } = await import('../src/shadow-rank.js');
+  // 无模型文件时 loadShadowModel 返回 null——用内联微型模型替身验证位移逻辑
+  const { writeFileSync } = await import('node:fs');
+  const { mkdtempSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const dump = { format: 'lightgbm-lambdarank-json', feature_order: ['hc'],
+    model: { tree_info: [{ tree_structure: { split_feature: 0, threshold: 0.5,
+      left_child: { leaf_value: 1 }, right_child: { leaf_value: 2 } } }], learning_rate: 1 } };
+  const dir = mkdtempSync(join(tmpdir(), 'ltr-'));
+  const mp = join(dir, 'm.json');
+  writeFileSync(mp, JSON.stringify(dump));
+  const model = loadShadowModel(mp);
+  assert.ok(model && typeof model.score === 'function');
+  const out = divergenceTopN(db, model, 'felix', { top: 3 });
+  assert.ok(out && Array.isArray(out.top) && out.top.length <= 3);
+  for (const t of out.top) {
+    assert.ok(t.rule_rank >= 1 && t.shadow_rank >= 1 && t.delta >= 0);
+  }
+});
+
 test('feedback 唯一索引：同三元组重复插入被拒', () => {
   assert.throws(() => {
     db.prepare(`INSERT INTO recommendation_feedback

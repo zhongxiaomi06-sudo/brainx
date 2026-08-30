@@ -1,5 +1,6 @@
 import { currentStateMap, legalActionsForState } from './engagement.js';
 import { markServed } from './tier.js';
+import { sourceModeMap } from './data-isolation.js';
 import { latestRun, recommendationRun } from './recommend.js';
 import { presentationForRecommendation } from './recommendation-presentation.js';
 import { latestRealSync } from './sync.js';
@@ -149,6 +150,7 @@ export function recommendationPage(db, consultantId, { cursor = null, search = '
   const last = entries.at(-1) || null;
   const hasMore = remaining.length > entries.length;
   const states = currentStateMap(db, consultantId);
+  const sourceModes = sourceModeMap(db, entries.map(({ item }) => item.job.project_id)); // 数据隔离硬约束①
   const latestRunId = db.prepare(`SELECT run_id FROM decision_runs
     WHERE consultant_id=? AND status='COMPLETED'
     ORDER BY created_at DESC, rowid DESC LIMIT 1`).get(consultantId)?.run_id || null;
@@ -184,6 +186,8 @@ export function recommendationPage(db, consultantId, { cursor = null, search = '
         recent_activity: presentation.recent_activity,
         presentation_version: presentation.version,
         presentation_source: presentation.source,
+        source_mode: sourceModes[item.job.project_id]?.source_mode || 'MARKET_ONLY',
+        membership_status: sourceModes[item.job.project_id]?.membership_status || null,
         engagement_state: state,
         legal_actions: legalActionsForState(state),
       };

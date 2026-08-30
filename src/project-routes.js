@@ -1,5 +1,6 @@
 /** project-routes.js — 项目归属写入与“我的项目”读取路由。 */
 import { confirmMembership } from './membership.js';
+import { isolationReport } from './data-isolation.js';
 import { listProjects } from './projects.js';
 import { relationOf } from './relations.js';
 import { jobVisibleTo } from './visibility.js';
@@ -10,7 +11,8 @@ export function projectRoutes(db) {
     'GET /api/v1/projects': (req, res, cid) => {
       const items = listProjects(db, cid);
       json(res, 200, { items, total_count: items.length });
-    },
+    },    'GET /api/v1/reports/data-isolation': (req, res) => json(res, 200, isolationReport(db)),
+
     'PATCH /api/v1/opportunities/:id/membership': async (req, res, cid, q, id) => {
       const job = db.prepare('SELECT 1 FROM job_facts WHERE project_id=?').get(id);
       const listedRelation = job ? relationOf(db, cid, id) : null;

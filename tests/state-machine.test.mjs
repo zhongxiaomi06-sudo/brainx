@@ -16,17 +16,16 @@ function seedRecommended(db) {
   return out.items[0].job.project_id;
 }
 
-test('EXPIRED 死态有出口：WATCH / ACCEPT / DISMISS 不再 409', () => {
+test('旧 EXPIRED 状态折叠为待开始，只保留直接跟进出口', () => {
   const db = openDb(':memory:');
   const pid = seedRecommended(db);
-  engage(db, CID, pid, 'WATCH', { idempotency_key: `w:${pid}` });
   // 直接落到 EXPIRED（模拟 90 天过期器产出）
   db.prepare(`INSERT INTO decision_events
     (event_id, event_type, actor, occurred_at, project_id, decision_id, policy_version, idempotency_key, prev_state, next_state, payload_json)
     VALUES ('e1','EXPIRED',?,datetime('now'),?,NULL,'test','x1','WATCHED','EXPIRED','{}')`).run(CID, pid);
-  assert.equal(currentState(db, CID, pid).state, 'EXPIRED');
-  const reWatch = engage(db, CID, pid, 'WATCH', { idempotency_key: `w2:${pid}` });
-  assert.ok(reWatch.ok, `EXPIRED→WATCH 应允许: ${reWatch.error}`);
+  assert.equal(currentState(db, CID, pid).state, 'VIEWED');
+  assert.equal(engage(db, CID, pid, 'WATCH', { idempotency_key: `w2:${pid}` }).status, 400);
+  assert.equal(engage(db, CID, pid, 'DISMISS', { idempotency_key: `d:${pid}` }).status, 400);
   const acc = engage(db, CID, pid, 'ACCEPT', { idempotency_key: `a:${pid}`, confirm: true });
   assert.ok(acc.ok, `EXPIRED→ACCEPT 应允许: ${acc.error}`);
 });
@@ -41,24 +40,21 @@ test('NEW 状态可直接 ACCEPT（未触碰推荐不再强制先关注）', () 
   assert.equal(currentState(db, CID, pid).state, 'ACCEPTED');
 });
 
-test('DISMISSED 可直接 ACCEPT：冷却期只管 WATCH，不锁接单（2026-08-31 放开）', () => {
+test('历史 DISMISSED 折叠为 VIEWED 且可直接 ACCEPT（2026-08-31 新模型）', () => {
+  // 新模型不再产生 DISMISSED（动作表无 DISMISS），但旧账本行仍存在：
+  // publicEngagementState 对外折叠为 VIEWED；ACCEPT.from 含 DISMISSED，旧态可直接接单。
   const db = openDb(':memory:');
   const pid = seedRecommended(db);
-  const d = engage(db, CID, pid, 'DISMISS', { idempotency_key: `cd:${pid}`, reason: '当前没精力' });
-  assert.ok(d.ok);
-  assert.equal(currentState(db, CID, pid).state, 'DISMISSED');
-  // WATCH 仍被 30 天冷却拦（关注榜卫生，设计保留）
-  const w = engage(db, CID, pid, 'WATCH', { idempotency_key: `cw:${pid}` });
-  assert.equal(w.ok, false);
-  assert.match(w.error, /冷却期/);
-  // ACCEPT 无 confirm 仍拦（门槛不变）；带 confirm 放行
-  assert.equal(engage(db, CID, pid, 'ACCEPT', { idempotency_key: `ca0:${pid}` }).ok, false);
-  const acc = engage(db, CID, pid, 'ACCEPT', { idempotency_key: `ca1:${pid}`, confirm: true });
-  assert.ok(acc.ok, `DISMISSED→ACCEPT 应允许: ${acc.error}`);
+  db.prepare(`INSERT INTO decision_events
+    (event_id, event_type, actor, occurred_at, project_id, decision_id, policy_version, idempotency_key, prev_state, next_state, payload_json)
+    VALUES ('e-dsm','DISMISSED',?,datetime('now'),?,NULL,'test','sm:dismiss','VIEWED','DISMISSED','{}')`).run(CID, pid);
+  assert.equal(currentState(db, CID, pid).state, 'VIEWED'); // 折叠：DISMISSED 不对外暴露
+  const acc = engage(db, CID, pid, 'ACCEPT', { idempotency_key: `sm:accept:${pid}`, confirm: true });
+  assert.ok(acc.ok, `历史 DISMISSED→ACCEPT 应允许: ${acc.error}`);
   assert.equal(currentState(db, CID, pid).state, 'ACCEPTED');
 });
 
-test('RELEASED 可直接 ACCEPT（结束跟进后重新接单，无需先关注）', () => {
+test('RELEASED 可直接 ACCEPT（结束跟进后重新接单，无需中转）', () => {
   const db = openDb(':memory:');
   const pid = seedRecommended(db);
   assert.ok(engage(db, CID, pid, 'ACCEPT', { idempotency_key: `ra:${pid}`, confirm: true }).ok);
@@ -67,22 +63,6 @@ test('RELEASED 可直接 ACCEPT（结束跟进后重新接单，无需先关注�
   const acc = engage(db, CID, pid, 'ACCEPT', { idempotency_key: `ra2:${pid}`, confirm: true });
   assert.ok(acc.ok, `RELEASED→ACCEPT 应允许: ${acc.error}`);
   assert.equal(currentState(db, CID, pid).state, 'ACCEPTED');
-});
-
-test('BRAINX_COOLDOWN_DAYS=0 暂时取消冷却：DISMISSED→WATCH 放行（2026-08-31）', () => {
-  const db = openDb(':memory:');
-  const pid = seedRecommended(db);
-  assert.ok(engage(db, CID, pid, 'DISMISS', { idempotency_key: `zd:${pid}`, reason: '当前没精力' }).ok);
-  process.env.BRAINX_COOLDOWN_DAYS = '0';
-  try {
-    const w = engage(db, CID, pid, 'WATCH', { idempotency_key: `zw:${pid}` });
-    assert.ok(w.ok, `冷却关闭后 DISMISSED→WATCH 应允许: ${w.error}`);
-  } finally { delete process.env.BRAINX_COOLDOWN_DAYS; }
-  // env 恢复默认 30 天后，同一职位再 DISMISS → WATCH 重新被冷却拦（开关往返）
-  assert.ok(engage(db, CID, pid, 'DISMISS', { idempotency_key: `zd2:${pid}`, reason: '当前没精力' }).ok);
-  const blocked = engage(db, CID, pid, 'WATCH', { idempotency_key: `zw2:${pid}` });
-  assert.equal(blocked.ok, false);
-  assert.match(blocked.error, /冷却期/);
 });
 
 test('chatTs 带秒格式（HH:mm:ss）不再静默掉 20 分', () => {

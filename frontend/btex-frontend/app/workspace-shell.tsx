@@ -16,14 +16,14 @@ import "./workspace-shell.css";
 export type WorkspaceShellPage = "today" | "jobs" | "projects" | "clients" | "settings";
 
 const primaryNavigation = [
-  { id: "today", label: "今日决策", icon: Sparkles },
-  { id: "jobs", label: "全部职位", icon: BriefcaseBusiness },
+  { id: "today", label: "精选盘", icon: Sparkles },
   { id: "projects", label: "我的项目", icon: ClipboardCheck },
+  { id: "jobs", label: "全部职位", icon: BriefcaseBusiness },
   { id: "clients", label: "客户洞察", icon: Users },
 ] as const;
 
 const pageMeta: Record<WorkspaceShellPage, { title: string; description: string }> = {
-  today: { title: "今日决策", description: "先判断，再加入项目或开始跟进" },
+  today: { title: "精选盘", description: "先判断，再加入项目或开始跟进" },
   jobs: { title: "全部职位", description: "检索和核验 TTC 真实职位事实" },
   projects: { title: "我的项目", description: "查看项目状态并推进下一行动" },
   clients: { title: "客户洞察", description: "按客户查看可核验的职位事实" },
@@ -64,7 +64,7 @@ export function WorkspaceShell({
           className="workspace-brand"
           type="button"
           onClick={() => onNavigate("today")}
-          aria-label="返回今日决策"
+          aria-label="返回精选盘"
         >
           <span className="workspace-brand-logo" aria-hidden="true" />
         </button>

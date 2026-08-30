@@ -37,7 +37,7 @@ type Story = StoryObj<typeof meta>;
 export const Recommendations: Story = {
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
-    await userEvent.click(canvas.getAllByRole("button", { name: "收藏到精选盘" })[0]);
+    await userEvent.click(canvas.getAllByRole("button", { name: "收藏职位" })[0]);
     await expect(args.onToggleTray).toHaveBeenCalledWith(args.jobs[0].id);
   },
 };

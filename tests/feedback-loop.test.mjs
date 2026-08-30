@@ -69,14 +69,14 @@ test('F1: owner 不在花名册 → 不落行；他人策展行不被冲掉', ()
 test('F2: 未配置密钥 → quickLink=null、verify=503（fail-closed）', () => {
   const saved = process.env.BRAINX_FEEDBACK_SECRET;
   delete process.env.BRAINX_FEEDBACK_SECRET;
-  assert.equal(quickLink('http://x', 'mia', 'P1', 'watch', now()), null);
-  assert.equal(verifyQuick({ consultant: 'mia', project: 'P1', action: 'watch', day: '2026-08-24', sig: 'x' }, now()).status, 503);
+  assert.equal(quickLink('http://x', 'mia', 'P1', 'ignore', now()), null);
+  assert.equal(verifyQuick({ consultant: 'mia', project: 'P1', action: 'ignore', day: '2026-08-24', sig: 'x' }, now()).status, 503);
   if (saved) process.env.BRAINX_FEEDBACK_SECRET = saved;
 });
 
 test('F2: 签名往返；篡改/过期被拒', () => {
   process.env.BRAINX_FEEDBACK_SECRET = 'test-secret-64';
-  const link = quickLink('http://x', 'mia', 'P1', 'watch', '2026-08-24T01:00:00Z');
+  const link = quickLink('http://x', 'mia', 'P1', 'ignore', '2026-08-24T01:00:00Z');
   const p = Object.fromEntries(new URL(link).searchParams);
   assert.equal(verifyQuick(p, '2026-08-24T02:00:00Z').ok, true);
   assert.equal(verifyQuick(p, '2026-08-25T02:00:00Z').ok, true, '次日仍有效');
@@ -85,7 +85,7 @@ test('F2: 签名往返；篡改/过期被拒', () => {
   assert.equal(verifyQuick({ ...p, sig: 'deadbeef' }, '2026-08-24T02:00:00Z').status, 403, '伪造签名');
 });
 
-test('F2: HTTP 端点端到端（无 session，watch 落 WATCHED 事件且幂等）', async () => {
+test('F2: HTTP 端点端到端（无 session，忽略写统一排除事实且幂等）', async () => {
   process.env.BRAINX_FEEDBACK_SECRET = 'test-secret-64';
   runSync(db, { source: 'fixture', consultant_id: 'felix' });
   recommend(db, 'felix', { top: 20 });
@@ -95,17 +95,17 @@ test('F2: HTTP 端点端到端（无 session，watch 落 WATCHED 事件且幂等
   await new Promise((r) => server.listen(0, r));
   const base = `http://127.0.0.1:${server.address().port}`;
   try {
-    const link = quickLink(base, 'felix', pid, 'watch', now());
+    const link = quickLink(base, 'felix', pid, 'ignore', now());
     const r1 = await fetch(link);
     assert.equal(r1.status, 200);
-    assert.match(await r1.text(), /已记录：关注/);
+    assert.match(await r1.text(), /已记录：忽略/);
     const r2 = await fetch(link); // 重复点击 → 幂等
     assert.match(await r2.text(), /此前已记录/);
-    const ev = db.prepare(`SELECT event_type FROM decision_events
-      WHERE actor='felix' AND project_id=? AND event_type='WATCHED'`).get(pid);
-    assert.ok(ev);
+    const ignored = db.prepare(`SELECT 1 FROM opportunity_ignores
+      WHERE consultant_id='felix' AND project_id=?`).get(pid);
+    assert.ok(ignored);
     // 未签名请求被拒（B12 后按语义返回 403 签名无效，而非笼统 400）
-    const r3 = await fetch(`${base}/api/v1/feedback/quick?consultant=felix&project=${pid}&action=watch&day=2026-08-24&sig=bad`);
+    const r3 = await fetch(`${base}/api/v1/feedback/quick?consultant=felix&project=${pid}&action=ignore&day=2026-08-24&sig=bad`);
     assert.equal(r3.status, 403);
   } finally {
     server.close();

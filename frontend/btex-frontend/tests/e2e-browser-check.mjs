@@ -202,7 +202,11 @@ try {
   const firstCard = await recommendationCards.first().getAttribute("aria-label");
   const firstCardText = await recommendationCards.first().innerText();
   assert.match(firstCardText, /今天推进|本周观察|待核验/, "正式卡片必须显示后端决策层级");
-  assert.match(firstCardText, /事实充分|部分事实待确认|事实不足/, "正式卡片必须显示规则化事实可信度");
+  assert.match(firstCardText, /AI 匹配分/, "正式卡片必须显示 AI 匹配分");
+  assert.match(firstCardText, /证据覆盖/, "正式卡片必须显示证据覆盖");
+  assert.match(firstCardText, /探索价值/, "正式卡片必须显示探索价值");
+  assert.doesNotMatch(firstCardText, /为什么值得看|需要注意|事实充分|部分事实待确认|事实不足/,
+    "正式卡片不得重复显示已删除的判断摘要区");
   assert.match(firstCardText, /职位事实更新|业务群活动|人工核验/, "正式卡片必须显示真实最近活动");
   const nextPage = recommendationQueue.getByRole("button", { name: /下一页/ });
   assert.equal(await nextPage.isEnabled(), true,
@@ -227,6 +231,10 @@ try {
   }
   assert.doesNotMatch(await page.locator("main").innerText(), /TODAY'S DECISIONS|今天只处理最值得推进的职位|待判断\s*\d+\s*待核验\s*\d+\s*我的项目/);
 
+  const dailyNavigation = page.getByRole("navigation", { name: "日常工作" });
+  assert.deepEqual(await dailyNavigation.getByRole("button").evaluateAll((buttons) =>
+    buttons.map((button) => button.getAttribute("aria-label"))),
+  ["精选盘", "我的项目", "全部职位", "客户洞察"], "正式主导航必须把我的项目放在精选盘之后");
   await page.getByRole("button", { name: "全部职位" }).click();
   await page.getByRole("button", { name: "客户洞察" }).click();
   await page.getByRole("heading", { name: "客户洞察" }).waitFor({ state: "visible" });
@@ -237,7 +245,7 @@ try {
   await page.getByText("TTC 职位系统", { exact: true }).waitFor({ state: "visible" });
   assert.match(await page.locator("main").innerText(), /真实职位来源/);
   await page.getByRole("button", { name: "返回应用" }).click();
-  await page.getByRole("button", { name: "今日决策", exact: true }).click();
+  await page.getByRole("button", { name: "精选盘", exact: true }).click();
   await page.getByRole("heading", { name: /推荐队列|还没有可判断的职位/ }).waitFor({ state: "visible" });
 
   const mobile = await context.newPage();

@@ -50,6 +50,17 @@ function recommendationOf(detail: BackendOpportunity): JobDetailRecommendation |
   return {
     action: recommendation.action === "RECOMMEND_ACCEPT" ? "FOLLOW"
       : recommendation.action === "RECOMMEND_WATCH" ? "WATCH" : "HOLD",
+    score: Number.isFinite(recommendation.score) ? recommendation.score : null,
+    evidenceCoverage: recommendation.evidence_coverage == null
+      ? null : Math.round(recommendation.evidence_coverage * 100),
+    breakdown: (recommendation.breakdown || []).map(item => ({
+      dim: item.dim,
+      label: item.label || item.dim,
+      weight: Number.isFinite(item.weight) ? item.weight : null,
+      score: item.score == null || !Number.isFinite(item.score) ? null : item.score,
+      weightedScore: item.weighted_score == null || !Number.isFinite(item.weighted_score)
+        ? null : item.weighted_score,
+    })),
     reasons: recommendation.reasons,
     risks: recommendation.risks || [],
     generatedAt: recommendation.created_at || null,
@@ -134,6 +145,9 @@ export function toDecisionJobDetail(job: DecisionJob, events: DecisionEvent[]): 
     recommendation: job.scoreNotes.length ? {
       action: job.actions.some(action => action.kind === "advance") ? "FOLLOW"
         : job.actions.some(action => action.kind === "watch") ? "WATCH" : "HOLD",
+      score: typeof job.finalScore === "number" ? job.finalScore : null,
+      evidenceCoverage: job.evidenceCoverage,
+      breakdown: [],
       reasons: job.scoreNotes,
       risks: job.risks,
       generatedAt: null,

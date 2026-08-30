@@ -1,5 +1,5 @@
 /** project-routes.js — 项目归属写入与“我的项目”读取路由。 */
-import { confirmMembership } from './membership.js';
+import { confirmMembership, removeMembership } from './membership.js';
 import { isolationReport } from './data-isolation.js';
 import { listProjects } from './projects.js';
 import { relationOf } from './relations.js';
@@ -31,6 +31,23 @@ export function projectRoutes(db) {
         });
       } catch (error) {
         err(res, 500, 'MEMBERSHIP_UPDATE_FAILED', String(error.message).slice(0, 300));
+      }
+    },
+    'DELETE /api/v1/opportunities/:id/membership': async (req, res, cid, q, id) => {
+      const job = db.prepare('SELECT 1 FROM job_facts WHERE project_id=?').get(id);
+      const listedRelation = job ? relationOf(db, cid, id) : null;
+      const listedInSharedPool = ['MY_JOB', 'TEAM_SHARED'].includes(listedRelation);
+      if (!job || (!jobVisibleTo(db, cid, id) && !listedInSharedPool)) {
+        return err(res, 404, 'NOT_FOUND', '职位不存在');
+      }
+      const input = await body(req);
+      if (!input) return err(res, 400, 'BAD_JSON', '请求体不是合法 JSON');
+      try {
+        const result = removeMembership(db, cid, id, input);
+        if (!result.ok) return err(res, result.status || 422, 'MEMBERSHIP_REMOVE_REJECTED', result.error);
+        json(res, 200, result);
+      } catch (error) {
+        err(res, 500, 'MEMBERSHIP_REMOVE_FAILED', String(error.message).slice(0, 300));
       }
     },
   };

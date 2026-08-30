@@ -57,7 +57,7 @@ test("uses the reference three-column shell and a single-column opportunity work
 
   assert.match(page, /import DecisionWorkbench from "\.\/workbench"/);
   assert.match(workbench, /type DecisionDirection = "paid"\s*\|\s*"growth"\s*\|\s*"marketing"/);
-  assert.match(workbench, /id: "today", label: "今日决策", icon: Sparkles/);
+  assert.match(workbench, /id: "today", label: "精选盘", icon: Sparkles/);
   assert.match(workbench, /<WorkspaceShell activePage=\{shellPage\}/);
   assert.match(workbench, /page==="settings"\?<WorkbenchSettingsPage/);
   assert.doesNotMatch(workbench, /page==="settings"&&<WorkbenchSettingsPage/);
@@ -71,7 +71,7 @@ test("uses the reference three-column shell and a single-column opportunity work
   assert.match(workbench, /<RecommendationQueueV2Review items=\{queueItems\}/);
   assert.doesNotMatch(workbench, /today-brief|今天只处理最值得推进的职位|TODAY&apos;S DECISIONS/);
   assert.match(workbench, /onOpen=\{item => \{ const job = queueJobs\.get\(item\.projectId\); if \(job\) open\(job, "judgement"\); \}\}/);
-  assert.match(workbench, /aria-label="精选盘"/);
+  assert.match(workbench, /aria-label="已收藏职位"/);
   assert.match(css, /\.pick-tray/);
   assert.match(css, /grid-template-columns:216px minmax\(0,1fr\)/);
   assert.match(css, /touch-action:manipulation/);
@@ -137,6 +137,10 @@ test("shows source context, row-level scores, detailed layers, reasons and risks
   assert.match(workbench, /DrawerSection title="证据来源"/);
   assert.match(workbench, /brainx:edit-facts/);
   assert.match(workbench, /确认事实后，必须完成重新判断，分数才会更新/);
+  assert.match(workbench, /recommendation\.breakdown/);
+  assert.match(workbench, /评分依据/);
+  assert.match(workbench, /缺失维度不按 0 分处理/);
+  assert.doesNotMatch(workbench, /客户真实招聘意愿/);
 });
 
 test("preserves engagement, result recording, replay, sync and notifications", async () => {
@@ -163,7 +167,10 @@ test("preserves engagement, result recording, replay, sync and notifications", a
   assert.doesNotMatch(loop, /<h2>项目跟进<\/h2>/);
   assert.match(loop, /commitment-timeline[\s\S]*commitment-idle-actions/);
   assert.match(workbench, /panel&&!pendingCommand&&<WorkbenchPanel/);
-  assert.match(workbench, /panel\.tab!=="engagement"&&legal\.includes\("DISMISS"\)/);
+  assert.match(workbench, /onDismiss=\{legal\.includes\("DISMISS"\)/);
+  assert.match(workbench, /onAddToProjects=\{\(\)=>onMembership\(job,"MY_JOB"\)\}/);
+  assert.match(workbench, /onIgnore=\{removableProject/);
+  assert.doesNotMatch(workbench, /panel\.tab!=="engagement"/);
   assert.match(globalCss, /command-modal \.filter-select-menu\{[^}]*max-height:[^}]*overflow-y:auto/);
   assert.match(workbench, /function ReplayPanel/);
   assert.match(workbench, /function NotificationPanel/);
@@ -185,12 +192,42 @@ test("searches the complete frozen recommendation queue instead of only the visi
   assert.match(workbench, /searchQuery:recommendationQueue\.searchQuery,onSearch:recommendationQueue\.search,sort:recommendationQueue\.sort,onSort:recommendationQueue\.changeSort/);
   assert.match(pagesApi, /params\.set\("q", search\.trim\(\)\)/);
   assert.match(pagesApi, /params\.set\("sort", sort\)/);
-  assert.match(pageHook, /getRecommendationPage\(current\.nextCursor, searchQuery, sort\)/);
+  assert.match(pageHook, /getRecommendationPage\(current\.nextCursor, searchQuery, sort, controller\.signal\)/);
   assert.match(pageHook, /const search = \(value: string\)/);
   assert.match(pageHook, /const changeSort = \(value: RecommendationSort\)/);
-  assert.match(today, /推荐优先级/);
-  assert.match(today, /最近活动/);
-  assert.match(today, /事实可信度/);
+  assert.match(pageHook, /new AbortController\(\)/);
+  assert.match(pageHook, /12_000/);
+  assert.match(pagesApi, /signal\?: AbortSignal/);
+  assert.doesNotMatch(today, /aria-label="数据来源"/);
+  assert.match(today, /综合推荐/);
+  assert.match(today, /推进活跃/);
+  assert.match(today, /最近活跃/);
+  assert.match(today, /事实优先/);
+  assert.match(today, /探索发现/);
+});
+
+test("removes attention from detail and exposes ignore only for pending projects", async () => {
+  const [loop, loopCss, projects, workbench, api, ignore] = await Promise.all([
+    source("app/engagement-loop.tsx"), source("app/engagement-loop.css"),
+    source("app/projects-view.tsx"), workbenchSource(), source("app/brainx-projects-api.ts"),
+    source("app/project-ignore-action.ts"),
+  ]);
+  assert.doesNotMatch(loop, />加入关注</);
+  assert.match(loop, /\.filter\(\(a\) => a === "DISMISS"\)/);
+  assert.match(loopCss, /\.commitment-idle-actions button/);
+  assert.match(projects, /project\.project_status === "PENDING_START"/);
+  assert.match(projects, /"忽略"/);
+  assert.match(workbench, /createProjectIgnore/);
+  assert.match(ignore, /removeOpportunityMembership/);
+  assert.match(ignore, /"DISMISSED"/);
+  assert.match(api, /method: "DELETE"/);
+});
+
+test("keeps the unified job detail large enough for working content", async () => {
+  const detailCss = await source("app/job-detail-card-review.css");
+  assert.match(detailCss, /width: min\(960px, calc\(100vw - 40px\)\)/);
+  assert.match(detailCss, /height: min\(600px, calc\(100dvh - 56px\)\)/);
+  assert.match(detailCss, /\.job-detail-review-scroll \{[^}]*overflow: auto/);
 });
 
 test("uses 加入项目、关注 and 开始跟进 as separate user-facing concepts", async () => {

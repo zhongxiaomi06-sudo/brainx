@@ -305,14 +305,27 @@ test("keeps notes and merges one complete detail contract for both job entries",
     job: { project_id: "P-DETAIL-1", pipeline_steps: { Interview: 2 }, owner_name: "顾问甲", notes: "后端最新备注" },
     relation: { relation: "TEAM_SHARED" }, engagement_state: "VIEWED", legal_actions: [], outcomes: [],
     events: [{ event_type: "VIEWED", occurred_at: "2026-08-27T10:30:00Z", reason: "今日决策打开" }],
-    latest_recommendation: { decision_id: "D-1", score: 90, action: "RECOMMEND_ACCEPT", reasons: ["动能明确"], risks: [], evidence_refs: [], created_at: "2026-08-27T10:25:00Z" },
+    latest_recommendation: {
+      decision_id: "D-1", score: 90, evidence_coverage: .8,
+      action: "RECOMMEND_ACCEPT", reasons: ["动能明确"], risks: [], evidence_refs: [],
+      breakdown: [
+        { dim: "direction", label: "职位方向匹配", weight: .25, score: 92, weighted_score: 23 },
+        { dim: "outcomes", label: "历史行为与交付结果", weight: .15, score: null, weighted_score: null },
+      ],
+      created_at: "2026-08-27T10:25:00Z",
+    },
   });
   assert.equal(merged.notes, "后端最新备注");
   assert.deepEqual(merged.pipeline, { Interview: 2 });
   assert.equal(merged.events?.[0].detail, "今日决策打开");
+  assert.equal(merged.recommendation?.score, 90);
+  assert.equal(merged.recommendation?.evidenceCoverage, 80);
+  assert.equal(merged.recommendation?.breakdown[0].score, 92);
+  assert.equal(merged.recommendation?.breakdown[1].score, null);
 
   const today = toDecisionJobDetail({ ...mapRecommendation({ ...sampleRec, job: { ...sampleRec.job, notes: "今日决策备注" } }) }, []);
   assert.equal(today.notes, "今日决策备注");
+  assert.deepEqual(today.recommendation?.breakdown, []);
 });
 
 test("normalizes radar field capabilities and sync report for the frontend", async () => {
@@ -412,8 +425,16 @@ test("maps a real project summary without inventing score or HC", () => {
   assert.deepEqual(job.brainxLegal, ["WATCH", "ACCEPT", "DISMISS"]);
 });
 
+test("source_mode 透出：COCKPIT_CONTEXT 不再被前端硬编码吞掉（2026-08-30 事故回归）", () => {
+  // 后端自 2026-08-30 起逐 item 透出 source_mode/membership_status，
+  // 前端曾硬编码 MARKET_ONLY，导致驾驶舱职位在「数据来源」筛选下永远不可见。
+  const cockpit = mapRecommendation({ ...sampleRec, source_mode: "COCKPIT_CONTEXT", membership_status: "UNCONFIRMED" });
+  assert.equal(cockpit.sourceMode, "COCKPIT_CONTEXT");
+  const market = mapRecommendation({ ...sampleRec, source_mode: "MARKET_ONLY", membership_status: null });
+  assert.equal(market.sourceMode, "MARKET_ONLY");
+});
+
 test("openmaiToHtml：候选人表格渲染为 <table>，机器块与 HTML 注释被剥离（2026-08-31）", () => {
-  // 取真实 result_text 的结构样本（生产 JDWIAC3）：标题 + 表格 + 链接 + 机器 JSON 块 + 注释
   const sample = [
     "## 搜索结果",
     "",

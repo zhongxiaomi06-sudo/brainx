@@ -4,9 +4,10 @@ import { sourceModeMap } from './data-isolation.js';
 import { latestRun, recommendationRun } from './recommend.js';
 import { presentationForRecommendation } from './recommendation-presentation.js';
 import { latestRealSync } from './sync.js';
+import { ignoredProjectIds } from './opportunity-ignore.js';
 
 export const RECOMMENDATION_PAGE_SIZE = 20;
-export const RECOMMENDATION_SORTS = ['priority', 'recent', 'confidence'];
+export const RECOMMENDATION_SORTS = ['priority', 'activity', 'recent', 'confidence', 'exploration'];
 
 function normalizeSearch(value) {
   return String(value || '').trim().normalize('NFKC').toLocaleLowerCase('zh-CN').slice(0, 120);
@@ -48,7 +49,9 @@ function decodeCursor(value) {
     }
     const sort = normalizeSort(parsed.sort);
     if (!sort || (sort === 'recent' && parsed.after_value !== null && typeof parsed.after_value !== 'string')
-        || (sort === 'confidence' && !Number.isInteger(parsed.after_value))) return null;
+        || (sort === 'confidence' && !Number.isInteger(parsed.after_value))
+        || (['activity', 'exploration'].includes(sort) && parsed.after_value !== null
+          && typeof parsed.after_value !== 'number')) return null;
     return { ...parsed, search: normalizeSearch(parsed.search), sort };
   } catch {
     return null;
@@ -60,6 +63,12 @@ function sortValue(entry, sort) {
   if (sort === 'confidence') {
     return { SUFFICIENT: 0, PARTIAL: 1, INSUFFICIENT: 2 }[entry.presentation.data_confidence.band] ?? 3;
   }
+  if (sort === 'activity') {
+    return entry.item.breakdown?.find((dimension) => dimension.dim === 'activity')?.score ?? null;
+  }
+  if (sort === 'exploration') {
+    return entry.item.breakdown?.find((dimension) => dimension.dim === 'exploration')?.score ?? null;
+  }
   return entry.item.rank;
 }
 
@@ -68,11 +77,11 @@ function compareSortKeys(leftValue, leftRank, rightValue, rightRank, sort) {
   if (leftValue === null && rightValue !== null) return 1;
   if (leftValue !== null && rightValue === null) return -1;
   if (leftValue !== rightValue) {
-    return sort === 'recent'
-      ? String(rightValue).localeCompare(String(leftValue))
-      : Number(leftValue) - Number(rightValue);
+    if (sort === 'recent') return String(rightValue).localeCompare(String(leftValue));
+    if (sort === 'confidence') return Number(leftValue) - Number(rightValue);
+    return Number(rightValue) - Number(leftValue);
   }
-  return leftRank - rightRank;
+  return sort === 'exploration' ? rightRank - leftRank : leftRank - rightRank;
 }
 
 function compareEntries(left, right, sort) {
@@ -99,7 +108,7 @@ function emptyPage(extra = {}) {
 
 /**
  * 读取同一冻结运行内的一页。游标携带 run_id、排序条件与上一条稳定排序键，
- * 避免新运行或“暂不考虑”导致偏移量漂移、重复或遗漏。
+ * 避免新运行或忽略动作导致偏移量漂移、重复或遗漏。
  */
 export function recommendationPage(db, consultantId, { cursor = null, search = '', sort = 'priority' } = {}) {
   const normalizedSearch = normalizeSearch(search);
@@ -138,6 +147,7 @@ export function recommendationPage(db, consultantId, { cursor = null, search = '
 
   const hidden = new Set(db.prepare(`SELECT project_id FROM recommendation_feedback
     WHERE consultant_id=?`).all(consultantId).map((row) => row.project_id));
+  for (const projectId of ignoredProjectIds(db, consultantId)) hidden.add(projectId);
   const visible = selected.items
     .filter((item) => !hidden.has(item.job.project_id))
     .filter((item) => matchesSearch(item, normalizedSearch))

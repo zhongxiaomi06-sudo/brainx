@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { openDb } from '../src/db.js';
 import { runSync, latestCompleteSnapshot, loadFixture } from '../src/sync.js';
 import { recommend, latestRun } from '../src/recommend.js';
-import { engage, currentState, commitmentSummary, inCooldown } from '../src/engagement.js';
+import { engage, currentState, commitmentSummary } from '../src/engagement.js';
 import { replay, recordOutcome } from '../src/replay.js';
 import { sortRecs, hardBlock, explorationScore } from '../src/scorer.js';
 import { buildDailyCard, pushCard } from '../src/push.js';
@@ -100,14 +100,13 @@ test('coverage<0.5 强制 OBSERVE', () => {
   }
 });
 
-test('状态机：VIEW→WATCH→ACCEPT→COMPLETE 全链 + 事件账本', () => {
+test('状态机：VIEW→ACCEPT→COMPLETE 全链 + 事件账本', () => {
   const run = latestRun(db, CID);
   const pid = run.items[0].job.project_id;
   const k = (a) => `t1:${a}:${pid}`;
   let r = engage(db, CID, pid, 'VIEW', { idempotency_key: k('v') });
   assert.equal(r.ok, true);
-  r = engage(db, CID, pid, 'WATCH', { idempotency_key: k('w') });
-  assert.equal(r.state, 'WATCHED');
+  assert.deepEqual(r.legal_actions, ['ACCEPT']);
   // ACCEPT 不 confirm → 409
   r = engage(db, CID, pid, 'ACCEPT', { idempotency_key: k('a0') });
   assert.equal(r.ok, false); assert.equal(r.status, 409);
@@ -116,7 +115,7 @@ test('状态机：VIEW→WATCH→ACCEPT→COMPLETE 全链 + 事件账本', () =>
   r = engage(db, CID, pid, 'COMPLETE', { idempotency_key: k('c') });
   assert.equal(r.state, 'COMPLETED');
   const evts = db.prepare(`SELECT event_type FROM decision_events WHERE project_id=? AND actor=?`).all(pid, CID);
-  assert.ok(evts.length >= 4);
+  assert.ok(evts.length >= 3);
 });
 
 test('幂等：重复 idempotency_key 不重复写事件', () => {
@@ -131,39 +130,18 @@ test('幂等：重复 idempotency_key 不重复写事件', () => {
   assert.equal(after - before, 1);
 });
 
-test('DISMISS 必须原因 + 冷却期阻断再关注', () => {
+test('关注和暂不考虑动作已下线，待开始只允许直接跟进', () => {
   const run = latestRun(db, CID);
   const pid = run.items[2].job.project_id;
-  let r = engage(db, CID, pid, 'DISMISS', { idempotency_key: `t3:d0:${pid}` });
-  assert.equal(r.status, 422);
-  r = engage(db, CID, pid, 'DISMISS', { idempotency_key: `t3:d1:${pid}`, reason: '当前没精力' });
-  assert.equal(r.state, 'DISMISSED');
-  assert.ok(inCooldown(db, CID, pid));
-  r = engage(db, CID, pid, 'WATCH', { idempotency_key: `t3:w:${pid}` });
-  assert.equal(r.ok, false);
-  assert.match(r.error, /冷却期|状态冲突/);
+  assert.equal(engage(db, CID, pid, 'WATCH', { idempotency_key: `t3:w:${pid}` }).status, 400);
+  assert.equal(engage(db, CID, pid, 'DISMISS', { idempotency_key: `t3:d:${pid}` }).status, 400);
+  assert.deepEqual(engage(db, CID, pid, 'VIEW', { idempotency_key: `t3:v:${pid}` }).legal_actions, ['ACCEPT']);
 });
 
-test('关注榜上限 10：满员拒绝且禁止静默替换', () => {
-  const run = latestRun(db, CID);
-  const others = db.prepare(`SELECT project_id FROM job_facts
-    WHERE active_state='OPEN' LIMIT 40`).all().map((r) => r.project_id);
-  let watched = db.prepare(`SELECT COUNT(*) n FROM current_engagement WHERE consultant_id=? AND state='WATCHED'`).get(CID).n;
-  let lastErr = null;
-  for (const pid of others) {
-    if (watched >= 10) break;
-    const r = engage(db, CID, pid, 'WATCH', { idempotency_key: `t4:${pid}` });
-    if (r.ok) watched++;
-  }
-  assert.equal(watched, 10);
-  // 找一个没被 DISMISS 过（无冷却期）也没被 WATCH 的 pid
-  const extra = others.find((p) => {
-    const s = currentState(db, CID, p);
-    return !s.state || s.state === 'RECOMMENDED' || s.state === 'VIEWED';
-  });
-  const r = engage(db, CID, extra, 'WATCH', { idempotency_key: `t4:extra:${extra}` });
-  assert.equal(r.ok, false);
-  assert.match(r.error, /关注榜已满/);
+test('承接摘要不再暴露关注容量', () => {
+  const summary = commitmentSummary(db, CID);
+  assert.equal(summary.watched_count, 0);
+  assert.equal(summary.watched_limit, 0);
 });
 
 test('回放：冻结行不受职位后续变化影响', () => {

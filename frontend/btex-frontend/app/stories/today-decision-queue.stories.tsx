@@ -10,7 +10,7 @@ const searchQueue = fn();
 const sortQueue = fn();
 
 const meta = {
-  title: "业务组件/今日决策队列",
+  title: "业务组件/精选盘队列",
   component: TodayDecisionQueue,
   args: {
     activeJobId: null,
@@ -70,14 +70,20 @@ export const FormalV2CardIntegration: Story = {
     await expect(canvas.getByRole("heading", { name: "推荐队列" })).toBeInTheDocument();
     await expect(canvas.getByText("参与计算 5313 · 已显示 1–1 / 45")).toBeInTheDocument();
     await expect(canvas.getByLabelText("今天推进，3格信号")).toBeInTheDocument();
-    await expect(canvas.getByText("事实充分")).toBeInTheDocument();
+    await expect(canvas.queryByText("事实充分")).not.toBeInTheDocument();
+    await expect(canvas.queryByText("为什么值得看")).not.toBeInTheDocument();
+    await expect(canvas.queryByText("需要注意")).not.toBeInTheDocument();
     await expect(canvas.getByText("业务群活动 · 08/29")).toBeInTheDocument();
     const search = canvas.getByRole("textbox", { name: "搜索职位或公司" });
     await expect(search).toHaveAttribute("placeholder", "搜索完整队列：职位 / 公司 / JD");
     await userEvent.type(search, "A");
     await expect(searchQueue).toHaveBeenCalledWith("A");
-    await userEvent.selectOptions(canvas.getByRole("combobox", { name: "职位排序" }), "recent");
-    await expect(sortQueue).toHaveBeenCalledWith("recent");
+    await expect(canvas.queryByRole("combobox", { name: "数据来源" })).not.toBeInTheDocument();
+    await userEvent.selectOptions(canvas.getByRole("combobox", { name: "队列视图" }), "exploration");
+    await expect(sortQueue).toHaveBeenCalledWith("exploration");
+    await expect(canvas.getByText("AI 匹配分")).toBeInTheDocument();
+    await expect(canvas.getByText("证据覆盖")).toBeInTheDocument();
+    await expect(canvas.getByText("探索价值")).toBeInTheDocument();
     const card = canvas.getByRole("article", { name: `${decisionJobs[0].role} · ${decisionJobs[0].company}` });
     await expect(card).toHaveAttribute("tabindex", "0");
     await expect(Array.from(card.querySelectorAll(".recommendation-v2-actions button"), button => button.textContent?.trim()))

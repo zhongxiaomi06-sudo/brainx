@@ -27,6 +27,7 @@ export type ProjectSummary = {
   pipeline: string | null;
   current_stage: string | null;
   pipeline_snapshot: string | null;
+  source_mode?: "COCKPIT_CONTEXT" | "MARKET_ONLY"; membership_status?: string | null; // 隔离透出（2026-08-31 后端补齐）
   next_action: string | null;
   owner_name: string | null;
   captured_at: string | null;
@@ -46,6 +47,7 @@ export type MembershipResponse = {
   project: ProjectSummary | null;
   recompute?: { blocked?: boolean; deferred?: boolean; reason?: string };
 };
+export type RemoveMembershipResponse = { ok: boolean; already: boolean; removed: boolean };
 
 export function getProjects(): Promise<ProjectsResponse> {
   return brainxFetch<ProjectsResponse>("/api/v1/projects");
@@ -59,6 +61,16 @@ export function updateOpportunityMembership(
   return brainxFetch(`/api/v1/opportunities/${encodeURIComponent(id)}/membership`, {
     method: "PATCH",
     body: { relation, idempotency_key: idempotencyKey },
+  });
+}
+
+export function removeOpportunityMembership(
+  id: string,
+  idempotencyKey: string,
+): Promise<RemoveMembershipResponse> {
+  return brainxFetch(`/api/v1/opportunities/${encodeURIComponent(id)}/membership`, {
+    method: "DELETE",
+    body: { idempotency_key: idempotencyKey },
   });
 }
 
@@ -77,7 +89,7 @@ function groupOf(project: ProjectSummary): DecisionGroup {
 export function projectToDecisionJob(project: ProjectSummary): DecisionJob {
   const facts: Record<string, string> = {
     "职位关系": project.relation === "MY_JOB" ? "我的职位" : "团队共享",
-    "数据来源": "职位市场",
+    "数据来源": project.source_mode === "COCKPIT_CONTEXT" ? "驾驶舱上下文" : "职位市场",
     "职位状态": project.active_state || "UNKNOWN",
     "当前阶段": project.current_stage || project.active_state || "UNKNOWN",
     "剩余 HC": project.hc == null ? "UNKNOWN" : String(project.hc),

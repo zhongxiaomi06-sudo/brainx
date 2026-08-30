@@ -341,7 +341,7 @@ export function mapRecommendation(rec: BackendRecommendation): BrainxJob {
     evidenceCoverage: coveragePct,
     recommendation: rec.reasons[0] || rec.risks[0] || BACKEND_ACTION_LABELS[rec.action] || rec.action,
     recentSignal: `${BACKEND_ACTION_LABELS[rec.action] || rec.action} · 证据覆盖 ${coveragePct}%`,
-    facts: factsOf(job),
+    facts: { ...factsOf(job), "数据来源": rec.source_mode === "COCKPIT_CONTEXT" ? "驾驶舱上下文" : "职位市场" },
     factFields: factFieldsOf(job),
     scoreNotes: rec.reasons || [],
     risks: rec.risks || [],

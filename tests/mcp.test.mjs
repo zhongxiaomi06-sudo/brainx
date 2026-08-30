@@ -69,7 +69,7 @@ test('MCP：initialize → tools/list → tools/call 全链', async () => {
     const model = JSON.parse(wb.result.content[0].text);
     assert.equal(model.consultant_id, 'mia');
     assert.equal(model.sync.state, 'EMPTY');
-    assert.equal(model.watched_limit, 10);
+    assert.equal(model.watched_limit, 0);
 
     // 未知工具 → JSON-RPC error；未知方法同理
     const bad = await c.call('tools/call', { name: 'brainx_nope', arguments: {} });
@@ -85,7 +85,7 @@ test('MCP：engage 写入路径（隔离库）+ 幂等', async () => {
   const c = mcpClient();
   try {
     await c.call('initialize', {});
-    // 隔离库无职位 → WATCH 不存在的职位按领域语义返回错误而非崩溃
+    // 旧 WATCH 动作已下线，MCP 返回领域错误而非崩溃
     const r = await c.call('tools/call', { name: 'brainx_engage', arguments: {
       consultant_id: 'felix', project_id: 'P-NOPE', action: 'WATCH', idempotency_key: 'mcp:t1' } });
     const out = JSON.parse(r.result.content[0].text);

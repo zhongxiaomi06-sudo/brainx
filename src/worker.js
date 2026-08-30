@@ -41,7 +41,12 @@ if (process.argv[1] && new URL(import.meta.url).pathname === process.argv[1]) {
   const db = openDb();
   const tasks = startWorkerTasks(db, relayBus(db)); // 事件写表，API 进程泵回浏览器 SSE
   console.log('[worker] 批处理进程已就绪（与 API 同库，经 worker_events 接力 SSE）');
-  const shutdown = () => { tasks.stop(); process.exit(0); };
+  // 保活（2026-08-30 生产事故修复）：bridge/scheduler 的定时器全部 unref——那是嵌入
+  // 模式的正确行为（不挡 API 优雅停机），但独立进程里事件循环没有任何 ref'd handle，
+  // 启动即 exit 0，systemd Restart=always 每 10s 空转重启（实测 NRestarts 50+，批处理
+  // 实际全停）。用一个保活定时器撑住事件循环；SIGTERM/SIGINT 时清掉再退出。
+  const keepAlive = setInterval(() => {}, 1 << 30);
+  const shutdown = () => { clearInterval(keepAlive); tasks.stop(); process.exit(0); };
   process.once('SIGINT', shutdown);
   process.once('SIGTERM', shutdown);
 }

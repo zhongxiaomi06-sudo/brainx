@@ -4,6 +4,7 @@
 import { now, uuid } from './db.js';
 import { engage, currentState, legalActions } from './engagement.js';
 import { effectiveJob } from './facts.js';
+import { clearOpportunityIgnore } from './opportunity-ignore.js';
 
 export const RELEASE_REASONS = ['资源不足', '优先级调整', '转交其他顾问', '客户/职位变化', '当前无法投入', '其他'];
 export const CLOSE_REASONS = ['职位关闭', 'HC 已满', '客户暂停', '需求取消', '其他'];
@@ -141,6 +142,7 @@ export function acceptCommitment(db, consultant_id, project_id, input = {}) {
         due_at: new Date(due_at).toISOString(), source: 'MANUAL', idempotency_key: `${input.idempotency_key}:action` }) }));
   }
   return transact(db, () => {
+    clearOpportunityIgnore(db, consultant_id, project_id);
     const event = engage(db, consultant_id, project_id, 'ACCEPT', {
       confirm: true, idempotency_key: input.idempotency_key, payload: { goal },
     });

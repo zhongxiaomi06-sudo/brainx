@@ -16,7 +16,7 @@ const BASE_URL = process.env.BRAINX_BASE_URL || 'http://127.0.0.1:3000';
 
 const REL_LABEL = { MY_JOB: '我的职位', PRIMARY_PM: '我主PM', TEAM_SHARED: '团队共享',
                     OTHER_CONSULTANT: '他人主做', NOT_JOINED: '未加入', UNKNOWN: '未知' };
-const ACTION_LABEL = { RECOMMEND_ACCEPT: '建议接单', RECOMMEND_WATCH: '建议关注', OBSERVE: '观察' };
+const ACTION_LABEL = { RECOMMEND_ACCEPT: '建议接单', RECOMMEND_WATCH: '建议观察', OBSERVE: '观察' };
 const TEMPLATE = { READY: 'green', RUNNING: 'blue', INCOMPLETE: 'orange', AUTH_EXPIRED: 'red', ERROR: 'red' };
 
 const dim = (r, name) => {
@@ -29,7 +29,7 @@ const btn = (text, u, type = 'default') =>
 
 /** WorkbenchModel → 飞书 card schema 2.0 JSON（纯函数，可单测）。
  * consultant_id 可选：提供且配置了 BRAINX_FEEDBACK_SECRET 时，每个职位追加
- * 「关注 / 不感兴趣」一键按钮（签名直写，无需登录工作台——反馈回写主入口）。 */
+ * “忽略”一键按钮（签名直写，无需登录工作台——反馈回写主入口）。 */
 export function buildDailyCard({ consultant_name, consultant_id, run, items, commitments, sync, snapshot_id }) {
   const state = sync?.complete ? 'READY' : 'INCOMPLETE';
   const els = [
@@ -50,10 +50,8 @@ export function buildDailyCard({ consultant_name, consultant_id, run, items, com
       btn('回放', `${BASE_URL}/?open=replay:${r.decision_id}`),
     ];
     // 一键反馈（F2）：签名当日有效；未配置密钥时 quickLink 返 null，按钮不渲染
-    const watchUrl = consultant_id && quickLink(BASE_URL, consultant_id, j.project_id, 'watch', now());
-    const niUrl = consultant_id && quickLink(BASE_URL, consultant_id, j.project_id, 'not_interested', now());
-    if (watchUrl) actions.push(btn('👀 关注', watchUrl));
-    if (niUrl) actions.push(btn('✕ 不感兴趣', niUrl, 'danger'));
+    const ignoreUrl = consultant_id && quickLink(BASE_URL, consultant_id, j.project_id, 'ignore', now());
+    if (ignoreUrl) actions.push(btn('✕ 忽略', ignoreUrl, 'danger'));
     els.push({ tag: 'action', actions });
     if (i < Math.min(3, items.length) - 1) els.push({ tag: 'hr' });
   });
@@ -61,7 +59,7 @@ export function buildDailyCard({ consultant_name, consultant_id, run, items, com
   if (shared) els.push({ tag: 'markdown', content: `👀 团队共享观察 ${shared} 个（打开工作台查看）` });
   els.push({ tag: 'hr' });
   els.push({ tag: 'markdown', content:
-    `我的承接：接单中 ${commitments.accepted_count} · 关注中 ${commitments.watched_count}/${commitments.watched_limit} · 需处理 ${commitments.need_action_count}` });
+    `我的承接：跟进中 ${commitments.accepted_count} · 需处理 ${commitments.need_action_count}` });
   els.push({ tag: 'action', actions: [btn('打开工作台', `${BASE_URL}/`, 'primary')] });
   els.push({ tag: 'note', elements: [{ tag: 'plain_text',
     content: `run: ${(run?.run_id || '').slice(0, 8)} · snapshot: ${(snapshot_id || '').slice(0, 8)} · ${run?.policy_version || ''}` }] });

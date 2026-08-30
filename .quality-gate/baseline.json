@@ -96,7 +96,7 @@
     },
     {
       "path": "src/server.js",
-      "maxLines": 665,
+      "maxLines": 664,
       "owner": "backend",
       "reason": "已拆出 TTC 数据源路由，剩余存量路由与启动编排仍须继续拆分；只能减少，不能增长",
       "expiresOn": "2026-10-31"

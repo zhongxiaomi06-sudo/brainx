@@ -27,7 +27,7 @@ function payload() {
   };
 }
 
-test('HTTP：确认项目归属后解锁关注动作并保留关系历史', async () => {
+test('HTTP：确认项目归属后直接进入待开始并保留关系历史', async () => {
   const db = openDb(':memory:');
   runSync(db, { source: 'test', consultant_id: 'felix', payload: payload() });
   const server = createServer(db);
@@ -43,7 +43,7 @@ test('HTTP：确认项目归属后解锁关注动作并保留关系历史', asyn
     assert.equal(response.status, 200);
     const result = await response.json();
     assert.equal(result.relation, 'MY_JOB');
-    assert.ok(result.legal_actions.includes('WATCH'));
+    assert.deepEqual(result.legal_actions, ['ACCEPT']);
     assert.equal(result.project.project_id, PID);
     assert.equal(result.project.project_status, 'PENDING_START');
     assert.equal(result.recompute.deferred, true);
@@ -139,7 +139,7 @@ test('HTTP：全部职位中的团队共享池职位可以直接加入我的项�
   }
 });
 
-test('HTTP：待开始项目可忽略并关闭归属历史，跟进中项目拒绝直接移除', async () => {
+test('HTTP：忽略同时关闭归属并形成持久排除，跟进中项目拒绝移除', async () => {
   const db = openDb(':memory:');
   runSync(db, { source: 'test', consultant_id: 'felix', payload: payload() });
   const server = createServer(db);
@@ -158,6 +158,12 @@ test('HTTP：待开始项目可忽略并关闭归属历史，跟进中项目拒�
     assert.equal(db.prepare(`SELECT COUNT(*) count FROM job_memberships
       WHERE consultant_id='felix' AND project_id=? AND valid_to IS NULL
         AND relation IN ('MY_JOB','TEAM_SHARED')`).get(PID).count, 0);
+    assert.equal(db.prepare(`SELECT COUNT(*) count FROM opportunity_ignores
+      WHERE consultant_id='felix' AND project_id=?`).get(PID).count, 1);
+    const hiddenProjects = await fetch(`http://127.0.0.1:${port}/api/v1/projects`, { headers });
+    assert.equal((await hiddenProjects.json()).total_count, 0);
+    const hiddenRadar = await fetch(`http://127.0.0.1:${port}/api/v1/radar`, { headers });
+    assert.equal((await hiddenRadar.json()).items.some((item) => item.project_id === PID), false);
 
     const duplicate = await fetch(`${base}/membership`, { method: 'DELETE', headers,
       body: JSON.stringify({ idempotency_key: 'membership:remove:1' }) });
@@ -165,20 +171,18 @@ test('HTTP：待开始项目可忽略并关闭归属历史，跟进中项目拒�
 
     await fetch(`${base}/membership`, { method: 'PATCH', headers,
       body: JSON.stringify({ relation: 'MY_JOB', idempotency_key: 'membership:remove:rejoin' }) });
-    await fetch(`${base}/engagement`, { method: 'POST', headers,
-      body: JSON.stringify({ action: 'DISMISS', reason: '当前没精力', idempotency_key: 'membership:remove:dismiss' }) });
-    const dismissed = await fetch(`${base}/membership`, { method: 'DELETE', headers,
-      body: JSON.stringify({ idempotency_key: 'membership:remove:dismissed' }) });
-    assert.equal(dismissed.status, 200);
-    assert.equal((await dismissed.json()).removed, true);
+    assert.equal(db.prepare(`SELECT COUNT(*) count FROM opportunity_ignores
+      WHERE consultant_id='felix' AND project_id=?`).get(PID).count, 0, '显式重新加入会清除忽略');
+    db.prepare(`INSERT INTO decision_events
+      (event_id, event_type, actor, occurred_at, project_id, idempotency_key, prev_state, next_state)
+      VALUES ('legacy-watch-membership','WATCHED','felix',datetime('now'),?,
+        'membership:legacy-watch','VIEWED','WATCHED')`).run(PID);
+    const legacyPending = await fetch(`${base}/membership`, { method: 'DELETE', headers,
+      body: JSON.stringify({ idempotency_key: 'membership:remove:legacy-watch' }) });
+    assert.equal(legacyPending.status, 200, '旧关注态应按待开始项目处理');
 
     await fetch(`${base}/membership`, { method: 'PATCH', headers,
       body: JSON.stringify({ relation: 'MY_JOB', idempotency_key: 'membership:remove:rejoin-follow' }) });
-    db.prepare('UPDATE decision_events SET occurred_at=? WHERE idempotency_key=?')
-      .run(new Date(Date.now() - 31 * 86400000).toISOString(), 'membership:remove:dismiss');
-    const watched = await fetch(`${base}/engagement`, { method: 'POST', headers,
-      body: JSON.stringify({ action: 'WATCH', idempotency_key: 'membership:remove:watch' }) });
-    assert.equal(watched.status, 200);
     const dueAt = new Date(Date.now() + 86400000).toISOString();
     const accepted = await fetch(`${base}/engagement`, { method: 'POST', headers,
       body: JSON.stringify({ action: 'ACCEPT', confirm: true, goal: '继续推进',
@@ -187,7 +191,7 @@ test('HTTP：待开始项目可忽略并关闭归属历史，跟进中项目拒�
     const blocked = await fetch(`${base}/membership`, { method: 'DELETE', headers,
       body: JSON.stringify({ idempotency_key: 'membership:remove:blocked' }) });
     assert.equal(blocked.status, 409);
-    assert.match((await blocked.json()).error.message, /结束当前动作/);
+    assert.match((await blocked.json()).error.message, /完成或释放当前行动/);
   } finally {
     await new Promise((resolve) => server.close(resolve));
     db.close();

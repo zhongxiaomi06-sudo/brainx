@@ -32,7 +32,12 @@ export function projectRoutes(db) {
       }
     },
     'DELETE /api/v1/opportunities/:id/membership': async (req, res, cid, q, id) => {
-      if (!jobVisibleTo(db, cid, id)) return err(res, 404, 'NOT_FOUND', '职位不存在');
+      const job = db.prepare('SELECT 1 FROM job_facts WHERE project_id=?').get(id);
+      const listedRelation = job ? relationOf(db, cid, id) : null;
+      const listedInSharedPool = ['MY_JOB', 'TEAM_SHARED'].includes(listedRelation);
+      if (!job || (!jobVisibleTo(db, cid, id) && !listedInSharedPool)) {
+        return err(res, 404, 'NOT_FOUND', '职位不存在');
+      }
       const input = await body(req);
       if (!input) return err(res, 400, 'BAD_JSON', '请求体不是合法 JSON');
       try {

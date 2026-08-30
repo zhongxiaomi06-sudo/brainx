@@ -2,6 +2,7 @@ import { currentStateMap, legalActionsForState } from './engagement.js';
 import { latestRun, recommendationRun } from './recommend.js';
 import { presentationForRecommendation } from './recommendation-presentation.js';
 import { latestRealSync } from './sync.js';
+import { ignoredProjectIds } from './opportunity-ignore.js';
 
 export const RECOMMENDATION_PAGE_SIZE = 20;
 export const RECOMMENDATION_SORTS = ['priority', 'activity', 'recent', 'confidence', 'exploration'];
@@ -105,7 +106,7 @@ function emptyPage(extra = {}) {
 
 /**
  * 读取同一冻结运行内的一页。游标携带 run_id、排序条件与上一条稳定排序键，
- * 避免新运行或“暂不考虑”导致偏移量漂移、重复或遗漏。
+ * 避免新运行或忽略动作导致偏移量漂移、重复或遗漏。
  */
 export function recommendationPage(db, consultantId, { cursor = null, search = '', sort = 'priority' } = {}) {
   const normalizedSearch = normalizeSearch(search);
@@ -144,6 +145,7 @@ export function recommendationPage(db, consultantId, { cursor = null, search = '
 
   const hidden = new Set(db.prepare(`SELECT project_id FROM recommendation_feedback
     WHERE consultant_id=?`).all(consultantId).map((row) => row.project_id));
+  for (const projectId of ignoredProjectIds(db, consultantId)) hidden.add(projectId);
   const visible = selected.items
     .filter((item) => !hidden.has(item.job.project_id))
     .filter((item) => matchesSearch(item, normalizedSearch))

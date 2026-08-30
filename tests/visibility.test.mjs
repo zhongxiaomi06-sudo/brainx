@@ -40,7 +40,7 @@ test('jobVisibleTo：有关系/被推荐/操作过可见；陌生人不可见', 
 
 test('HTTP 闸门：陌生人读职位 404；主人 200 且事件/结果只含自己的', async () => {
   // felix 与 mia 都操作过同一职位（mia 在上面 VIEW 过）
-  engage(db, 'felix', PID, 'WATCH', { idempotency_key: 'vis:felix:watch' });
+  engage(db, 'felix', PID, 'VIEW', { idempotency_key: 'vis:felix:view' });
   recordOutcome(db, 'felix', { project_id: PID, stage: '面试', value: { rating: 4 }, idempotency_key: 'vis:o:f' });
   recordOutcome(db, 'mia', { project_id: PID, stage: '关闭', value: { rating: 2 }, idempotency_key: 'vis:o:m' });
 

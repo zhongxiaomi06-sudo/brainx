@@ -6,7 +6,7 @@
 
 ## 1. 产品定位
 
-**一句话**：猎头团队的「今天该做哪个职位」决策系统——多源职位数据自动同步，以可解释的决策分层和稳定排序给每位顾问生成推荐队列，顾问在工作台/飞书卡片上承接、关注、关闭，全流程事件溯源可回放。
+**一句话**：猎头团队的「今天该做哪个职位」决策系统——多源职位数据自动同步，以可解释的决策分层和稳定排序给每位顾问生成推荐队列，顾问在工作台/飞书卡片上加入项目、开始跟进、忽略或关闭，全流程事件溯源可回放。
 
 **解决什么问题**：
 - 团队 ~900 个在招职位，顾问靠群里刷消息和个人记忆选单，优质职位被埋没、撞单、接单后没人跟进结果；
@@ -24,7 +24,7 @@
 
 | 角色 | 人数 | 核心诉求 |
 |---|---|---|
-| 顾问（felix/mia/york/wendy/linda/shanon/otto） | 7 | 每天看到「我最该做的 Top 职位」，一键接单/关注/不感兴趣，接单后自动找人 |
+| 顾问（felix/mia/york/wendy/linda/shanon/otto） | 7 | 每天看到「我最该做的 Top 职位」，一键加入项目、开始跟进或忽略，跟进后自动找人 |
 | 管理者（Felix 兼） | 1 | 团队承接全景、待办积压、数据健康 |
 | 算法负责人（mia 初版 → hanyu 优化） | 2 | 反馈标签采集、权重迭代、POLICY_VERSION 晋升 |
 | 工程/架构（曾老师） | 1 | 云端运维、数据质量门仲裁 |
@@ -57,6 +57,7 @@
 | `job_outcomes` | 职位级结果（面试/Offer/入职/人工标注） |
 | `push_log` | 推送幂等（consultant+kind+run_id 唯一） |
 | `recommendation_feedback` | 不感兴趣反馈（触发排序降权） |
+| `opportunity_ignores` | 顾问×职位的持久忽略事实；统一驱动精选盘、全部职位和后续推荐排除 |
 | `openmai_results` | 接单找人结果 |
 | `manual_fact_overrides` | 人工事实覆盖层（6 字段人工值优先于同步值） |
 
@@ -76,7 +77,7 @@
 - 规模实证：984 职位 / 680 轮 / 612,595 条冻结推荐 / 7 顾问。
 
 ### 4.2 承接状态机
-`VIEW → WATCH → ACCEPT → COMPLETE / DISMISS / RELEASE`，事件账本推导当前状态；幂等键 + 冷却期 + 关注上限；DISMISS 须填原因码（7 枚举）。
+正式状态机为 `NEW / RECOMMENDED / VIEWED → ACCEPTED → RELEASED / COMPLETED`。加入项目后、开始跟进前统一显示“待开始”；不再创建 `WATCHED` 或 `DISMISSED`。忽略写入 `opportunity_ignores` 并退出当前工作列表，不是承接状态。旧 `WATCHED / DISMISSED / EXPIRED` 事件仅用于兼容历史，不再作为合法新动作或界面状态。
 
 ### 4.3 TTC 闭环：接单自动找人
 `ACCEPT → startOpenmaiTask`（异步：TTC JWT → CRM 职位详情 → OpenMai SSE → 落库 → SSE 回传前端）。P-FIX 占位自动解析真身（P-FIX→J 真 project_id）。
@@ -85,7 +86,7 @@
 - **定时推送**：每日 07:00 / 19:00 CST，每人 Top3 卡片，私聊（绝不推群），push_log 幂等（窗口重入不重复发）。
 - **重大变化推送**：Top1 易主 / ACCEPT 档新进 Top3（autopush，默认关）。
 - **卡片 = 快照摘要，UI = 实时渲染**：卡片按钮一律 URL 深链，操作发生在工作台。
-- **一键反馈（F2，新增未部署）**：卡片按钮带 HMAC 签名直写「👀关注 / ✕不感兴趣」，无需登录工作台；当日/次日双窗口校验，未配密钥 fail-closed。
+- **一键反馈（F2，新增未部署）**：卡片按钮带 HMAC 签名直写“忽略”，无需登录工作台；当日/次日双窗口校验，未配密钥 fail-closed。
 
 ### 4.5 工作台前端（btex-frontend，唯一前端）
 React 19 + Vinext；`brainx-api.ts` 适配层（connected 模式调真实 `/api/v1`，401 回退演示）；SSE 定向投递实时刷新；showcase 演示面显式标记。
@@ -114,7 +115,7 @@ React 19 + Vinext；`brainx-api.ts` 适配层（connected 模式调真实 `/api/
 - F4：outcome 导入 CLI（`brainx-outcome-import`）
 
 **标签体系**（training-requirements v1）：
-ACCEPTED(+2) / WATCHED·VIEWED(+1) / 7 天静默(-1) / DISMISSED·NOT_INTERESTED(-2) / 人工标注(+2/+1/-2/0) / rating 1-5（终局质量乘数）。冲突裁决：人工标注 > 行为事件 > 反馈 ×。
+ACCEPTED(+2) / VIEWED(+1) / 7 天静默(-1) / IGNORE·NOT_INTERESTED(-2) / 人工标注(+2/+1/-2/0) / rating 1-5（终局质量乘数）。旧 WATCHED/DISMISSED 只作为历史训练兼容值。冲突裁决：人工标注 > 行为事件 > 忽略/反馈。
 
 **量级门槛**：~150 标签 → 网格搜索粗调；≥300 正样本 → logistic 回归；未达门槛**不得晋升 POLICY_VERSION**。
 

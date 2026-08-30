@@ -11,6 +11,7 @@ import { relationMap, deriveRelation } from './relations.js';
 import { currentStateMap } from './engagement.js';
 import { profileTtcFields, TTC_MAIN_COLUMNS } from './ttc-field-catalog.js';
 import { latestTtcFieldReport } from './ttc-field-report.js';
+import { ignoredProjectIds } from './opportunity-ignore.js';
 
 const parseRaw = (value) => {
   try { return JSON.parse(value || '{}'); } catch { return {}; }
@@ -38,8 +39,10 @@ export function radarRows(db, consultant_id) {
   const cMap = Object.fromEntries(cockpit.map((c) => [c.project_id, c]));
   const relCtx = relationMap(db, consultant_id);
   const engagementStates = currentStateMap(db, consultant_id);
+  const ignored = ignoredProjectIds(db, consultant_id);
   const rows = [];
   for (const j of jobs) {
+    if (ignored.has(j.project_id)) continue;
     const relation = deriveRelation(relCtx, j.project_id);
     if (relation === 'NOT_JOINED' || relation === 'UNKNOWN') continue;
     const c = cMap[j.project_id];

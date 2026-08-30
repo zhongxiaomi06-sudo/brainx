@@ -16,17 +16,16 @@ function seedRecommended(db) {
   return out.items[0].job.project_id;
 }
 
-test('EXPIRED 死态有出口：WATCH / ACCEPT / DISMISS 不再 409', () => {
+test('旧 EXPIRED 状态折叠为待开始，只保留直接跟进出口', () => {
   const db = openDb(':memory:');
   const pid = seedRecommended(db);
-  engage(db, CID, pid, 'WATCH', { idempotency_key: `w:${pid}` });
   // 直接落到 EXPIRED（模拟 90 天过期器产出）
   db.prepare(`INSERT INTO decision_events
     (event_id, event_type, actor, occurred_at, project_id, decision_id, policy_version, idempotency_key, prev_state, next_state, payload_json)
     VALUES ('e1','EXPIRED',?,datetime('now'),?,NULL,'test','x1','WATCHED','EXPIRED','{}')`).run(CID, pid);
-  assert.equal(currentState(db, CID, pid).state, 'EXPIRED');
-  const reWatch = engage(db, CID, pid, 'WATCH', { idempotency_key: `w2:${pid}` });
-  assert.ok(reWatch.ok, `EXPIRED→WATCH 应允许: ${reWatch.error}`);
+  assert.equal(currentState(db, CID, pid).state, 'VIEWED');
+  assert.equal(engage(db, CID, pid, 'WATCH', { idempotency_key: `w2:${pid}` }).status, 400);
+  assert.equal(engage(db, CID, pid, 'DISMISS', { idempotency_key: `d:${pid}` }).status, 400);
   const acc = engage(db, CID, pid, 'ACCEPT', { idempotency_key: `a:${pid}`, confirm: true });
   assert.ok(acc.ok, `EXPIRED→ACCEPT 应允许: ${acc.error}`);
 });

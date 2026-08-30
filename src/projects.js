@@ -1,6 +1,6 @@
 /** projects.js — “我的项目”真实摘要；membership 是项目归属的唯一入口。 */
 import { now } from './db.js';
-import { legalActions } from './engagement.js';
+import { legalActions, publicEngagementState } from './engagement.js';
 
 function projectStatus(state, action) {
   if (state === 'COMPLETED') return 'COMPLETED';
@@ -31,6 +31,8 @@ export function listProjects(db, consultant_id, { projectId = null } = {}) {
       AND a.status IN ('OPEN','BLOCKED')
     WHERE m.consultant_id=? AND m.valid_to IS NULL
       AND m.relation IN ('MY_JOB','TEAM_SHARED')
+      AND NOT EXISTS (SELECT 1 FROM opportunity_ignores i
+        WHERE i.consultant_id=m.consultant_id AND i.project_id=m.project_id)
       ${projectFilter}
     ORDER BY m.valid_from DESC, m.project_id`).all(...(projectId ? [consultant_id, projectId] : [consultant_id]));
 
@@ -44,7 +46,7 @@ export function listProjects(db, consultant_id, { projectId = null } = {}) {
       source: row.action_source,
       updated_at: row.action_updated_at,
     } : null;
-    const state = row.engagement_state || 'NEW';
+    const state = publicEngagementState(row.engagement_state || 'NEW');
     return {
       project_id: row.project_id,
       relation: row.relation,
@@ -65,7 +67,7 @@ export function listProjects(db, consultant_id, { projectId = null } = {}) {
       state_since: row.state_since || null,
       project_status: projectStatus(state, action),
       active_action: action,
-      legal_actions: legalActions(db, consultant_id, row.project_id).filter((item) => item !== 'VIEW'),
+      legal_actions: legalActions(db, consultant_id, row.project_id),
     };
   });
 }

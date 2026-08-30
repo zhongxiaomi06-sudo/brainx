@@ -6,6 +6,8 @@ import { recommend } from '../src/recommend.js';
 import { recommendationPage, RECOMMENDATION_PAGE_SIZE } from '../src/recommendation-page.js';
 import { dataConfidenceOf, recommendationPresentationOf } from '../src/recommendation-presentation.js';
 import { createServer } from '../src/server.js';
+import { recordOpportunityIgnore } from '../src/opportunity-ignore.js';
+import { radarRows } from '../src/radar.js';
 
 const CID = 'felix';
 let db;
@@ -29,6 +31,21 @@ test('推荐分页固定每页20条并返回真实计数', () => {
   assert.ok(page.items.every((item) => item.data_confidence.rule_version === 'data-confidence-1.0'));
   assert.ok(page.items.every((item) => item.presentation_source === 'FROZEN'));
   assert.ok(page.next_cursor);
+});
+
+test('忽略职位立即退出精选盘和全部职位，后续推荐轮也不再评估', () => {
+  const local = openDb(':memory:');
+  runSync(local, { source: 'fixture', consultant_id: CID });
+  recommend(local, CID, { top: 200, persistLimit: 200 });
+  const before = recommendationPage(local, CID);
+  const projectId = before.items[0].job.project_id;
+  const ignored = recordOpportunityIgnore(local, CID, projectId, `ignore:${projectId}`);
+  assert.equal(ignored.ok, true);
+  assert.equal(recommendationPage(local, CID).items.some((item) => item.job.project_id === projectId), false);
+  assert.equal(radarRows(local, CID).some((item) => item.project_id === projectId), false);
+  const next = recommend(local, CID, { top: 200, persistLimit: 200 });
+  assert.equal(next.items.some((item) => item.job.project_id === projectId), false);
+  local.close();
 });
 
 test('推荐展示只用真实关键事实、更新时间和活动生成层级', () => {

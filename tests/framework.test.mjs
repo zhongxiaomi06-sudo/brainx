@@ -3,7 +3,7 @@
  * ① relations.js 关系推导层（mia/york 推荐池断链）
  * ② fixture 属主守卫（非属主同步不继承策展关系）
  * ③ ACCEPT 接单守卫（OTHER_CONSULTANT 只可机会发现）
- * ④ 状态机：VIEWED 可达 / VIEW 不降级 WATCHED / UNWATCH note 落 reason
+ * ④ 状态机：VIEWED 可达 / 历史 WATCHED 折叠 / 旧动作停止写入
  * ⑤ captured_at 只在事实变化时前进（新鲜度维度恢复意义）
  * ⑥ latestRun 不携 raw_json 出网
  * ⑦ 静态服务 isPathInside 兄弟目录前缀漏洞
@@ -74,7 +74,7 @@ test('ACCEPT：OTHER_CONSULTANT 职位可由当前顾问独立接单', () => {
   assert.equal(r.state, 'ACCEPTED');
 });
 
-/* ④ 状态机：VIEWED 真正可达；查看 WATCHED 职位不降级；UNWATCH note 落 reason */
+/* ④ 状态机：VIEWED 真正可达；历史 WATCHED 折叠为待开始；旧动作停止写入 */
 test('状态机：VIEW 后状态为 VIEWED（不再回落 RECOMMENDED）', () => {
   // fixture 拆分（fixture_split.js）会按公司×职能重算 project_id，
   // 必须用拆分后真正入库的 pid，而非 fixture 原始复合行的占位 pid
@@ -85,22 +85,20 @@ test('状态机：VIEW 后状态为 VIEWED（不再回落 RECOMMENDED）', () =>
   assert.equal(currentState(db, 'mia', pid).state, 'VIEWED'); // 修正前视图不含 VIEWED
 });
 
-test('状态机：查看 WATCHED 职位不降级；UNWATCH 落『关注回滚』reason', () => {
+test('状态机：旧 WATCHED 状态折叠为待开始，查看后归一为 VIEWED', () => {
   const pid = db.prepare(`SELECT project_id FROM job_facts WHERE project_id != ? LIMIT 1`)
     .get(fixtureJob('TEAM_SHARED').project_id).project_id;
-  let r = engage(db, 'mia', pid, 'WATCH', { idempotency_key: 'fw:mia:watch' });
-  assert.equal(r.state, 'WATCHED');
-  r = engage(db, 'mia', pid, 'VIEW', { idempotency_key: 'fw:mia:view2' });
-  assert.equal(r.state, 'WATCHED'); // 修正前：查看把关注冲成 VIEWED
-  assert.equal(currentState(db, 'mia', pid).state, 'WATCHED');
+  db.prepare(`INSERT INTO decision_events
+    (event_id, event_type, actor, occurred_at, project_id, idempotency_key, prev_state, next_state)
+    VALUES ('fw-legacy-watch','WATCHED','mia',datetime('now'),?,'fw:mia:watch','VIEWED','WATCHED')`).run(pid);
+  assert.equal(currentState(db, 'mia', pid).state, 'VIEWED');
+  const r = engage(db, 'mia', pid, 'VIEW', { idempotency_key: 'fw:mia:view2' });
+  assert.equal(r.state, 'VIEWED');
+  assert.deepEqual(r.legal_actions, ['ACCEPT']);
   const ev = db.prepare(`SELECT event_type, next_state FROM decision_events
     WHERE actor='mia' AND project_id=? AND idempotency_key='fw:mia:view2'`).get(pid);
-  assert.deepEqual([ev.event_type, ev.next_state], ['VIEWED', 'WATCHED']); // 审计记 VIEW，状态留 WATCHED
-  r = engage(db, 'mia', pid, 'UNWATCH', { idempotency_key: 'fw:mia:unwatch' });
-  assert.equal(r.state, 'VIEWED');
-  const rel = db.prepare(`SELECT event_type, reason FROM decision_events
-    WHERE actor='mia' AND project_id=? AND idempotency_key='fw:mia:unwatch'`).get(pid);
-  assert.deepEqual([rel.event_type, rel.reason], ['RELEASED', '关注回滚']); // 修正前 note 从不持久化
+  assert.deepEqual([ev.event_type, ev.next_state], ['VIEWED', 'VIEWED']);
+  assert.equal(engage(db, 'mia', pid, 'UNWATCH', { idempotency_key: 'fw:mia:unwatch' }).status, 400);
 });
 
 /* ⑤ captured_at：无变化不回刷，事实变化才前进 */
@@ -166,7 +164,7 @@ test('migrations：schema_migrations 逐文件记账，重开不重跑', () => {
                           '0017_commitment_loop.sql',
                           '0017_position_add_company.sql', '0017_workbench_preferences.sql',
                           '0018_database_growth_guard.sql', '0019_ttc_field_reports.sql',
-                          '0020_remove_recommendation_events.sql']);
+                          '0020_remove_recommendation_events.sql', '0021_opportunity_ignores.sql']);
 });
 
 const TMPDB = join(tmpdir(), `brainx-fw-${process.pid}.db`);
@@ -183,15 +181,33 @@ test('migrations：旧库 user_version=2 兼容——前 2 个文件标记已应
     (event_id, event_type, actor, occurred_at, project_id, idempotency_key, prev_state, next_state)
     VALUES ('legacy-rec', 'RECOMMENDED', 'felix', '2026-08-10', 'P-LEGACY', 'legacy:rec', 'NEW', 'RECOMMENDED'),
            ('legacy-view', 'VIEWED', 'felix', '2026-08-11', 'P-LEGACY', 'legacy:view', 'RECOMMENDED', 'VIEWED')`);
+  legacy.exec(`INSERT INTO sync_runs
+    (sync_id, consultant_id, source, as_of, rows_expected, rows_read, complete,
+     errors, input_hash, started_at, completed_at)
+    VALUES ('legacy-sync','mia','fixture','2026-08-10',1,1,1,'[]','legacy','2026-08-10','2026-08-10');
+    INSERT INTO job_facts
+    (project_id, company, role, active_state, captured_at, sync_id, raw_json, updated_at)
+    VALUES ('P-IGNORED','旧客户','旧职位','OPEN','2026-08-10','legacy-sync','{}','2026-08-10');
+    INSERT INTO job_memberships
+    (consultant_id, project_id, relation, source, valid_from)
+    VALUES ('mia','P-IGNORED','MY_JOB','LEGACY','2026-08-10');
+    INSERT INTO decision_events
+    (event_id, event_type, actor, occurred_at, project_id, idempotency_key, prev_state, next_state)
+    VALUES ('legacy-dismiss','DISMISSED','mia','2026-08-12','P-IGNORED',
+      'legacy:dismiss','VIEWED','DISMISSED');`);
   legacy.exec('PRAGMA user_version = 2');
   legacy.close();
   const reopened = openDb(TMPDB);
   const rows = reopened.prepare('SELECT name FROM schema_migrations ORDER BY name').all().map((r) => r.name);
-  assert.equal(rows.length, 22); // 全部记账（含 0020 机器推荐轨迹清理）
+  assert.equal(rows.length, 23); // 全部记账（含 0021 忽略事实）
   assert.equal(reopened.prepare(`SELECT COUNT(*) n FROM decision_events
     WHERE event_type='RECOMMENDED'`).get().n, 0, '历史机器推荐轨迹已清理');
   assert.equal(reopened.prepare(`SELECT COUNT(*) n FROM decision_events
     WHERE event_type='VIEWED'`).get().n, 1, '人工操作轨迹完整保留');
+  assert.equal(reopened.prepare(`SELECT COUNT(*) n FROM opportunity_ignores
+    WHERE consultant_id='mia' AND project_id='P-IGNORED'`).get().n, 1, '旧暂不考虑迁为忽略事实');
+  assert.ok(reopened.prepare(`SELECT valid_to FROM job_memberships
+    WHERE consultant_id='mia' AND project_id='P-IGNORED'`).get().valid_to, '旧项目归属已关闭');
   const view = reopened.prepare(`SELECT sql FROM sqlite_master WHERE type='view' AND name='current_engagement'`).get();
   assert.match(view.sql, /VIEWED/); // 0006 新视图已应用（含 VIEWED 推导）
   // 0007 扩列已生效

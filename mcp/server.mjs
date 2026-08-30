@@ -11,7 +11,7 @@ import { createInterface } from 'node:readline';
 import { openDb } from '../src/db.js';
 import { runSync, latestSync, latestCompleteSnapshot } from '../src/sync.js';
 import { recommend, latestRun, loadConsultants } from '../src/recommend.js';
-import { engage, commitmentSummary, currentState, legalActions, DISMISS_REASONS } from '../src/engagement.js';
+import { engage, commitmentSummary, currentState, legalActions } from '../src/engagement.js';
 import { replay, recordOutcome } from '../src/replay.js';
 import { acceptCommitment, commitmentDetails, recordProgress, recordTerminalResult,
   releaseCommitment, suggestedAction, RELEASE_REASONS, CLOSE_REASONS } from '../src/commitment.js';

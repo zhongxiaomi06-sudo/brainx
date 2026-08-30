@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { openDb, now } from './db.js';
 import { runSync, latestSync, latestRealSync, latestBridgeError, latestCompleteSnapshot, friendlyBridgeError } from './sync.js';
 import { recommend, latestRun, loadConsultants } from './recommend.js';
-import { engage, commitmentSummary, currentState, legalActions, DISMISS_REASONS } from './engagement.js';
+import { engage, commitmentSummary, currentState, legalActions } from './engagement.js';
 import { replay, recordOutcome } from './replay.js';
 import { acceptCommitment, commitmentDetails, recordProgress, recordTerminalResult,
   releaseCommitment, suggestedAction, RELEASE_REASONS, CLOSE_REASONS } from './commitment.js';
@@ -38,6 +38,7 @@ import { recommendationPage } from './recommendation-page.js';
 import { verifyQuick, quickResultPage, QUICK_ACTIONS } from './quickfb.js';
 import { verifySnapshotKey, jobSnapshot } from './snapshot.js';
 import { createGuard } from './guard.js';
+import { recordOpportunityIgnore } from './opportunity-ignore.js';
 import { makeClientErrorRoute } from './client-error.js';
 import { body, err, isPathInside, json, normalizeWorkbenchPreferences, proxyFrontend,
   safeJsonArray, STATIC_MIME } from './server-http.js';
@@ -298,12 +299,11 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       };
       const v = verifyQuick(p, now());
       if (!v.ok) return page(false, v.error, v.status);
-      const out = p.action === 'watch'
-        ? engage(db, p.consultant, p.project, 'WATCH',
-                 { idempotency_key: `quick-watch:${p.consultant}:${p.project}:${p.day}` })
-        : recommendationFeedback(db, p.consultant,
-                 { project_id: p.project, feedback: 'NOT_INTERESTED', reason: '一键反馈（推送卡片）',
-                   idempotency_key: `quick-ni:${p.consultant}:${p.project}:${p.day}` });
+      if (!db.prepare('SELECT 1 FROM job_facts WHERE project_id=?').get(p.project)) {
+        return page(false, '职位不存在', 404);
+      }
+      const out = recordOpportunityIgnore(db, p.consultant, p.project,
+        `quick-ignore:${p.consultant}:${p.project}:${p.day}`);
       if (!out.ok) return page(false, out.error || out.message || '操作失败');
       return page(true, `已记录：${QUICK_ACTIONS[p.action]}${out.already ? '（此前已记录）' : ''}`);
     },
@@ -468,7 +468,6 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       json(res, out.ok ? 200 : (out.status || 400), out);
     },
 
-    'GET /api/v1/dismiss-reasons': (req, res) => json(res, 200, { items: DISMISS_REASONS }),
     'GET /api/v1/commitment-options': (req, res) => json(res, 200, {
       release_reasons: RELEASE_REASONS, close_reasons: CLOSE_REASONS,
     }),

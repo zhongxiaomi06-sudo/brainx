@@ -136,10 +136,34 @@
 
 .recommendation-v2-body {
   display: grid;
-  grid-template-columns: minmax(0, 1.7fr) minmax(300px, .9fr);
-  gap: 12px 20px;
+  gap: 0;
   min-width: 0;
   padding-left: 46px;
+}
+.recommendation-v2-scores {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  padding: 8px 0;
+  border-top: 1px solid #edf0ef;
+  border-bottom: 1px solid #edf0ef;
+}
+.recommendation-v2-scores div { min-width: 0; padding: 0 16px; border-left: 1px solid #edf0ef; }
+.recommendation-v2-scores div:first-child { padding-left: 0; border-left: 0; }
+.recommendation-v2-scores dt {
+  margin-bottom: 2px;
+  color: #8b9692;
+  font-size: 8px;
+  font-weight: 650;
+  letter-spacing: .04em;
+}
+.recommendation-v2-scores dd {
+  margin: 0;
+  color: #17866d;
+  font-size: 16px;
+  font-weight: 760;
+  letter-spacing: -.03em;
 }
 .recommendation-v2-facts {
   grid-column: 1 / -1;
@@ -147,7 +171,6 @@
   grid-template-columns: .75fr .75fr .5fr .75fr 1.35fr 1.25fr;
   margin: 0;
   padding: 8px 0;
-  border-top: 1px solid #edf0ef;
   border-bottom: 1px solid #edf0ef;
 }
 .recommendation-v2-facts div { min-width: 0; padding: 0 12px; border-left: 1px solid #edf0ef; }
@@ -170,81 +193,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
-.recommendation-v2-reasons { min-width: 0; }
-.recommendation-v2-reasons h4 {
-  margin: 0 0 6px;
-  color: #76817d;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: .04em;
-}
-.recommendation-v2-reasons ol { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; }
-.recommendation-v2-reasons li {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: baseline;
-  gap: 10px;
-  min-width: 0;
-  padding-left: 10px;
-  position: relative;
-}
-.recommendation-v2-reasons li::before {
-  position: absolute;
-  top: .5em;
-  left: 0;
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: #7ca99c;
-  content: "";
-}
-.recommendation-v2-reasons li span {
-  overflow: hidden;
-  color: #33423d;
-  font-size: 10px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.recommendation-v2-reasons li small,
-.recommendation-v2-missing { color: #9ba39f; font-size: 8px; white-space: nowrap; }
-.recommendation-v2-reasons > p { margin: 0; color: #87918d; font-size: 10px; }
-
-.recommendation-v2-assessment {
-  display: grid;
-  align-content: start;
-  gap: 5px;
-  padding-left: 16px;
-  border-left: 1px solid #edf0ef;
-}
-.recommendation-v2-risk,
-.recommendation-v2-confidence {
-  display: flex;
-  align-items: flex-start;
-  gap: 7px;
-  min-width: 0;
-  color: #865047;
-}
-.recommendation-v2-risk.is-clear { color: #3e6c5f; }
-.recommendation-v2-confidence { color: #50635d; }
-.recommendation-v2-risk > svg,
-.recommendation-v2-confidence > svg { flex: 0 0 auto; width: 13px; height: 13px; margin-top: 1px; }
-.recommendation-v2-risk span,
-.recommendation-v2-confidence span { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: baseline; gap: 6px; min-width: 0; }
-.recommendation-v2-risk b,
-.recommendation-v2-confidence b { font-size: 9px; white-space: nowrap; }
-.recommendation-v2-risk small,
-.recommendation-v2-confidence small {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  overflow: hidden;
-  color: #8d9793;
-  font-size: 8px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.recommendation-v2-confidence small svg { width: 9px; }
 
 .recommendation-v2-card > footer {
   display: flex;
@@ -310,11 +258,9 @@
 @keyframes recommendation-v2-spin { to { transform: rotate(360deg); } }
 
 @media (max-width: 900px) {
-  .recommendation-v2-body { grid-template-columns: 1fr; }
   .recommendation-v2-facts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .recommendation-v2-facts div { padding: 5px 10px; }
   .recommendation-v2-facts div:nth-child(4) { padding-left: 0; border-left: 0; }
-  .recommendation-v2-assessment { padding: 8px 0 0; border-top: 1px solid #edf0ef; border-left: 0; }
 }
 
 @media (max-width: 680px) {
@@ -327,9 +273,6 @@
   .recommendation-v2-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .recommendation-v2-facts div:nth-child(odd) { padding-left: 0; border-left: 0; }
   .recommendation-v2-facts div:nth-child(4) { padding-left: 10px; border-left: 1px solid #edf0ef; }
-  .recommendation-v2-reasons li { grid-template-columns: 1fr; gap: 1px; }
-  .recommendation-v2-risk span,
-  .recommendation-v2-confidence span { grid-template-columns: 1fr; gap: 1px; }
   .recommendation-v2-card > footer { align-items: flex-end; flex-direction: column; padding-left: 44px; }
   .recommendation-v2-actions { flex-wrap: wrap; justify-content: flex-end; }
   .recommendation-v2-feedback { margin: 0; }

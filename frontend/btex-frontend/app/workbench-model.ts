@@ -396,9 +396,9 @@ export const events = [
 ];
 export const statusOrder: Exclude<Status, "待同步">[] = ["新发布", "升温", "活跃", "拥挤", "降温", "疑似失活", "已关闭"];
 export const nav = [
-  ["today", "今日决策", Sparkles],
-  ["jobs", "全部职位", BriefcaseBusiness],
+  ["today", "精选盘", Sparkles],
   ["accepted", "我的项目", ClipboardCheck],
+  ["jobs", "全部职位", BriefcaseBusiness],
   ["clients", "客户洞察", Users],
   ["sources", "连接与数据", Database],
   ["rules", "策略设置", Settings2],

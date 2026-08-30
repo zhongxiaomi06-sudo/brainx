@@ -147,6 +147,12 @@
   margin-top: 0;
   padding-top: 1px;
 }
+.commitment-idle-actions button {
+  min-width: 128px;
+  height: 44px;
+  padding: 0 18px;
+  border-radius: 12px;
+}
 .commitment-timeline article i {
   width: 6px;
   height: 6px;
@@ -159,4 +165,6 @@
   .commitment-loop { padding: 14px 18px 28px; }
   .commitment-primary-actions { display: grid; grid-template-columns: 1fr 1fr; }
   .commitment-membership-options { grid-template-columns: 1fr; }
+  .commitment-idle-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .commitment-idle-actions button { width: 100%; min-width: 0; }
 }

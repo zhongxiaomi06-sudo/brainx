@@ -136,13 +136,13 @@ export function scoreJob(job, relation, ctx) {
   } else {
     dims.direction = null; // 冷启动：无画像无历史，方向维缺失而非 0
   }
-  // 顾问级“不感兴趣”只影响未来排序，不修改冻结快照或职位事实（仅在方向维已有分值时降权）。
+  // 顾问级忽略事实只影响未来排序，不修改冻结快照或职位事实（仅在方向维已有分值时降权）。
   if (dims.direction != null && ctx.feedback_projects?.includes(job.project_id)) {
     dims.direction = Math.max(0, dims.direction - 20);
   }
   // 反馈闭环（baseline-1.1，2026-08-24）：公司级记忆。
-  // 修正前只按 project_id 降权——同一客户换个职位重新进池就忘了顾问说过「不感兴趣」。
-  // 负向：DISMISSED / ×不感兴趣 过的公司 -15；正向：承接（ACCEPTED）过的公司 +10。
+  // 修正前只按 project_id 降权——同一客户换个职位重新进池就忘了顾问曾忽略该机会。
+  // 负向：历史 DISMISSED / 当前忽略过的公司 -15；正向：承接（ACCEPTED）过的公司 +10。
   if (dims.direction != null && ctx.negative_companies?.includes(job.company)) {
     dims.direction = Math.max(0, dims.direction - 15);
   }
@@ -258,7 +258,7 @@ export function explain(job, relation, scored, ctx) {
   if (b.similarity != null && b.similarity > 0) reasons.push(`历史相似 ${b.similarity} 分：与你历史主做项目存在重合特征`);
   if (ctx.positive_companies?.includes(job.company)) reasons.push(`你曾承接该公司项目，方向维加权`);
   const risks = [];
-  if (ctx.negative_companies?.includes(job.company)) risks.push(`该公司此前被你标记不感兴趣/暂不考虑，方向维已降权`);
+  if (ctx.negative_companies?.includes(job.company)) risks.push(`该公司此前有职位被你忽略，方向维已降权`);
   const zombieRounds = (ctx.rec_rounds?.[job.project_id] || 0);
   if (zombieRounds >= 3 && !ctx.engaged_projects?.has(job.project_id)) risks.push(`已连续 ${zombieRounds} 轮推荐未互动，活跃度降权防霸榜`);
   const capLimit = Number(ctx.capacity_limit) > 0 ? Number(ctx.capacity_limit) : CAPACITY_LIMIT;

@@ -473,10 +473,10 @@ export function CommitmentLoopPanel({
       {!membershipNeedsConfirmation && !requiresFactVerification && displayState !== "ACCEPTED" && displayState !== "COMPLETED" ? (
         <div className="commitment-command-row commitment-idle-actions" aria-label="项目下一步">
           {legal
-            .filter((a) => ["WATCH", "UNWATCH", "DISMISS"].includes(a))
+            .filter((a) => a === "DISMISS")
             .map((a) => (
               <button key={a} onClick={() => onCommand(a)}>
-                {a === "WATCH" ? "加入关注" : a === "UNWATCH" ? "取消关注" : "暂不考虑"}
+                暂不考虑
               </button>
             ))}
           {legal.includes("ACCEPT") && (

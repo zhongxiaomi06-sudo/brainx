@@ -6,6 +6,7 @@ import { runSync } from '../src/sync.js';
 import { recommend, latestRun, buildCtx } from '../src/recommend.js';
 import { engage, currentState } from '../src/engagement.js';
 import { scoreJob, POLICY_VERSION } from '../src/scorer.js';
+import { recordOpportunityIgnore } from '../src/opportunity-ignore.js';
 
 let db;
 const CID = 'felix';
@@ -117,7 +118,7 @@ test('1.1：僵尸职位 ≥3 轮零互动 → 活跃 7 折；有互动则不衰
 });
 
 // —— 反馈闭环：buildCtx 全链路 ——
-test('1.1：DISMISS/ACCEPT 回流 buildCtx 的公司记忆与轮次信号', () => {
+test('1.1：IGNORE/ACCEPT 回流 buildCtx 的公司记忆与轮次信号', () => {
   runSync(db, { source: 'ttc', consultant_id: 'mia', payload: { as_of: new Date().toISOString(), jobs: [
     { project_id: 'JNEG', company: '负向客户', role: '职位A', city: null, pipeline: null, hc: null,
       active_state: 'OPEN', source_url: 'ttc://job/JNEG' },
@@ -125,13 +126,12 @@ test('1.1：DISMISS/ACCEPT 回流 buildCtx 的公司记忆与轮次信号', () =
       active_state: 'OPEN', source_url: 'ttc://job/JPOS' },
   ] } });
   recommend(db, 'mia', { top: 20 });
-  engage(db, 'mia', 'JNEG', 'DISMISS', { reason: '不符合方向', idempotency_key: 't-dismiss-1' });
-  engage(db, 'mia', 'JPOS', 'WATCH', { idempotency_key: 't-watch-1' });
+  recordOpportunityIgnore(db, 'mia', 'JNEG', 't-ignore-1');
   engage(db, 'mia', 'JPOS', 'ACCEPT', { confirm: true, idempotency_key: 't-accept-1' });
   const ctx = buildCtx(db, 'mia', { sync_id: 'x' });
-  assert.ok(ctx.negative_companies.includes('负向客户'), 'DISMISS 公司进负向记忆');
+  assert.ok(ctx.negative_companies.includes('负向客户'), 'IGNORE 公司进负向记忆');
   assert.ok(ctx.positive_companies.includes('正向客户'), 'ACCEPT 公司进正向记忆');
-  assert.ok(ctx.engaged_projects.has('JNEG') && ctx.engaged_projects.has('JPOS'));
+  assert.ok(ctx.feedback_projects.includes('JNEG') && ctx.engaged_projects.has('JPOS'));
   // 推荐轮次从冻结快照聚合，不再依赖机器 decision_events。
   assert.ok(Object.keys(ctx.rec_rounds).length > 0
     && Math.max(...Object.values(ctx.rec_rounds)) >= 1, '推荐轮次表已聚合');

@@ -2,6 +2,7 @@ import { now, uuid } from './db.js';
 import { latestRun } from './recommend.js';
 import { effectiveJob } from './facts.js';
 import { currentState } from './engagement.js';
+import { isOpportunityIgnored } from './opportunity-ignore.js';
 
 const LIMIT = 20;
 
@@ -27,11 +28,12 @@ function batchFor(db, consultantId, snapshotId, size = LIMIT) {
 }
 
 function isHidden(db, consultantId, item) {
+  if (isOpportunityIgnored(db, consultantId, item.job.project_id)) return true;
   const feedback = db.prepare(`SELECT 1 FROM recommendation_feedback
     WHERE consultant_id=? AND project_id=? LIMIT 1`).get(consultantId, item.job.project_id);
   if (feedback) return true;
   const state = currentState(db, consultantId, item.job.project_id);
-  if (['ACCEPTED', 'COOLING', 'DISMISSED'].includes(state.state)) return true;
+  if (state.state === 'ACCEPTED') return true;
   return ['CLOSED', 'COMPLETED', 'COOLING'].includes(item.job.active_state);
 }
 

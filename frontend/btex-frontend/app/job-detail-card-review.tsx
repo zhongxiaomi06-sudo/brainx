@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ArrowRight,
+  BarChart3,
   BriefcaseBusiness,
   Check,
   Clock3,
@@ -18,10 +19,21 @@ export type JobDetailPipeline = Record<string, number> | null;
 
 export type JobDetailRecommendation = {
   action: "FOLLOW" | "WATCH" | "HOLD";
+  score: number | null;
+  evidenceCoverage: number | null;
+  breakdown: JobDetailScoreDimension[];
   reasons: string[];
   risks: string[];
   generatedAt: string | null;
   policyVersion: string | null;
+};
+
+export type JobDetailScoreDimension = {
+  dim: string;
+  label: string;
+  weight: number | null;
+  score: number | null;
+  weightedScore: number | null;
 };
 
 export type JobDetailEvent = {
@@ -60,6 +72,7 @@ export type JobDetailCardProps = {
   job: JobDetailReviewData;
   onClose: () => void;
   onAddToProjects?: (projectId: string) => Promise<void> | void;
+  onIgnore?: (projectId: string) => Promise<void> | void;
   onDismiss?: (projectId: string) => void;
   onOpenSource?: (projectId: string) => void;
   activeTab?: JobDetailTab;
@@ -91,6 +104,15 @@ const pipelineLabels: Record<string, string> = {
   onboard: "入职",
 };
 
+const scoreDimensions = [
+  ["direction", "职位方向匹配"],
+  ["activity", "项目活跃度与 Pipeline"],
+  ["similarity", "与历史项目相似度"],
+  ["capacity", "当前跟进容量"],
+  ["outcomes", "历史行为与交付结果"],
+  ["exploration", "探索额度"],
+] as const;
+
 function displayDate(value: string | null | undefined) {
   if (!value) return "待确认";
   const date = new Date(value);
@@ -116,6 +138,55 @@ function pipelineItems(pipeline: JobDetailPipeline) {
     .map(([key, value]) => ({ label: pipelineLabels[key.toLowerCase()] || key, value }));
 }
 
+function percent(value: number | null) {
+  return value === null ? "待确认" : `${Math.round(value * 100)}%`;
+}
+
+function scoreText(value: number | null) {
+  return value === null ? "待确认" : `${Number(value.toFixed(1))} / 100`;
+}
+
+function JudgementContent({ job, recommendation }: {
+  job: JobDetailReviewData;
+  recommendation: JobDetailRecommendation | null;
+}) {
+  if (!recommendation) return <section className="job-detail-review-section is-recommendation">
+    <div className="job-detail-review-empty">这个职位尚无真实推荐结果</div>
+  </section>;
+  const dimensions = scoreDimensions.map(([dim, label]) => {
+    const found = recommendation.breakdown.find(item => item.dim === dim);
+    return found || { dim, label, weight: null, score: null, weightedScore: null };
+  });
+  const suggestions = [
+    { label: actionLabels[recommendation.action], source: "冻结推荐结论" },
+    ...(job.nextAction ? [{ label: job.nextAction, source: "当前职位事实" }] : []),
+  ];
+  return <>
+    <section className="job-detail-score-summary" aria-label="推荐评分摘要">
+      <div><span>推荐指数</span><b>{recommendation.score ?? "待确认"}</b></div>
+      <div><span>证据覆盖</span><b>{recommendation.evidenceCoverage === null ? "待确认" : `${recommendation.evidenceCoverage}%`}</b></div>
+      <div><span>策略版本</span><b>{recommendation.policyVersion || "待确认"}</b></div>
+    </section>
+    <section className="job-detail-review-section">
+      <div className="job-detail-review-section-title"><span><BarChart3 /></span><div><h3>评分依据</h3><p>后端冻结六维评分；缺失维度不按 0 分处理</p></div></div>
+      <div className="job-detail-score-list">{dimensions.map(item => <div className={`job-detail-score-row${item.score === null ? " is-missing" : ""}`} key={item.dim}>
+        <span><b>{item.label}</b><small>{item.weight === null ? "权重待确认" : `权重 ${percent(item.weight)}`}</small></span>
+        <div className="job-detail-score-bar" role="progressbar" aria-label={item.label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={item.score ?? undefined}><i style={{ width: `${Math.max(0, Math.min(100, item.score ?? 0))}%` }} /></div>
+        <strong>{scoreText(item.score)}{item.weightedScore !== null && <small>贡献 {Number(item.weightedScore.toFixed(2))}</small>}</strong>
+      </div>)}</div>
+    </section>
+    <section className="job-detail-review-section">
+      <div className="job-detail-review-section-title"><span><Check /></span><div><h3>建议动作</h3><p>只展示冻结推荐和当前职位事实</p></div></div>
+      <div className="job-detail-score-actions">{suggestions.map((item, index) => <div key={`${item.source}:${item.label}`}><span>{String(index + 1).padStart(2, "0")}</span><p><b>{item.label}</b><small>{item.source}</small></p></div>)}</div>
+    </section>
+    <section className="job-detail-review-section is-recommendation">
+      <div className="job-detail-review-section-title"><span><Check /></span><div><h3>判断依据</h3><p>{displayDate(recommendation.generatedAt)}</p></div></div>
+      <ul>{recommendation.reasons.map(reason => <li key={reason}>{reason}</li>)}</ul>
+      {recommendation.risks.length > 0 && <div className="job-detail-review-risks"><b>风险与缺失</b>{recommendation.risks.map(risk => <span key={risk}>{risk}</span>)}</div>}
+    </section>
+  </>;
+}
+
 function Fact({ label, value }: { label: string; value: string | number | null | undefined }) {
   return <div><dt>{label}</dt><dd className={displayValue(value) === "待确认" ? "is-missing" : ""}>{displayValue(value)}</dd></div>;
 }
@@ -124,6 +195,7 @@ export function JobDetailCard({
   job,
   onClose,
   onAddToProjects,
+  onIgnore,
   onDismiss,
   onOpenSource,
   activeTab,
@@ -135,9 +207,12 @@ export function JobDetailCard({
   const dialogRef = useRef<HTMLElement>(null);
   const [localTab, setLocalTab] = useState<JobDetailTab>(initialTab);
   const [adding, setAdding] = useState(false);
+  const [ignoring, setIgnoring] = useState(false);
   const selectedTab = activeTab || localTab;
   const pipeline = pipelineItems(job.pipeline);
-  const recommendation = job.recommendation?.reasons.length ? job.recommendation : null;
+  const recommendation = job.recommendation
+    && (job.recommendation.reasons.length > 0 || job.recommendation.breakdown.length > 0)
+    ? job.recommendation : null;
   const recentEvents = newestEvents(job.events || []);
   const tabs: { id: JobDetailTab; label: string }[] = [
     { id: "facts", label: "职位事实" },
@@ -155,6 +230,11 @@ export function JobDetailCard({
     if (!onAddToProjects || adding || job.inMyProjects) return;
     setAdding(true);
     try { await onAddToProjects(job.projectId); } finally { setAdding(false); }
+  };
+  const ignoreProject = async () => {
+    if (!onIgnore || ignoring || !job.inMyProjects) return;
+    setIgnoring(true);
+    try { await onIgnore(job.projectId); } finally { setIgnoring(false); }
   };
 
   useEffect(() => {
@@ -231,10 +311,7 @@ export function JobDetailCard({
             <span><b>TTC CRM 职位快照</b><small>最近同步 {displayDate(job.capturedAt)} · 缺失字段保持待确认</small></span>
             {onOpenSource && <button type="button" onClick={() => onOpenSource(job.projectId)}>查看来源<ExternalLink /></button>}
           </section>
-          </> : detailContent || (selectedTab === "judgement" ? <section className="job-detail-review-section is-recommendation">
-            <div className="job-detail-review-section-title"><span><Check /></span><div><h3>当前判断</h3><p>{recommendation ? `${actionLabels[recommendation.action]} · ${displayDate(recommendation.generatedAt)}` : "尚未生成可核验判断"}</p></div></div>
-            {recommendation ? <><ul>{recommendation.reasons.map(reason => <li key={reason}>{reason}</li>)}</ul>{recommendation.risks.length > 0 && <div className="job-detail-review-risks"><b>待确认</b>{recommendation.risks.map(risk => <span key={risk}>{risk}</span>)}</div>}<small>策略版本 {recommendation.policyVersion || "待确认"}</small></> : <div className="job-detail-review-empty">这个职位尚无真实推荐结果</div>}
-          </section> : selectedTab === "engagement" ? <section className="job-detail-review-section">
+          </> : detailContent || (selectedTab === "judgement" ? <JudgementContent job={job} recommendation={recommendation} /> : selectedTab === "engagement" ? <section className="job-detail-review-section">
             <div className="job-detail-review-section-title"><span><ArrowRight /></span><div><h3>跟进与结果</h3><p>项目关系、当前阶段和下一步动作</p></div></div>
             <dl className="job-detail-review-facts"><Fact label="跟进状态" value={job.engagementState} /><Fact label="与我的关系" value={job.relation} /><Fact label="当前阶段" value={job.currentStage} /><Fact label="下一步动作" value={job.nextAction} /></dl>
           </section> : selectedTab === "trail" ? <section className="job-detail-review-section">
@@ -246,8 +323,9 @@ export function JobDetailCard({
           </section>)}
         </div>
 
-        {(onDismiss || onAddToProjects) && <footer className={`job-detail-review-actions${onDismiss && onAddToProjects ? "" : " is-single"}`}>
+        {(onDismiss || onIgnore || onAddToProjects) && <footer className={`job-detail-review-actions${[onDismiss, onIgnore, onAddToProjects].filter(Boolean).length === 1 ? " is-single" : ""}`}>
           {onDismiss && <button type="button" className="is-dismiss" onClick={() => onDismiss(job.projectId)}>暂不考虑</button>}
+          {onIgnore && job.inMyProjects && <button type="button" className="is-ignore" disabled={ignoring} onClick={() => void ignoreProject()}>{ignoring ? "忽略中…" : "忽略"}</button>}
           {onAddToProjects && <button type="button" className="is-primary" disabled={job.inMyProjects || adding} onClick={() => void addToProjects()}>{job.inMyProjects ? "已加入我的项目" : adding ? "添加中…" : "加入我的项目"}</button>}
         </footer>}
       </section>

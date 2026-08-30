@@ -71,7 +71,7 @@ export const CommitmentReady: Story = {
     const timeline = canvas.getByRole("heading", { name: "行动与结果" });
     const start = canvas.getByRole("button", { name: "开始跟进" });
     await expect(canvas.queryByRole("heading", { name: "项目跟进" })).not.toBeInTheDocument();
-    await expect(canvas.getByRole("button", { name: "加入关注" })).toBeInTheDocument();
+    await expect(canvas.queryByRole("button", { name: "加入关注" })).not.toBeInTheDocument();
     await expect(canvas.getByRole("button", { name: "暂不考虑" })).toBeInTheDocument();
     await expect(Boolean(timeline.compareDocumentPosition(start) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
   },

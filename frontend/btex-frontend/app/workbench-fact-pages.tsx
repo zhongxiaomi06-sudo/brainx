@@ -12,6 +12,8 @@ import { ClientInsightsReview, type ClientFactRow } from "./client-insights-revi
 import { JobsWorkspaceReview, type JobsWorkspaceReviewRow } from "./jobs-workspace-review";
 import { type BackendClientRow, type BackendRadarRow, type RadarFieldCapability } from "./brainx-api";
 import { getOpportunityDetail } from "./brainx-opportunity-api";
+import type { ProjectSummary } from "./brainx-projects-api";
+import { canIgnoreProject } from "./project-ignore-action";
 
 const filterKeys = new Set<TtcFieldCapability["key"]>(["company", "city", "active_state", "hc", "owner_name"]);
 function jobStatus(value?: string | null): TtcJobStatus {
@@ -98,7 +100,16 @@ export function toClientFact(row: BackendClientRow): ClientFactRow {
   };
 }
 
-function WorkbenchJobsPage({ items, capabilities, projects, company, onAddToProjects }: { items: BackendRadarRow[]; capabilities: RadarFieldCapability[]; projects: string[]; company?: string | null; onAddToProjects: (projectId: string) => Promise<void> }) {
+type WorkbenchJobsPageProps = {
+  items: BackendRadarRow[];
+  capabilities: RadarFieldCapability[];
+  projects: ProjectSummary[];
+  company?: string | null;
+  onAddToProjects: (projectId: string) => Promise<void>;
+  onIgnoreProject: (project: ProjectSummary) => Promise<void>;
+};
+
+function WorkbenchJobsPage({ items, capabilities, projects, company, onAddToProjects, onIgnoreProject }: WorkbenchJobsPageProps) {
   const rows = useMemo(() => items.map(toJobsWorkspaceRow).filter(row => !company || row.company === company), [company, items]);
   const fields = useMemo(() => capabilities.map(toTtcCapability).filter((field): field is TtcFieldCapability => field !== null), [capabilities]);
   const filterCapabilities = useMemo(() => ({
@@ -115,7 +126,26 @@ function WorkbenchJobsPage({ items, capabilities, projects, company, onAddToProj
     const sourceUrl = safeSourceUrl(row?.cockpit?.source_url || row?.source_url);
     if (sourceUrl) window.open(sourceUrl, "_blank", "noopener,noreferrer");
   };
-  return <>{company && <div className="ttc-filter-context">正在查看客户“{company}”的职位</div>}<JobsWorkspaceReview rows={rows} embedded dataLabel="真实职位数据 · 来自 TTC 同步快照" tipText="筛选真实职位，打开详情后可加入我的项目" filterCapabilities={filterCapabilities} joinedProjectIds={projects} loadDetail={loadDetail} onFollow={onAddToProjects} onOpenSource={openSource} /></>;
+  async function ignoreProject(projectId: string) {
+    const project = projects.find(item => item.project_id === projectId);
+    if (!project) throw new Error("项目已不在当前列表中");
+    await onIgnoreProject(project);
+  }
+
+  return <>
+    {company && <div className="ttc-filter-context">正在查看客户“{company}”的职位</div>}
+    <JobsWorkspaceReview rows={rows} embedded
+      dataLabel="真实职位数据 · 来自 TTC 同步快照"
+      tipText="筛选真实职位，打开详情后可加入我的项目"
+      filterCapabilities={filterCapabilities}
+      joinedProjectIds={projects.map(project => project.project_id)}
+      ignorableProjectIds={projects.filter(canIgnoreProject).map(project => project.project_id)}
+      loadDetail={loadDetail}
+      onFollow={onAddToProjects}
+      onIgnore={ignoreProject}
+      onOpenSource={openSource}
+    />
+  </>;
 }
 
 function WorkbenchClientsPage({ items, onOpenJobs }: { items: BackendClientRow[]; onOpenJobs: (company: string) => void }) {

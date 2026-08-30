@@ -48,11 +48,17 @@ test('served 回填：page 真实下发后 served_at 补齐且幂等', () => {
   assert.equal(mid, after);
 });
 
-test('0-5 标签：终局优先于承接态，未互动为未知，DISMISSED/×为 0', () => {
+test('0-5 标签：终局优先于承接态，未互动为未知，历史 DISMISSED/×为 0', () => {
   const pid = db.prepare(`SELECT project_id FROM recommendations
     WHERE consultant_id='felix' ORDER BY rank LIMIT 1`).get().project_id;
   assert.equal(labelFor(db, 'felix', pid), null, '未展示未互动=未知');
-  engage(db, 'felix', pid, 'WATCH', { idempotency_key: 'lbl-1' });
+  // 新模型动作表无 WATCH/DISMISS；历史账本态直插事件模拟（与 0021 迁移前数据同形，
+  // labels 读 current_engagement 视图原始态，不经过 publicEngagementState 折叠）
+  const put = (id, type, next, projectId = pid) => db.prepare(`INSERT INTO decision_events
+    (event_id, event_type, actor, occurred_at, project_id, decision_id, policy_version, idempotency_key, prev_state, next_state, payload_json)
+    VALUES (?,?,?,datetime('now'),?,NULL,'test',?,'VIEWED',?,'{}')`)
+    .run(id, type, 'felix', projectId, `lbl:${id}`, next);
+  put('e-watch', 'WATCHED', 'WATCHED');
   assert.equal(labelFor(db, 'felix', pid), 1);
   engage(db, 'felix', pid, 'ACCEPT', { confirm: true, idempotency_key: 'lbl-2' });
   assert.equal(labelFor(db, 'felix', pid), 2);
@@ -62,7 +68,7 @@ test('0-5 标签：终局优先于承接态，未互动为未知，DISMISSED/×�
   assert.equal(labelFor(db, 'felix', pid), 5);
   const pid2 = db.prepare(`SELECT project_id FROM recommendations
     WHERE consultant_id='felix' AND project_id != ? ORDER BY rank LIMIT 1`).get(pid).project_id;
-  engage(db, 'felix', pid2, 'DISMISS', { reason: '其他', idempotency_key: 'lbl-5' });
+  put('e-dismiss', 'DISMISSED', 'DISMISSED', pid2);
   assert.equal(labelFor(db, 'felix', pid2), 0);
 });
 

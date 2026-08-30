@@ -21,7 +21,7 @@ export class BrainxApiError extends Error {
 /** 浏览器端唯一 HTTP 边界；错误信封在这里统一转成可分类异常。 */
 export async function brainxFetch<T = unknown>(
   path: string,
-  options: { method?: string; body?: unknown } = {},
+  options: { method?: string; body?: unknown; signal?: AbortSignal } = {},
 ): Promise<T> {
   const method = options.method || "GET";
   const response = await fetch(path, {
@@ -29,6 +29,7 @@ export async function brainxFetch<T = unknown>(
     credentials: "same-origin",
     headers: options.body !== undefined ? { "Content-Type": "application/json" } : undefined,
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    signal: options.signal,
   });
   if (response.status === 204) return null as T;
   let data: T | BrainxErrorPayload | null = null;

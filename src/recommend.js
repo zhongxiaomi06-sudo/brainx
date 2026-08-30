@@ -17,6 +17,7 @@ import { currentState } from './engagement.js';
 import { effectiveJobs } from './facts.js';
 import { dataConfidenceOf, presentationEvidence, recommendationPresentationOf } from './recommendation-presentation.js';
 import { writeImpressions } from './tier.js';
+import { ignoredProjectIds } from './opportunity-ignore.js';
 
 /** 花名册从 DB 读（0003 起 consultants 表为权威，fixtures 只是种子）。 */
 export function loadConsultants(db) {
@@ -29,21 +30,23 @@ export function buildCtx(db, consultant_id, snapshot) {
   const hist = db.prepare(`SELECT DISTINCT j.company || ' ' || j.role AS text
     FROM job_memberships m JOIN job_facts j ON j.project_id = m.project_id
     WHERE m.consultant_id=? AND m.relation IN ('MY_JOB','PRIMARY_PM')`).all(consultant_id);
-  const watched = db.prepare(`SELECT COUNT(*) n FROM current_engagement
-    WHERE consultant_id=? AND state='WATCHED'`).get(consultant_id).n;
   const accepted = db.prepare(`SELECT COUNT(*) n FROM current_engagement
     WHERE consultant_id=? AND state='ACCEPTED'`).get(consultant_id).n;
   const avg = db.prepare(`SELECT AVG(json_extract(value_json,'$.rating')) a FROM job_outcomes
     WHERE consultant_id=? AND json_extract(value_json,'$.rating') IS NOT NULL`).get(consultant_id).a;
   const feedbackProjects = db.prepare(`SELECT project_id FROM recommendation_feedback
     WHERE consultant_id=?`).all(consultant_id).map((row) => row.project_id);
+  feedbackProjects.push(...ignoredProjectIds(db, consultant_id));
   // 反馈闭环（baseline-1.1）：公司级记忆 + 僵尸职位检测信号
   const negCompanies = db.prepare(`SELECT DISTINCT j.company FROM decision_events e
     JOIN job_facts j ON j.project_id=e.project_id
     WHERE e.actor=? AND e.event_type='DISMISSED'
     UNION SELECT DISTINCT j.company FROM recommendation_feedback f
     JOIN job_facts j ON j.project_id=f.project_id
-    WHERE f.consultant_id=?`).all(consultant_id, consultant_id).map((r) => r.company);
+    WHERE f.consultant_id=?
+    UNION SELECT DISTINCT j.company FROM opportunity_ignores i
+    JOIN job_facts j ON j.project_id=i.project_id
+    WHERE i.consultant_id=?`).all(consultant_id, consultant_id, consultant_id).map((r) => r.company);
   const posCompanies = db.prepare(`SELECT DISTINCT j.company FROM decision_events e
     JOIN job_facts j ON j.project_id=e.project_id
     WHERE e.actor=? AND e.event_type='ACCEPTED'`).all(consultant_id).map((r) => r.company);
@@ -61,7 +64,7 @@ export function buildCtx(db, consultant_id, snapshot) {
     // 经 normalizeWeights 校验归一；非法配置静默回落基线（不阻断推荐）。
     weights: normalizeWeights(c.weights ?? null).weights ?? undefined,
     historical_texts: hist.map((h) => h.text),
-    watched_count: watched, accepted_count: accepted,
+    watched_count: 0, accepted_count: accepted,
     outcomes_avg: avg, feedback_projects: feedbackProjects,
     negative_companies: negCompanies, positive_companies: posCompanies,
     rec_rounds: recRounds, engaged_projects: engagedProjects,
@@ -146,10 +149,12 @@ export function recommend(db, consultant_id, {
   const jobs = effectiveJobs(db, consultant_id);
   const relCtx = relationMap(db, consultant_id);
   const ctx = buildCtx(db, consultant_id, snapshot);
+  const ignored = ignoredProjectIds(db, consultant_id);
 
   const evaluated = [];
   let blockedCount = 0;
   for (const job of jobs) {
+    if (ignored.has(job.project_id)) { blockedCount++; continue; }
     const relation = deriveRelation(relCtx, job.project_id);
     const block = hardBlock(job, relation, true);
     if (block) { blockedCount++; continue; }
@@ -229,16 +234,19 @@ export const publicRec = (r) => ({
 
 /** 读最新一轮推荐（工作台默认视图）。raw_json 不出网（原始负载只供库内/回放对照）。
  * 只认 COMPLETED 轮：节流产物的审计行没有冻结推荐，不可当最新轮。 */
-/** 消费侧承接态过滤（与 recommendation-batch.isHidden 同语义）：feedback / ACCEPTED /
- * DISMISSED / 关闭态职位不进 Top3、推送卡与推荐列表——此前已 × 的职位照样当 Top1 推给本人。 */
+/** 消费侧承接态过滤（与 recommendation-batch.isHidden 同语义）：feedback / 忽略 /
+ * ACCEPTED / 关闭态职位不进 Top3、推送卡与推荐列表——此前已 × 的职位照样当 Top1 推给本人。
+ * 2026-08-31 新忽略模型适配：DISMISSED 已折叠为 VIEWED（旧值由 0021 迁移进 opportunity_ignores），
+ * 过滤改查 opportunity_ignores；ACCEPTED 仍按承接态即时排除。 */
 export function hideEngagedItems(db, consultant_id, items) {
   const fb = new Set(db.prepare(`SELECT project_id FROM recommendation_feedback
     WHERE consultant_id=?`).all(consultant_id).map((r) => r.project_id));
+  const ignored = ignoredProjectIds(db, consultant_id);
   return items.filter((it) => {
     const pid = it.job?.project_id;
-    if (!pid || fb.has(pid)) return false;
+    if (!pid || fb.has(pid) || ignored.has(pid)) return false;
     const st = currentState(db, consultant_id, pid).state;
-    if (['ACCEPTED', 'DISMISSED'].includes(st)) return false;
+    if (st === 'ACCEPTED') return false;
     return !['CLOSED', 'COMPLETED', 'COOLING'].includes(it.job?.active_state);
   });
 }

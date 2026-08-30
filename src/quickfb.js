@@ -1,8 +1,8 @@
 /** quickfb.js — 推送卡片一键反馈（2026-08-24 F2）。
  *
  * 背景：卡片按钮历来是纯 URL 深链（打开工作台才能操作），顾问不登录 UI 就
- * 没有任何反馈入口 → 反馈表几乎全空、算法无标签可学。一键链接把「关注 /
- * 不感兴趣」两个最高频动作直接做进卡片按钮，点开即落库。
+ * 没有任何反馈入口 → 反馈表几乎全空、算法无标签可学。一键链接把“忽略”
+ * 直接做进卡片按钮，点开即写入统一职位排除事实。
  *
  * 安全：链接带 HMAC-SHA256 签名（consultant|project|action|day），密钥走
  * env BRAINX_FEEDBACK_SECRET；当日/次日双窗口校验（跨时区点击宽容）。
@@ -10,7 +10,7 @@
  */
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
-export const QUICK_ACTIONS = { watch: '关注', not_interested: '不感兴趣' };
+export const QUICK_ACTIONS = { ignore: '忽略' };
 
 const secret = () => process.env.BRAINX_FEEDBACK_SECRET || '';
 

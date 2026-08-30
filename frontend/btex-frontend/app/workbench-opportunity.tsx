@@ -245,8 +245,8 @@ function OpportunityRow({
           event.stopPropagation();
           onToggleTray(job.id);
         }}
-        aria-label={inTray ? "移出精选盘" : "收藏到精选盘"}
-        title={inTray ? "移出精选盘" : "收藏到精选盘"}
+        aria-label={inTray ? "移出已收藏" : "收藏职位"}
+        title={inTray ? "移出已收藏" : "收藏职位"}
       >
         {inTray ? <Check /> : <Star />}
       </button>

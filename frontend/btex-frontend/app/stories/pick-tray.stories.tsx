@@ -9,7 +9,7 @@ import {
 } from "../workbench-model";
 
 const meta = {
-  title: "业务组件/精选盘",
+  title: "业务组件/已收藏职位",
   parameters: {
     docs: {
       description: {
@@ -75,8 +75,8 @@ export const SelectedJobs: Story = {
   render: () => <PickTrayHarness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const remove = canvas.getAllByRole("button", { name: /从精选盘移除/ })[0];
-    const company = remove.getAttribute("aria-label")?.replace("从精选盘移除 ", "") || "";
+    const remove = canvas.getAllByRole("button", { name: /从已收藏移除/ })[0];
+    const company = remove.getAttribute("aria-label")?.replace("从已收藏移除 ", "") || "";
     await userEvent.click(remove);
     await expect(canvas.queryByText(company)).not.toBeInTheDocument();
     await expect(canvas.getByText("1 已收藏")).toBeInTheDocument();

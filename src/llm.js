@@ -42,6 +42,60 @@ export function isLlmConfigured() {
   return !!(LLM_BASE_URL && LLM_API_KEY && LLM_MODEL);
 }
 
+/** 供应商 tool_calls 的 arguments 统一落成对象：标准是给 JSON 字符串,个别直接给对象;
+ * 解析失败不丢请求,给 __parseError 让工具层回一条错误 tool 消息续跑。 */
+function safeParseArgs(raw) {
+  if (raw == null) return {};
+  if (typeof raw === 'object') return raw;
+  try { return JSON.parse(String(raw)); } catch { return { __parseError: String(raw).slice(0, 500) }; }
+}
+
+/** 非流式 chat completion(agent loop 专用,支持 OpenAI tools 协议)。
+ * 归一化返回 { content, finishReason, toolCalls:[{id,name,arguments}], usage };
+ * 供应商扩展字段(reasoning_content 等)一律不读。错误形状与 chatStream 相同(LLM_HTTP_*),
+ * 路由层 modelStatus 可直接复用。 */
+export async function chatCompletion(messages, { tools, timeout = LLM_TIMEOUT_MS, signal } = {}) {
+  if (!isLlmConfigured()) throw new Error('LLM_NOT_CONFIGURED');
+  const url = LLM_BASE_URL.replace(/\/$/, '') + '/chat/completions';
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeout);
+  if (signal) signal.addEventListener('abort', () => ctrl.abort(), { once: true });
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${LLM_API_KEY}` },
+      body: JSON.stringify({
+        model: LLM_MODEL, messages, temperature: 0.2,
+        ...(tools?.length ? { tools } : {}),
+        ...LLM_EXTRA_BODY,
+      }),
+      signal: ctrl.signal,
+    });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      const error = new Error(`LLM_HTTP_${res.status}`);
+      error.status = res.status;
+      error.detail = detail.slice(0, 200);
+      throw error;
+    }
+    const data = await res.json();
+    const choice = data?.choices?.[0] || {};
+    const msg = choice.message || {};
+    return {
+      content: typeof msg.content === 'string' ? msg.content : '',
+      finishReason: choice.finish_reason || 'stop',
+      toolCalls: (Array.isArray(msg.tool_calls) ? msg.tool_calls : []).map((tc) => ({
+        id: tc?.id || '',
+        name: tc?.function?.name || '',
+        arguments: safeParseArgs(tc?.function?.arguments),
+      })),
+      usage: data.usage || null,
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** 流式文本对话。回调收到 OpenAI-compatible delta 文本；Key 永不离开服务端。 */
 export async function chatStream(messages, { timeout = LLM_TIMEOUT_MS, signal, onText } = {}) {
   if (!isLlmConfigured()) throw new Error('LLM_NOT_CONFIGURED');

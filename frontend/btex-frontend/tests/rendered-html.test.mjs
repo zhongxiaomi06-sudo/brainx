@@ -137,6 +137,10 @@ test("shows source context, row-level scores, detailed layers, reasons and risks
   assert.match(workbench, /DrawerSection title="证据来源"/);
   assert.match(workbench, /brainx:edit-facts/);
   assert.match(workbench, /确认事实后，必须完成重新判断，分数才会更新/);
+  assert.match(workbench, /recommendation\.breakdown/);
+  assert.match(workbench, /评分依据/);
+  assert.match(workbench, /缺失维度不按 0 分处理/);
+  assert.doesNotMatch(workbench, /客户真实招聘意愿/);
 });
 
 test("preserves engagement, result recording, replay, sync and notifications", async () => {

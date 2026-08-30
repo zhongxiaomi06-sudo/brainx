@@ -24,6 +24,16 @@ const completeJob: JobDetailReviewData = {
   notes: "客户重点关注硬件架构与量产经验。",
   recommendation: {
     action: "FOLLOW",
+    score: 86.4,
+    evidenceCoverage: 85,
+    breakdown: [
+      { dim: "direction", label: "职位方向匹配", weight: .25, score: 92, weightedScore: 23 },
+      { dim: "activity", label: "项目活跃度与 Pipeline", weight: .2, score: 88, weightedScore: 17.6 },
+      { dim: "similarity", label: "与历史项目相似度", weight: .15, score: 76, weightedScore: 11.4 },
+      { dim: "capacity", label: "当前跟进容量", weight: .15, score: 80, weightedScore: 12 },
+      { dim: "outcomes", label: "历史行为与交付结果", weight: .15, score: null, weightedScore: null },
+      { dim: "exploration", label: "探索额度", weight: .1, score: 65, weightedScore: 6.5 },
+    ],
     reasons: ["职位仍在招聘，HC 与主做顾问信息完整。", "Pipeline 已进入面试阶段，当前存在明确推进动作。"],
     risks: ["需确认上海办公比例"],
     generatedAt: "2026-08-27T10:25:00+08:00",
@@ -165,7 +175,12 @@ export const TodayDecisionEntry: Story = {
     await expect(canvas.getByRole("button", { name: "职位事实" })).toHaveAttribute("aria-current", "page");
     await expect(canvas.queryByText(/AI 匹配分|最终得分|探索价值|证据覆盖/)).not.toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: "判断" }));
-    await expect(canvas.getByText("当前判断")).toBeInTheDocument();
+    await expect(canvas.getByText("评分依据")).toBeInTheDocument();
+    await expect(canvas.getByText("职位方向匹配")).toBeInTheDocument();
+    await expect(canvas.getByText("92 / 100")).toBeInTheDocument();
+    await expect(canvas.getByText("建议动作")).toBeInTheDocument();
+    await expect(canvas.getByText("本周确认客户面试反馈")).toBeInTheDocument();
+    await expect(canvas.getAllByText("待确认").length).toBeGreaterThan(0);
     await userEvent.click(canvas.getByRole("button", { name: "职位事实" }));
     await userEvent.click(canvas.getByRole("button", { name: "加入我的项目" }));
     await expect(canvas.getByRole("button", { name: "已加入我的项目" })).toBeDisabled();
@@ -181,6 +196,10 @@ export const AllPositionsEntry: Story = {
     await expect(canvas.getByRole("dialog", { name: completeJob.role })).toBeInTheDocument();
     await expect(canvas.getByText("TTC CRM 职位快照")).toBeInTheDocument();
     await expect(canvas.getByText("备注与职位描述")).toBeInTheDocument();
+    await userEvent.click(canvas.getByRole("button", { name: "判断" }));
+    await expect(canvas.getByText("评分依据")).toBeInTheDocument();
+    await expect(canvas.getByText("推荐指数")).toBeInTheDocument();
+    await expect(canvas.queryByText("客户真实招聘意愿")).not.toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: "暂不考虑" }));
     await expect(canvas.queryByRole("dialog")).not.toBeInTheDocument();
     await expect(canvas.getByText("当前列表没有待处理职位")).toBeInTheDocument();
@@ -204,6 +223,18 @@ export const NarrowReview: Story = {
   name: "窄屏居中卡",
   render: () => <EntryHarness mode="today" />,
   parameters: { viewport: { defaultViewport: "mobile1" } },
+};
+
+export const MissingScoreDimension: Story = {
+  name: "真实评分缺失维度",
+  render: () => <JobDetailCard job={completeJob} onClose={close} activeTab="judgement" />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText("历史行为与交付结果")).toBeInTheDocument();
+    await expect(canvas.getAllByText("待确认").length).toBeGreaterThan(0);
+    await expect(canvas.queryByText("0 / 100")).not.toBeInTheDocument();
+    await expect(canvas.getByText("baseline-1.0")).toBeInTheDocument();
+  },
 };
 
 export const DecisionTrailNewestFirst: Story = {

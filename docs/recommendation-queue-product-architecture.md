@@ -174,6 +174,8 @@
 
 精选盘卡片和全部职位行只负责不同的扫描场景，打开后必须复用同一个 `JobDetailCard`、同一字段顺序和同一合法动作集合。
 
+统一详情的“判断”层必须展示当前冻结推荐的总分、证据覆盖、策略版本和六维 breakdown。可以复用历史版本的评分依据布局，但不得复用历史演示分数、建议动作或信号轨道；任一维度缺失时显示“待确认”，不得按 0 分参与展示解释。
+
 ## 10. 推荐排序架构
 
 现阶段不创建新的黑盒 AI 总分。保留已有确定性、可回放的运行框架，把排序重构为“资格过滤 → 决策分层 → 层内排序 → 探索配额”。
@@ -286,6 +288,7 @@
 
 - [前端审核台账](frontend-reviews/README.md)
 - [本轮产品架构审核记录](frontend-reviews/2026-08-28-recommendation-queue-v2.md)
+- [全部职位详情真实评分栏目审核记录](frontend-reviews/2026-08-31-job-detail-real-score.md)
 - [前端交互架构](frontend-interaction-architecture.md)
 - [前端真实数据重构施工清单](frontend-refactor-construction-checklist.md)
 - [内部 Storybook 组件库](storybook-component-library.md)

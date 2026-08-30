@@ -140,10 +140,11 @@ test("shows source context, row-level scores, detailed layers, reasons and risks
 });
 
 test("preserves engagement, result recording, replay, sync and notifications", async () => {
-  const [workbench, demo, loop] = await Promise.all([
+  const [workbench, demo, loop, globalCss] = await Promise.all([
     workbenchSource(),
     source("app/decision-demo.ts"),
     source("app/engagement-loop.tsx"),
+    source("app/globals.css"),
   ]);
 
   assert.match(workbench, /function WorkbenchPanel/);
@@ -159,6 +160,11 @@ test("preserves engagement, result recording, replay, sync and notifications", a
   assert.match(loop, /回写进展/);
   assert.match(loop, /待补录终局结果/);
   assert.match(loop, /progress\/suggestion/);
+  assert.doesNotMatch(loop, /<h2>项目跟进<\/h2>/);
+  assert.match(loop, /commitment-timeline[\s\S]*commitment-idle-actions/);
+  assert.match(workbench, /panel&&!pendingCommand&&<WorkbenchPanel/);
+  assert.match(workbench, /panel\.tab!=="engagement"&&legal\.includes\("DISMISS"\)/);
+  assert.match(globalCss, /command-modal \.filter-select-menu\{[^}]*max-height:[^}]*overflow-y:auto/);
   assert.match(workbench, /function ReplayPanel/);
   assert.match(workbench, /function NotificationPanel/);
   assert.match(workbench, /const runSync=\(\)=>/);

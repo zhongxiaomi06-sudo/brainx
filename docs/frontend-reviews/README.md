@@ -29,7 +29,7 @@
 | `TtcJobsTable` 真实职位表 | 已完成 | 退回修改 | 未接入 | 待确认 | 已验证（本地） | 原正式入口已由现代职位工作区替换；组件保留为历史事实表与 Storybook 参考 |
 | `ClientInsightsReview` 客户事实索引 | 已完成 | 已通过 | 已接入 | 待确认 | 已验证（本地） | 正式应用代码已使用 |
 | `WorkspaceEntry` 真实数据入口三态 | 已完成 | 未单独审核 | 已接入 | 待确认 | 部分验证 | 连接、登录和异常入口已接入，仍归全链路验收 |
-| `JobDetailCard` 居中职位弹窗 | 已完成 | 已通过 | 已接入 | 待确认 | 部分验证 | 今日决策与全部职位共用五页签居中弹窗；备注和详情接口自动验证通过，待目标环境同职位复核 |
+| `JobDetailCard` 居中职位弹窗 | 已完成 | 退回修改 | 已接入 | 待确认 | 部分验证 | 跟进页重复状态卡与暂不考虑弹层已按标注调整，待用户复看正式页面；目标环境仍待同职位复核 |
 | `JobsWorkspaceReview` 现代职位工作区 | 已完成 | 已通过 | 已接入 | 未发布 | 部分验证 | 正式“全部职位”复用嵌入模式和真实 Radar/详情接口；目标环境待验证 |
 | `RecommendationPolicyReview` 推荐策略 | 已完成 | 未审核 | 未接入 | 未发布 | 未验证 | 缺少只读 dry-run 契约 |
 | `DirectionProfileReview` 方向画像与分类 | 已完成 | 未审核 | 未接入 | 未发布 | 未验证 | 缺少结构化保存和人工修订契约 |
@@ -103,6 +103,7 @@
 - [删除批量接单审核记录](2026-08-28-remove-batch-accept.md)
 - [加入我的项目闭环正式接入记录](2026-08-29-add-to-projects-closure.md)
 - [加入项目动作反馈与真实数据复核](2026-08-30-project-action-feedback.md)
+- [跟进操作区与暂不考虑确认层复核](2026-08-30-engagement-action-layout.md)
 - [推荐队列与职位决策产品架构](../recommendation-queue-product-architecture.md)
 - [前端真实数据重构施工清单](../frontend-refactor-construction-checklist.md)
 - [内部 Storybook 组件库](../storybook-component-library.md)

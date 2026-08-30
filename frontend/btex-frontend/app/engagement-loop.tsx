@@ -379,31 +379,6 @@ export function CommitmentLoopPanel({
           </div>
         </section>
       ) : null}
-      {!membershipNeedsConfirmation && !requiresFactVerification && displayState !== "ACCEPTED" && displayState !== "COMPLETED" ? (
-        <section className="commitment-onboarding">
-          <span>{stateLabel[displayState]}</span>
-          <h2>项目跟进</h2>
-          <div className="commitment-command-row">
-            {legal.includes("ACCEPT") && (
-              <button className="primary" onClick={() => setEditor("accept")}>
-                开始跟进
-              </button>
-            )}
-            {legal
-              .filter((a) => ["WATCH", "UNWATCH", "DISMISS"].includes(a))
-              .map((a) => (
-                <button key={a} onClick={() => onCommand(a)}>
-                  {a === "WATCH" ? "加入关注" : a === "UNWATCH" ? "取消关注" : "暂不考虑"}
-                </button>
-              ))}
-            {legal.length === 0 && (
-              <button className="primary" onClick={onVerify}>
-                查看并修正事实
-              </button>
-            )}
-          </div>
-        </section>
-      ) : null}
       {displayState === "ACCEPTED" && (
         <>
           <section className={`current-action-card${overdue ? " overdue" : snapshot.activeAction?.status === "BLOCKED" ? " blocked" : ""}`}>
@@ -495,6 +470,27 @@ export function CommitmentLoopPanel({
           <p className="muted">暂无记录</p>
         )}
       </section>
+      {!membershipNeedsConfirmation && !requiresFactVerification && displayState !== "ACCEPTED" && displayState !== "COMPLETED" ? (
+        <div className="commitment-command-row commitment-idle-actions" aria-label="项目下一步">
+          {legal
+            .filter((a) => ["WATCH", "UNWATCH", "DISMISS"].includes(a))
+            .map((a) => (
+              <button key={a} onClick={() => onCommand(a)}>
+                {a === "WATCH" ? "加入关注" : a === "UNWATCH" ? "取消关注" : "暂不考虑"}
+              </button>
+            ))}
+          {legal.includes("ACCEPT") && (
+            <button className="primary" onClick={() => setEditor("accept")}>
+              开始跟进
+            </button>
+          )}
+          {legal.length === 0 && (
+            <button className="primary" onClick={onVerify}>
+              查看并修正事实
+            </button>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }

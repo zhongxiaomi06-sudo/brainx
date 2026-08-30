@@ -20,6 +20,7 @@ import {
 import { mergeOpportunityDetail, newestEvents, toDecisionJobDetail, toRadarJobDetail } from "../app/job-detail-data.ts";
 import { projectToDecisionJob } from "../app/brainx-projects-api.ts";
 import { mapRecommendationPage } from "../app/brainx-recommendation-pages-api.ts";
+import { openmaiToHtml } from "../app/openmai-markdown.ts";
 
 const sampleRec = {
   decision_id: "d-1",
@@ -409,4 +410,36 @@ test("maps a real project summary without inventing score or HC", () => {
   assert.equal(job.facts["剩余 HC"], "UNKNOWN");
   assert.equal(job.recentSignal, "面试");
   assert.deepEqual(job.brainxLegal, ["WATCH", "ACCEPT", "DISMISS"]);
+});
+
+test("openmaiToHtml：候选人表格渲染为 <table>，机器块与 HTML 注释被剥离（2026-08-31）", () => {
+  // 取真实 result_text 的结构样本（生产 JDWIAC3）：标题 + 表格 + 链接 + 机器 JSON 块 + 注释
+  const sample = [
+    "## 搜索结果",
+    "",
+    "当前共命中 **4 位**候选人。",
+    "",
+    "| # | 姓名 | 核心匹配点 | 查看 |",
+    "|---|---|---|---|",
+    "| 1 | 童文心 | 字节跳动背景 | [查看](https://ttcadvisory.com/app/private-talent/talents/PT2064600175304888320) |",
+    "",
+    "```openmai-table-artifact",
+    '{"type":"openmai-table-artifact","total":4}',
+    "```",
+    "",
+    "<!-- RECOMMENDED_IDS: PT2064600175304888320 -->",
+  ].join("\n");
+  const html = openmaiToHtml(sample);
+  assert.match(html, /<h2>搜索结果<\/h2>/);
+  assert.match(html, /<table>/);
+  assert.match(html, /童文心/);
+  assert.match(html, /<a target="_blank" rel="noopener noreferrer" href="https:\/\/ttcadvisory\.com/);
+  assert.ok(!html.includes("openmai-table-artifact"), "机器 JSON 块不得出现");
+  assert.ok(!html.includes("RECOMMENDED_IDS"), "HTML 注释不得出现");
+  assert.ok(!html.includes("<!--"), "不得残留任何 HTML 注释");
+});
+
+test("openmaiToHtml：空输入与无表格输入不炸", () => {
+  assert.equal(openmaiToHtml(""), "");
+  assert.match(openmaiToHtml("找人中，请稍候"), /找人中/);
 });

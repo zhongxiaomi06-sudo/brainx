@@ -102,10 +102,19 @@ test("maps a backend recommendation into a workbench decision job", () => {
   assert.equal(job.evidenceCoverage, 85);
   assert.equal(job.group, "ACTIVE_ADVANCEMENT");
   assert.equal(job.eligibility, "ELIGIBLE");
-  assert.equal(job.sourceMode, "MARKET_ONLY");
+  assert.equal(job.sourceMode, "MARKET_ONLY"); // 无 source_mode 字段时按职位市场（与后端隔离判定一致）
   assert.equal(job.scoreNotes.length, 2);
   assert.equal(job.evidence.length, 2);
   assert.equal(job.actions[0].kind, "advance");
+});
+
+test("source_mode 透出：COCKPIT_CONTEXT 不再被前端硬编码吞掉（2026-08-30 事故回归）", () => {
+  // 后端自 2026-08-30 起逐 item 透出 source_mode/membership_status，
+  // 前端曾硬编码 MARKET_ONLY，导致驾驶舱职位在「数据来源」筛选下永远不可见。
+  const cockpit = mapRecommendation({ ...sampleRec, source_mode: "COCKPIT_CONTEXT", membership_status: "UNCONFIRMED" });
+  assert.equal(cockpit.sourceMode, "COCKPIT_CONTEXT");
+  const market = mapRecommendation({ ...sampleRec, source_mode: "MARKET_ONLY", membership_status: null });
+  assert.equal(market.sourceMode, "MARKET_ONLY");
 });
 
 test("maps run-bound recommendation page metadata and legal state", () => {

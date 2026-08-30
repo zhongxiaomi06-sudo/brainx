@@ -106,7 +106,7 @@ export type BackendRecommendation = {
   decision_id: string; rank: number; action: string; score: number;
   confidence_band: string; evidence_coverage: number;
   reasons: string[]; risks: string[]; evidence_refs: BackendEvidenceRef[];
-  breakdown?: BackendBreakdown[]; job: BackendJob;
+  breakdown?: BackendBreakdown[]; job: BackendJob; source_mode?: "COCKPIT_CONTEXT" | "MARKET_ONLY"; membership_status?: string | null; // 隔离透出（2026-08-30 起逐 item；唯一权威=cockpit_facts 行存在，公司名相似不升格）
 };
 export type BackendSync = {
   state: string; updated_at?: string | null; rows_read?: number | null;
@@ -331,7 +331,7 @@ export function mapRecommendation(rec: BackendRecommendation): BrainxJob {
     company: job.company || "未知客户",
     role: job.role || "未知职位",
     direction: directionOf(job.role || ""),
-    sourceMode: "MARKET_ONLY", // 后端 job_facts 来自职位市场源（Bitable 盘点 / fixture 导出）
+    sourceMode: rec.source_mode === "COCKPIT_CONTEXT" ? "COCKPIT_CONTEXT" : "MARKET_ONLY", // 后端逐 item 透出（缺省按职位市场，与隔离判定一致：无 cockpit_facts 行即市场）
     group: groupOf(rec.action, job.hc ?? null, job.active_state || ""),
     eligibility: eligibilityOf(rec.action, relation, job.hc ?? null, job.active_state || ""),
     globalScore: breakdownDim(rec.breakdown, "activity"),

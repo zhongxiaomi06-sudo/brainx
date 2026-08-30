@@ -452,3 +452,4 @@ body.btex-document{background:#fff;color:var(--reference-ink)}
 @media (max-width:959px){
   .concept-shell .pick-card-rail{padding:42px 0 0}
 }
+.formal-workbench > .toast{z-index:150}

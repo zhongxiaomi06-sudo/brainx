@@ -98,7 +98,7 @@ export function toClientFact(row: BackendClientRow): ClientFactRow {
   };
 }
 
-function WorkbenchJobsPage({ items, capabilities, company, onAddToProjects }: { items: BackendRadarRow[]; capabilities: RadarFieldCapability[]; company?: string | null; onAddToProjects: (projectId: string) => void }) {
+function WorkbenchJobsPage({ items, capabilities, projects, company, onAddToProjects }: { items: BackendRadarRow[]; capabilities: RadarFieldCapability[]; projects: string[]; company?: string | null; onAddToProjects: (projectId: string) => Promise<void> }) {
   const rows = useMemo(() => items.map(toJobsWorkspaceRow).filter(row => !company || row.company === company), [company, items]);
   const fields = useMemo(() => capabilities.map(toTtcCapability).filter((field): field is TtcFieldCapability => field !== null), [capabilities]);
   const filterCapabilities = useMemo(() => ({
@@ -115,7 +115,7 @@ function WorkbenchJobsPage({ items, capabilities, company, onAddToProjects }: { 
     const sourceUrl = safeSourceUrl(row?.cockpit?.source_url || row?.source_url);
     if (sourceUrl) window.open(sourceUrl, "_blank", "noopener,noreferrer");
   };
-  return <>{company && <div className="ttc-filter-context">正在查看客户“{company}”的职位</div>}<JobsWorkspaceReview rows={rows} embedded dataLabel="真实职位数据 · 来自 TTC 同步快照" tipText="筛选真实职位，打开详情后可加入我的项目" filterCapabilities={filterCapabilities} loadDetail={loadDetail} onFollow={onAddToProjects} onOpenSource={openSource} /></>;
+  return <>{company && <div className="ttc-filter-context">正在查看客户“{company}”的职位</div>}<JobsWorkspaceReview rows={rows} embedded dataLabel="真实职位数据 · 来自 TTC 同步快照" tipText="筛选真实职位，打开详情后可加入我的项目" filterCapabilities={filterCapabilities} joinedProjectIds={projects} loadDetail={loadDetail} onFollow={onAddToProjects} onOpenSource={openSource} /></>;
 }
 
 function WorkbenchClientsPage({ items, onOpenJobs }: { items: BackendClientRow[]; onOpenJobs: (company: string) => void }) {

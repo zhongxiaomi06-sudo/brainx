@@ -100,7 +100,7 @@ export function commitmentDetails(db, consultant_id, project_id) {
   return {
     commitment_goal: latestAcceptedGoal(db, consultant_id, project_id),
     active_action: actions.find((item) => ['OPEN', 'BLOCKED'].includes(item.status)) || null,
-    action_history: actions,
+    action_history: actions.filter((item) => ['DONE', 'CANCELLED'].includes(item.status)),
     suggested_action: state === 'ACCEPTED' ? suggestedAction(db, consultant_id, project_id) : null,
     terminal_result_missing: state === 'COMPLETED' && !terminal,
   };

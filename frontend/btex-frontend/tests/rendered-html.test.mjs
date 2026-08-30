@@ -111,8 +111,10 @@ test("splits candidates by their live engagement state and keeps verification jo
   assert.match(workbench, /className=\{`formal-recommendation-v2\$\{isContext \? " is-context" : ""\}`\}/);
   assert.match(workbench, /title="我的项目"/);
   assert.match(workbench, /getProjects\(\)/);
-  assert.match(workbench, /onAddToProjects=\{job=>\{void addToMyProjects\(job\.id,job\.company\)\}\}/);
-  assert.match(workbench, /if \(action === "ADD"\) \{ onAddToProjects\(job\); return; \}/);
+  assert.match(workbench, /onAddToProjects=\{job=>addToMyProjects\(job\.id,job\.company\)\}/);
+  assert.match(workbench, /if \(action === "ADD"\) return onAddToProjects\(job\);/);
+  assert.match(workbench, /添加中…/);
+  assert.match(workbench, /已加入我的项目/);
   assert.match(workbench, /<RecommendationQueueV2Review items=\{queueItems\}/);
   assert.match(workbench, /"剩余 HC"\s*:\s*"UNKNOWN"/);
 });

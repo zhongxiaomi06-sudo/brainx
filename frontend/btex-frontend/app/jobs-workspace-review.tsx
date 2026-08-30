@@ -58,8 +58,9 @@ type JobsWorkspaceReviewProps = {
   dataLabel?: string;
   tipText?: string;
   filterCapabilities?: { city: boolean; activeState: boolean };
+  joinedProjectIds?: string[];
   onSync?: () => void;
-  onFollow?: (projectId: string) => void;
+  onFollow?: (projectId: string) => Promise<void> | void;
   onDismiss?: (projectId: string) => void;
   onOpenSource?: (projectId: string) => void;
   loadDetail?: (row: JobsWorkspaceReviewRow) => Promise<JobDetailReviewData>;
@@ -107,6 +108,7 @@ export function JobsWorkspaceReview({
   dataLabel = "脱敏审核数据 · 字段结构对齐 TTC 职位快照",
   tipText = "从同步真实职位开始，然后筛选并加入跟进",
   filterCapabilities = { city: true, activeState: true },
+  joinedProjectIds = [],
   onSync,
   onFollow,
   onDismiss,
@@ -148,6 +150,7 @@ export function JobsWorkspaceReview({
   }, [city, query, rows, savedView, sortDescending, status]);
   const visibleRows = filteredRows.slice(0, rowLimit);
   const selected = selectedId ? rows.find((row) => row.projectId === selectedId) || null : null;
+  const joinedProjects = useMemo(() => new Set(joinedProjectIds), [joinedProjectIds]);
   useEffect(() => {
     if (!selected || !loadDetail) return;
     let active = true;
@@ -245,7 +248,7 @@ export function JobsWorkspaceReview({
       </section>
       {selected && (
         <JobDetailCard
-          job={enrichedDetail?.projectId === selected.projectId ? enrichedDetail : {
+          job={{...(enrichedDetail?.projectId === selected.projectId ? enrichedDetail : {
             projectId: selected.projectId,
             role: selected.role,
             company: selected.company,
@@ -266,9 +269,10 @@ export function JobsWorkspaceReview({
             sourceUrl: selected.sourceUrl,
             engagementState: selected.engagementState,
             inMyProjects: ["MY_JOB", "PRIMARY_PM"].includes(selected.relation || "") || selected.workflowState === "FOLLOWING",
-          }}
+          }), inMyProjects: joinedProjects.has(selected.projectId) || (enrichedDetail?.projectId === selected.projectId
+            ? enrichedDetail.inMyProjects : ["MY_JOB", "PRIMARY_PM"].includes(selected.relation || "") || selected.workflowState === "FOLLOWING")}}
           onClose={() => setSelectedId(null)}
-          onAddToProjects={onFollow ? (projectId) => onFollow(projectId) : undefined}
+          onAddToProjects={onFollow && selected.relation !== "OTHER_CONSULTANT" ? (projectId) => onFollow(projectId) : undefined}
           onDismiss={onDismiss ? (projectId) => {
             onDismiss?.(projectId);
             setSelectedId(null);

@@ -12,7 +12,8 @@ function projectStatus(state, action) {
   return 'IN_PROGRESS';
 }
 
-export function listProjects(db, consultant_id) {
+export function listProjects(db, consultant_id, { projectId = null } = {}) {
+  const projectFilter = projectId ? ' AND m.project_id=?' : '';
   const rows = db.prepare(`SELECT
       m.project_id, m.relation, m.source AS membership_source, m.valid_from AS joined_at,
       j.company, j.role, j.city, j.active_state, j.hc, j.pipeline,
@@ -30,7 +31,8 @@ export function listProjects(db, consultant_id) {
       AND a.status IN ('OPEN','BLOCKED')
     WHERE m.consultant_id=? AND m.valid_to IS NULL
       AND m.relation IN ('MY_JOB','TEAM_SHARED')
-    ORDER BY m.valid_from DESC, m.project_id`).all(consultant_id);
+      ${projectFilter}
+    ORDER BY m.valid_from DESC, m.project_id`).all(...(projectId ? [consultant_id, projectId] : [consultant_id]));
 
   return rows.map((row) => {
     const action = row.action_id ? {

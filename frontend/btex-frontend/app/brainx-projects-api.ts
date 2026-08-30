@@ -44,7 +44,7 @@ export type MembershipResponse = {
   relation: "MY_JOB" | "TEAM_SHARED";
   legal_actions: EngagementCommand[];
   project: ProjectSummary | null;
-  recompute?: { blocked?: boolean; reason?: string };
+  recompute?: { blocked?: boolean; deferred?: boolean; reason?: string };
 };
 
 export function getProjects(): Promise<ProjectsResponse> {

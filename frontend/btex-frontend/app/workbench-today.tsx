@@ -24,7 +24,7 @@ type TodayDecisionQueueProps = {
   sync: SyncStatus;
   open: (job: DecisionJob, tab?: "facts" | "judgement" | "engagement" | "trail" | "replay") => void;
   onAction: (job: DecisionJob, action: DecisionAction) => void;
-  onAddToProjects: (job: DecisionJob) => void;
+  onAddToProjects: (job: DecisionJob) => Promise<void>;
   onGoToProject: (projectId: string) => void;
   onFeedback: (job: DecisionJob, reason?: string) => void;
   showVerification?: boolean;
@@ -190,7 +190,7 @@ export function TodayDecisionQueue(props: TodayDecisionQueueProps) {
           onAction={(item, action) => { const job = queueJobs.get(item.projectId); if (!job) return;
             if (action === "DISMISS") { onFeedback(job); return; }
             if (action === "WATCH") { const watch = job.actions.find(candidate => candidate.kind === "watch"); if (watch) onAction(job, watch); else open(job, "engagement"); return; }
-            if (action === "ADD") { onAddToProjects(job); return; }
+            if (action === "ADD") return onAddToProjects(job);
             if (action === "GO_PROJECT") { onGoToProject(job.id); return; }
             open(job, "engagement");
           }} />

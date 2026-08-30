@@ -150,7 +150,7 @@ function RecommendationCard({ item, onOpen, onAction }: {
       <div className="recommendation-v2-actions">
         {item.legalActions.includes("DISMISS") && <button type="button" className="quiet" disabled={!!busy} onClick={() => void perform("DISMISS")}>暂不考虑</button>}
         {item.legalActions.includes("WATCH") && <button type="button" disabled={!!busy} onClick={() => void perform("WATCH")}><Eye />观察</button>}
-        {item.legalActions.includes("ADD") && <button type="button" className="primary" disabled={!!busy} onClick={() => void perform("ADD")}>{busy === "ADD" ? <RefreshCw className="spin" /> : <Check />}加入我的项目</button>}
+        {item.legalActions.includes("ADD") && <button type="button" className="primary" disabled={!!busy} onClick={() => void perform("ADD")}>{busy === "ADD" ? <RefreshCw className="spin" /> : <Check />}{busy === "ADD" ? "添加中…" : "加入我的项目"}</button>}
         {item.legalActions.includes("GO_PROJECT") && <button type="button" className="primary" disabled={!!busy} onClick={() => void perform("GO_PROJECT")}><ArrowRight />去我的项目</button>}
       </div>
     </footer>

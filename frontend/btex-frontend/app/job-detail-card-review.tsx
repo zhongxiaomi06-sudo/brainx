@@ -58,7 +58,7 @@ export type JobDetailReviewData = {
 export type JobDetailCardProps = {
   job: JobDetailReviewData;
   onClose: () => void;
-  onAddToProjects?: (projectId: string) => void;
+  onAddToProjects?: (projectId: string) => Promise<void> | void;
   onDismiss?: (projectId: string) => void;
   onOpenSource?: (projectId: string) => void;
   activeTab?: JobDetailTab;
@@ -133,6 +133,7 @@ export function JobDetailCard({
 }: JobDetailCardProps) {
   const dialogRef = useRef<HTMLElement>(null);
   const [localTab, setLocalTab] = useState<JobDetailTab>(initialTab);
+  const [adding, setAdding] = useState(false);
   const selectedTab = activeTab || localTab;
   const pipeline = pipelineItems(job.pipeline);
   const recommendation = job.recommendation?.reasons.length ? job.recommendation : null;
@@ -148,6 +149,11 @@ export function JobDetailCard({
     if (tab === selectedTab) return;
     if (!activeTab) setLocalTab(tab);
     onTabChange?.(tab);
+  };
+  const addToProjects = async () => {
+    if (!onAddToProjects || adding || job.inMyProjects) return;
+    setAdding(true);
+    try { await onAddToProjects(job.projectId); } finally { setAdding(false); }
   };
 
   useEffect(() => {
@@ -241,7 +247,7 @@ export function JobDetailCard({
 
         {(onDismiss || onAddToProjects) && <footer className={`job-detail-review-actions${onDismiss && onAddToProjects ? "" : " is-single"}`}>
           {onDismiss && <button type="button" className="is-dismiss" onClick={() => onDismiss(job.projectId)}>暂不考虑</button>}
-          {onAddToProjects && <button type="button" className="is-primary" disabled={job.inMyProjects} onClick={() => onAddToProjects(job.projectId)}>{job.inMyProjects ? "已加入我的项目" : "加入我的项目"}</button>}
+          {onAddToProjects && <button type="button" className="is-primary" disabled={job.inMyProjects || adding} onClick={() => void addToProjects()}>{job.inMyProjects ? "已加入我的项目" : adding ? "添加中…" : "加入我的项目"}</button>}
         </footer>}
       </section>
     </div>

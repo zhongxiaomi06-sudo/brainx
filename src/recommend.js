@@ -16,6 +16,7 @@ import { relationMap, deriveRelation } from './relations.js';
 import { currentState } from './engagement.js';
 import { effectiveJobs } from './facts.js';
 import { dataConfidenceOf, presentationEvidence, recommendationPresentationOf } from './recommendation-presentation.js';
+import { writeImpressions } from './tier.js';
 
 /** 花名册从 DB 读（0003 起 consultants 表为权威，fixtures 只是种子）。 */
 export function loadConsultants(db) {
@@ -190,6 +191,8 @@ export function recommend(db, consultant_id, {
                    JSON.stringify(r.risks), JSON.stringify(r.evidence_refs),
                    JSON.stringify(r.breakdown), POLICY_VERSION, r.rank, now());
       }
+      // 曝光埋点（算法文档 §2.4）：展示位置与展示概率随冻结同事务落库
+      writeImpressions(db, { run_id, consultant_id, items: evaluated, top, policy_version: POLICY_VERSION });
       pruneRecommendationHistory(db, consultant_id);
       db.exec('COMMIT');
     } catch (e) { db.exec('ROLLBACK'); throw e; }

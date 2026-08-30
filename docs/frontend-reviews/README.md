@@ -29,7 +29,7 @@
 | `TtcJobsTable` 真实职位表 | 已完成 | 退回修改 | 未接入 | 待确认 | 已验证（本地） | 原正式入口已由现代职位工作区替换；组件保留为历史事实表与 Storybook 参考 |
 | `ClientInsightsReview` 客户事实索引 | 已完成 | 已通过 | 已接入 | 待确认 | 已验证（本地） | 正式应用代码已使用 |
 | `WorkspaceEntry` 真实数据入口三态 | 已完成 | 未单独审核 | 已接入 | 待确认 | 部分验证 | 连接、登录和异常入口已接入，仍归全链路验收 |
-| `JobDetailCard` 居中职位弹窗 | 已完成 | 退回修改 | 已接入 | 待确认 | 部分验证 | 跟进页重复状态卡与暂不考虑弹层已按标注调整，待用户复看正式页面；目标环境仍待同职位复核 |
+| `JobDetailCard` 居中职位弹窗 | 已完成 | 退回修改 | 已接入 | 待确认 | 部分验证 | 跟进页重复状态卡与暂不考虑弹层已按标注调整；决策轨迹已按用户要求强制最新记录在前，待用户复看正式页面；目标环境仍待同职位复核 |
 | `JobsWorkspaceReview` 现代职位工作区 | 已完成 | 部分通过 | 已接入 | 未发布 | 已验证（本地真实库） | 用户退回原搜索与禁用筛选后已完成本地修复：删除 `⌘K`、增加绿色搜索按钮，城市下拉只保留“北京 / 上海 / 杭州”式城市级标准项，并用21330条真实职位验证城市/状态筛选；修复后视觉与目标环境待复看 |
 | `RecommendationPolicyReview` 推荐策略 | 已完成 | 未审核 | 未接入 | 未发布 | 未验证 | 缺少只读 dry-run 契约 |
 | `DirectionProfileReview` 方向画像与分类 | 已完成 | 未审核 | 未接入 | 未发布 | 未验证 | 缺少结构化保存和人工修订契约 |
@@ -106,6 +106,7 @@
 - [跟进操作区与暂不考虑确认层复核](2026-08-30-engagement-action-layout.md)
 - [完整推荐队列搜索修复复核](2026-08-30-recommendation-search.md)
 - [现代职位工作区搜索与筛选修复复核](2026-08-30-jobs-search-filter.md)
+- [决策轨迹时间顺序复核](2026-08-30-decision-trail-order.md)
 - [推荐队列与职位决策产品架构](../recommendation-queue-product-architecture.md)
 - [前端真实数据重构施工清单](../frontend-refactor-construction-checklist.md)
 - [内部 Storybook 组件库](../storybook-component-library.md)

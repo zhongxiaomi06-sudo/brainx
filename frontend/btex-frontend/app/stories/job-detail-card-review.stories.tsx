@@ -50,6 +50,16 @@ const missingJob: JobDetailReviewData = {
   recommendation: null,
 };
 
+const trailJob: JobDetailReviewData = {
+  ...completeJob,
+  events: [
+    { id: "event-old", label: "较早记录", at: "2026-08-27T10:20:00+08:00" },
+    { id: "event-new", label: "最新记录", at: "2026-08-30T17:11:00+08:00" },
+    { id: "event-middle", label: "中间记录", at: "2026-08-29T09:30:00+08:00" },
+    { id: "event-oldest", label: "最早记录", at: "2026-08-26T23:58:00+08:00" },
+  ],
+};
+
 const close = fn();
 const addToProjects = fn();
 const dismiss = fn();
@@ -194,4 +204,15 @@ export const NarrowReview: Story = {
   name: "窄屏居中卡",
   render: () => <EntryHarness mode="today" />,
   parameters: { viewport: { defaultViewport: "mobile1" } },
+};
+
+export const DecisionTrailNewestFirst: Story = {
+  name: "决策轨迹最新在前",
+  render: () => <JobDetailCard job={trailJob} onClose={close} activeTab="trail" />,
+  play: async ({ canvasElement }) => {
+    const labels = [...canvasElement.querySelectorAll(".job-detail-review-events b")]
+      .map((element) => element.textContent);
+    await expect(labels).toEqual(["最新记录", "中间记录", "较早记录"]);
+    await expect(labels).not.toContain("最早记录");
+  },
 };

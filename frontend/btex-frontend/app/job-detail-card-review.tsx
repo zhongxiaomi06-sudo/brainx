@@ -137,7 +137,9 @@ export function JobDetailCard({
   const selectedTab = activeTab || localTab;
   const pipeline = pipelineItems(job.pipeline);
   const recommendation = job.recommendation?.reasons.length ? job.recommendation : null;
-  const recentEvents = (job.events || []).slice(0, 3);
+  const recentEvents = (job.events || []).slice()
+    .sort((a, b) => String(b.at || "").localeCompare(String(a.at || "")))
+    .slice(0, 3);
   const tabs: { id: JobDetailTab; label: string }[] = [
     { id: "facts", label: "职位事实" },
     { id: "judgement", label: "判断" },

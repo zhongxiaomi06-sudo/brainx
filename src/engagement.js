@@ -41,9 +41,38 @@ export function currentState(db, consultant_id, project_id) {
   const row = db.prepare(`SELECT state, state_since FROM current_engagement
     WHERE consultant_id=? AND project_id=?`).get(consultant_id, project_id);
   if (row) return row;
-  const rec = db.prepare(`SELECT 1 FROM decision_events
-    WHERE actor=? AND project_id=? AND event_type='RECOMMENDED' LIMIT 1`).get(consultant_id, project_id);
+  const rec = db.prepare(`SELECT 1 FROM recommendations
+    WHERE consultant_id=? AND project_id=? LIMIT 1`).get(consultant_id, project_id)
+    || db.prepare(`SELECT 1 FROM decision_events
+      WHERE actor=? AND project_id=? AND event_type='RECOMMENDED' LIMIT 1`).get(consultant_id, project_id);
   return { state: rec ? 'RECOMMENDED' : 'NEW', state_since: null };
+}
+
+/**
+ * 批量读取顾问的职位状态。雷达/客户列表必须使用这一入口，避免为每个职位
+ * 分别查询 current_engagement 与 decision_events，导致大职位池把主线程堵死。
+ */
+export function currentStateMap(db, consultant_id) {
+  // current_engagement 是面向单职位读取的兼容视图；对整个职位池查询会触发
+  // 相关子查询。批量路径直接在该顾问事件上做一次窗口归并。
+  const states = new Map(db.prepare(`SELECT project_id, state, state_since FROM (
+    SELECT project_id, next_state AS state, occurred_at AS state_since,
+      ROW_NUMBER() OVER (PARTITION BY project_id ORDER BY occurred_at DESC, id DESC) AS position
+    FROM decision_events
+    WHERE actor=? AND event_type IN
+      ('VIEWED','WATCHED','ACCEPTED','DISMISSED','RELEASED','EXPIRED','COMPLETED')
+  ) WHERE position=1`).all(consultant_id)
+    .map((row) => [row.project_id, { state: row.state, state_since: row.state_since }]));
+  const recommended = db.prepare(`SELECT DISTINCT project_id FROM recommendations
+    WHERE consultant_id=?
+    UNION SELECT DISTINCT project_id FROM decision_events
+    WHERE actor=? AND event_type='RECOMMENDED'`).all(consultant_id, consultant_id);
+  for (const row of recommended) {
+    if (!states.has(row.project_id)) {
+      states.set(row.project_id, { state: 'RECOMMENDED', state_since: null });
+    }
+  }
+  return states;
 }
 
 /** 冷却中的职位（DISMISSED 未超 30 天）。 */
@@ -106,16 +135,13 @@ export function engage(db, consultant_id, project_id, action,
 
 export function legalActions(db, consultant_id, project_id) {
   const { state } = currentState(db, consultant_id, project_id);
-  let acts = Object.entries(TRANSITIONS)
+  return legalActionsForState(state);
+}
+
+/** 已批量取得状态时复用，避免列表逐职位重复查询状态视图。 */
+export function legalActionsForState(state) {
+  return Object.entries(TRANSITIONS)
     .filter(([, t]) => t.from.includes(state)).map(([k]) => k);
-  // 与 engage() 同一判定：冷却期/关注榜满时不 advertise 必失败的 WATCH
-  // （此前前端按此渲染「重新关注」，点击必 409，409 响应里又带 WATCH，死循环引导）。
-  if (acts.includes('WATCH')) {
-    const full = db.prepare(`SELECT COUNT(*) n FROM current_engagement
-      WHERE consultant_id=? AND state='WATCHED'`).get(consultant_id).n >= WATCH_LIMIT;
-    if (full || inCooldown(db, consultant_id, project_id)) acts = acts.filter((a) => a !== 'WATCH');
-  }
-  return acts;
 }
 
 /** 承接摘要（首屏底部）：接单中/关注中/需要处理。 */
@@ -148,10 +174,7 @@ export function commitmentSummary(db, consultant_id) {
   return {
     accepted_count: accepted.length, watched_count: watched.length,
     watched_limit: WATCH_LIMIT, need_action_count: need.length,
-    items: items.sort((a, b) => {
-      if (a.state === b.state) return 0;
-      return a.state > b.state ? -1 : 1; // ACCEPTED>WATCHED>DISMISSED 字典序
-    }),
+    items: items.sort((a, b) => (a.state > b.state ? -1 : 1)),
   };
 }
 

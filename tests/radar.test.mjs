@@ -3,7 +3,10 @@ import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { openDb } from '../src/db.js';
 import { runSync } from '../src/sync.js';
-import { radarRows, clientRows } from '../src/radar.js';
+import { radarRows, radarPayload, clientRows } from '../src/radar.js';
+import { toJobRow } from '../src/ttcsdk/job.js';
+import { createServer } from '../src/server.js';
+import { signSession } from '../src/session.js';
 
 let db;
 before(() => {
@@ -27,6 +30,24 @@ test('雷达：属主看到整个候选池，自己的策展关系被正确标�
   assert.ok(rows.some((r) => r.relation === 'PRIMARY_PM' || r.relation === 'MY_JOB'));
   // 事实字段：HC 为 null 时原样为 null，绝不写成 0
   assert.ok(rows.every((r) => r.hc === null || r.hc >= 0));
+});
+
+test('雷达：职位状态使用批量查询，不随职位数量产生 N+1', () => {
+  const originalPrepare = db.prepare.bind(db);
+  let stateQueries = 0;
+  db.prepare = (sql) => {
+    if (String(sql).includes('FROM decision_events')) {
+      stateQueries += 1;
+    }
+    return originalPrepare(sql);
+  };
+  try {
+    const rows = radarRows(db, 'felix');
+    assert.ok(rows.length > 20);
+    assert.equal(stateQueries, 2);
+  } finally {
+    db.prepare = originalPrepare;
+  }
 });
 
 test('雷达：无策展关系的顾问按团队池默认看到候选池（他人策展标注 OTHER_CONSULTANT）', () => {
@@ -71,5 +92,48 @@ test('客户洞察：按公司聚合候选池职位，只呈现可数事实', ()
   // 排序：活跃职位多者在前
   for (let i = 1; i < rows.length; i++) {
     assert.ok(rows[i - 1].active_jobs >= rows[i].active_jobs || rows[i - 1].job_count >= rows[i].job_count);
+  }
+});
+
+test('雷达 API：返回城市数组、结构化 Pipeline、主做顾问、字段能力与同步报告', async () => {
+  const local = openDb(':memory:');
+  const normalized = toJobRow({
+    unique_id: 'TTC-API-1', name: '平台研发负责人', company_name: '示例客户',
+    cities: ['北京市', '上海市'], head_count: 2, status: 1, update_time: 1787732000000,
+    description: '负责平台研发与代码执行，备注必须完整保留。',
+    pipeline_info: { pipeline_step_count: { Sourcing: 3, Interview: 1 } },
+    managers: [{ name: 'Mia 钟笑咪' }],
+  });
+  runSync(local, { source: 'ttc', consultant_id: 'mia',
+    payload: { as_of: '2026-08-26T00:00:00Z', jobs: [normalized] } });
+  const direct = radarPayload(local, 'mia');
+  assert.deepEqual(direct.items[0].cities, ['北京市', '上海市']);
+  assert.deepEqual(direct.items[0].pipeline_steps, { Sourcing: 3, Interview: 1 });
+  assert.equal(direct.items[0].owner_name, 'Mia 钟笑咪');
+  assert.equal(direct.items[0].notes, '负责平台研发与代码执行，备注必须完整保留。');
+  assert.equal(direct.field_capabilities.find((field) => field.key === 'city').filter_available, true);
+  assert.equal(direct.field_report.total_rows, 1);
+
+  const server = createServer(local);
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const headers = { Cookie: `brainx_session=${encodeURIComponent(signSession('mia'))}` };
+  try {
+    const response = await fetch(`${base}/api/v1/radar`, { headers });
+    const payload = await response.json();
+    assert.equal(response.status, 200);
+    assert.deepEqual(payload.items[0].cities, ['北京市', '上海市']);
+    assert.equal(payload.items[0].pipeline_steps.Sourcing, 3);
+    assert.equal(payload.items[0].owner_name, 'Mia 钟笑咪');
+    assert.equal(payload.items[0].notes, '负责平台研发与代码执行，备注必须完整保留。');
+    assert.equal(payload.field_capabilities.length, 8);
+    assert.equal(payload.field_report.sync_id, direct.field_report.sync_id);
+
+    const reportResponse = await fetch(`${base}/api/v1/ttc/field-report`, { headers });
+    const reportPayload = await reportResponse.json();
+    assert.equal(reportResponse.status, 200);
+    assert.equal(reportPayload.report.total_rows, 1);
+  } finally {
+    server.close();
   }
 });

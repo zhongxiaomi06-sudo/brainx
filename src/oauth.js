@@ -15,7 +15,10 @@ import { sessionSecret } from './session.js';
 // cli_aac5c592feb89cd0 仅本地开发兼容，用 BRAINX_FEISHU_APP_ID 显式覆盖）
 export const FEISHU_APP_ID = process.env.BRAINX_FEISHU_APP_ID || 'cli_aaf72a911bb9dd21';
 const APP_SECRET = () => process.env.BRAINX_FEISHU_APP_SECRET || '';
-const BASE = () => process.env.BRAINX_BASE_URL || 'http://127.0.0.1:3000';
+// 未显式配置 BASE_URL 时跟随实际对外端口，避免开发机改了 BRAINX_PORT 后
+// 飞书仍回跳 3000。授权、回调、Cookie 与页面必须始终处于同一个 origin。
+const BASE = () => process.env.BRAINX_BASE_URL
+  || `http://127.0.0.1:${process.env.BRAINX_PORT || 3000}`;
 
 // 网页授权只申请租户白名单内的最小集（2026-08-10 实证：--recommend 全量包被管理员
 // 驳回，这 9 项在 Mia 2026-07-09 授权里已存在=必然白名单内）。不传 scope 会默认申请

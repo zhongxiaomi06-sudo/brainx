@@ -90,6 +90,18 @@ test('集成：突发流量实测——400 次快照请求触发告警', async (
   }
   await Promise.all(jobs);
   const snap = await (await fetch(`${base}/api/v1/meta/guard`)).json();
-  const out = detect(snap, warmOut.baseline, { maxRpm: 300, maxRouteRpm: 200, spikeMult: 2 });
-  assert.equal(out.alerted, true, `应触发告警，alerts=${JSON.stringify(out.alerts)}`);
+  const bucketResults = snap.history.map((bucket) => detect({
+    window_s: snap.window_s,
+    per_minute: {
+      total: bucket.req,
+      bytes_in: bucket.bytes_in,
+      bytes_out: bucket.bytes_out,
+      by_route: bucket.by_route,
+    },
+  }, warmOut.baseline, { maxRpm: 300, maxRouteRpm: 200, spikeMult: 2 }));
+  assert.equal(
+    bucketResults.some((out) => out.alerted),
+    true,
+    `应触发告警，alerts=${JSON.stringify(bucketResults.flatMap((out) => out.alerts))}`,
+  );
 });

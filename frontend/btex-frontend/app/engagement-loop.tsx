@@ -103,7 +103,9 @@ export function CommitmentLoopPanel({
   const load = useCallback(async () => {
     if (mode === "connected") {
       const detail = await fetchJobDetail(job.id);
-      setDisplayState(detail.engagementState); setSnapshot(detail.commitment); return;
+      setDisplayState(detail.engagementState);
+      setSnapshot(detail.commitment);
+      return;
     }
     if (mode === "offline" && typeof window !== "undefined") {
       try {
@@ -125,9 +127,7 @@ export function CommitmentLoopPanel({
     }
   }, [job, mode, outcomes, state, storageKey]);
   useEffect(() => {
-    let alive = true; // 切换职位时丢弃后到的旧响应
-    queueMicrotask(() => { void load().catch(() => { if (alive) setSnapshot(emptySnapshot(job, state, outcomes)); }); });
-    return () => { alive = false; };
+    queueMicrotask(() => { void load().catch(() => setSnapshot(emptySnapshot(job, state, outcomes))); });
   }, [job, load, outcomes, state]);
   useEffect(() => {
     if (mode !== "offline" || typeof window === "undefined") return;
@@ -185,13 +185,13 @@ export function CommitmentLoopPanel({
           method: "POST",
           body: { action: "ACCEPT", goal: goal.trim(), action_title: actionTitle.trim(), due_at: toIso(dueAt), idempotency_key: makeIdempotencyKey(`accept:${job.id}`) },
         });
-        await refresh("已接单，第一条行动已建立");
+        await refresh("已开始跟进，第一条行动已建立");
         return;
       }
       const action: CommitmentAction = { actionId: `local-${Date.now()}`, title: actionTitle.trim(), dueAt: toIso(dueAt), status: "OPEN", source: "MANUAL", createdAt: new Date().toISOString() };
       setSnapshot({ goal: goal.trim(), activeAction: action, actionHistory: [], suggestedAction: null, terminalResultMissing: false, terminalResult: null });
       dispatchLocal("ACCEPTED");
-      notify("已接单");
+      notify("已开始跟进");
       setEditor(null);
     });
   const buildSuggestion = () =>
@@ -279,7 +279,7 @@ export function CommitmentLoopPanel({
             idempotency_key: makeIdempotencyKey(`terminal:${job.id}`),
           },
         });
-        await refresh(snapshot.terminalResultMissing ? "终局结果已补录" : "承接已完成，结果已归档");
+        await refresh(snapshot.terminalResultMissing ? "终局结果已补录" : "本轮跟进已完成，结果已归档");
         return;
       }
       const at = new Date().toISOString();
@@ -307,14 +307,14 @@ export function CommitmentLoopPanel({
           method: "POST",
           body: { action: "RELEASE", reason: releaseReason, summary: summary.trim(), idempotency_key: makeIdempotencyKey(`release:${job.id}`) },
         });
-        await refresh("承接已释放，当前行动已取消");
+        await refresh("跟进已结束，当前行动已取消");
         return;
       }
       const current = snapshot.activeAction;
       const cancelled = current ? { ...current, status: "CANCELLED" as const, completedAt: new Date().toISOString(), completionNote: `${releaseReason}：${summary.trim()}` } : null;
       setSnapshot((s) => ({ ...s, activeAction: null, actionHistory: cancelled ? [cancelled, ...s.actionHistory] : s.actionHistory }));
       dispatchLocal("RELEASED");
-      notify("承接已释放");
+      notify("跟进已结束");
       setEditor(null);
     });
   const deadlineButtons = (set: (value: string) => void) => (
@@ -379,31 +379,6 @@ export function CommitmentLoopPanel({
           </div>
         </section>
       ) : null}
-      {!membershipNeedsConfirmation && !requiresFactVerification && displayState !== "ACCEPTED" && displayState !== "COMPLETED" ? (
-        <section className="commitment-onboarding">
-          <span>{stateLabel[displayState]}</span>
-          <h2>承接设置</h2>
-          <div className="commitment-command-row">
-            {legal.includes("ACCEPT") && (
-              <button className="primary" onClick={() => setEditor("accept")}>
-                接单并设定行动
-              </button>
-            )}
-            {legal
-              .filter((a) => ["WATCH", "UNWATCH", "DISMISS"].includes(a))
-              .map((a) => (
-                <button key={a} onClick={() => onCommand(a)}>
-                  {a === "WATCH" ? "加入关注" : a === "UNWATCH" ? "取消关注" : "暂不考虑"}
-                </button>
-              ))}
-            {legal.length === 0 && (
-              <button className="primary" onClick={onVerify}>
-                查看并修正事实
-              </button>
-            )}
-          </div>
-        </section>
-      ) : null}
       {displayState === "ACCEPTED" && (
         <>
           <section className={`current-action-card${overdue ? " overdue" : snapshot.activeAction?.status === "BLOCKED" ? " blocked" : ""}`}>
@@ -422,7 +397,7 @@ export function CommitmentLoopPanel({
               <button
                 className="primary"
                 onClick={() => {
-                  setGoal(snapshot.goal || "继续当前承接");
+                  setGoal(snapshot.goal || "继续当前项目跟进");
                   setEditor("accept");
                 }}
               >
@@ -451,7 +426,7 @@ export function CommitmentLoopPanel({
               </button>
               <button onClick={() => setEditor("terminal")}>终局结果</button>
               <button className="quiet" onClick={() => setEditor("release")}>
-                释放承接
+                结束跟进
               </button>
             </div>
           )}
@@ -495,6 +470,27 @@ export function CommitmentLoopPanel({
           <p className="muted">暂无记录</p>
         )}
       </section>
+      {!membershipNeedsConfirmation && !requiresFactVerification && displayState !== "ACCEPTED" && displayState !== "COMPLETED" ? (
+        <div className="commitment-command-row commitment-idle-actions" aria-label="项目下一步">
+          {legal
+            .filter((a) => ["WATCH", "UNWATCH", "DISMISS"].includes(a))
+            .map((a) => (
+              <button key={a} onClick={() => onCommand(a)}>
+                {a === "WATCH" ? "加入关注" : a === "UNWATCH" ? "取消关注" : "暂不考虑"}
+              </button>
+            ))}
+          {legal.includes("ACCEPT") && (
+            <button className="primary" onClick={() => setEditor("accept")}>
+              开始跟进
+            </button>
+          )}
+          {legal.length === 0 && (
+            <button className="primary" onClick={onVerify}>
+              查看并修正事实
+            </button>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }

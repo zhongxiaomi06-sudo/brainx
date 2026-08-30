@@ -20,8 +20,7 @@ import { createServer } from '../src/server.js';
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i > -1 && process.argv[i + 1] ? process.argv[i + 1] : d; };
 const has = (k) => process.argv.includes(`--${k}`);
 const base = arg('url', 'http://127.0.0.1:3000');
-let interval = Number(arg('interval', '30'));
-if (!Number.isFinite(interval) || interval < 1) { console.error('[guard] --interval 非法，回退 30s'); interval = 30; } // NaN→setInterval 1ms 会洪峰自家 API
+const interval = Number(arg('interval', '30'));
 const webhook = arg('webhook', process.env.BRAINX_GUARD_WEBHOOK || '');
 const opts = {
   maxRpm: Number(arg('max-rpm', '600')),

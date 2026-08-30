@@ -4,7 +4,7 @@ import type { ManualFactField } from "./brainx-api";
 import type { AuthStatus, DecisionEvent, EngagementCommand, EngagementState, Notification, Outcome, SyncStatus } from "./decision-demo";
 export { cockpitRadarJobs, demoRadarJobs, jobs } from "./workbench-radar-data";
 
-export type Page = "today" | "jobs" | "clients" | "alerts" | "rules" | "sources" | "accepted";
+export type Page = "today" | "jobs" | "clients" | "alerts" | "rules" | "sources" | "accepted" | "settings";
 export type Status = "待同步" | "新发布" | "升温" | "活跃" | "拥挤" | "降温" | "疑似失活" | "已关闭";
 export type PositionType = "技术" | "产品" | "运营" | "算法" | "设计" | "商业化";
 export type JobSource = "市场信号" | "驾驶舱导入";
@@ -59,7 +59,7 @@ export type DecisionJob = {
   brainxLegal?: EngagementCommand[];
   brainxDecisionId?: string;
 };
-export type Panel = { kind: "job"; jobId: string; tab: "judgement" | "engagement" | "trail" | "replay" } | { kind: "sync" } | { kind: "identity" } | { kind: "notifications" } | { kind: "commitments" } | null;
+export type Panel = { kind: "job"; jobId: string; tab: "facts" | "judgement" | "engagement" | "trail" | "replay" } | { kind: "sync" } | { kind: "identity" } | { kind: "notifications" } | { kind: "commitments" } | null;
 export type DirectSegmentOption<T extends string> = { value: T; label: React.ReactNode; ariaLabel?: string };
 
 export const decisionGroupMeta: Record<DecisionGroup, { title: string; subtitle: string }> = {
@@ -129,7 +129,7 @@ export const decisionSeeds: DecisionSeed[] = [
     final: 80,
     group: "NEW_VALIDATION",
     reasons: ["市场职位处于面试阶段，且仍有明确 HC。", "探索价值高，但尚未匹配到驾驶舱 project_id。"],
-    risks: ["项目负责人和当前 HC 需要在承接前再次确认。"],
+    risks: ["项目负责人和当前 HC 需要在开始跟进前再次确认。"],
     nextAction: "确认负责人和 HC，再做 72 小时低成本验证",
     evidence: ["职位市场快照", "市场 Pipeline", "HC 字段"],
   },
@@ -192,8 +192,8 @@ export const decisionSeeds: DecisionSeed[] = [
     final: 83,
     group: "NEW_VALIDATION",
     reasons: ["市场 Pipeline 活跃，面试与推荐样本充分。", "方向吻合，但顾问尚未加入项目。"],
-    risks: ["未加入项目，不能直接出现接单动作。"],
-    nextAction: "确认项目归属与可承接状态，再决定是否加入",
+    risks: ["未加入项目，不能直接开始跟进。"],
+    nextAction: "确认项目归属与跟进条件，再决定是否加入",
     evidence: ["职位市场快照", "市场 Pipeline", "项目关系字段"],
   },
   {
@@ -234,7 +234,7 @@ export const decisionSeeds: DecisionSeed[] = [
     final: 86,
     group: "NEW_VALIDATION",
     reasons: ["存在 5 个剩余 HC，机会空间明确。", "已有 9 名面试样本，项目需求处于活跃状态。"],
-    risks: ["尚未加入项目，需确认项目负责人和承接规则。"],
+    risks: ["尚未加入项目，需确认项目负责人和跟进规则。"],
     nextAction: "确认负责人和 HC，再做 72 小时低成本验证",
     evidence: ["职位市场快照", "市场 Pipeline", "HC 字段"],
   },
@@ -297,8 +297,8 @@ export const decisionSeeds: DecisionSeed[] = [
     final: 70,
     group: "MAINTENANCE",
     reasons: ["职位仍保留 2 个 HC，但近期反馈不足。", "需要先确认需求是否仍然有效。"],
-    risks: ["连续反馈间隔较长，不能直接投入承接资源。"],
-    nextAction: "先确认需求有效性与负责人，再决定是否接单",
+    risks: ["连续反馈间隔较长，不能直接投入跟进资源。"],
+    nextAction: "先确认需求有效性与负责人，再决定是否开始跟进",
     evidence: ["职位市场快照", "HC 字段", "反馈记录"],
   },
 ];
@@ -332,7 +332,7 @@ export const decisionJobs: DecisionJob[] = decisionSeeds.map((seed) => ({
   evidence: seed.evidence,
   actions:
     seed.relation === "未加入"
-      ? [{ id: "verify", label: "确认项目归属", kind: "verify", detail: "先确认负责人和承接状态" }]
+      ? [{ id: "verify", label: "确认项目归属", kind: "verify", detail: "先确认负责人和跟进条件" }]
       : [
           { id: "advance", label: "进入项目推进", kind: "advance", detail: seed.nextAction },
           { id: "watch", label: "加入观察", kind: "watch", detail: "保留本周提醒" },
@@ -396,12 +396,12 @@ export const events = [
 ];
 export const statusOrder: Exclude<Status, "待同步">[] = ["新发布", "升温", "活跃", "拥挤", "降温", "疑似失活", "已关闭"];
 export const nav = [
-  ["today", "工作台", Sparkles],
-  ["jobs", "职位市场", BriefcaseBusiness],
-  ["clients", "人才库", Users],
-  ["accepted", "项目管理", ClipboardCheck],
-  ["sources", "数据源", Database],
-  ["rules", "设置中心", Settings2],
+  ["today", "今日决策", Sparkles],
+  ["jobs", "全部职位", BriefcaseBusiness],
+  ["accepted", "我的项目", ClipboardCheck],
+  ["clients", "客户洞察", Users],
+  ["sources", "连接与数据", Database],
+  ["rules", "策略设置", Settings2],
 ] as const;
 export const sourceNames = ["内部项目驾驶舱", "职位库", "客户管理记录", "飞书文档", "飞书消息", "邮件反馈", "历史交付记录"];
 export type PickFolder = { id: string; name: string; jobIds: string[] };
@@ -417,7 +417,6 @@ export type SavedWorkbenchState = Partial<{
   extraTasks: string[];
   weights: number[];
   decisionActions: string[];
-  dismissedRecommendationIds: string[];
   membershipRelations: Record<string, MembershipRelation>;
   tray: string[];
   folders: PickFolder[];
@@ -432,21 +431,7 @@ export type SavedWorkbenchState = Partial<{
 export function readSavedWorkbenchState(): SavedWorkbenchState {
   if (typeof document === "undefined") return {};
   try {
-    const raw = JSON.parse(localStorage.getItem("decision-workbench") || "{}");
-    // 合法 JSON 但字段类型错误（tray:5、folders:"abc"…）会让渲染期 map 崩溃——
-    // 逐字段校验形状，脏字段丢弃回默认值，而不是整页进错误边界。
-    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
-    const clean = {} as Record<string, unknown>;
-    const arr = (v: unknown) => (Array.isArray(v) ? v : undefined);
-    const obj = (v: unknown) => (v && typeof v === "object" && !Array.isArray(v) ? v : undefined);
-    const pick = (key: string, check: (v: unknown) => unknown) => {
-      const v = check(raw[key]); if (v !== undefined) clean[key] = v;
-    };
-    ["done", "snoozed", "extraTasks", "weights", "decisionActions", "tray", "folders",
-      "notifications", "dismissedRecommendationIds"].forEach((k) => pick(k, arr));
-    ["engagement", "events", "outcomes", "sync", "auth", "membershipRelations"].forEach((k) => pick(k, obj));
-    if (typeof raw.folderMode === "boolean") clean.folderMode = raw.folderMode;
-    return clean as SavedWorkbenchState;
+    return JSON.parse(localStorage.getItem("decision-workbench") || "{}");
   } catch {
     return {};
   }
@@ -454,9 +439,9 @@ export function readSavedWorkbenchState(): SavedWorkbenchState {
 export const initialEngagement: Record<string, EngagementState> = { JU87P01: "ACCEPTED", JNDLIXO: "ACCEPTED", JVS2PHH: "ACCEPTED", JPG4HAS: "VIEWED" };
 export const INITIAL_TRAY_IDS = Object.keys(initialEngagement).filter((id) => initialEngagement[id] === "ACCEPTED");
 export const initialEvents: Record<string, DecisionEvent[]> = {
-  JU87P01: [{ id: "evt-1", type: "已接单", at: "08-11 11:31" }],
-  JNDLIXO: [{ id: "evt-3", type: "已接单", at: "08-11 13:42" }],
-  JVS2PHH: [{ id: "evt-2", type: "已接单", at: "08-11 16:20" }],
+  JU87P01: [{ id: "evt-1", type: "已开始跟进", at: "08-11 11:31" }],
+  JNDLIXO: [{ id: "evt-3", type: "已开始跟进", at: "08-11 13:42" }],
+  JVS2PHH: [{ id: "evt-2", type: "已开始跟进", at: "08-11 16:20" }],
 };
 export const initialOutcomes: Record<string, Outcome[]> = {
   JU87P01: [{ id: "out-39ai-1", stage: "推荐采纳", rating: 5, note: "已确认本轮由本人推进，等待客户回信。", at: "08-11 11:32" }],
@@ -475,17 +460,17 @@ export function legalActions(job: DecisionJob, state: EngagementState): Engageme
 export type EngagementPrerequisite = { title: string; detail: string; action?: DecisionAction };
 export function engagementPrerequisite(job: DecisionJob, state: EngagementState): EngagementPrerequisite {
   const verify = job.actions.find((action) => action.kind === "verify");
-  if (job.facts["职位关系"] === "未加入") return { title: "先确认项目归属", detail: "该职位尚未加入当前项目；完成核验前，关注与接单操作会保持关闭。", action: verify };
-  if (job.eligibility === "VERIFY_REQUIRED") return { title: "先补齐关键事实", detail: "Offer、入职或剩余 HC 尚未确认，不能直接进入承接流程。", action: verify };
-  if (job.eligibility === "BLOCKED") return { title: "当前承接受阻", detail: "前置条件未满足，暂时没有可执行的承接操作。" };
-  if (job.eligibility === "EXCLUDED") return { title: "当前不进入承接", detail: "该职位已被排除，不会提供关注或接单操作。" };
+  if (job.facts["职位关系"] === "未加入") return { title: "先确认项目归属", detail: "该职位尚未加入当前项目；完成核验前，关注与开始跟进操作会保持关闭。", action: verify };
+  if (job.eligibility === "VERIFY_REQUIRED") return { title: "先补齐关键事实", detail: "Offer、入职或剩余 HC 尚未确认，不能直接进入跟进流程。", action: verify };
+  if (job.eligibility === "BLOCKED") return { title: "当前跟进受阻", detail: "前置条件未满足，暂时没有可执行的跟进操作。" };
+  if (job.eligibility === "EXCLUDED") return { title: "当前不进入跟进", detail: "该职位已被排除，不会提供关注或开始跟进操作。" };
   if (state === "DISMISSED") return { title: "已暂不考虑", detail: "已记录原因；如有新信号，可重新关注后再评估。" };
-  if (state === "RELEASED") return { title: "已释放", detail: "该职位已从当前工作区释放；可重新关注后再接单。" };
-  if (state === "COMPLETED") return { title: "已完成", detail: "该职位的本轮承接已经结束，结果已归档。" };
+  if (state === "RELEASED") return { title: "已释放", detail: "该职位已从当前工作区释放；可重新关注后再开始跟进。" };
+  if (state === "COMPLETED") return { title: "已完成", detail: "该职位的本轮跟进已经结束，结果已归档。" };
   return { title: "当前没有可执行操作", detail: "等待后端返回下一步允许动作。" };
 }
 export function stateEvent(command: EngagementCommand) {
-  return { WATCH: "已关注", UNWATCH: "已取消关注", ACCEPT: "已接单", DISMISS: "暂不考虑", RELEASE: "已释放", COMPLETE: "已完成" }[command];
+  return { WATCH: "已关注", UNWATCH: "已取消关注", ACCEPT: "已开始跟进", DISMISS: "暂不考虑", RELEASE: "已释放", COMPLETE: "已完成" }[command];
 }
 export function nextState(command: EngagementCommand): EngagementState {
   return ({ WATCH: "WATCHED", UNWATCH: "VIEWED", ACCEPT: "ACCEPTED", DISMISS: "DISMISSED", RELEASE: "RELEASED", COMPLETE: "COMPLETED" } as const)[command];

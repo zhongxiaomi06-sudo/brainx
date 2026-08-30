@@ -23,6 +23,7 @@ import { now, uuid } from './db.js';
 import { BITABLE_BASE, BITABLE_TABLE, flatLark, parseBitableRecord } from './bitable.js';
 import { splitFixtureJob } from './fixture_split.js';
 import { larkProfileArgs } from './env.js';
+import { buildTtcFieldReport, recordTtcFieldReport } from './ttc-field-report.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -42,8 +43,7 @@ export function fetchFeishuJobs() {
     ...larkProfileArgs(),
     'base', '+record-list', '--base-token', BITABLE_BASE,
     '--table-id', BITABLE_TABLE, '--page-size', '100', '--format', 'json',
-  ], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024,
-        timeout: 60000, killSignal: 'SIGKILL' }); // lark-cli 实测会无限 hang——手动同步入口也要有上限
+  ], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
   const d = JSON.parse(out.slice(out.indexOf('{'))).data;
   return {
     as_of: now(),
@@ -100,13 +100,20 @@ export function runSync(db, { source = 'fixture', consultant_id = 'felix', dry_r
              complete: !!complete, errors, warnings, input_hash, would_upsert: valid.length };
   }
 
+  const completed_at = now();
+  const fieldReport = source === 'ttc' ? buildTtcFieldReport(valid, {
+    sync_id, consultant_id, rows_expected: jobs.length, rows_read: valid.length,
+    complete: !!complete, errors, warnings, created_at: completed_at,
+  }) : null;
+
   db.exec('BEGIN');
   try {
     db.prepare(`INSERT INTO sync_runs
       (sync_id, consultant_id, source, as_of, rows_expected, rows_read, complete, errors, input_hash, started_at, completed_at)
       VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
       .run(sync_id, consultant_id, source, as_of, jobs.length, valid.length, complete,
-           JSON.stringify(errors), input_hash, t0, now());
+           JSON.stringify(errors), input_hash, t0, completed_at);
+    if (fieldReport) recordTtcFieldReport(db, fieldReport);
 
     // captured_at 语义 = 「事实最后变化时间」，不是「最后同步时间」：
     // 十二个事实字段任一变化（IS NOT = null 安全不等）才前进，否则保留原值。
@@ -182,7 +189,7 @@ export function runSync(db, { source = 'fixture', consultant_id = 'felix', dry_r
   }
   return { sync_id, consultant_id, source, as_of, rows_expected: jobs.length,
            rows_read: valid.length, complete: !!complete, errors, warnings, input_hash,
-           started_at: t0, completed_at: now() };
+           field_report: fieldReport, started_at: t0, completed_at };
 }
 
 /** 最近一条 complete=1 的快照（推荐只允许用它）。 */

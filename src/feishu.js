@@ -141,9 +141,7 @@ export async function listUserChats(token, fetchImpl = fetch) {
 const pad = (n) => String(n).padStart(2, '0');
 /** 飞书 create_time（毫秒字符串）→ 'YYYY-MM-DD HH:mm'（Asia/Shanghai，与 lark-cli 输出同形）。 */
 export const msToLocal = (ms) => {
-  const t = Number(ms);
-  if (!Number.isFinite(t) || t <= 0) return ''; // 脏 create_time 不产 'NaN-NaN...' 污染串
-  const d = new Date(t + 8 * 3600 * 1000); // 服务器时区不保证 +08:00，手动偏
+  const d = new Date(Number(ms) + 8 * 3600 * 1000); // 服务器时区不保证 +08:00，手动偏
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
 };
 /** 游标 'YYYY-MM-DD HH:mm'（+08:00 语义）→ epoch 秒（API start_time 参数）。 */

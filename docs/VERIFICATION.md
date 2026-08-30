@@ -95,7 +95,7 @@ cd ~/Downloads/brainx
 node scripts/build_fixture.mjs          # 重建 fixture（可选）
 node bin/brainx-sync.mjs                # 同步入库（60 行）
 node bin/brainx-recommend.mjs           # 生成推荐 run
-BRAINX_PORT=3100 BRAINX_BASE_URL=http://127.0.0.1:3100 node src/server.js
+BRAINX_PORT=3000 BRAINX_BASE_URL=http://127.0.0.1:3000 node src/server.js
 # 浏览器打开 http://127.0.0.1:3100 → 飞书授权登录
 
 # 常驻（推荐）：登录自启 + 崩溃拉起 + 桥接器定时跑

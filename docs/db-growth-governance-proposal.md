@@ -1,6 +1,6 @@
 # 提案：推荐冻结治理 —— DB 增长刹车与 Retention（2026-08-24）
 
-> 状态：**B（retention 清空）已于 2026-08-24 在云端执行完毕**（166万→11万行，3.4G→267M）；**A（生成节流）已实现**（`recommend({throttle:true})`，259 测试全绿，待部署）；C（磁盘水位告警）待做。关联：云端排查结论（cloud-recovery-checklist.md）。
+> 状态：2026-08-30 已补上第二道根因修复：自动推荐两小时硬间隔、推荐快照不再复制到决策轨迹、节流轮不再触发更新广播；本地 339,662 条机器事件已清理。目标环境仍待发布、备份和清理，C（磁盘水位告警）待做。详见[高频自动推荐审计](audits/2026-08-30-recommendation-event-growth.md)。
 
 ## 1. 问题：库在以每天 ~0.6GB 膨胀，7 天后磁盘再次写满
 
@@ -40,17 +40,16 @@ bridge 每 180s 对 7 位顾问无条件调 `recommend()`（`src/server.js:775`�
 
 ### A. 生成侧节流（治本，预期削减 ~90% 增量）
 `recommend()` 增加跳过条件（bridge 调用路径生效，手动 run 不受影响）：
-- 快照 `input_hash` 与上一轮相同 **且** 距上轮 < 2 小时 → 跳过冻结，直接返回上轮 run_id；
-- input_hash 变化（真有新数据）→ 正常冻结；
-- 无变化但超 2 小时 → 冻结一轮作为时间基线。
+- 距上一正式轮 < 2 小时 → 无论分页是否使 `input_hash` 变化，都跳过冻结并返回上轮 run_id；
+- 超过 2 小时 → 冻结一轮作为新基线；
 
-改动点：`src/recommend.js` recommend() 入口 + bridge 调用处；跳过事件记 decision_runs（status='SKIPPED_UNCHANGED'）保证可审计。
+改动点：`src/recommend.js` recommend() 入口 + bridge 调用处；跳过事件记 `decision_runs`（`status='SKIPPED_THROTTLED'`）保证可审计。
 
 ### B. 存储侧 retention（清存量，一次性 + 周度例行）
 新脚本 `bin/brainx-retention.mjs`（幂等、--dry-run 默认开）：
 - 保留：rank≤20 全部行 + 信号关联行 + 每顾问每日 created_at 最早一轮全量 + 最近 5 轮全量；
 - 删除：其余 recommendations 行及其孤儿 decision_runs（status='COMPLETED' 且 run 内行被删光）；
-- decision_events 中 event_type='RECOMMENDED' 的行同规则 retention（它们与 recommendations 同构膨胀）；
+- `decision_events` 不再承载推荐快照；迁移清除全部 `RECOMMENDED`，人工轨迹不受影响；
 - 存量预计：166万 → ~15万行（Top20 12,322 + 信号关联 + 基线轮），**释放 ~3G**；
 - 周度 cron：checkpoint + retention + 磁盘水位上报 guard。
 

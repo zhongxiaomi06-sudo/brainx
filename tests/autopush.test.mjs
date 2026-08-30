@@ -64,27 +64,27 @@ test('两轮完全一致 → null；只有一轮 → null', () => {
   assert.equal(detectMaterialChange(db, 'solo'), null);
 });
 
-test('自动推卡：默认关闭 → disabled；开启后推本人 open_id（stub 断言不打真 CLI）', async () => {
+test('自动推卡：默认关闭 → disabled；开启后推本人 open_id（stub 断言不打真 CLI）', () => {
   addJobless(db, 'noop');
   twoRuns(db, 'noop', [['P-X', 'OBSERVE']], [['P-Y', 'RECOMMEND_ACCEPT']]);
 
   // 关闭门
   delete process.env.BRAINX_PUSH_AUTO;
   let calls = [];
-  let r = await makeAutoPush(db, { pushImpl: (...a) => calls.push(a) })('noop');
+  let r = makeAutoPush(db, { pushImpl: (...a) => calls.push(a) })('noop');
   assert.equal(r.reason, 'disabled');
   assert.equal(calls.length, 0);
 
   // 开启但无 open_id → 不推
   process.env.BRAINX_PUSH_AUTO = '1';
-  r = await makeAutoPush(db, { pushImpl: (...a) => calls.push(a) })('noop');
+  r = makeAutoPush(db, { pushImpl: (...a) => calls.push(a) })('noop');
   assert.equal(r.reason, 'no_open_id');
   assert.equal(calls.length, 0);
 
   // 开启 + 有 open_id（felix 第一轮已 TOP1_CHANGED → P-B）→ 推到本人 open_id
   db.prepare(`INSERT OR IGNORE INTO job_facts (project_id, company, role, city, pipeline, hc, active_state, source_url, captured_at, sync_id, raw_json, updated_at)
     VALUES ('P-B','易主公司','产品总监','北京',NULL,NULL,'OPEN',NULL,'2026-08-07','s','{}','2026-08-07')`).run();
-  r = await makeAutoPush(db, { pushImpl: (d, opts) => { calls.push(opts); return { status: 'SENT' }; } })('felix');
+  r = makeAutoPush(db, { pushImpl: (d, opts) => { calls.push(opts); return { status: 'SENT' }; } })('felix');
   assert.equal(r.pushed, true);
   assert.equal(calls.length, 1);
   assert.equal(calls[0].kind, 'HEATING_ALERT');
@@ -93,10 +93,10 @@ test('自动推卡：默认关闭 → disabled；开启后推本人 open_id（st
   assert.ok(calls[0].card.elements[0].content.includes('Top1 易主'));
 });
 
-test('无重大变化时不推（no_material_change）', async () => {
+test('无重大变化时不推（no_material_change）', () => {
   process.env.BRAINX_PUSH_AUTO = '1';
   let calls = 0;
-  const r = await makeAutoPush(db, { pushImpl: () => { calls++; return { status: 'SENT' }; } })('york');
+  const r = makeAutoPush(db, { pushImpl: () => { calls++; return { status: 'SENT' }; } })('york');
   assert.equal(r.reason, 'no_material_change');
   assert.equal(calls, 0);
 });

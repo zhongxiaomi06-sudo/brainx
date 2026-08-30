@@ -12,7 +12,7 @@ import { now } from './db.js';
 import { latestRun } from './recommend.js';
 import { latestRealSync, latestCompleteSnapshot } from './sync.js';
 import { commitmentSummary } from './engagement.js';
-import { buildDailyCard, buildSyncAlertCard, pushCard } from './push.js';
+import { buildDailyCard, pushCard } from './push.js';
 
 const SLOTS = [7, 19]; //  CST 小时
 const WINDOW_MS = 30 * 60 * 1000;
@@ -34,18 +34,14 @@ export function slotState(at = new Date()) {
 export async function pushSlotFor(db, consultant_id, open_id, slotKey, { send = true } = {}) {
   const sync = latestRealSync(db, consultant_id);
   const snapshot = latestCompleteSnapshot(db, consultant_id);
-  const run = latestRun(db, consultant_id, { hideEngaged: true });
+  const run = latestRun(db, consultant_id);
+  if (!run || !run.items.length) return null; // 无推荐不发
   const c = commitmentSummary(db, consultant_id);
   const name = db.prepare('SELECT display_name FROM consultants WHERE consultant_id=?')
     .get(consultant_id)?.display_name || consultant_id;
-  // 与 push/send 路由同一分支：同步长期不完整时发 SYNC_ALERT 告警卡而非陈旧 Top3——
-  // 此前限流数天期间 07:00/19:00 照推几天前的推荐，顾问对断供完全无感。
-  const kind = sync && !sync.complete ? 'SYNC_ALERT' : 'DAILY_TOP3';
-  if (kind === 'DAILY_TOP3' && (!run || !run.items.length)) return null; // 无推荐不发（告警不受此限）
-  const card = kind === 'SYNC_ALERT' ? buildSyncAlertCard(sync)
-    : buildDailyCard({ consultant_name: name, consultant_id, run: run.run, items: run.items,
-                       commitments: c, sync, snapshot_id: snapshot?.sync_id });
-  return pushCard(db, { consultant_id, kind, run_id: slotKey, card,
+  const card = buildDailyCard({ consultant_name: name, consultant_id, run: run.run, items: run.items,
+                                commitments: c, sync, snapshot_id: snapshot?.sync_id });
+  return pushCard(db, { consultant_id, kind: 'DAILY_TOP3', run_id: slotKey, card,
                         target: open_id, send }); // pushCard 为 async，返回值透传 Promise
 }
 

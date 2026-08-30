@@ -1,6 +1,9 @@
-// brainx-api.ts — Brain X 后端 HTTP 适配层：前端唯一数据通道（契约见 brainx/src/server.js）。
-// 纯函数映射器不依赖浏览器环境，供 tests/brainx-adapter.test.mjs 直接单测；
-// 请求函数只在浏览器端调用，SSR 构建期不触发网络请求。
+// brainx-api.ts — Brain X 后端（btex/brainx）HTTP 适配层。
+// 前端唯一数据通道：页面不得直接 fetch /api；全部请求与映射集中在这里。
+// 后端契约见 brainx/src/server.js 与 README「后端接入」章节。
+//
+// 纯函数映射器（map*/of*）不依赖浏览器环境，供 tests/brainx-adapter.test.mjs 直接单测。
+// 请求函数只在浏览器端调用；SSR（npm run build）期间不会触发任何网络请求。
 import type {
   DecisionEvent,
   EngagementCommand,
@@ -11,7 +14,16 @@ import type {
   CommitmentSnapshot,
   SyncStatus,
 } from "./decision-demo";
-
+import { brainxFetch } from "./brainx-http.ts";
+import { getProjects, type ProjectSummary } from "./brainx-projects-api.ts";
+export { brainxFetch, BrainxApiError } from "./brainx-http.ts";
+export {
+  classifyRadarPositionType, getClients, getRadar, getTtcFieldReport, mapClientRow, mapRadarRow,
+} from "./brainx-radar-api.ts";
+export type {
+  BackendClientRow, BackendRadarRow, RadarClient, RadarFieldCapability, RadarFieldReport, RadarJob, RadarPayload,
+  RadarPositionType,
+} from "./brainx-radar-api.ts";
 // —— 与 workbench.tsx 的 DecisionJob 结构一致的映射结果（结构类型，避免循环依赖）——
 export type BrainxDirection = "paid" | "growth" | "marketing";
 export type BrainxGroup =
@@ -46,8 +58,8 @@ export type BrainxJob = {
   risks: string[]; evidence: string[]; actions: BrainxDecisionAction[];
   brainxLegal?: EngagementCommand[]; brainxDecisionId?: string;
 };
-
 export type BrainxSnapshot = {
+  consultantId: string;
   jobs: BrainxJob[];
   engagement: Record<string, EngagementState>;
   events: Record<string, DecisionEvent[]>;
@@ -62,7 +74,8 @@ export type BrainxSnapshot = {
   policyVersion: string | null;
   profileKeywords: string[];
   openmai: Record<string, OpenmaiResult | null>;
-  preferences: WorkbenchPreferences | null; // 拉取失败为 null（与「真空盘」区分）
+  preferences: WorkbenchPreferences;
+  projects: ProjectSummary[];
 };
 
 export type BrainxReplay = {
@@ -77,13 +90,12 @@ export type BrainxReplay = {
   outcomes: Outcome[];
 };
 
-export type BrainxErrorPayload = { error?: { code?: string; message?: string } } & Record<string, unknown>;
-
 type BackendEvidenceRef = { type?: string; ref?: string; excerpt?: string };
 export type BackendBreakdown = { dim: string; label?: string; weight: number; score: number | null; weighted_score?: number | null; status?: "available" | "missing" };
 type BackendJob = {
   project_id: string; company?: string; role?: string; city?: string | null;
-  pipeline?: string | null; hc?: number | null; active_state?: string | null;
+  cities?: string[]; pipeline?: string | null; pipeline_steps?: Record<string, number> | null;
+  owner_name?: string | null; hc?: number | null; active_state?: string | null;
   priority?: string | null; notes?: string | null; company_type?: string | null;
   current_stage?: string | null; pipeline_snapshot?: string | null; next_action?: string | null;
   fact_sources?: Partial<Record<ManualFactField, string>>;
@@ -100,15 +112,11 @@ export type BackendSync = {
   state: string; updated_at?: string | null; rows_read?: number | null;
   rows_expected?: number | null; errors?: string[]; warning?: { at: string; message: string; detail?: string } | null;
 };
-export type BackendCommitment = {
-  project_id: string; state: EngagementState; state_since?: string | null;
-  company?: string | null; role?: string | null; active_state?: string | null; next_action?: string | null;
-};
 export type BackendWorkbench = {
   consultant_id: string; sync: BackendSync; feishu_auth?: { authorized?: boolean; needs_reauth?: boolean };
   ttc_auth?: Record<string, unknown>; current_policy_version?: string | null;
   watched_count?: number; watched_limit?: number; accepted_count?: number; cooldown_count?: number;
-  need_action_count?: number; commitments?: BackendCommitment[]; today_top3?: BackendRecommendation[];
+  need_action_count?: number; today_top3?: BackendRecommendation[];
   run_id?: string | null;
 };
 export type BackendRecommendations = {
@@ -143,8 +151,6 @@ export type BackendReplay = {
 export type BackendProfile = { consultant_id: string; display_name: string; profile_keywords: string[]; profile_note: string; feishu_auth?: { authorized?: boolean; needs_reauth?: boolean } };
 export type WorkbenchFolder = { id: string; name: string; jobIds: string[] };
 export type WorkbenchPreferences = { tray: string[]; folders: WorkbenchFolder[]; folderMode: boolean; updatedAt?: string | null };
-export type BackendRadarRow = BackendJob & { engagement_state?: EngagementState; cockpit?: { membership_status?: string | null; current_stage?: string | null; stage_confidence?: string | null; pipeline_snapshot?: string | null; next_action?: string | null; cockpit_as_of?: string | null; completeness?: string | null; source_url?: string | null } | null };
-export type BackendClientRow = { company: string; company_type?: string | null; job_count?: number; active_jobs?: number; hc_known?: number | null; last_activity?: string | null; relations?: string[]; states?: string[] };
 export type BackendDismissReasons = { items: string[] };
 export type BackendSessionStatus = { configured: boolean; dev_auth: boolean };
 export type BackendSseEvent = { type?: "hello" | "sync" | "recommend" | "sync_error" | "openmai_result"; message?: string; consultant_id?: string; project_id?: string; status?: string; at?: string };
@@ -155,25 +161,7 @@ export type BackendPickTray = { snapshot_id: string | null; batch_id: string | n
 export type BackendFeedbackResponse = { ok: boolean; already?: boolean; feedback_id?: string; replacement?: BackendPickTray };
 export type BackendOutcomeResponse = { ok: boolean; already?: boolean; outcome_id?: string | number };
 export type BackendProgressResponse = { ok: boolean; already?: boolean; state?: EngagementState; active_action?: BackendCommitmentAction; incorporated_into_next_decision?: boolean; backfilled?: boolean };
-export type BackendMembershipResponse = { ok: boolean; already?: boolean; relation: "MY_JOB"|"TEAM_SHARED"; legal_actions: EngagementCommand[]; recompute?: { blocked?: boolean; reason?: string } };
 export type BackendProfileUpdate = { ok: boolean; consultant_id: string; profile_keywords?: string[]; profile_note?: string };
-
-export class BrainxApiError extends Error {
-  status: number;
-  code: string | undefined;
-  payload: BrainxErrorPayload | undefined;
-  kind: "AUTH" | "CONFLICT" | "VALIDATION" | "UNAVAILABLE" | "HTTP";
-  constructor(message: string, status = 0, code?: string, payload?: BrainxErrorPayload) {
-    super(message);
-    this.status = status;
-    this.code = code;
-    this.payload = payload;
-    this.kind = status === 401 || status === 403 ? "AUTH"
-      : status === 409 ? "CONFLICT"
-      : status === 400 || status === 422 ? "VALIDATION"
-      : status >= 500 ? "UNAVAILABLE" : "HTTP";
-  }
-}
 
 // —— 词典（与后端 src/*.js 的枚举对齐，前端仅用于展示标签，不做业务判断）——
 export const RELATION_LABELS: Record<string, string> = {
@@ -197,7 +185,7 @@ export const PRIORITY_LABELS: Record<string, string> = {
 };
 
 export const BACKEND_ACTION_LABELS: Record<string, string> = {
-  RECOMMEND_ACCEPT: "建议接单",
+  RECOMMEND_ACCEPT: "建议开始跟进",
   RECOMMEND_WATCH: "建议关注",
   OBSERVE: "先观察验证",
 };
@@ -206,7 +194,7 @@ export const EVENT_TYPE_LABELS: Record<string, string> = {
   VIEWED: "已查看",
   RECOMMENDED: "已推荐",
   WATCHED: "已关注",
-  ACCEPTED: "已接单",
+  ACCEPTED: "已开始跟进",
   DISMISSED: "暂不考虑",
   RELEASED: "已释放",
   COMPLETED: "已完成",
@@ -222,7 +210,7 @@ export const BACKEND_WEIGHTS: { dim: string; label: string; weight: string }[] =
   { dim: "direction", label: "职位方向匹配", weight: "25%" },
   { dim: "activity", label: "项目活跃度与 Pipeline", weight: "20%" },
   { dim: "similarity", label: "与历史项目相似度", weight: "15%" },
-  { dim: "capacity", label: "当前承接容量", weight: "15%" },
+  { dim: "capacity", label: "当前跟进容量", weight: "15%" },
   { dim: "outcomes", label: "历史行为与交付结果", weight: "15%" },
   { dim: "exploration", label: "探索额度", weight: "10%" },
 ];
@@ -253,7 +241,7 @@ export function directionOf(role: string): BrainxDirection {
 
 export function eligibilityOf(action: string, relation: string, hc: number | null, activeState: string): BrainxEligibility {
   if (hc === 0 || activeState === "CLOSED" || activeState === "COMPLETED") return "EXCLUDED";
-  // OTHER_CONSULTANT 不再阻塞接单（顾问接单互不影响，仅保留"他人主做"提示）
+  // OTHER_CONSULTANT 不再阻塞开始跟进（顾问之间互不排斥，仅保留“他人主做”提示）
   if (relation === "NOT_JOINED" || relation === "UNKNOWN") return "VERIFY_REQUIRED";
   if (action === "OBSERVE") return "VERIFY_REQUIRED";
   return "ELIGIBLE";
@@ -268,19 +256,19 @@ export function groupOf(action: string, hc: number | null, activeState: string):
 
 export function actionsOf(action: string, relation: string): BrainxDecisionAction[] {
   if (relation === "OTHER_CONSULTANT" || relation === "NOT_JOINED") {
-    return [{ id: "ownership", label: "确认项目归属", kind: "verify", detail: "确认是否允许承接，或先与其他顾问沟通认领" }];
+    return [{ id: "ownership", label: "确认项目归属", kind: "verify", detail: "确认是否允许跟进，或先与其他顾问沟通认领" }];
   }
   if (action === "RECOMMEND_ACCEPT") {
-    return [{ id: "advance", label: "进入项目推进", kind: "advance", detail: "接单后按客户反馈窗口持续回写信号" }];
+    return [{ id: "advance", label: "进入项目推进", kind: "advance", detail: "开始跟进后按客户反馈窗口持续回写信号" }];
   }
   if (action === "RECOMMEND_WATCH") {
-    return [{ id: "watch", label: "加入观察", kind: "watch", detail: "保留本周提醒，评估后再接单" }];
+    return [{ id: "watch", label: "加入观察", kind: "watch", detail: "保留本周提醒，评估后再开始跟进" }];
   }
   return [{ id: "verify", label: "核验关键事实", kind: "verify", detail: "补齐 HC 与阶段事实后再判断" }];
 }
 
 export function factsOf(
-  job: { relation?: string | null; active_state?: string | null; current_stage?: string | null; hc?: number | null; captured_at?: string | null; pipeline?: string | null; pipeline_snapshot?: string | null; city?: string | null; priority?: string | null; company_type?: string | null; next_action?: string | null; notes?: string | null },
+  job: { relation?: string | null; active_state?: string | null; current_stage?: string | null; hc?: number | null; captured_at?: string | null; pipeline?: string | null; pipeline_snapshot?: string | null; city?: string | null; priority?: string | null; company_type?: string | null; next_action?: string | null; notes?: string | null; owner_name?: string | null },
 ): Record<string, string> {
   const facts: Record<string, string> = {
     "职位关系": RELATION_LABELS[job.relation || ""] || job.relation || "UNKNOWN",
@@ -297,6 +285,7 @@ export function factsOf(
   if (job.company_type) facts["客户类型"] = job.company_type;
   if (job.next_action) facts["下一步动作"] = job.next_action;
   if (job.notes) facts["备注"] = job.notes;
+  if (job.owner_name) facts["主做顾问"] = job.owner_name;
   return facts;
 }
 
@@ -425,7 +414,7 @@ export function buildNotifications(
     });
   }
   if (wb.need_action_count && wb.need_action_count > 0) {
-    notes.push({ id: "brainx-commit", kind: "COMMITMENT", title: `${wb.need_action_count} 个承接需要处理`, detail: "关注超过 7 天未推进，或接单后未回写结果", read: false });
+    notes.push({ id: "brainx-commit", kind: "COMMITMENT", title: `${wb.need_action_count} 个项目需要处理`, detail: "关注超过 7 天未推进，或开始跟进后未回写结果", read: false });
   }
   return notes;
 }
@@ -443,134 +432,6 @@ export function mapReplayData(r: BackendReplay): BrainxReplay {
     events: mapEvents(r.events),
     outcomes: mapOutcomes(r.outcomes),
   };
-}
-
-// —— 职位雷达 / 客户洞察（GET /api/v1/radar、/api/v1/clients）——
-// 纪律：只呈现事实；后端没有的运营指标（评分/转化/招聘意愿）一律 null/待后端，不补造。
-
-export type RadarPositionType = "技术" | "产品" | "运营" | "算法" | "设计" | "商业化";
-export type RadarJobStatus = "待同步" | "活跃" | "降温" | "已关闭";
-
-export type RadarJob = {
-  id: string;
-  name: string;
-  client: string;
-  industry: string;
-  city: string;
-  pm: string;
-  status: RadarJobStatus;
-  score: number | null;
-  hc: number | null;
-  feedback: string;
-  recommended: number | null;
-  interview: number | null;
-  offer: number | null;
-  reason: string;
-  salary: string;
-  source: "市场信号" | "驾驶舱导入";
-  positionType: RadarPositionType;
-  sourceColumn?: string;
-};
-
-export type RadarClient = {
-  name: string;
-  industry: string;
-  state: string;
-  active: number;
-  hc: number | null;
-  feedback: string;
-  r2i: string;
-  i2o: string;
-  hires: number | null;
-  intent: string;
-  score: number | null;
-  risk: string;
-};
-
-/** 岗位方向分类（与 workbench 的 classifyCockpitRole 同一套规则，供雷达映射用）。 */
-export function classifyRadarPositionType(role: string): RadarPositionType {
-  const value = String(role || "").replace(/\s+/g, " ").trim();
-  if (/设计|UI\s*\/?\s*UX|视觉/i.test(value)) return "设计";
-  if (/算法|大模型|机器学习|深度学习|研究|Research|MLE|VLM|NLP|RAG|LLM/i.test(value)) return "算法";
-  if (/运营|社群|社区|助理|财务|FA\b|KOL/i.test(value)) return "运营";
-  if (/产品(经理|负责人|总监|设计|策略|运营|市场|增长|商业化|&)|\bPM\b|Product/i.test(value)) return "产品";
-  if (/增长|市场|投放|销售|商务|品牌|GTM|售前|招聘|HR|BD|营销|内容|CMO/i.test(value)) return "商业化";
-  if (/工程|研发|开发|前端|后端|全栈|运维|测试|架构|技术|CTO|iOS|Android|Engineer/i.test(value)) return "技术";
-  if (/产品/i.test(value)) return "产品";
-  return "商业化";
-}
-
-function radarStatusOf(activeState: string | null | undefined): RadarJobStatus {
-  if (activeState === "OPEN") return "活跃";
-  if (activeState === "COOLING") return "降温";
-  if (activeState === "CLOSED" || activeState === "COMPLETED") return "已关闭";
-  return "待同步";
-}
-
-/** 后端 /radar 行 → 雷达表格行。 */
-export function mapRadarRow(r: BackendRadarRow): RadarJob {
-  const cockpit = r.cockpit || null;
-  const relationLabel = RELATION_LABELS[r.relation || ""] || r.relation || "团队共享";
-  let reason: string;
-  if (cockpit) {
-    const statusLabel = { PRIMARY_PM: "我主做", PARTICIPANT: "参与", MENTIONED: "被提及", UNCONFIRMED: "待确认" }[cockpit.membership_status || ""] || cockpit.membership_status || "待确认";
-    reason = `驾驶舱 · ${statusLabel} · ${cockpit.current_stage || "阶段待确认"}${cockpit.next_action ? ` · ${cockpit.next_action}` : ""}`;
-  } else if (r.pipeline) {
-    reason = `Pipeline · ${r.pipeline}`;
-  } else {
-    reason = "市场信号 · 待后端同步";
-  }
-  return {
-    id: r.project_id,
-    name: r.role || "未知职位",
-    client: r.company || "未知客户",
-    industry: r.company_type || "未标注业务方向",
-    city: r.city || "待确认",
-    pm: relationLabel,
-    status: radarStatusOf(r.active_state),
-    score: null, // 雷达不做评分展示；评分以后端推荐为准
-    hc: r.hc ?? null, // UNKNOWN 原样为 null，绝不写 0
-    feedback: r.captured_at ? String(r.captured_at).slice(0, 10) : "待接入",
-    recommended: null,
-    interview: null,
-    offer: null,
-    reason,
-    salary: "待同步",
-    source: cockpit ? "驾驶舱导入" : "市场信号",
-    positionType: classifyRadarPositionType(r.role || ""),
-    sourceColumn: cockpit ? "驾驶舱导入" : undefined,
-  };
-}
-
-/** 后端 /clients 行 → 客户洞察行。 */
-export function mapClientRow(c: BackendClientRow): RadarClient {
-  const relations = c.relations || [];
-  const states = c.states || [];
-  let risk = "运营指标待后端接入";
-  if (relations.includes("OTHER_CONSULTANT")) risk = "其他顾问主做";
-  else if (states.includes("COOLING")) risk = "有职位进入冷却期";
-  return {
-    name: c.company,
-    industry: c.company_type || "未标注业务方向",
-    state: (c.active_jobs ?? 0) > 0 ? "有活跃职位" : "无活跃职位",
-    active: c.active_jobs ?? 0,
-    hc: c.hc_known ?? null, // UNKNOWN 原样为 null，绝不写 0
-    feedback: c.last_activity ? String(c.last_activity).slice(0, 10) : "—",
-    r2i: "待后端",
-    i2o: "待后端",
-    hires: null,
-    intent: "待确认",
-    score: null,
-    risk,
-  };
-}
-
-/** 拉取雷达与客户洞察（浏览器端）。 */
-export async function getRadar(): Promise<{ items: BackendRadarRow[] }> {
-  return brainxFetch<{ items: BackendRadarRow[] }>("/api/v1/radar");
-}
-export async function getClients(): Promise<{ items: BackendClientRow[] }> {
-  return brainxFetch<{ items: BackendClientRow[] }>("/api/v1/clients");
 }
 
 export async function getPickTray(cursor?: string): Promise<BackendPickTray> {
@@ -617,46 +478,6 @@ export async function updateOpportunityFacts(id: string, update: ManualFactUpdat
   return brainxFetch(`/api/v1/opportunities/${encodeURIComponent(id)}/facts`, { method: "PATCH", body: update });
 }
 
-export async function updateOpportunityMembership(
-  id: string,
-  relation: "MY_JOB"|"TEAM_SHARED",
-  idempotencyKey: string,
-): Promise<BackendMembershipResponse> {
-  return brainxFetch(`/api/v1/opportunities/${encodeURIComponent(id)}/membership`, {
-    method: "PATCH", body: { relation, idempotency_key: idempotencyKey },
-  });
-}
-
-// —— HTTP 客户端（浏览器端专用；401 抛 BrainxApiError 由调用方决定回退/登录）——
-// 边界层返回任意 JSON 载荷：形状由各映射函数收敛为强类型，这里保留原样。
-export async function brainxFetch<T = unknown>(
-  path: string,
-  options: { method?: string; body?: unknown; timeoutMs?: number } = {},
-): Promise<T> {
-  const method = options.method || "GET";
-  // 默认 15s 超时：后端挂起时初始探测曾永不返回，brainxMode 永久停在 connecting
-  const res = await fetch(path, {
-    method,
-    credentials: "same-origin",
-    signal: AbortSignal.timeout(options.timeoutMs ?? 15000),
-    headers: options.body !== undefined ? { "Content-Type": "application/json" } : undefined,
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-  });
-  if (res.status === 204) return null as T;
-  let data: T | BrainxErrorPayload | null = null;
-  try { data = await res.json(); } catch { /* 非 JSON 响应体 */ }
-  if (!res.ok) {
-    // 两种错误信封：err() 的 {error:{code,message}} 与领域函数的 {error:"字符串"}（如 engage 409）
-    const raw = (data as BrainxErrorPayload | null)?.error;
-    const message = raw && typeof raw === "object"
-      ? raw.message || `HTTP ${res.status}`
-      : typeof raw === "string" ? raw : `HTTP ${res.status}`;
-    const code = raw && typeof raw === "object" ? raw.code : undefined;
-    throw new BrainxApiError(message, res.status, code, data as BrainxErrorPayload);
-  }
-  return data as T;
-}
-
 // —— 人才供给（旁路，只读展示；后端 GET /opportunities/:id/talent-supply）——
 export type TalentSupplySnapshot = {
   jobId: string;
@@ -678,13 +499,13 @@ export async function getTalentSupply(jobId: string): Promise<TalentSupplySnapsh
 /** 读取完整工作台快照：概览 + 推荐 + 逐职位详情（承接态/允许动作/事件/结果）+ 画像。
  *  会话未登录（401）时抛错，由调用方进入离线回退。 */
 export async function getSnapshot(): Promise<BrainxSnapshot> {
-  const [wb, recs, profile, dismiss, preferences] = await Promise.all([
+  const [wb, recs, projects, profile, dismiss, preferences] = await Promise.all([
     brainxFetch<BackendWorkbench>("/api/v1/workbench"),
     brainxFetch<BackendRecommendations>("/api/v1/recommendations?limit=20"),
+    getProjects(),
     brainxFetch<BackendProfile>("/api/v1/profile"),
     brainxFetch<BackendDismissReasons>("/api/v1/dismiss-reasons").catch(() => ({ items: FALLBACK_DISMISS_REASONS })),
-    // 失败给 null 而非空对象：空对象会被当「真空盘」应用并被持久化 effect PUT 回服务器（清空偏好）
-    brainxFetch<WorkbenchPreferences>("/api/v1/workbench/preferences").catch(() => null),
+    brainxFetch<WorkbenchPreferences>("/api/v1/workbench/preferences").catch(() => ({ tray: [], folders: [], folderMode: false, updatedAt: null })),
   ]);
 
   const jobs = (recs.items || []).map(mapRecommendation) as BrainxJob[];
@@ -710,27 +531,12 @@ export async function getSnapshot(): Promise<BrainxSnapshot> {
     job.brainxLegal = legal[job.id];
   });
 
-  // 承接中但不在本轮 Top10 的职位（侧栏“我的承接”需要），用伪条目补进列表
-  for (const c of wb.commitments || []) {
-    if (engagement[c.project_id]) continue;
-    jobs.push({
-      id: c.project_id, rank: 99, company: c.company || "未知客户", role: c.role || "未知职位",
-      direction: directionOf(c.role || ""), sourceMode: "MARKET_ONLY",
-      group: "MAINTENANCE", eligibility: "ELIGIBLE",
-      globalScore: "—", explorationScore: "—", personalScore: "—", finalScore: "—",
-      evidenceCoverage: null,
-      recommendation: c.next_action || "承接中职位",
-      recentSignal: "",
-      facts: { "职位关系": "团队共享", "数据来源": "职位市场", "当前阶段": "UNKNOWN", "剩余 HC": "UNKNOWN", "最近活动": "UNKNOWN", "历史 Pipeline": "暂无记录" },
-      scoreNotes: [], risks: [], evidence: [], actions: [], brainxLegal: [],
-    });
-    engagement[c.project_id] = c.state as EngagementState;
-    events[c.project_id] = [];
-    outcomes[c.project_id] = [];
-    legal[c.project_id] = [];
+  for (const project of projects.items || []) {
+    engagement[project.project_id] = project.engagement_state;
+    legal[project.project_id] = project.legal_actions;
   }
-
   return {
+    consultantId: profile.consultant_id || wb.consultant_id,
     jobs,
     engagement,
     events,
@@ -750,10 +556,11 @@ export async function getSnapshot(): Promise<BrainxSnapshot> {
     policyVersion: recs.policy_version || wb.current_policy_version || null,
     profileKeywords: profile.profile_keywords || [],
     preferences,
+    projects: projects.items || [],
   };
 }
 
-/** 接单自动找人结果（/api/v1/opportunities/:id 响应内嵌 openmai 字段）。 */
+/** 开始跟进后自动找人结果（/api/v1/opportunities/:id 响应内嵌 openmai 字段）。 */
 export type OpenmaiResult = {
   status: "none" | "running" | "done" | "failed";
   result_text?: string | null;

@@ -42,9 +42,7 @@ export function detectMaterialChange(db, consultant_id) {
 
 /** 桥接器 onRecommended 钩子工厂。pushImpl 可注入（测试绝不打真实 lark-cli）。 */
 export function makeAutoPush(db, { pushImpl = pushCard } = {}) {
-  // async：pushCard 是异步函数，此前同步闭包里 `out.status` 读的是 Promise（恒 undefined），
-  // 失败被误报 pushed:true；且内部同步 DB 抛错会变 unhandled rejection 冲垮进程。
-  return async (consultant_id) => {
+  return (consultant_id) => {
     if (process.env.BRAINX_PUSH_AUTO !== '1') return { pushed: false, reason: 'disabled' };
     const change = detectMaterialChange(db, consultant_id);
     if (!change) return { pushed: false, reason: 'no_material_change' };
@@ -64,7 +62,7 @@ export function makeAutoPush(db, { pushImpl = pushCard } = {}) {
               job: { project_id: rec.project_id, company: rec.company, role: rec.role,
                      city: rec.city, relation: rel?.relation || 'UNKNOWN' } },
     });
-    const out = await pushImpl(db, { consultant_id, kind: 'HEATING_ALERT', run_id: change.run_id,
+    const out = pushImpl(db, { consultant_id, kind: 'HEATING_ALERT', run_id: change.run_id,
                                card, target: c.open_id, send: true });
     return { pushed: out.status !== 'FAILED', change, push: out };
   };

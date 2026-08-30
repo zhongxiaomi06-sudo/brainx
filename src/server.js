@@ -18,22 +18,23 @@ import { buildDailyCard, buildSyncAlertCard, pushCard } from './push.js';
 import { signSession, verifySession, cookieOf } from './session.js';
 import { signState, verifyState, buildAuthorizeUrl, exchangeCode, oauthConfigured } from './oauth.js';
 import { findByOpenId, updateProfile } from './roster.js';
-import { startWorkerTasks } from './worker.js';
-import { startRelayPump } from './worker-relay.js';
+import { startBridge } from './bridge.js';
+import { startScheduler } from './scheduler.js';
+import { makeAutoPush } from './autopush.js';
 import { saveUserTokens, tokenStatus } from './feishu.js';
 import { jobVisibleTo } from './visibility.js';
 import { relationOf } from './relations.js';
-import { confirmMembership } from './membership.js';
-import { validateJwt, saveTtcToken, ttcAuthStatus } from './ttcsdk/auth.js';
-import { quota as ttcQuota } from './ttcsdk/user.js';
-import { TtcApiError } from './ttcsdk/http.js';
+import { projectRoutes } from './project-routes.js';
 import { startOpenmaiTask, getOpenmaiResult } from './openmai-task.js';
-import { radarRows, clientRows } from './radar.js';
+import { radarPayload, clientRows } from './radar.js';
+import { ttcFieldReportForSync } from './ttc-field-report.js';
+import { ttcAuthStatus, ttcRoutes } from './ttc-routes.js';
 import { syncTalentsFromCsv, listTalents as listTalentsRepo, getTalent, talentBackendStatus, ingestResume, syncTalentsFromResumes, listResumes, talentHealth } from './talent.js';
 import { talentSupplyForJob, talentSupplyEnabled } from './talent-supply.js';
 import { effectiveJob, effectiveFactPayload, updateFactOverrides } from './facts.js';
 import { assistantRoutes } from './assistant-routes.js';
 import { pickTray, nextBatch, feedback as recommendationFeedback, undoFeedback as recommendationUndoFeedback } from './recommendation-batch.js';
+import { recommendationPage } from './recommendation-page.js';
 import { verifyQuick, quickResultPage, QUICK_ACTIONS } from './quickfb.js';
 import { verifySnapshotKey, jobSnapshot } from './snapshot.js';
 import { createGuard } from './guard.js';
@@ -74,17 +75,20 @@ export function createServer(db = openDb(), deps = {}) {
 
   const routes = {
     ...assistantRoutes(db, deps),
+    ...projectRoutes(db),
     'GET /api/v1/consultants': (req, res) => {
       json(res, 200, { items: loadConsultants(db)
         .map((c) => ({ consultant_id: c.consultant_id, display_name: c.display_name })) });
     },
 
-    // —— 人才库（MySQL 异步，连不通自动内存回退；读写独立于决策库，绝不进基础评分）——
+    // —— 人才库（MySQL 人才库，异步；连不通自动内存回退）——
+    // 注意：人才库读写独立于 SQLite 决策库，绝不进入职位/客户基础评分。
     'GET /api/v1/talent/status': async (req, res, cid) => {
       try { json(res, 200, { ...(await talentBackendStatus()), supply_enabled: talentSupplyEnabled() }); }
       catch (e) { err(res, 502, 'TALENT_BACKEND_ERROR', String(e.message).slice(0, 200)); }
     },
     // 人才库健康自检：后端类型 + RDS 连通性 + 建表状态（凭据只出 host/库名，不出密码）。
+    // 填完 .env 的 BRAINX_MYSQL_* 后请求此路由即可确认是否真的切到了阿里云 RDS。
     'GET /api/v1/talent/health': async (req, res, cid) => {
       try { json(res, 200, await talentHealth()); }
       catch (e) { err(res, 502, 'TALENT_HEALTH_ERROR', String(e.message).slice(0, 200)); }
@@ -222,7 +226,7 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
     'GET /api/v1/workbench': (req, res, cid) => {
       const sync = latestRealSync(db, cid);
       const bridgeErr = latestBridgeError(db, cid, sync?.completed_at || '');
-      const run = latestRun(db, cid, { hideEngaged: true }); // Top3/推送/列表统一隐藏承接态与已 × 职位
+      const run = latestRun(db, cid);
       const c = commitmentSummary(db, cid);
       json(res, 200, {
         consultant_id: cid,
@@ -267,18 +271,9 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       json(res, 200, { ok: true, ...prefs, updatedAt });
     },
     'GET /api/v1/recommendations': (req, res, cid, q) => {
-      const limit = Math.min(Number(q.get('limit')) || 10, 50);
-      // latestRealSync：bridge-error 观测行不参与阻断（曾用 latestSync，桥接失败即 blocked）
-      const sync = latestRealSync(db, cid);
-      const run = latestRun(db, cid, { hideEngaged: true }); // Top3/列表隐藏承接态与已 × 职位
-      if (sync && !sync.complete) {
-        return json(res, 200, { blocked: true, reason: '本次同步不完整，为避免误导，暂不生成正式推荐',
-                                run_id: null, items: [] });
-      }
-      if (!run) return json(res, 200, { blocked: false, run_id: null, items: [], empty: true });
-      json(res, 200, { blocked: false, run_id: run.run.run_id, snapshot_id: run.run.snapshot_id,
-                       policy_version: run.run.policy_version, generated_at: run.run.created_at,
-                       items: run.items.slice(0, limit) });
+      const out = recommendationPage(db, cid, { cursor: q.get('cursor'), search: q.get('q'), sort: q.get('sort') });
+      if (out.ok === false) return err(res, out.status, out.code, out.message);
+      json(res, 200, out);
     },
 
     'GET /api/v1/recommendations/pick-tray': (req, res, cid, q) => {
@@ -293,7 +288,8 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       const out = recommendationUndoFeedback(db, cid, await body(req));
       json(res, out.ok ? 200 : out.status || 422, out);
     },
-    // 一键反馈（F2）：卡片按钮直写，HMAC 签名代替 session（open 路由，鉴权在 verifyQuick）
+    // 一键反馈（F2，2026-08-24）：推送卡片按钮直写，HMAC 签名代替 session
+    // （open 路由，鉴权全在 verifyQuick）。顾问不登录工作台也能产标签。
     'GET /api/v1/feedback/quick': (req, res, cid, q) => {
       const p = Object.fromEntries(q);
       const page = (okFlag, text, status) => {
@@ -332,7 +328,8 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
     'GET /api/v1/sync-runs/:id': (req, res, cid, q, id) => {
       const r = db.prepare('SELECT * FROM sync_runs WHERE sync_id=? AND consultant_id=?').get(id, cid);
       if (!r) return err(res, 404, 'NOT_FOUND', '同步批次不存在');
-      json(res, 200, { ...r, errors: JSON.parse(r.errors || '[]') });
+      json(res, 200, { ...r, errors: JSON.parse(r.errors || '[]'),
+        field_report: ttcFieldReportForSync(db, cid, id) });
     },
 
     'GET /api/v1/opportunities/:id': (req, res, cid, q, id) => {
@@ -370,7 +367,7 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
           evidence_coverage: rec.evidence_coverage,
           reasons: JSON.parse(rec.reasons_json), risks: JSON.parse(rec.risks_json),
           evidence_refs: JSON.parse(rec.evidence_refs_json),
-          breakdown: JSON.parse(rec.breakdown_json), policy_version: rec.policy_version } : null,
+          breakdown: JSON.parse(rec.breakdown_json), policy_version: rec.policy_version, created_at: rec.created_at } : null,
       });
     },
 
@@ -398,22 +395,6 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
           recompute: rec?.blocked ? { blocked: true, reason: rec.reason } : { blocked: false },
         });
       } catch (e) { err(res, 500, 'FACT_UPDATE_FAILED', String(e.message).slice(0, 300)); }
-    },
-
-    'PATCH /api/v1/opportunities/:id/membership': async (req, res, cid, q, id) => {
-      const job = db.prepare('SELECT 1 FROM job_facts WHERE project_id=?').get(id);
-      if (!job || !jobVisibleTo(db, cid, id)) return err(res, 404, 'NOT_FOUND', '职位不存在');
-      const b = await body(req);
-      if (!b) return err(res, 400, 'BAD_JSON', '请求体不是合法 JSON');
-      try {
-        const out = confirmMembership(db, cid, id, b);
-        if (!out.ok) return err(res, out.status || 422, 'MEMBERSHIP_UPDATE_REJECTED', out.error);
-        const rec = out.already ? null : recommend(db, cid, { top: 20 });
-        json(res, 200, {
-          ...out,
-          recompute: rec?.blocked ? { blocked: true, reason: rec.reason } : { blocked: false },
-        });
-      } catch (e) { err(res, 500, 'MEMBERSHIP_UPDATE_FAILED', String(e.message).slice(0, 300)); }
     },
 
     'POST /api/v1/opportunities/:id/engagement': async (req, res, cid, q, id) => {
@@ -466,9 +447,7 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       const st = currentState(db, cid, id)?.state;
       if (!['ACCEPTED', 'COMPLETED'].includes(st)) return err(res, 404, 'NOT_FOUND', '职位不存在或未接单');
       const cur = getOpenmaiResult(db, cid, id);
-      // 陈旧 running 放行：重启丢内存任务集但留 running 行曾致永久 409；超 60min 视为僵死
-      const staleMs = Date.now() - Date.parse(cur.started_at || 0);
-      if (cur.status === 'running' && !(Number.isFinite(staleMs) && staleMs > 60 * 60 * 1000)) return err(res, 409, 'RUNNING', '找人在进行中，请等待完成后再试');
+      if (cur.status === 'running') return err(res, 409, 'RUNNING', '找人在进行中，请等待完成后再试');
       const out = startOpenmaiTask(db, bus, cid, id, { force: true });
       json(res, 200, { ok: true, openmai: out });
     },
@@ -495,8 +474,9 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
     }),
 
     // 职位雷达与客户洞察（fail-closed 可见性；只呈现事实，不补造运营指标）
-    'GET /api/v1/radar': (req, res, cid) => json(res, 200, { items: radarRows(db, cid) }),
+    'GET /api/v1/radar': (req, res, cid) => json(res, 200, radarPayload(db, cid)),
     'GET /api/v1/clients': (req, res, cid) => json(res, 200, { items: clientRows(db, cid) }),
+    ...ttcRoutes(db),
 
     // 我的档案（方向画像）：只许读/改自己；保存后下一轮 recommend 即生效
     'GET /api/v1/profile': (req, res, cid) => {
@@ -511,61 +491,6 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       if (!b) return err(res, 400, 'BAD_JSON', '请求体不是合法 JSON');
       const out = updateProfile(db, cid, b);
       json(res, out.ok ? 200 : (out.status || 400), out);
-    },
-
-    // TTC 凭据托管（~60 天贴一次 ottin-jwt-token-v2）；只许本人；JWT 校验+活验证才落库；永不回显。
-    'GET /api/v1/ttc/connect': (req, res, cid) => json(res, 200, ttcAuthStatus(db, cid)),
-    'PUT /api/v1/ttc/connect': async (req, res, cid) => {
-      const b = await body(req);
-      const jwt = String(b?.jwt || '').trim();
-      if (!jwt) return err(res, 400, 'EMPTY', '没收到 JWT');
-      if (jwt.length > 8192) return err(res, 400, 'TOO_LONG', '长度异常，确认只复制了 token 值');
-      let meta;
-      try { meta = validateJwt(jwt); } catch (e) { return err(res, 422, 'BAD_JWT', e.message); }
-      try { await ttcQuota(jwt); } catch (e) {
-        if (e instanceof TtcApiError && e.authInvalid) {
-          return err(res, 401, 'TTC_AUTH_INVALID', 'JWT 无效或已失效——回 TTC 系统（app.ttcadvisory.com）重新登录后再复制');
-        }
-        return err(res, 502, 'TTC_UNREACHABLE', '连不上 TTC 接口，稍后再试');
-      }
-      saveTtcToken(db, cid, jwt, meta);
-      json(res, 200, { ok: true, ...ttcAuthStatus(db, cid) });
-    },
-    'DELETE /api/v1/ttc/connect': (req, res, cid) => {
-      db.prepare('DELETE FROM ttc_tokens WHERE consultant_id=?').run(cid);
-      json(res, 200, { ok: true, connected: false });
-    },
-    // —— 浏览器扩展自动同步（免登录：来源校验 + JWT 本身有效，与 PUT /ttc/connect 同链）——
-    // 状态查询为安全视图，绝不出 JWT 本体。
-    'GET /api/v1/ttc/status': (req, res, cid, q) => {
-      const consultantId = q.get('consultant_id') || 'felix';
-      if (!loadConsultants(db).some((c) => c.consultant_id === consultantId))
-        return err(res, 404, 'NOT_FOUND', '顾问不存在');
-      json(res, 200, ttcAuthStatus(db, consultantId));
-    },
-    'POST /api/v1/ttc/ext-sync': async (req, res) => {
-      const origin = String(req.headers.origin || '');
-      const referer = String(req.headers.referer || '');
-      const fromExtension = origin.startsWith('chrome-extension://') || referer.startsWith('chrome-extension://');
-      const fromLocal = /^https?:\/\/(127\.0\.0\.1|localhost):/.test(origin) || /^https?:\/\/(127\.0\.0\.1|localhost):/.test(referer);
-      if (!fromExtension && !fromLocal) return err(res, 403, 'FORBIDDEN', '仅接受浏览器扩展或本地来源');
-      const b = await body(req);
-      const jwt = String(b?.jwt || '').trim();
-      const consultantId = String(b?.consultant_id || b?.consultantId || 'felix').trim();
-      if (!jwt) return err(res, 400, 'EMPTY', '没收到 JWT');
-      if (jwt.length > 8192) return err(res, 400, 'TOO_LONG', '长度异常，确认只发送了 token 值');
-      if (!loadConsultants(db).some((c) => c.consultant_id === consultantId))
-        return err(res, 422, 'BAD_CONSULTANT', '顾问不存在，请在扩展里选择正确的顾问');
-      let meta;
-      try { meta = validateJwt(jwt); } catch (e) { return err(res, 422, 'BAD_JWT', e.message); }
-      try { await ttcQuota(jwt); } catch (e) {
-        if (e instanceof TtcApiError && e.authInvalid) {
-          return err(res, 401, 'TTC_AUTH_INVALID', 'JWT 无效或已失效——回 TTC 系统重新登录后扩展会自动重试');
-        }
-        return err(res, 502, 'TTC_UNREACHABLE', '连不上 TTC 接口，稍后再试');
-      }
-      saveTtcToken(db, consultantId, jwt, meta);
-      json(res, 200, { ok: true, consultant_id: consultantId, ...ttcAuthStatus(db, consultantId) });
     },
 
     // 职位快照（外部系统消费，替代直打 CRM job/search；API Key 鉴权，不走 session）
@@ -600,7 +525,7 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
     'POST /api/v1/push/preview': (req, res, cid) => {
       const sync = latestRealSync(db, cid);
       const snapshot = latestCompleteSnapshot(db, cid);
-      const run = latestRun(db, cid, { hideEngaged: true }); // Top3/推送/列表统一隐藏承接态与已 × 职位
+      const run = latestRun(db, cid);
       const c = commitmentSummary(db, cid);
       const name = loadConsultants(db).find((x) => x.consultant_id === cid)?.display_name || cid;
       const card = sync && !sync.complete
@@ -614,7 +539,7 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       const b = await body(req);
       const sync = latestRealSync(db, cid);
       const snapshot = latestCompleteSnapshot(db, cid);
-      const run = latestRun(db, cid, { hideEngaged: true }); // Top3/推送/列表统一隐藏承接态与已 × 职位
+      const run = latestRun(db, cid);
       const c = commitmentSummary(db, cid);
       const name = loadConsultants(db).find((x) => x.consultant_id === cid)?.display_name || cid;
       const kind = sync && !sync.complete ? 'SYNC_ALERT' : 'DAILY_TOP3';
@@ -655,10 +580,12 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
                     // 人才库健康探测：纯状态（后端类型/连通性/建表），不含任何用户数据或密码，
                     // 允许未登录访问，以便数据源页无论登录与否都能显示真库连接状态。
                     'GET /api/v1/talent/health', 'GET /api/v1/talent/status',
-                    // 职位快照：外部系统无 session 凭 API Key 读取（verifySnapshotKey，未配置 fail-closed）。
+                    // 职位快照：外部系统（York AI worker 等）无 brainx session，凭 API Key 读取；
+                    // 鉴权在 handler 内自校验（verifySnapshotKey），未配置 key 时 fail-closed 全拒。
                     'GET /api/v1/jobs/snapshot', 'GET /api/v1/meta/guard',
                     'POST /api/v1/meta/client-error', // 浏览器端错误探针：未必有 session，只写聚合日志
-                    'GET /api/v1/feedback/quick']; // 一键反馈：签名即鉴权（verifyQuick fail-closed）
+                    // 一键反馈：无 session，HMAC 签名即鉴权（verifyQuick fail-closed）
+                    'GET /api/v1/feedback/quick'];
       const cid = open.includes(`${req.method} ${path}`) ? null : auth(req, res);
       if (open.includes(`${req.method} ${path}`) || cid) {
         try { return await handler(req, res, cid, u.searchParams, dynId); }
@@ -718,22 +645,21 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   }
   const shutdown = () => {
     if (frontendProcess && !frontendProcess.killed) frontendProcess.kill('SIGTERM');
-    // SSE 恒非 idle 会让 server.close 永等——先结束 SSE，再 closeAllConnections，5s 强退保底
-    for (const res of sseClients.keys()) { try { res.end(); } catch { /* 已断开 */ } }
-    sseClients.clear();
     server.close(() => process.exit(0));
-    server.closeAllConnections?.();
-    setTimeout(() => process.exit(0), 5000).unref();
   };
   process.once('SIGINT', shutdown);
   process.once('SIGTERM', shutdown);
   server.listen(port, host, () => console.log(`Brain X 工作台: http://${host}:${port}`));
-  if (process.env.BRAINX_EMBED_WORKER === '0') {
-    // 拆分模式（A 方案）：bridge/定时推送在独立 worker 进程（npm run worker），
-    // 本进程只跑 HTTP/SSE 永不阻塞；worker 事件经 worker_events 表泵回浏览器。
-    startRelayPump(db, server.bus);
-    console.log('拆分模式：批处理由独立 worker 进程承担（npm run worker）');
-  } else {
-    startWorkerTasks(db, server.bus); // 嵌入模式（默认）：行为与拆分前一致
+  // 桥接常驻：BRAINX_BRIDGE_INTERVAL_MS（默认 180s）；BRAINX_BRIDGE_OFF=1 关闭
+  if (process.env.BRAINX_BRIDGE_OFF !== '1') {
+    startBridge(db, server.bus, {
+      recommendFn: (cid) => recommend(db, cid, { top: 20, throttle: true }), // 方案 A：自动轮次快照未变<2h 跳过冻结
+      consultantIdsFn: () => loadConsultants(db).map((c) => c.consultant_id),
+      onRecommended: makeAutoPush(db), // 重大变化自动推卡；BRAINX_PUSH_AUTO=1 才真发
+    });
+    console.log(`桥接器已启动（间隔 ${Number(process.env.BRAINX_BRIDGE_INTERVAL_MS || 180000) / 1000}s）`);
   }
+  // 定时推送：每天 07:00 / 19:00（CST）给每位顾问发 Top3 卡；BRAINX_PUSH_SCHEDULE=0 关闭
+  startScheduler(db);
+  console.log('定时推送已启动（07:00 / 19:00 CST）');
 }

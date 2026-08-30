@@ -21,9 +21,7 @@ const POLL_TIMEOUT_MS = 35 * 60_000;
 const running = new Set(); // `${project_id}|${consultant_id}`
 
 async function ttcFetch(path, jwt, method = 'POST', body = undefined, timeoutMs = CRM_TIMEOUT_MS) {
-  // 绝对 URL 原样使用（pollAsyncResult/loadPersisted 传完整 OPENMAI_BASE 地址），
-  // 相对路径才拼 API_BASE——此前无条件拼接产生 https://api...https://gateway... 畸形 URL。
-  const resp = await fetch(path.startsWith('http') ? path : `${API_BASE}${path}`, {
+  const resp = await fetch(`${API_BASE}${path}`, {
     method,
     headers: { Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json', Accept: 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),

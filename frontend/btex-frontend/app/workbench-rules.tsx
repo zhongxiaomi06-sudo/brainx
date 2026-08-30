@@ -9,7 +9,7 @@ const DIMENSIONS = [
   { dim: "direction", label: "职位方向匹配", note: "画像关键词与历史方向" },
   { dim: "activity", label: "项目活跃度与 Pipeline", note: "群活跃、优先级与新鲜度" },
   { dim: "similarity", label: "与历史项目相似度", note: "与你主做过的项目文本重合" },
-  { dim: "capacity", label: "当前承接容量", note: "关注与接单越满，此维分越低" },
+  { dim: "capacity", label: "当前跟进容量", note: "关注与跟进项目越多，此维分越低" },
   { dim: "outcomes", label: "历史行为与交付结果", note: "交付评分；缺数据则不参与归一" },
   { dim: "exploration", label: "探索额度", note: "每日确定性探索位" },
 ] as const;
@@ -86,7 +86,7 @@ export function Rules({ notify, mode, policy, keywords, note, onRefresh, onProfi
     setSaving(true);
     try {
       await brainxFetch<ProfileUpdate>("/api/v1/profile", { method: "PUT", body: { weights: next || {} } });
-      const run = await brainxFetch<BackendRecommendationRun>("/api/v1/recommendations/run", { method: "POST", timeoutMs: 120000 });
+      const run = await brainxFetch<BackendRecommendationRun>("/api/v1/recommendations/run", { method: "POST" });
       await onRefresh();
       if (!next) { setWeights({ ...BASELINE }); setCustomized(false); }
       else setCustomized(true);

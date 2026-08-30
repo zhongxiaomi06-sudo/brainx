@@ -135,6 +135,18 @@
   padding: 12px 0;
   border-bottom: 1px solid rgba(32, 79, 68, .09);
 }
+.commitment-timeline {
+  padding: 17px 18px 5px;
+  border: 1px solid rgba(23, 76, 64, .1);
+  border-radius: 15px;
+  background: #fff;
+}
+.commitment-timeline h2 { margin-bottom: 5px; }
+.commitment-idle-actions {
+  justify-content: flex-end;
+  margin-top: 0;
+  padding-top: 1px;
+}
 .commitment-timeline article i {
   width: 6px;
   height: 6px;

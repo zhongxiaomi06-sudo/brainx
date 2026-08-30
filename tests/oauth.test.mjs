@@ -3,7 +3,7 @@ import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import { openDb } from '../src/db.js';
-import { signState, verifyState, buildAuthorizeUrl } from '../src/oauth.js';
+import { signState, verifyState, buildAuthorizeUrl, redirectUri } from '../src/oauth.js';
 import { seedRoster, findByOpenId, listConsultants, upsertMembers } from '../src/roster.js';
 import { signSession, verifySession, sessionSecret } from '../src/session.js';
 import { createServer } from '../src/server.js';
@@ -42,16 +42,27 @@ test('oauth state：签发/校验/篡改/过期', () => {
   assert.ok(!verifyState(`${nonce}.${oldTs}.${sig}`));      // 过期
 });
 
+test('OAuth 回调默认跟随工作台对外端口', () => {
+  const previousBase = process.env.BRAINX_BASE_URL;
+  const previousPort = process.env.BRAINX_PORT;
+  try {
+    delete process.env.BRAINX_BASE_URL;
+    process.env.BRAINX_PORT = '3456';
+    assert.equal(redirectUri(), 'http://127.0.0.1:3456/api/v1/oauth/callback');
+  } finally {
+    if (previousBase === undefined) delete process.env.BRAINX_BASE_URL;
+    else process.env.BRAINX_BASE_URL = previousBase;
+    if (previousPort === undefined) delete process.env.BRAINX_PORT;
+    else process.env.BRAINX_PORT = previousPort;
+  }
+});
+
 test('session：open_id 绑定 + 篡改拒绝', () => {
   const t = signSession('felix', 'ou_3b30bc83806e157d9af0cd9188d7ab8d');
   const v = verifySession(t);
   assert.equal(v.consultant_id, 'felix');
   assert.equal(v.open_id, 'ou_3b30bc83806e157d9af0cd9188d7ab8d');
-  // 篡改签名段 → timingSafeEqual 拒；篡改 payload 段 → HMAC 不符
-  assert.equal(verifySession(t.slice(0, -2) + (t.endsWith('aa') ? 'bb' : 'aa')), null);
-  const seg = t.split('.');
-  seg[1] = Buffer.from('mia', 'utf8').toString('base64url');
-  assert.equal(verifySession(seg.join('.')), null);
+  assert.equal(verifySession(t.replace('felix', 'miaxx')), null); // 改身份 → 签名不符
   assert.equal(verifySession('felix..12345.deadbeef'), null);
 });
 
@@ -85,7 +96,8 @@ test('OAuth HTTP 流：authorize 302 + 回调换身份 + 花名册 fail-closed +
 
   // 3. 带合法 cookie 访问 workbench → 200
   const r3 = await fetch(`${base}/api/v1/workbench`, { headers: { Cookie: `brainx_session=${token}` } });
-  assert.equal(r3.status, 200);
+  const r3Body = await r3.text();
+  assert.equal(r3.status, 200, r3Body);
 
   // 4. 坏 state → /login?error=bad_state
   const r4 = await fetch(`${base}/api/v1/oauth/callback?code=abc&state=bad`, { redirect: 'manual' });

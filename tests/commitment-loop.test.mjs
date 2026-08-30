@@ -203,6 +203,7 @@ test('HTTP 契约：接单校验、详情扩展、拒绝直接 COMPLETE 与跨�
   assert.equal(payload.commitment_goal, '确认下一轮');
   assert.equal(payload.active_action.title, '联系客户');
   assert.ok(Array.isArray(payload.action_history));
+  assert.equal(payload.action_history.length, 0);
   assert.equal(payload.legal_actions.includes('COMPLETE'), false);
 
   const otherHeaders = { Cookie: `brainx_session=${encodeURIComponent(signSession('mia', 'ou_mia'))}` };

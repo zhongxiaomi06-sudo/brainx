@@ -69,13 +69,13 @@ export async function fetchBitablePayloadApi(token, fetchImpl = fetch) {
 
 /** 拉某群增量消息（游标之后；重叠由 message_id 主键去重）。lark-cli 通道（兼容保留）。
  * 冷启动（无游标）用 desc 拿最新一页建游标；有游标后 asc 向前走。 */
-export async function fetchNewMessages(db, chat_id, execImpl = lark, consultant_id = null) {
+export function fetchNewMessages(db, chat_id, execImpl = lark, consultant_id = null) {
   const key = cursorKey(chat_id, consultant_id);
   const cur = db.prepare('SELECT checkpoint FROM bridge_cursor WHERE source=?').get(key);
   const args = ['im', '+chat-messages-list', '--chat-id', chat_id,
     '--order', cur ? 'asc' : 'desc', '--page-size', '50', '--no-reactions', '--format', 'json'];
   if (cur) args.push('--start', toIso(cur.checkpoint));
-  const d = await execImpl(args); // lark 是 async：缺 await 时 d 是 Promise，消息静默恒空
+  const d = execImpl(args);
   const msgs = d?.data?.messages || [];
   return msgs.filter((m) => !m.deleted && m.message_id);
 }
@@ -246,43 +246,54 @@ export async function bridgeOnce(db, { consultant_ids, execImpl = lark, api = { 
       const rrIdx = prevRr ? Number(prevRr.checkpoint) || 0 : 0;
       const cid = withJwt[rrIdx % withJwt.length];
       const jwt = getValidTtcJwt(db, cid);
-      // 增量水位（2026-08-25）：职位按 update_time 降序，翻到不新即停——
-      // 日常 1-3 页/顾问，替代 91 页全量（限流期间单页探测 200、91 页爬取 -90429 的根因）
+      // 首次全量与后续增量共用可恢复游标。限流时必须保存 TTC 返回的 cursor；
+      // 只推进 update_time 水位会跳过尚未翻到的旧页，造成“永远只有第一页”。
+      const doneKey = `ttc_backfill_done@${cid}`;
+      const cursorKey = `ttc_scan_cursor@${cid}`;
+      const highKey = `ttc_scan_high@${cid}`;
+      const backfillDone = db.prepare('SELECT checkpoint FROM bridge_cursor WHERE source=?').get(doneKey);
+      const resume = db.prepare('SELECT checkpoint FROM bridge_cursor WHERE source=?').get(cursorKey);
       const wm = db.prepare('SELECT checkpoint FROM bridge_cursor WHERE source=?').get('ttc_watermark');
-      const sinceMs = wm ? Date.parse(wm.checkpoint) || 0 : 0;
+      const sinceMs = backfillDone && wm ? Date.parse(wm.checkpoint) || 0 : 0;
+      const savedCursor = resume?.checkpoint || '';
+      const numericCursor = Number(savedCursor);
+      const initialCursor = savedCursor && Number.isSafeInteger(numericCursor) ? numericCursor : savedCursor;
+      // checkpoint 一律按字符串绑定：node:sqlite（Node 22）把 JS number 绑成 REAL，
+      // TEXT affinity 转回文本时得科学计数串——读回精度漂移（...316 变 ...320）。
+      const putCursor = (source, checkpoint) => db.prepare(`INSERT INTO bridge_cursor
+        (source, checkpoint, updated_at) VALUES (?,?,?) ON CONFLICT(source) DO UPDATE SET
+        checkpoint=excluded.checkpoint, updated_at=excluded.updated_at`).run(source, String(checkpoint), now());
       try {
-        const { jobs, complete: ttcComplete } = await searchSince(jwt,
-          { sinceMs, paceMs: TTC_PAGE_PACE_MS }, fetchImpl);
+        // TTC 的限流响应会消费本次请求携带的 cursor；同轮继续翻页后再重试会报 -111。
+        // 因此每 tick 只取一页，先持久化下一页 cursor，下个 tick 再继续。
+        const { jobs, complete: ttcComplete, nextCursor } = await searchSince(jwt,
+          { sinceMs, initialCursor, paceMs: TTC_PAGE_PACE_MS, maxPages: 1 }, fetchImpl);
         for (const j of jobs) {
           if (!j.unique_id || j.has_permission === false) continue;
           if (!union.has(j.unique_id)) union.set(j.unique_id, toJobRow(j));
         }
-        // 水位推进纪律（2026-08-27 修正棘轮跳空）：降序分页 + 查询语义是
-        // 「update_time > sinceMs」，截断时把水位推进到已抓前缀最大值会永久跳过
-        // (旧水位, 已抓最小值] 区间的职位变更（searchSince 契约：sinceMs 不前进，
-        // 下轮自然补齐）。故只有完整爬完（ttcComplete）才推进水位；
-        // 截断轮次保留原水位，已抓前缀照常入库（降序前缀是新数据，安全），
-        // 代价是下轮重拉前缀（配额开销），但绝无数据跳空。
-        if (ttcComplete) {
-          const maxU = Math.max(sinceMs, ...jobs.map((j) => Number(j.update_time) || 0));
-          if (maxU > sinceMs) {
-            db.prepare(`INSERT INTO bridge_cursor (source, checkpoint, updated_at) VALUES (?,?,?)
-              ON CONFLICT(source) DO UPDATE SET checkpoint=excluded.checkpoint, updated_at=excluded.updated_at`)
-              .run('ttc_watermark', new Date(maxU).toISOString(), now());
-          }
-        }
+        const previousHigh = db.prepare('SELECT checkpoint FROM bridge_cursor WHERE source=?').get(highKey);
+        const maxU = Math.max(Number(previousHigh?.checkpoint) || sinceMs,
+          ...jobs.map((j) => Number(j.update_time) || 0));
+        if (maxU > 0) putCursor(highKey, String(maxU));
         if (ttcComplete) {
           sourcesOk++; // TTC 通道畅通（0 新增也是成功：上游真的没变化）
-          db.prepare(`INSERT INTO bridge_cursor (source, checkpoint, updated_at) VALUES (?,?,?)
-            ON CONFLICT(source) DO UPDATE SET checkpoint=excluded.checkpoint, updated_at=excluded.updated_at`)
-            .run(rrKey, String((rrIdx + 1) % withJwt.length), now());
-        } else if (jobs.length) {
-          ttcErrs.push(`${cid}:限流中断，水位棘轮 +${jobs.length} 条（下轮从新水位续爬）`);
+          if (maxU > 0) putCursor('ttc_watermark', new Date(maxU).toISOString());
+          putCursor(doneKey, '1');
+          db.prepare('DELETE FROM bridge_cursor WHERE source IN (?,?)').run(cursorKey, highKey);
+          putCursor(rrKey, String((rrIdx + 1) % withJwt.length));
+        } else if (jobs.length && nextCursor) {
+          // 有进展的限流不是源故障：正常间隔续传，避免指数退避把全量恢复拖到数小时。
+          sourcesOk++;
+          putCursor(cursorKey, nextCursor);
         } else {
           ttcErrs.push(`${cid}:限流中断，无新数据`);
         }
       } catch (e) {
         if (e instanceof TtcApiError && e.authInvalid) markTtcReauth(db, cid);
+        if (e instanceof TtcApiError && e.code === -111 && initialCursor) {
+          db.prepare('DELETE FROM bridge_cursor WHERE source IN (?,?)').run(cursorKey, highKey);
+        }
         ttcErrs.push(`${cid}:${String(e.message).slice(0, 60)}`);
         if (isRateLimited(e)) ttcErrs.push('限流 fail-fast：本轮放弃其余顾问');
       }
@@ -411,11 +422,11 @@ export function startBridge(db, bus, { intervalMs, recommendFn, consultantIdsFn,
           }
           if (recommendFn) {
             for (const cid of cids) {
-              try { recommendFn(cid); } catch { /* 阻断不致命 */ }
-              try {
-                const r = onRecommended?.(cid);
-                if (r && typeof r.catch === 'function') r.catch(() => {}); // async 闭包的 rejection 也要接住
-              } catch { /* 推卡失败不影响桥接 */ }
+              let result = null;
+              try { result = await recommendFn(cid); } catch { /* 阻断不致命 */ }
+              // 节流/阻断只复用旧轮次，不得伪装成“推荐已更新”或重复推卡。
+              if (!result?.run_id || result.skipped || result.blocked) continue;
+              try { onRecommended?.(cid); } catch { /* 推卡失败不影响桥接 */ }
               bus?.emit({ type: 'recommend', consultant_id: cid, at: now() });
             }
           }
@@ -423,9 +434,7 @@ export function startBridge(db, bus, { intervalMs, recommendFn, consultantIdsFn,
         // 判定依据 sources_ok：所有源都不可达才是失败（2026-08-26 修正——
         // 「源畅通但零新增」曾被误判为全断，健康状态被无限退避 + 误报横幅）。
         // 真实部分失败（errors 非空）仍走退避；仅令牌失效不算源失败。
-        // 无人托管凭据（skipped 全员）≠ 源断：sources_ok=0 且零错误时静默跳过即可，
-        // 此前误报「TTC 与 Bitable 均不可用」并给每顾问写 bridge-error 行（表膨胀 + 误导）。
-        if (out.sources_ok === 0 && out.errors.length === 0 && out.skipped.length === 0) {
+        if (out.sources_ok === 0 && out.errors.length === 0) {
           failed = true;
           bus?.emit({ type: 'sync_error', message: '职位源拉取失败（TTC 与 Bitable 均不可用）', at: now() });
         }

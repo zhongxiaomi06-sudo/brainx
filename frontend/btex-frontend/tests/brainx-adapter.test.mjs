@@ -6,6 +6,8 @@ import {
   eligibilityOf,
   factsOf,
   groupOf,
+  getRadar,
+  getTtcFieldReport,
   mapClientRow,
   mapEvents,
   mapOutcomes,
@@ -15,6 +17,9 @@ import {
   mapSyncStatus,
   BrainxApiError,
 } from "../app/brainx-api.ts";
+import { mergeOpportunityDetail, newestEvents, toDecisionJobDetail, toRadarJobDetail } from "../app/job-detail-data.ts";
+import { projectToDecisionJob } from "../app/brainx-projects-api.ts";
+import { mapRecommendationPage } from "../app/brainx-recommendation-pages-api.ts";
 
 const sampleRec = {
   decision_id: "d-1",
@@ -54,6 +59,37 @@ const sampleRec = {
   },
 };
 
+const samplePresentation = {
+  decision_tier: "VERIFY",
+  decision_tier_reason: { code: "FACTS_REQUIRE_VERIFICATION", text: "关键事实不足，先核验再推进" },
+  data_confidence: {
+    band: "INSUFFICIENT",
+    rule_version: "data-confidence-1.0",
+    missing_fields: ["HC", "当前阶段"],
+    latest_fact_at: "2026-08-07T00:40:00.000Z",
+    age_days: 22,
+    stale: false,
+    reasons: [{ code: "CRITICAL_FACTS_MISSING", text: "HC、当前阶段待确认" }],
+    primary_risk: "HC、当前阶段待确认，推进前请先核验。",
+  },
+  recent_activity: {
+    type: "JOB_FACT_UPDATED", label: "职位事实更新",
+    occurred_at: "2026-08-07T00:40:00.000Z", source: "SYNC", detail: null,
+  },
+  presentation_version: "recommendation-presentation-1.0",
+  presentation_source: "FROZEN",
+};
+
+test("decision trail keeps only the newest three events", () => {
+  const ordered = newestEvents([
+    { id: "old", at: "08/30 12:42" },
+    { id: "latest", at: "08/30 17:49" },
+    { id: "middle", at: "08/30 17:16" },
+    { id: "older", at: "08/30 13:52" },
+  ]);
+  assert.deepEqual(ordered.map(event => event.id), ["latest", "middle", "older"]);
+});
+
 test("maps a backend recommendation into a workbench decision job", () => {
   const job = mapRecommendation(sampleRec);
   assert.equal(job.id, "P-FIX-E5FC611B");
@@ -70,6 +106,36 @@ test("maps a backend recommendation into a workbench decision job", () => {
   assert.equal(job.scoreNotes.length, 2);
   assert.equal(job.evidence.length, 2);
   assert.equal(job.actions[0].kind, "advance");
+});
+
+test("maps run-bound recommendation page metadata and legal state", () => {
+  const page = mapRecommendationPage({
+    blocked: false,
+    run_id: "run-1",
+    snapshot_id: "snapshot-1",
+    policy_version: "baseline-1.1",
+    generated_at: "2026-08-29T08:00:00Z",
+    evaluated_count: 5313,
+    total_count: 45,
+    page_size: 20,
+    sort: "recent",
+    next_cursor: "cursor-20",
+    new_run_available: false,
+    items: [{ ...sampleRec, ...samplePresentation,
+      engagement_state: "WATCHED", legal_actions: ["VIEW", "UNWATCH", "ACCEPT"] }],
+  });
+  assert.equal(page.runId, "run-1");
+  assert.equal(page.totalCount, 45);
+  assert.equal(page.evaluatedCount, 5313);
+  assert.equal(page.nextCursor, "cursor-20");
+  assert.equal(page.sort, "recent");
+  assert.equal(page.engagement["P-FIX-E5FC611B"], "WATCHED");
+  assert.deepEqual(page.jobs[0].brainxLegal, ["UNWATCH", "ACCEPT"]);
+  assert.equal(page.jobs[0].facts["决策层级"], "VERIFY");
+  assert.equal(page.jobs[0].facts["事实可信度"], "INSUFFICIENT");
+  assert.equal(page.jobs[0].facts["事实可信度规则"], "data-confidence-1.0");
+  assert.equal(page.jobs[0].facts["最近活动"], "职位事实更新");
+  assert.equal(page.jobs[0].facts["最近活动时间"], "2026-08-07T00:40:00.000Z");
 });
 
 test("treats null HC as UNKNOWN, never as 0", () => {
@@ -191,7 +257,10 @@ test("maps backend radar rows without inventing operational metrics", () => {
     company: "蝴蝶梦境",
     role: "海外增长负责人",
     city: "上海",
+    cities: ["上海市", "北京市"],
     pipeline: "推荐 3 · 面试 1",
+    pipeline_steps: { recommendation: 3, interview: 1 },
+    owner_name: "Mia 钟笑咪",
     hc: null,
     active_state: "OPEN",
     relation: "TEAM_SHARED",
@@ -203,11 +272,67 @@ test("maps backend radar rows without inventing operational metrics", () => {
   assert.equal(row.status, "活跃");
   assert.equal(row.source, "市场信号");
   assert.equal(row.hc, null); // UNKNOWN 原样为 null，绝不写 0
+  assert.deepEqual(row.cities, ["上海市", "北京市"]);
+  assert.deepEqual(row.pipelineSteps, { recommendation: 3, interview: 1 });
+  assert.equal(row.ownerName, "Mia 钟笑咪");
   assert.equal(row.score, null);
   assert.equal(row.recommended, null);
   assert.equal(row.pm, "团队共享");
   assert.match(row.reason, /Pipeline/);
   assert.equal(row.positionType, "商业化");
+});
+
+test("keeps notes and merges one complete detail contract for both job entries", () => {
+  const base = toRadarJobDetail({
+    project_id: "P-DETAIL-1", company: "示例客户", role: "平台研发负责人",
+    cities: ["上海市"], active_state: "OPEN", hc: 1, relation: "TEAM_SHARED",
+    priority: "HIGH", notes: "必须完整保留的职位说明", source_url: "https://example.com/job/1",
+  });
+  assert.equal(base.notes, "必须完整保留的职位说明");
+  assert.equal(base.priority, "HIGH");
+
+  const merged = mergeOpportunityDetail(base, {
+    job: { project_id: "P-DETAIL-1", pipeline_steps: { Interview: 2 }, owner_name: "顾问甲", notes: "后端最新备注" },
+    relation: { relation: "TEAM_SHARED" }, engagement_state: "VIEWED", legal_actions: [], outcomes: [],
+    events: [{ event_type: "VIEWED", occurred_at: "2026-08-27T10:30:00Z", reason: "今日决策打开" }],
+    latest_recommendation: { decision_id: "D-1", score: 90, action: "RECOMMEND_ACCEPT", reasons: ["动能明确"], risks: [], evidence_refs: [], created_at: "2026-08-27T10:25:00Z" },
+  });
+  assert.equal(merged.notes, "后端最新备注");
+  assert.deepEqual(merged.pipeline, { Interview: 2 });
+  assert.equal(merged.events?.[0].detail, "今日决策打开");
+
+  const today = toDecisionJobDetail({ ...mapRecommendation({ ...sampleRec, job: { ...sampleRec.job, notes: "今日决策备注" } }) }, []);
+  assert.equal(today.notes, "今日决策备注");
+});
+
+test("normalizes radar field capabilities and sync report for the frontend", async () => {
+  const backendReport = {
+    sync_id: "sync-1", consultant_id: "mia", created_at: "2026-08-26T00:00:00Z",
+    schema_version: "ttc-job-search-2026-08-26", total_rows: 1,
+    rows_expected: 1, rows_read: 1, complete: true, errors: [], warnings: [],
+    fields: [{ key: "city", label: "城市", kind: "text-list", populated: 1, coverage: 1,
+      display_available: true, filter_available: true }],
+  };
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (path) => new Response(JSON.stringify(String(path).includes("field-report")
+    ? { report: backendReport }
+    : {
+        schema_version: backendReport.schema_version,
+        items: [{ project_id: "p-1", cities: ["上海市"], pipeline_steps: { Interview: 1 }, owner_name: "Mia" }],
+        field_capabilities: backendReport.fields,
+        field_report: backendReport,
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+  try {
+    const radar = await getRadar();
+    assert.equal(radar.schemaVersion, backendReport.schema_version);
+    assert.equal(radar.fieldCapabilities[0].filterAvailable, true);
+    assert.equal(radar.fieldReport.syncId, "sync-1");
+    const report = await getTtcFieldReport();
+    assert.equal(report.totalRows, 1);
+    assert.equal(report.fields[0].displayAvailable, true);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("maps cockpit radar rows as 驾驶舱导入 with cockpit context", () => {
@@ -259,4 +384,20 @@ test("classifies radar position types from role text", () => {
   assert.equal(classifyRadarPositionType("产品经理"), "产品");
   assert.equal(classifyRadarPositionType("海外投放经理"), "商业化");
   assert.equal(classifyRadarPositionType("前端开发"), "技术");
+});
+
+test("maps a real project summary without inventing score or HC", () => {
+  const job = projectToDecisionJob({
+    project_id: "P-MY-1", relation: "MY_JOB", membership_source: "MANUAL_CONFIRMATION",
+    joined_at: "2026-08-29T00:00:00.000Z", company: "真实客户", role: "增长负责人",
+    city: "上海", active_state: "OPEN", hc: null, pipeline: "面试 2", current_stage: "面试",
+    pipeline_snapshot: null, next_action: null, owner_name: "Mia", captured_at: "2026-08-28T00:00:00.000Z",
+    engagement_state: "NEW", state_since: null, project_status: "PENDING_START", active_action: null,
+    legal_actions: ["WATCH", "ACCEPT", "DISMISS"],
+  });
+  assert.equal(job.id, "P-MY-1");
+  assert.equal(job.finalScore, "—");
+  assert.equal(job.facts["剩余 HC"], "UNKNOWN");
+  assert.equal(job.recentSignal, "面试");
+  assert.deepEqual(job.brainxLegal, ["WATCH", "ACCEPT", "DISMISS"]);
 });

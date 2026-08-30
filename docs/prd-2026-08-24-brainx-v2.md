@@ -6,7 +6,7 @@
 
 ## 1. 产品定位
 
-**一句话**：猎头团队的「今天该做哪个职位」决策系统——多源职位数据自动同步，确定性评分给每位顾问出每日 Top 推荐，顾问在工作台/飞书卡片上承接、关注、关闭，全流程事件溯源可回放。
+**一句话**：猎头团队的「今天该做哪个职位」决策系统——多源职位数据自动同步，以可解释的决策分层和稳定排序给每位顾问生成推荐队列，顾问在工作台/飞书卡片上承接、关注、关闭，全流程事件溯源可回放。
 
 **解决什么问题**：
 - 团队 ~900 个在招职位，顾问靠群里刷消息和个人记忆选单，优质职位被埋没、撞单、接单后没人跟进结果；
@@ -67,6 +67,8 @@
 ## 4. 核心功能（已实现，真机验证通过）
 
 ### 4.1 推荐引擎（baseline-1.0）
+
+> 本节记录当前已实现能力。推荐队列、决策分层、卡片信息和动作闭环的目标产品架构，以[推荐队列与职位决策产品架构](recommendation-queue-product-architecture.md)为准；现有 Top20 与综合分展示不得被理解为已经完成目标架构。
 - **六维确定性评分**：`FinalScore = ProcessScore×60% + ExplorationScore×25% + PersonalScore×15%`，同批输入同排序，禁随机数；UNKNOWN 关系硬阻断；FILLED/CLOSED/EXCLUDE 出榜。
 - **快照闸门**：同步不完整 → 推荐 blocked 不落库，前端出「数据不完整」提示。
 - **推荐分页**：精选盘 pick tray + 下一批 + 不感兴趣反馈（含撤销/补充原因）。
@@ -185,7 +187,7 @@ ACCEPTED(+2) / WATCHED·VIEWED(+1) / 7 天静默(-1) / DISMISSED·NOT_INTERESTED
 9. 独立 ECS 迁移（两 IP 分离，用户拍板规格/地域）；
 10. TTC 抓取阶段 2/3（company/pipeline 抓包、驾驶舱群名自动发现、群消息 DRY_RUN）；
 11. CRM `job/export` 治本（外部依赖 CRM 团队排期）；
-12. DB 膨胀治理专项。
+12. DB 膨胀治理专项：生成侧与机器轨迹清理已在本地完成，目标环境发布、清理和水位告警待办。
 
 ---
 
@@ -210,7 +212,7 @@ ACCEPTED(+2) / WATCHED·VIEWED(+1) / 7 天静默(-1) / DISMISSED·NOT_INTERESTED
 | 2 | 本地 launchd 定位 | **降级为纯开发：关停 bridge + scheduler**，不再承担数据同步与推送 | ✅ 已执行：plist 设 `BRAINX_BRIDGE_OFF=1`（仓库模板同步更新） |
 | 3 | otto 推送 | **有意排除**，维持现状（active 但不进定时推送对象） | 无需改动 |
 | 4 | ECS 迁移 | **待定**，不启动、不建云资源 | 挂起 |
-| 5 | DB retention | 待定（随 ECS 议题一并决策） | 挂起 |
+| 5 | DB retention | 推荐快照保留最近三轮；机器推荐不得进入人工轨迹 | ✅ 本地已实现并清理；目标环境待备份、发布和执行 |
 | 6 | 服务器遗留物 | **删除** | ✅ 已删 7 个 `diag_*.mjs`；备份目录与 `.bak` 早前已清，无残留 |
 
 > 决议 1+2 的系统影响：本地 launchd 实例此后只做前端/接口开发调试；数据同步、定时推送、打标数据源一律以云端容器为准。本地 DB 不再更新属预期行为，健康简报的数据停滞告警应改为只监控云端。
@@ -221,3 +223,5 @@ ACCEPTED(+2) / WATCHED·VIEWED(+1) / 7 天静默(-1) / DISMISSED·NOT_INTERESTED
 - [部署编排](DEPLOYMENT.md)
 - [安全操作手册](SECURITY.md)
 - [上传前完整验证](standards/PRE_PUSH_VERIFICATION.md)
+- [推荐队列与职位决策产品架构](recommendation-queue-product-architecture.md)
+- [高频自动推荐与决策轨迹膨胀审计](audits/2026-08-30-recommendation-event-growth.md)

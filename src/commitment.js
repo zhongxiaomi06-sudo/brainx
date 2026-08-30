@@ -100,7 +100,7 @@ export function commitmentDetails(db, consultant_id, project_id) {
   return {
     commitment_goal: latestAcceptedGoal(db, consultant_id, project_id),
     active_action: actions.find((item) => ['OPEN', 'BLOCKED'].includes(item.status)) || null,
-    action_history: actions,
+    action_history: actions.filter((item) => ['DONE', 'CANCELLED'].includes(item.status)),
     suggested_action: state === 'ACCEPTED' ? suggestedAction(db, consultant_id, project_id) : null,
     terminal_result_missing: state === 'COMPLETED' && !terminal,
   };
@@ -130,14 +130,12 @@ export function acceptCommitment(db, consultant_id, project_id, input = {}) {
   if (dueError) return fail(422, dueError);
   const state = currentState(db, consultant_id, project_id).state;
   if (state === 'ACCEPTED') {
-    // 先查幂等再查冲突：修复路径插行动不写 decision_event，同 key 重试时
-    // activeAction 已存在——先撞 409 会让重试方误判失败（幂等检查永不可达）。
+    const existing = activeAction(db, consultant_id, project_id);
+    if (existing) return fail(409, '该职位已有当前行动');
     const duplicateAction = db.prepare(`SELECT action_id FROM commitment_actions WHERE idempotency_key=?`)
       .get(`${input.idempotency_key}:action`);
     if (duplicateAction) return { ok: true, already: true, repaired: true, state,
       active_action: actionById(db, consultant_id, project_id, duplicateAction.action_id) };
-    const existing = activeAction(db, consultant_id, project_id);
-    if (existing) return fail(409, '该职位已有当前行动');
     return transact(db, () => ({ ok: true, repaired: true, state,
       active_action: insertAction(db, consultant_id, project_id, { title, goal,
         due_at: new Date(due_at).toISOString(), source: 'MANUAL', idempotency_key: `${input.idempotency_key}:action` }) }));

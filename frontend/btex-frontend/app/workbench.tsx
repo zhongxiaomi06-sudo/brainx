@@ -3,32 +3,46 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity, AlertTriangle, ArrowLeft, BarChart3, Bell, BriefcaseBusiness,
-  Check, ChevronDown, ChevronRight, CircleHelp, Clock3, Database, Filter, GitCompareArrows,
-  Infinity, ListFilter, MoreHorizontal, Plus, RotateCcw, Search, Settings2,
+  Check, ChevronDown, ChevronRight, CircleHelp, Clock3, Database, Filter,
+  MoreHorizontal, Plus, Search, Settings2,
   BellRing, CheckCircle2, CircleUserRound, ClipboardCheck, Send, ShieldCheck, SlidersHorizontal, Sparkles, Users, X, Zap,
 } from "lucide-react";
 import { actionLabel, seedAuth, seedNotifications, seedSync, stateLabel, type AuthStatus, type DecisionEvent, type EngagementCommand, type EngagementState, type Notification, type Outcome, type SyncStatus } from "./decision-demo";
-import { FALLBACK_DISMISS_REASONS, brainxFetch, connectSSE, fetchJobDetail, getSnapshot, makeIdempotencyKey, mapReplayData, mapRadarRow, mapClientRow, getRadar, getClients, getTalentSupply, updateWorkbenchPreferences, sendRecommendationFeedback, undoRecommendationFeedback, updateOpportunityMembership, rerunOpenmai, type TalentSupplySnapshot, type BackendConsultants, type BackendEngagementResponse, type BackendOutcomeResponse, type BackendRecommendationRun, type BackendReplay, type BackendSessionStatus, type BrainxReplay, type BrainxSnapshot, type OpenmaiResult, type RadarJob, type RadarClient } from "./brainx-api";
+import {
+  FALLBACK_DISMISS_REASONS, BrainxApiError, brainxFetch, connectSSE, fetchJobDetail,
+  getSnapshot, makeIdempotencyKey, mapReplayData, getRadar,
+  getClients, getTalentSupply, updateWorkbenchPreferences, sendRecommendationFeedback,
+  undoRecommendationFeedback, rerunOpenmai,
+  type TalentSupplySnapshot, type BackendConsultants, type BackendEngagementResponse,
+  type BackendOutcomeResponse, type BackendRecommendationRun, type BackendReplay,
+  type BackendSessionStatus, type BrainxReplay, type BrainxSnapshot, type OpenmaiResult,
+  type BackendClientRow, type RadarPayload,
+} from "./brainx-api";
+import { getProjects, projectToDecisionJob, updateOpportunityMembership, type ProjectSummary } from "./brainx-projects-api";
 import { streamAssistant, type AssistantMessage } from "./brainx-assistant-api";
-import { actionSeed, clients, cockpitRadarJobs, decisionGroupMeta, decisionJobs, DEFAULT_FOLDERS, demoRadarJobs, engagementPrerequisite, events, initialEngagement, initialEvents, initialOutcomes, INITIAL_TRAY_IDS, jobs, legalActions, nav, nextState, readSavedWorkbenchState, sourceNames, stateEvent, statusOrder, verificationJobs, type Client, type DecisionAction, type DecisionGroup, type DecisionJob, type Job, type MembershipRelation, type Page, type Panel, type PickFolder, type PositionType, type SourceMode } from "./workbench-model";
-import { DirectGlassSegment, DrawerSection, FilterSelect, Heading, StatusTag, type FilterSelectOption } from "./workbench-controls";
+import { actionSeed, clients, decisionGroupMeta, decisionJobs, DEFAULT_FOLDERS, engagementPrerequisite, events, initialEngagement, initialEvents, initialOutcomes, INITIAL_TRAY_IDS, legalActions, nextState, readSavedWorkbenchState, stateEvent, verificationJobs, type DecisionAction, type DecisionGroup, type DecisionJob, type MembershipRelation, type Page, type Panel, type PickFolder, type SourceMode } from "./workbench-model";
+import { DrawerSection, FilterSelect, Heading, StatusTag, type FilterSelectOption } from "./workbench-controls";
+import { JobDetailCard, type JobDetailReviewData, type JobDetailTab } from "./job-detail-card-review";
+import { mergeOpportunityDetail, newestEvents, toDecisionJobDetail } from "./job-detail-data";
+import { getOpportunityDetail } from "./brainx-opportunity-api";
 import { ManualFactSection } from "./workbench-facts";
-import { DecisionZone } from "./workbench-opportunity";
-import { PickTray } from "./workbench-pick-tray";
 import { Rules } from "./workbench-rules";
 import { CommitmentLoopPanel } from "./engagement-loop";
+import Sources from "./workbench-sources";
+import { WorkspaceEntry, type WorkspaceEntryKind } from "./workbench-entry";
+import { TodayDecisionQueue } from "./workbench-today";
+import { WorkbenchClientsPage, WorkbenchJobsPage } from "./workbench-fact-pages";
+import { WorkspaceShell, type WorkspaceShellPage } from "./workspace-shell";
+import { WorkbenchSettingsPage } from "./workbench-settings-page";
+import { ProjectsView } from "./projects-view";
+import { getRecommendationPage } from "./brainx-recommendation-pages-api";
+import { useRecommendationPages } from "./use-recommendation-pages";
 
 
-export default function DecisionWorkbench(){
+export default function DecisionWorkbench({demo=false}:{demo?:boolean}={}){
  const [hydrated,setHydrated]=useState(false);
  const [page,setPage]=useState<Page>("today");
  const [query,setQuery]=useState("");
- const [status,setStatus]=useState("全部状态");
- const [sort,setSort]=useState("score");
- const [view,setView]=useState<"list"|"rail">("list");
- const [selected,setSelected]=useState<Job["id"][]>([]);
- const [detail,setDetail]=useState<Job|null>(null);
- const [clientDetail,setClientDetail]=useState<typeof clients[number]|null>(null);
  const [drawer,setDrawer]=useState<string|null>(null);
  const [toast,setToast]=useState<{text:string;actions?:{label:string;onClick:()=>void}[];input?:{placeholder:string;onSubmit:(text:string)=>void}}|null>(null);
  const toastInputRef=useRef<HTMLInputElement>(null);
@@ -40,8 +54,6 @@ export default function DecisionWorkbench(){
  const [tray,setTray]=useState<string[]>([]);
  const [folders,setFolders]=useState<PickFolder[]>(DEFAULT_FOLDERS);
  const [folderMode,setFolderMode]=useState(false);
- const [eventType,setEventType]=useState("客户反馈");
- const [hc,setHc]=useState(3);
  const [panel,setPanel]=useState<Panel>(null);
  const [panelMotion,setPanelMotion]=useState<"idle"|"entering"|"open"|"closing">("idle");
  const panelAnimationFrame=useRef<number|null>(null);
@@ -55,14 +67,11 @@ export default function DecisionWorkbench(){
  const [sync,setSync]=useState<SyncStatus>(seedSync);
  const [auth,setAuth]=useState<AuthStatus>(seedAuth);
  const [notifications,setNotifications]=useState<Notification[]>(seedNotifications);
- const [mobileNavOpen,setMobileNavOpen]=useState(false);
- const [mobileDrawerProgress,setMobileDrawerProgress]=useState<number|null>(null);
- const mobileDrawerDrag=useRef<{pointerId:number;startX:number;startProgress:number;drawerWidth:number;lastX:number;lastAt:number;velocity:number;progress:number;moved:boolean}|null>(null);
- const mobileDrawerCloseTimer=useRef<number|null>(null);
  const [pendingCommand,setPendingCommand]=useState<{job:DecisionJob;command:EngagementCommand}|null>(null);
- // Brain X 后端连接态：connecting（探测中）→ connected（API 驱动）/ offline（演示模式回退）
+ // Brain X 后端连接态：connecting（探测中）→ connected（API 驱动）/ offline（真实数据不可用）；演示数据仅由 demo 属性显式开启
  const [brainxMode,setBrainxMode]=useState<"connecting"|"connected"|"offline">("connecting");
- const [workspaceMenuOpen,setWorkspaceMenuOpen]=useState(false);
+ const [workspaceIssue,setWorkspaceIssue]=useState<Exclude<WorkspaceEntryKind,"connecting">|null>(null);
+ const [connectAttempt,setConnectAttempt]=useState(0);
  const [assistantOpen,setAssistantOpen]=useState(false);
  const [assistantMessages,setAssistantMessages]=useState<AssistantMessage[]>([]);
  const [assistantInput,setAssistantInput]=useState("");
@@ -70,39 +79,131 @@ export default function DecisionWorkbench(){
  const [assistantSettings,setAssistantSettings]=useState(false);
  const assistantAbort=useRef<AbortController|null>(null);
  const [brainxJobs,setBrainxJobs]=useState<DecisionJob[]|null>(null);
- const [brainxRun,setBrainxRun]=useState<{snapshotId:string|null;policyVersion:string|null}>({snapshotId:null,policyVersion:null});
+ const [brainxConsultantId,setBrainxConsultantId]=useState("");
+ const [brainxRun,setBrainxRun]=useState<{runId:string|null;snapshotId:string|null;policyVersion:string|null}>({runId:null,snapshotId:null,policyVersion:null});
  const [brainxDismissReasons,setBrainxDismissReasons]=useState<string[]>(FALLBACK_DISMISS_REASONS);
  const [brainxReplay,setBrainxReplay]=useState<Record<string,BrainxReplay>>({});
  const [brainxKeywords,setBrainxKeywords]=useState<string[]>([]);
  const [brainxNote,setBrainxNote]=useState("");
- const [brainxRadar,setBrainxRadar]=useState<Job[]|null>(null);
- const [brainxClients,setBrainxClients]=useState<Client[]|null>(null);
- const feedbackJob=(job:DecisionJob)=>{const doDelete=async(reason:string)=>{const clean=(reason||"").trim().slice(0,200);const snapshot=brainxJobs;try{if(brainxMode==="connected"){await sendRecommendationFeedback(job.id,clean,brainxRun.snapshotId,makeIdempotencyKey(`recommendation-feedback:${job.id}`))}setBrainxJobs(current=>current?current.filter(item=>item.id!==job.id):current);notify(brainxMode==="connected"?"已减少此类推荐":"演示模式已隐藏该职位（不会写入后端）",{actions:[{label:"撤销",onClick:()=>{setBrainxJobs(snapshot);if(brainxMode==="connected")void undoRecommendationFeedback(job.id).then(()=>notify("已撤销不感兴趣")).catch(error=>notify(`撤销已恢复本地显示，但后端删除失败：${error instanceof Error?error.message:"后端未响应"}`,undefined,4000));if(brainxMode!=="connected")notify("已撤销不感兴趣")}}]})}catch(error){notify(`反馈失败：${error instanceof Error?error.message:"后端未响应"}`)}};notify(`为什么删除「${job.company} · ${job.role}」？（必填）`,{input:{placeholder:"例如：方向不符 / 客户质量不足 / 当前没精力…",onSubmit:(text)=>{void doDelete(text)}}})};
- const loadBrainxSide=useRef(async()=>{try{const [radar,clientsData]=await Promise.all([getRadar(),getClients()]);setBrainxRadar(radar.items.map(mapRadarRow) as unknown as Job[]);setBrainxClients(clientsData.items.map(mapClientRow) as unknown as Client[])}catch{/* 雷达/洞察加载失败不阻断决策主链路 */}});
- const brainxApply=useRef((snapshot:BrainxSnapshot)=>{setBrainxJobs(snapshot.jobs as DecisionJob[]);setEngagement(snapshot.engagement);setOpenmaiByJob(snapshot.openmai||{});setDecisionEvents(snapshot.events);setOutcomes(snapshot.outcomes);setSync(snapshot.sync);setAuth(snapshot.auth);setNotifications(snapshot.notifications);setBrainxDismissReasons(snapshot.dismissReasons);setBrainxRun({snapshotId:snapshot.snapshotId,policyVersion:snapshot.policyVersion});setBrainxKeywords(snapshot.profileKeywords);if(snapshot.preferences){setTray(snapshot.preferences.tray);setFolders(snapshot.preferences.folders.length?snapshot.preferences.folders:DEFAULT_FOLDERS);setFolderMode(!!snapshot.preferences.folderMode)} /* preferences 拉取失败（null）时保留现状，不回写清空 */;setBrainxMode("connected")});
- const loadBrainxSnapshot=useRef(async()=>{const snapshot=await getSnapshot();brainxApply.current(snapshot)});
+ const [brainxRadar,setBrainxRadar]=useState<RadarPayload|null>(null);
+ const [brainxClients,setBrainxClients]=useState<BackendClientRow[]|null>(null);
+ const [brainxProjects,setBrainxProjects]=useState<ProjectSummary[]>([]);
+ const [jobCompanyFilter,setJobCompanyFilter]=useState<string|null>(null);
+ const [focusedProjectId,setFocusedProjectId]=useState<string|null>(null);
+ const joiningProjects=useRef(new Set<string>());
+ const recommendationQueue=useRecommendationPages(page=>{
+  setBrainxJobs(page.jobs as DecisionJob[]);
+  setEngagement(current=>({...current,...page.engagement}));
+  setBrainxRun({runId:page.runId,snapshotId:page.snapshotId,policyVersion:page.policyVersion});
+ });
+ const feedbackJob=(job:DecisionJob)=>{
+  const doDelete=async(reason:string)=>{
+   const clean=(reason||"").trim().slice(0,200);
+   const snapshot=brainxJobs;
+   const pageSnapshot={pages:recommendationQueue.pages,pageIndex:recommendationQueue.pageIndex};
+   try{
+    if(brainxMode==="connected"){
+     await sendRecommendationFeedback(job.id,clean,brainxRun.snapshotId,
+      makeIdempotencyKey(`recommendation-feedback:${job.id}`));
+    }
+    setBrainxJobs(current=>current?current.filter(item=>item.id!==job.id):current);
+    recommendationQueue.removeJob(job.id);
+    notify(brainxMode==="connected"?"已减少此类推荐":"演示模式已隐藏该职位（不会写入后端）",{
+     actions:[{label:"撤销",onClick:()=>{
+      setBrainxJobs(snapshot);
+      recommendationQueue.restore(pageSnapshot);
+      if(brainxMode==="connected")void undoRecommendationFeedback(job.id)
+       .then(()=>notify("已撤销不感兴趣"))
+       .catch(error=>notify(`撤销已恢复本地显示，但后端删除失败：${error instanceof Error?error.message:"后端未响应"}`,undefined,4000));
+      if(brainxMode!=="connected")notify("已撤销不感兴趣");
+     }}],
+    });
+   }catch(error){notify(`反馈失败：${error instanceof Error?error.message:"后端未响应"}`)}
+  };
+  notify(`为什么删除「${job.company} · ${job.role}」？（必填）`,{
+   input:{placeholder:"例如：方向不符 / 客户质量不足 / 当前没精力…",onSubmit:text=>{void doDelete(text)}},
+  });
+ };
+ const loadBrainxSide=useRef(async()=>{await Promise.allSettled([
+  getRadar().then(radar=>setBrainxRadar(radar)),
+  getClients().then(clientsData=>setBrainxClients(clientsData.items)),
+ ])});
+ const brainxApply=useRef((snapshot:BrainxSnapshot)=>{
+  setBrainxJobs(snapshot.jobs as DecisionJob[]);
+  setBrainxProjects(snapshot.projects);
+  setMembershipRelations(Object.fromEntries(snapshot.projects.map(project=>[project.project_id,project.relation])));
+  setBrainxConsultantId(snapshot.consultantId);setEngagement(snapshot.engagement);setOpenmaiByJob(snapshot.openmai||{});
+  setDecisionEvents(snapshot.events);setOutcomes(snapshot.outcomes);setSync(snapshot.sync);setAuth(snapshot.auth);
+  setNotifications(snapshot.notifications);setBrainxDismissReasons(snapshot.dismissReasons);
+  setBrainxRun({runId:snapshot.runId,snapshotId:snapshot.snapshotId,policyVersion:snapshot.policyVersion});
+  setBrainxKeywords(snapshot.profileKeywords);setTray(snapshot.preferences.tray);
+  setFolders(snapshot.preferences.folders.length?snapshot.preferences.folders:DEFAULT_FOLDERS);
+  setFolderMode(!!snapshot.preferences.folderMode);setBrainxMode("connected");
+ });
+ const loadBrainxSnapshot=useRef(async()=>{
+  const [snapshot,page]=await Promise.all([getSnapshot(),getRecommendationPage().catch(()=>null)]);
+  brainxApply.current(snapshot);
+  if(page){
+   recommendationQueue.reset(page);
+  }
+ });
  useEffect(()=>{const savedState=readSavedWorkbenchState();setDone(savedState.done||[]);setSnoozed(savedState.snoozed||[]);setExtraTasks(savedState.extraTasks||[]);setWeights(savedState.weights?.length===3?savedState.weights:[60,25,15]);setDecisionActions(savedState.decisionActions||[]);setMembershipRelations(savedState.membershipRelations||{});setTray(savedState.tray??INITIAL_TRAY_IDS);setFolders(savedState.folders?.length?savedState.folders:DEFAULT_FOLDERS);setFolderMode(!!savedState.folderMode);setEngagement({...initialEngagement,...(savedState.engagement||{})});setDecisionEvents({...initialEvents,...(savedState.events||{})});setOutcomes({...initialOutcomes,...(savedState.outcomes||{})});setSync(savedState.sync||seedSync);setAuth(savedState.auth||seedAuth);setNotifications(savedState.notifications||seedNotifications);setHydrated(true)},[]);
  useEffect(()=>{const update=(event:Event)=>{const detail=(event as CustomEvent<{jobId:string;state:EngagementState}>).detail;if(detail?.jobId&&detail?.state)setEngagement(current=>({...current,[detail.jobId]:detail.state}))};window.addEventListener("brainx:commitment-updated",update);return()=>window.removeEventListener("brainx:commitment-updated",update)},[]);
  useEffect(()=>{if(!hydrated)return;if(brainxMode==="connected"){localStorage.setItem("decision-workbench",JSON.stringify({tray,folders,folderMode,weights,decisionActions,membershipRelations}));void updateWorkbenchPreferences({tray,folders,folderMode}).catch(()=>{});return}localStorage.setItem("decision-workbench",JSON.stringify({done,snoozed,extraTasks,weights,decisionActions,membershipRelations,tray,folders,folderMode,engagement,events:decisionEvents,outcomes,sync,auth,notifications}))},[hydrated,brainxMode,done,snoozed,extraTasks,weights,decisionActions,membershipRelations,tray,folders,folderMode,engagement,decisionEvents,outcomes,sync,auth,notifications]);
- // 后端探测与快照引导：仅浏览器端；成功 → connected（API 驱动），失败 → offline（本地演示回退）。
- // localStorage 仅作演示回退与乐观缓存，连接后端后不写入本地业务状态。
- useEffect(()=>{if(!hydrated)return;let cancelled=false;void(async()=>{try{await brainxFetch<BackendSessionStatus>("/api/v1/oauth/status");const snapshot=await getSnapshot();if(!cancelled)brainxApply.current(snapshot);void loadBrainxSide.current()}catch{if(!cancelled)setBrainxMode("offline")}})();return()=>{cancelled=true}},[hydrated]);
+ // 正式工作台不再把演示数据作为失败回退；演示态只能由 Storybook 显式开启。
+ useEffect(()=>{
+  if(!hydrated)return;
+  if(demo){setWorkspaceIssue(null);setBrainxMode("offline");return}
+  let cancelled=false;
+  setBrainxMode("connecting");
+  setWorkspaceIssue(null);
+  void(async()=>{try{
+   await brainxFetch<BackendSessionStatus>("/api/v1/oauth/status");
+   await loadBrainxSnapshot.current();
+   if(cancelled)return;
+   void loadBrainxSide.current();
+  }catch(error){
+   if(cancelled)return;
+   setBrainxMode("offline");
+   setWorkspaceIssue(error instanceof BrainxApiError&&error.kind==="AUTH"?"auth":"unavailable");
+  }})();
+  return()=>{cancelled=true};
+ },[hydrated,demo,connectAttempt]);
  // SSE 实时通知：同步/推荐事件 → 去抖刷新快照并插入提醒；组件卸载关闭连接
- const sseReloadTimer=useRef<number|null>(null); // SSE 快照重载真去抖（事件突发时每事件各起一个 800ms 重载风暴）
- useEffect(()=>{if(brainxMode!=="connected")return;const sub=connectSSE(event=>{if(!event.type||event.type==="hello")return;if(event.type==="openmai_result"){const pid=String((event as {project_id?:string}).project_id||"");setNotifications(current=>[{id:`sse-om-${Date.now()}`,kind:"SYNC_ALERT",title:(event as {status?:string}).status==="done"?"自动找人完成":"自动找人失败",detail:pid,read:false},...current]);if(pid)window.setTimeout(()=>{void fetchJobDetail(pid).then(d=>setOpenmaiByJob(current=>({...current,[pid]:d.openmai}))).catch(()=>{})},600);return}const title=event.type==="sync_error"?"同步异常":event.type==="recommend"?"推荐已更新":"同步完成";setNotifications(current=>[{id:`sse-${Date.now()}-${Math.floor(Math.random()*1e6)}`,kind:"SYNC_ALERT" as const,title,detail:String(event.message||""),read:false},...current].slice(0,50));if(sseReloadTimer.current)window.clearTimeout(sseReloadTimer.current);sseReloadTimer.current=window.setTimeout(()=>{sseReloadTimer.current=null;void loadBrainxSnapshot.current().catch(()=>{});void loadBrainxSide.current()},800)});return()=>sub.close()},[brainxMode]);
+ useEffect(()=>{
+  if(brainxMode!=="connected")return;
+  const sub=connectSSE(event=>{
+   if(!event.type||event.type==="hello")return;
+   if(event.type==="openmai_result"){
+    const pid=String((event as {project_id?:string}).project_id||"");
+    setNotifications(current=>[{id:`sse-om-${Date.now()}`,kind:"SYNC_ALERT",
+     title:(event as {status?:string}).status==="done"?"自动找人完成":"自动找人失败",
+     detail:pid,read:false},...current]);
+    if(pid)window.setTimeout(()=>{void fetchJobDetail(pid)
+     .then(d=>setOpenmaiByJob(current=>({...current,[pid]:d.openmai}))).catch(()=>{})},600);
+    return;
+   }
+   const title=event.type==="sync_error"?"同步异常":event.type==="recommend"?"推荐已更新":"同步完成";
+   setNotifications(current=>[{id:`sse-${Date.now()}`,kind:"SYNC_ALERT",title,
+    detail:String(event.message||""),read:false},...current]);
+   if(event.type==="recommend"){
+    recommendationQueue.markNewRun();
+    return;
+   }
+   window.setTimeout(()=>{void loadBrainxSnapshot.current().catch(()=>{});void loadBrainxSide.current()},800);
+  });
+  return()=>sub.close();
+ },[brainxMode]);
  const notify=(s:string,opts?:{actions?:{label:string;onClick:()=>void}[];input?:{placeholder:string;onSubmit:(text:string)=>void}},ms?:number)=>{if(toastTimerRef.current){clearTimeout(toastTimerRef.current);toastTimerRef.current=null}setToast({text:s,actions:opts?.actions,input:opts?.input});if(!opts?.input)toastTimerRef.current=setTimeout(()=>{setToast(null);toastTimerRef.current=null},ms??(opts?.actions?.length?6000:2200))};
- const radarJobs:Job[]=brainxMode==="connected"&&brainxRadar?brainxRadar:demoRadarJobs;
- const filteredJobs=useMemo(()=>radarJobs.filter(job=>(status==="全部状态"||job.status===status)&&(`${job.name}${job.client}${job.city}${job.industry}${job.positionType}${job.source}`.includes(query))).sort((a,b)=>sort==="score"?(b.score??-1)-(a.score??-1):(b.hc??-1)-(a.hc??-1)),[query,status,sort,radarJobs]);
  const visibleActions=actionSeed.map((a,i)=>({a,i})).filter(x=>!done.includes(x.i)&&!snoozed.includes(x.i));
  const clearPanelMotion=()=>{if(typeof window==="undefined")return;if(panelAnimationFrame.current!==null){window.cancelAnimationFrame(panelAnimationFrame.current);panelAnimationFrame.current=null}if(panelCloseTimer.current!==null){window.clearTimeout(panelCloseTimer.current);panelCloseTimer.current=null}};
  const dismissPanelImmediately=()=>{clearPanelMotion();setPanel(null);setPanelMotion("idle")};
  const openPanel=(next:Panel)=>{if(!next)return;clearPanelMotion();if(panel&&panelMotion==="open"){setPanel(next);return}const animate=typeof window!=="undefined"&&window.matchMedia("(min-width: 961px)").matches;if(panelMotion==="closing"){setPanel(next);setPanelMotion("open");return}setPanel(next);if(!animate){setPanelMotion("open");return}setPanelMotion("entering");panelAnimationFrame.current=window.requestAnimationFrame(()=>{panelAnimationFrame.current=window.requestAnimationFrame(()=>{setPanelMotion("open");panelAnimationFrame.current=null})})};
  const closePanel=()=>{if(!panel)return;clearPanelMotion();const animate=typeof window!=="undefined"&&window.matchMedia("(min-width: 961px)").matches;if(!animate){dismissPanelImmediately();return}setPanelMotion("closing");panelCloseTimer.current=window.setTimeout(()=>{setPanel(null);setPanelMotion("idle");panelCloseTimer.current=null},380)};
- useEffect(()=>{const closeOnEscape=(event:KeyboardEvent)=>{if(event.key!=="Escape")return;closePanel();setPendingCommand(null);setDrawer(null);setDetail(null);setClientDetail(null);setMobileNavOpen(false);setWorkspaceMenuOpen(false)};window.addEventListener("keydown",closeOnEscape);return()=>window.removeEventListener("keydown",closeOnEscape)},[panel,panelMotion]);
+ useEffect(()=>{const closeOnEscape=(event:KeyboardEvent)=>{if(event.key!=="Escape")return;closePanel();setPendingCommand(null);setDrawer(null)};window.addEventListener("keydown",closeOnEscape);return()=>window.removeEventListener("keydown",closeOnEscape)},[panel,panelMotion]);
  useEffect(()=>()=>clearPanelMotion(),[]);
- const go=(p:Page)=>{setPage(p);setDetail(null);setClientDetail(null);dismissPanelImmediately();setDrawer(null);setMobileNavOpen(false);setWorkspaceMenuOpen(false)};
- useEffect(()=>{try{const saved=localStorage.getItem("brainx-assistant-history");if(!saved)return;const parsed=JSON.parse(saved);if(Array.isArray(parsed)&&parsed.every(m=>m&&typeof m==="object"&&typeof m.content==="string"))setAssistantMessages(parsed)}catch{}},[]); // 非数组/脏形状直接丢弃（此前合法 JSON 非数组会让 messages.map 渲染期崩溃，错误边界清的还是另一个键）
- useEffect(()=>{const desktop=window.matchMedia("(min-width: 1280px)");const syncAssistantLayout=()=>setAssistantOpen(desktop.matches);syncAssistantLayout();desktop.addEventListener("change",syncAssistantLayout);return()=>desktop.removeEventListener("change",syncAssistantLayout)},[]);
+ const go=(p:Page)=>{setPage(p);dismissPanelImmediately();setDrawer(null)};
+ useEffect(()=>{try{const saved=localStorage.getItem("brainx-assistant-history");if(saved)setAssistantMessages(JSON.parse(saved))}catch{}},[]);
  useEffect(()=>{try{localStorage.setItem("brainx-assistant-history",JSON.stringify(assistantMessages.slice(-40)))}catch{}},[assistantMessages]);
  useEffect(()=>()=>assistantAbort.current?.abort(),[]);
  const sendAssistant=()=>{const question=assistantInput.trim();if(!question||assistantBusy)return;const user:AssistantMessage={role:"user",content:question};const controller=new AbortController();assistantAbort.current=controller;setAssistantInput("");setAssistantBusy(true);setAssistantMessages(current=>[...current,user,{role:"assistant",content:""}]);void streamAssistant({question,history:assistantMessages.slice(-12),context:{page,opportunity_id:selectedDecisionJob?.id||null},signal:controller.signal},text=>setAssistantMessages(current=>{const next=[...current];const last=next.length-1;if(last>=0&&next[last].role==="assistant")next[last]={...next[last],content:next[last].content+text};return next}),message=>setAssistantMessages(current=>{const next=[...current];const last=next.length-1;if(last>=0&&next[last].role==="assistant")next[last]={...next[last],content:message};return next})).catch(error=>{if(error?.name!=="AbortError")setAssistantMessages(current=>{const next=[...current];const last=next.length-1;if(last>=0&&next[last].role==="assistant")next[last]={...next[last],content:`助手暂不可用：${error instanceof Error?error.message:"后端未响应"}`};return next})}).finally(()=>{assistantAbort.current=null;setAssistantBusy(false)})};
@@ -111,84 +212,87 @@ export default function DecisionWorkbench(){
  const removeTray=(id:string)=>{setTray(current=>current.filter(x=>x!==id));notify("已移出精选盘")};
  const assignFolder=(jobId:string,folderId:string)=>{setFolders(current=>current.map(f=>f.id===folderId?{...f,jobIds:Array.from(new Set([...f.jobIds,jobId]))}:{...f,jobIds:f.jobIds.filter(x=>x!==jobId)}));setTray(current=>current.filter(x=>x!==jobId));notify(folderId?"已放入文件夹":"已从文件夹移除")};
  const createFolder=(name:string)=>{const trimmed=name.trim();if(!trimmed)return;setFolders(current=>[...current,{id:`f-${Date.now()}`,name:trimmed,jobIds:[]}]);notify(`已新建文件夹「${trimmed}」`)};
- const confirmTray=async()=>{const jobs=activeDecisionJobs.filter(job=>tray.includes(job.id)&&(engagement[job.id]||"NEW")!=="ACCEPTED");if(!jobs.length){notify("盘里的职位都已接单");return}let done=0;const failReasons:string[]=[];const acceptedIds:string[]=[];let lastAcceptedId:string|null=null;for(const job of jobs){const state=engagement[job.id]||"NEW";const legal=legalActions(job,state);if(!legal.includes("ACCEPT")&&!legal.includes("WATCH")){failReasons.push(`${job.company}：需先完成核验`);continue}if(brainxMode!=="connected"){if(legal.includes("WATCH"))applyCommand(job,"WATCH");applyCommand(job,"ACCEPT");done++;lastAcceptedId=job.id;continue}try{const url=`/api/v1/opportunities/${encodeURIComponent(job.id)}/engagement`;if(legal.includes("WATCH"))await brainxFetch<BackendEngagementResponse>(url,{method:"POST",body:{action:"WATCH",idempotency_key:makeIdempotencyKey(`tray-watch:${job.id}`)}});const res=await brainxFetch<BackendEngagementResponse>(url,{method:"POST",body:{action:"ACCEPT",confirm:true,idempotency_key:makeIdempotencyKey(`tray-accept:${job.id}`)}});setEngagement(current=>({...current,[job.id]:res.state}));setTray(current=>current.filter(x=>x!==job.id));done++;lastAcceptedId=job.id;acceptedIds.push(job.id)}catch(error){const msg=error instanceof Error?error.message:"后端未响应";failReasons.push(`${job.company}：${msg}`)}}
-  if(done){notify(`已接单 ${done} 个职位`);const acc=lastAcceptedId?activeDecisionJobs.find(j=>j.id===lastAcceptedId):null;if(acc)openDecision(acc,"engagement")}
-  if(acceptedIds.length)await Promise.all(acceptedIds.map(id=>refreshBrainxJob(id).catch(()=>{})));
-  if(failReasons.length)notify(`未能接单：${failReasons.slice(0,2).join("；")}${failReasons.length>2?" 等":""}`)};
- const activeDecisionJobs=useMemo(()=>(brainxJobs||decisionJobs).map(job=>{const relation=membershipRelations[job.id];if(!relation)return job;return {...job,facts:{...job.facts,"职位关系":relation==="MY_JOB"?"我的职位":"团队共享"}}}),[brainxJobs,membershipRelations]);
- const confirmJobMembership=async(job:DecisionJob,relation:MembershipRelation)=>{if(brainxMode==="connected"){await updateOpportunityMembership(job.id,relation,makeIdempotencyKey(`membership:${job.id}`));await loadBrainxSnapshot.current()}else{setMembershipRelations(current=>({...current,[job.id]:relation}));const at=new Date().toLocaleString("zh-CN",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"});setDecisionEvents(current=>({...current,[job.id]:[{id:`evt-${Date.now()}`,type:"确认项目归属",at,reason:relation==="MY_JOB"?"我的职位":"团队共享"},...(current[job.id]||[])]}))}notify(`${job.company} · 已加入${relation==="MY_JOB"?"我的职位":"团队共享"}`)};
- const refreshBrainxJob=async(jobId:string)=>{if(brainxMode!=="connected")return;try{const detail=await fetchJobDetail(jobId);setEngagement(current=>({...current,[jobId]:detail.engagementState}));setDecisionEvents(current=>({...current,[jobId]:detail.events}));setOutcomes(current=>({...current,[jobId]:detail.outcomes}));setOpenmaiByJob(current=>({...current,[jobId]:detail.openmai}));setBrainxJobs(current=>current?current.map(job=>job.id===jobId?{...job,brainxLegal:detail.legal,brainxDecisionId:detail.decisionId||job.brainxDecisionId}:job):null)}catch{/* 详情刷新失败不打断交互，下次打开再试 */}};
+ const activeDecisionJobs=useMemo(()=>(brainxJobs??(demo?decisionJobs:[])).map(job=>{const relation=membershipRelations[job.id];if(!relation)return job;return {...job,facts:{...job.facts,"职位关系":relation==="MY_JOB"?"我的职位":"团队共享"}}}),[brainxJobs,demo,membershipRelations]);
+ const goToProject=(projectId:string)=>{setFocusedProjectId(projectId);go("accepted")};
+ const refreshProjects=async()=>{
+  const response=await getProjects();setBrainxProjects(response.items);
+  setMembershipRelations(Object.fromEntries(response.items.map(project=>[project.project_id,project.relation])));
+ };
+ const mergeProject=(project:ProjectSummary|null)=>{if(!project)return;setBrainxProjects(current=>[project,...current.filter(item=>item.project_id!==project.project_id)]);setMembershipRelations(current=>({...current,[project.project_id]:project.relation}))};
+ const addToMyProjects=async(jobId:string,label="该职位")=>{
+  if(joiningProjects.current.has(jobId))return;
+  joiningProjects.current.add(jobId);
+  try{
+   if(brainxMode==="connected"){
+    const response=await updateOpportunityMembership(jobId,"MY_JOB",makeIdempotencyKey(`membership:${jobId}`));
+    mergeProject(response.project);
+   }else setMembershipRelations(current=>({...current,[jobId]:"MY_JOB"}));
+   notify(`${label} · 已加入我的项目`,{actions:[{label:"继续浏览",onClick:()=>{}},{label:"去我的项目",onClick:()=>goToProject(jobId)}]});
+  }catch(error){notify(`加入项目失败：${error instanceof Error?error.message:"后端未响应"}`,undefined,4000);throw error}
+  finally{joiningProjects.current.delete(jobId)}
+ };
+ const confirmJobMembership=async(job:DecisionJob,relation:MembershipRelation)=>{
+  if(relation==="MY_JOB"){await addToMyProjects(job.id,job.company);return}
+  if(brainxMode==="connected"){
+   await updateOpportunityMembership(job.id,relation,makeIdempotencyKey(`membership:${job.id}`));
+   await refreshProjects();
+  }else setMembershipRelations(current=>({...current,[job.id]:relation}));
+  notify(`${job.company} · 已加入团队共享`);
+ };
+ const addRadarJobToProjects=async(jobId:string)=>{const job=brainxRadar?.items.find(item=>item.project_id===jobId);await addToMyProjects(jobId,job?.company||"该职位")};
+ const refreshBrainxJob=async(jobId:string,withProjects=false)=>{if(brainxMode!=="connected")return;try{
+  const [detail,projects]=await Promise.all([fetchJobDetail(jobId),withProjects?getProjects():Promise.resolve(null)]);
+  setEngagement(current=>({...current,[jobId]:detail.engagementState}));setDecisionEvents(current=>({...current,[jobId]:detail.events}));
+  setOutcomes(current=>({...current,[jobId]:detail.outcomes}));setOpenmaiByJob(current=>({...current,[jobId]:detail.openmai}));
+  setBrainxJobs(current=>current?current.map(job=>job.id===jobId?{...job,brainxLegal:detail.legal,brainxDecisionId:detail.decisionId||job.brainxDecisionId}:job):null);
+  if(projects){setBrainxProjects(projects.items);setMembershipRelations(Object.fromEntries(projects.items.map(project=>[project.project_id,project.relation])))}
+ }catch{/* 详情刷新失败不打断交互，下次打开再试 */}};
  const rerunOpenmaiForJob=(jobId:string)=>{void(async()=>{try{await rerunOpenmai(jobId);const detail=await fetchJobDetail(jobId);setOpenmaiByJob(current=>({...current,[jobId]:detail.openmai}))}catch(error){notify(`重新找人失败：${error instanceof Error?error.message:"后端未响应"}`)}})()};
- const openDecision=(job:DecisionJob,tab:"judgement"|"engagement"|"trail"|"replay"="judgement")=>{if(panel?.kind==="job"&&panel.jobId===job.id&&panel.tab===tab&&panelMotion!=="closing"){closePanel();return}if(brainxMode==="connected")void brainxFetch<BackendEngagementResponse>(`/api/v1/opportunities/${encodeURIComponent(job.id)}/engagement`,{method:"POST",body:{action:"VIEW",idempotency_key:makeIdempotencyKey(`view:${job.id}`)}}).catch(()=>{});openPanel({kind:"job",jobId:job.id,tab})};
+ const openDecision=(job:DecisionJob,tab:JobDetailTab="facts")=>{if(panel?.kind==="job"&&panel.jobId===job.id&&panel.tab===tab&&panelMotion!=="closing"){closePanel();return}if(brainxMode==="connected")void brainxFetch<BackendEngagementResponse>(`/api/v1/opportunities/${encodeURIComponent(job.id)}/engagement`,{method:"POST",body:{action:"VIEW",idempotency_key:makeIdempotencyKey(`view:${job.id}`)}}).then(()=>refreshBrainxJob(job.id)).catch(()=>{});openPanel({kind:"job",jobId:job.id,tab})};
  const applyCommand=(job:DecisionJob,command:EngagementCommand,reason?:string)=>{if(brainxMode!=="connected"){const state=nextState(command);setEngagement(current=>({...current,[job.id]:state}));setDecisionEvents(current=>({...current,[job.id]:[{id:`evt-${Date.now()}`,type:stateEvent(command),at:new Date().toLocaleString("zh-CN",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}),reason},...(current[job.id]||[])]}));setPendingCommand(null);notify(`${job.company} · ${stateEvent(command)}`);return}const key=makeIdempotencyKey(`engage:${job.id}:${command}`);setPendingCommand(null);void(async()=>{try{const res=await brainxFetch<BackendEngagementResponse>(`/api/v1/opportunities/${encodeURIComponent(job.id)}/engagement`,{method:"POST",body:{action:command,confirm:command==="ACCEPT",reason,idempotency_key:key}});setEngagement(current=>({...current,[job.id]:res.state}));await refreshBrainxJob(job.id);notify(`${job.company} · ${stateEvent(command)}`)}catch(error){notify(`操作失败：${error instanceof Error?error.message:"后端未响应"}`)}})()};
  const requestCommand=(job:DecisionJob,command:EngagementCommand)=>{if(command==="ACCEPT"||command==="DISMISS"){setPendingCommand({job,command});return}applyCommand(job,command)};
  const recordOutcome=(job:DecisionJob,stage:Outcome["stage"],rating?:number,note?:string)=>{if(brainxMode!=="connected"){const item:Outcome={id:`out-${Date.now()}`,stage,rating,note,at:new Date().toLocaleString("zh-CN",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"})};setOutcomes(current=>({...current,[job.id]:[item,...(current[job.id]||[])]}));setDecisionEvents(current=>({...current,[job.id]:[{id:`evt-${Date.now()}`,type:"记录结果",at:item.at,reason:stage},...(current[job.id]||[])]}));notify(`已记录${stage}`);return}void(async()=>{try{await brainxFetch<BackendOutcomeResponse>("/api/v1/outcomes",{method:"POST",body:{project_id:job.id,stage,value:{rating,note},idempotency_key:makeIdempotencyKey(`outcome:${job.id}`)}});await refreshBrainxJob(job.id);notify(`已记录${stage}`)}catch(error){notify(`记录失败：${error instanceof Error?error.message:"后端未响应"}`)}})()};
- const runSync=()=>{void(async()=>{if(brainxMode!=="connected"){setSync(current=>({...current,state:"RUNNING",errors:[]}));notify("正在生成演示快照…");window.setTimeout(()=>{setSync({...seedSync,updatedAt:new Date().toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit"})});notify("快照已更新，推荐已刷新")},650);return}setSync(current=>({...current,state:"RUNNING",errors:[]}));notify("正在同步后端快照…");try{await brainxFetch("/api/v1/sync-runs",{method:"POST",body:{source:"fixture"},timeoutMs:120000});const rec=await brainxFetch<BackendRecommendationRun>("/api/v1/recommendations/run",{method:"POST",timeoutMs:120000});if(rec?.blocked){setSync(current=>({...current,state:"INCOMPLETE",errors:[rec.reason||"本次同步不完整"]}));notify(rec.reason||"本次同步不完整");return}await loadBrainxSnapshot.current();void loadBrainxSide.current();notify("快照已更新，推荐已刷新")}catch(error){setSync(current=>({...current,state:"ERROR",errors:[error instanceof Error?error.message:"同步失败"]}));notify(`同步失败：${error instanceof Error?error.message:"后端未响应"}`)}})()};
+ const runSync=()=>{void(async()=>{if(brainxMode!=="connected"){setSync(current=>({...current,state:"RUNNING",errors:[]}));notify("正在生成演示快照…");window.setTimeout(()=>{setSync({...seedSync,updatedAt:new Date().toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit"})});notify("快照已更新，推荐已刷新")},650);return}setSync(current=>({...current,state:"RUNNING",errors:[]}));notify("正在同步后端快照…");try{await brainxFetch("/api/v1/sync-runs",{method:"POST",body:{source:"fixture"}});const rec=await brainxFetch<BackendRecommendationRun>("/api/v1/recommendations/run",{method:"POST"});if(rec?.blocked){setSync(current=>({...current,state:"INCOMPLETE",errors:[rec.reason||"本次同步不完整"]}));notify(rec.reason||"本次同步不完整");return}await loadBrainxSnapshot.current();void loadBrainxSide.current();notify("快照已更新，推荐已刷新")}catch(error){setSync(current=>({...current,state:"ERROR",errors:[error instanceof Error?error.message:"同步失败"]}));notify(`同步失败：${error instanceof Error?error.message:"后端未响应"}`)}})()};
  const openNotification=(item:Notification)=>{setNotifications(current=>current.map(note=>note.id===item.id?{...note,read:true}:note));if(item.jobId){const job=activeDecisionJobs.find(entry=>entry.id===item.jobId);if(job)openDecision(job,item.kind==="DAILY_TOP3"?"replay":"engagement")}else openPanel({kind:"sync"})};
- const selectedDecisionJob=panel?.kind==="job"?[...activeDecisionJobs,...verificationJobs].find(job=>job.id===panel.jobId)||null:null;
- const commitmentJobs=activeDecisionJobs.filter(job=>["WATCHED","ACCEPTED"].includes(engagement[job.id]||"NEW"));
- const acceptedJobs=activeDecisionJobs.filter(job=>engagement[job.id]==="ACCEPTED");
- const visibleAcceptedJobs=useMemo(()=>{
-  const keyword=query.trim().toLocaleLowerCase();
-  if(!keyword)return acceptedJobs;
-  return acceptedJobs.filter(job=>`${job.company} ${job.role} ${job.recentSignal} ${Object.values(job.facts).join(" ")}`.toLocaleLowerCase().includes(keyword));
- },[acceptedJobs,query]);
- const panelPresent=!!panel;
- const clearMobileDrawerCloseTimer=()=>{if(mobileDrawerCloseTimer.current!==null){window.clearTimeout(mobileDrawerCloseTimer.current);mobileDrawerCloseTimer.current=null}};
- const closeMobileDrawer=(animate=true)=>{clearMobileDrawerCloseTimer();if(!animate){setMobileDrawerProgress(null);setMobileNavOpen(false);return}setMobileDrawerProgress(0);mobileDrawerCloseTimer.current=window.setTimeout(()=>{setMobileNavOpen(false);setMobileDrawerProgress(null);mobileDrawerCloseTimer.current=null},230)};
- const toggleMobileDrawer=()=>{if(mobileNavOpen){closeMobileDrawer();return}clearMobileDrawerCloseTimer();setMobileNavOpen(true);setMobileDrawerProgress(0);window.requestAnimationFrame(()=>setMobileDrawerProgress(null))};
- const beginMobileSwipe=(event:React.PointerEvent<HTMLDivElement>)=>{if(typeof window==="undefined"||window.innerWidth>720||event.button!==0||mobileNavOpen)return;if((event.target as Element).closest("button,a,input,select,textarea"))return;if(event.clientX>28)return;clearMobileDrawerCloseTimer();const drawerWidth=Math.min(window.innerWidth*.82,320);mobileDrawerDrag.current={pointerId:event.pointerId,startX:event.clientX,startProgress:0,drawerWidth,lastX:event.clientX,lastAt:event.timeStamp,velocity:0,progress:0,moved:false};if(!mobileNavOpen)setMobileNavOpen(true);setMobileDrawerProgress(0)};
- const moveMobileSwipe=(event:React.PointerEvent<HTMLDivElement>)=>{const drag=mobileDrawerDrag.current;if(!drag||drag.pointerId!==event.pointerId)return;const distance=Math.abs(event.clientX-drag.startX);if(!drag.moved&&distance<8)return;if(!drag.moved){drag.moved=true;event.currentTarget.setPointerCapture(event.pointerId)}const raw=drag.startProgress+(event.clientX-drag.startX)/drag.drawerWidth;const elapsed=event.timeStamp-drag.lastAt;if(elapsed>0)drag.velocity=(event.clientX-drag.lastX)/elapsed;drag.lastX=event.clientX;drag.lastAt=event.timeStamp;drag.progress=raw<0?raw*.24:raw>1?1+(raw-1)*.24:raw;setMobileDrawerProgress(drag.progress)};
- const endMobileSwipe=(event:React.PointerEvent<HTMLDivElement>,cancelled=false)=>{
-  const drag=mobileDrawerDrag.current;
-  if(!drag||drag.pointerId!==event.pointerId)return;
-  if(event.currentTarget.hasPointerCapture(event.pointerId))event.currentTarget.releasePointerCapture(event.pointerId);
-  const velocityProgress=drag.velocity/drag.drawerWidth;
-  const momentum=cancelled?0:Math.max(-.35,Math.min(.35,velocityProgress*140));
-  const projected=Math.min(1,Math.max(0,drag.progress+momentum));
-  if(projected>=.5){setMobileNavOpen(true);setMobileDrawerProgress(1);window.setTimeout(()=>setMobileDrawerProgress(null),230)}else closeMobileDrawer();
-  mobileDrawerDrag.current=null;
+ const projectDecisionJobs=useMemo(()=>brainxProjects.map(projectToDecisionJob),[brainxProjects]);
+ const allDecisionJobs=useMemo(()=>[...activeDecisionJobs,...projectDecisionJobs.filter(project=>!activeDecisionJobs.some(job=>job.id===project.id))],[activeDecisionJobs,projectDecisionJobs]);
+ const selectedDecisionJob=panel?.kind==="job"?[...allDecisionJobs,...verificationJobs].find(job=>job.id===panel.jobId)||null:null;
+ const commitmentJobs=allDecisionJobs.filter(job=>["WATCHED","ACCEPTED"].includes(engagement[job.id]||"NEW"));
+ const shellPage:WorkspaceShellPage=page==="accepted"?"projects":page==="clients"?"clients":page==="jobs"?"jobs":page==="today"?"today":"settings";
+ const navigateShell=(next:WorkspaceShellPage)=>{if(next==="jobs")setJobCompanyFilter(null);if(next==="settings")setAssistantOpen(false);go(next==="projects"?"accepted":next==="settings"?"settings":next)};
+ const recommendationPagination=demo?undefined:{
+  pageIndex:recommendationQueue.pageIndex,
+  totalCount:recommendationQueue.current?.totalCount??activeDecisionJobs.length,
+  evaluatedCount:recommendationQueue.current?.evaluatedCount??activeDecisionJobs.length,
+  runId:recommendationQueue.current?.runId||brainxRun.runId||"",
+  generatedAt:recommendationQueue.current?.generatedAt||sync.updatedAt||"时间待确认",
+  policyVersion:recommendationQueue.current?.policyVersion||brainxRun.policyVersion||"待确认",
+  loading:recommendationQueue.loading,error:recommendationQueue.error,
+  newRunAvailable:recommendationQueue.current?.newRunAvailable??false,
+  onPrevious:recommendationQueue.previous,onNext:recommendationQueue.next,
+  onRefreshRun:recommendationQueue.refresh,
  };
- return <div className={`app btex-app concept-shell ${assistantOpen?"assistant-open":""} ${panelMotion==="open"?"decision-panel-open":""} ${panelPresent?"decision-panel-present decision-panel-compact":""} panel-motion-${panelMotion} ${mobileNavOpen?"mobile-nav-open":""} ${mobileDrawerDrag.current?"mobile-nav-swiping":""}`} style={{"--mobile-drawer-progress":mobileDrawerProgress??1} as React.CSSProperties} onPointerDown={beginMobileSwipe} onPointerMove={moveMobileSwipe} onPointerUp={event=>endMobileSwipe(event)} onPointerCancel={event=>endMobileSwipe(event,true)}>
-  <aside className="rail-nav" aria-label="主要导航">
-   <button className="rail-brand" onClick={()=>go("today")} aria-label="B-tex 首页"><img className="rail-brand-logo" src="/brand/btex-logo.png" alt="B-tex BrainX"/></button>
-   <nav className="rail-blocks">{nav.map(([id,label,Icon])=><button key={id} className={page===id?"active":""} onClick={()=>go(id)} aria-label={label} aria-current={page===id?"page":undefined}><span className="rail-ico"><Icon/></span><span className="rail-label">{label}</span>{id==="accepted"&&acceptedJobs.length>0&&<i className="rail-count">{acceptedJobs.length}</i>}</button>)}</nav>
-   <div className="rail-spacer"/>
-   <button className="rail-alert-trigger" onClick={()=>openPanel({kind:"notifications"})} aria-label="打开通知"><BellRing/>{notifications.filter(note=>!note.read).length>0&&<i>{notifications.filter(note=>!note.read).length}</i>}</button>
-   <button className="rail-person identity-trigger" onClick={()=>openPanel({kind:"identity"})} aria-label={`身份：${auth.consultant}`}><CircleUserRound/><span className="rail-person-dot"/></button>
-   <span className="rail-status" title={brainxMode==="connected"?"BrainX 已连接":brainxMode==="connecting"?"连接 BrainX…":"演示模式"}><i className="pulse"/></span>
-  </aside>
-  <button className="mobile-nav-trigger" onClick={toggleMobileDrawer} aria-label={mobileNavOpen?"收起全部模块":"打开全部模块"} aria-expanded={mobileNavOpen}><Infinity aria-hidden="true"/><span>{mobileNavOpen?"收起模块":"全部模块"}</span></button>
-  {mobileNavOpen&&<button className="mobile-nav-backdrop" onClick={()=>closeMobileDrawer()} aria-label="关闭全部模块"/>}
-  <main className="main">
-   <header className="topbar">
-    <div className="concept-workspace-switcher">
-     <button className="concept-workspace-title" type="button" onClick={()=>setWorkspaceMenuOpen(open=>!open)} aria-haspopup="menu" aria-expanded={workspaceMenuOpen}><b>招聘决策工作台</b><ChevronDown aria-hidden="true"/></button>
-     {workspaceMenuOpen&&<div className="concept-workspace-menu" role="menu" aria-label="切换工作区">
-      <button type="button" role="menuitem" className={page==="today"?"active":""} onClick={()=>go("today")}><span>招聘决策工作台</span><small>查看推荐与职位判断</small>{page==="today"&&<Check aria-hidden="true"/>}</button>
-      <button type="button" role="menuitem" className={page==="jobs"?"active":""} onClick={()=>go("jobs")}><span>职位市场</span><small>搜索当前可见职位</small>{page==="jobs"&&<Check aria-hidden="true"/>}</button>
-      <button type="button" role="menuitem" className={page==="clients"?"active":""} onClick={()=>go("clients")}><span>人才库</span><small>查看客户与人才洞察</small>{page==="clients"&&<Check aria-hidden="true"/>}</button>
-     </div>}
-    </div>
-    {page==="today"?<><button className="btex-person identity-trigger" onClick={()=>openPanel({kind:"identity"})}><span className="reference-avatar">{auth.consultant.slice(0,1)}</span><span><b>{auth.consultant}</b><small>Consultant</small></span></button><button className={`sync sync-trigger ${auth.needsReauth?"auth_expired":sync.state.toLowerCase()}`} onClick={()=>openPanel(auth.needsReauth?{kind:"identity"}:{kind:"sync"})}><i/> {auth.needsReauth?"飞书授权已过期":sync.state==="READY"?`已同步 · ${sync.updatedAt}`:sync.state==="RUNNING"?"同步中…":sync.state==="INCOMPLETE"?"同步不完整":sync.state==="AUTH_EXPIRED"?"授权过期":sync.state==="ERROR"?"同步失败":"尚未同步"}</button><button className="icon-btn notification-trigger" onClick={()=>openPanel({kind:"notifications"})} aria-label="今日提醒"><BellRing/>{notifications.filter(note=>!note.read).length>0&&<i>{notifications.filter(note=>!note.read).length}</i>}</button></>:<><div className="search"><Search/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="搜索客户、职位、PM…"/></div><button className="top-pill" onClick={()=>notify("全局筛选已展开")}><Filter/> 当前团队 <ChevronRight/></button><button className="icon-btn" onClick={()=>openPanel({kind:"notifications"})} aria-label="通知"><Bell/></button></>}
-    <button className={`profile-trigger ${page==="rules"?"active":""}`} onClick={()=>go("rules")} aria-label="打开设置"><Settings2/><span>设置</span></button><button className={`assistant-trigger ${assistantOpen?"active":""}`} onClick={()=>setAssistantOpen(value=>!value)} aria-label="打开 BrainX 助手" aria-expanded={assistantOpen}><Sparkles/><span>BrainX 助手</span></button>
-   </header>
-   <div className="content">
-    {detail?<JobDetail job={detail} onBack={()=>setDetail(null)} weights={weights} eventType={eventType} setEventType={setEventType} hc={hc} setHc={setHc} notify={notify}/>:clientDetail?<ClientDetail c={clientDetail} onBack={()=>setClientDetail(null)} notify={notify}/>:<>
-     {page==="today"&&<DecisionToday activeJobId={panel?.kind==="job"&&panelMotion!=="closing"?panel.jobId:null} completed={decisionActions} jobs={activeDecisionJobs} engagement={engagement} sync={sync} open={openDecision} onAction={runDecisionAction} onFeedback={feedbackJob} showVerification={brainxMode!=="connected"} tray={tray} onToggleTray={toggleTray} onRemoveTray={removeTray} onConfirmTray={confirmTray} folders={folders} folderMode={folderMode} onFolderMode={()=>setFolderMode(v=>!v)} onAssignFolder={assignFolder} onCreateFolder={createFolder}/>}
-     {page==="accepted"&&<AcceptedJobsView jobs={visibleAcceptedJobs} total={acceptedJobs.length} query={query} open={openDecision}/>}
-     {page==="jobs"&&<JobsView jobs={filteredJobs} mode={brainxMode} status={status} setStatus={setStatus} sort={sort} setSort={setSort} view={view} setView={setView} selected={selected} setSelected={setSelected} openJob={setDetail} notify={notify}/>}
-     {page==="clients"&&<ClientsView clients={(brainxMode==="connected"&&brainxClients?brainxClients:clients).filter(c=>`${c.name}${c.industry}`.includes(query))} open={setClientDetail} notify={notify}/>}
-     {page==="alerts"&&<Alerts setExtraTasks={setExtraTasks} notify={notify} setDrawer={setDrawer}/>}
-     {page==="rules"&&<Rules key={`${brainxKeywords.join("|")}:${brainxNote}`} notify={notify} mode={brainxMode} policy={brainxRun.policyVersion} keywords={brainxKeywords} note={brainxNote} onRefresh={async()=>{await loadBrainxSnapshot.current();void loadBrainxSide.current()}} onProfileSaved={(nextKeywords,nextNote)=>{setBrainxKeywords(nextKeywords);setBrainxNote(nextNote)}}/>}
-     {page==="sources"&&<Sources notify={notify}/>}
-    </>}
-   </div>
-  </main>
-     {panel&&<WorkbenchPanel panel={panel} motion={panelMotion} job={selectedDecisionJob} commitmentJobs={commitmentJobs} auth={auth} sync={sync} notifications={notifications} engagement={engagement} events={decisionEvents} outcomes={outcomes} completed={decisionActions} openmaiResults={openmaiByJob} onRerunOpenmai={rerunOpenmaiForJob} mode={brainxMode} legalMap={brainxJobs?Object.fromEntries(activeDecisionJobs.map(job=>[job.id,job.brainxLegal||[]])):{}} replayMap={brainxReplay} dismissReasons={brainxDismissReasons} onReplay={(jobId,data)=>setBrainxReplay(current=>({...current,[jobId]:data}))} onFactsUpdated={async()=>{await loadBrainxSnapshot.current();void loadBrainxSide.current()}} onMembership={confirmJobMembership} onClose={closePanel} onOpenJob={openDecision} onAction={runDecisionAction} onCommand={requestCommand} onOutcome={recordOutcome} onSync={runSync} onSetSync={setSync} onAuth={setAuth} onNotification={openNotification} notify={notify}/>}
+ return <div className="btex-app formal-workbench">
+  {page==="settings"?<WorkbenchSettingsPage auth={auth} consultantId={brainxConsultantId||auth.consultant} keywords={brainxKeywords} note={brainxNote} policyVersion={brainxRun.policyVersion} sync={sync} fieldReport={brainxRadar?.fieldReport??null} onBack={()=>go("today")} onOpenConnections={()=>go("sources")} onRefresh={()=>{void loadBrainxSnapshot.current();void loadBrainxSide.current();notify("正在刷新同步诊断")}} notify={notify} />:<>
+  <WorkspaceShell activePage={shellPage} onNavigate={navigateShell} consultant={auth.consultant} assistantOpen={assistantOpen} onAssistantToggle={()=>setAssistantOpen(value=>!value)} assistantPlacement="overlay">
+   {["today","accepted","jobs","clients"].includes(page)&&(brainxMode==="connecting"||workspaceIssue)?
+    <WorkspaceEntry kind={brainxMode==="connecting"?"connecting":workspaceIssue!} onRetry={()=>setConnectAttempt(value=>value+1)} onCheckConnection={async()=>{await brainxFetch<BackendSessionStatus>("/api/v1/oauth/status");await loadBrainxSnapshot.current();await loadBrainxSide.current()}} onOpenSources={()=>go("sources")} />:<>
+    {page==="today"&&<TodayDecisionQueue activeJobId={panel?.kind==="job"&&panelMotion!=="closing"?panel.jobId:null} completed={decisionActions} jobs={activeDecisionJobs} projects={brainxProjects} engagement={engagement} sync={sync} open={openDecision} onAction={runDecisionAction} onAddToProjects={job=>addToMyProjects(job.id,job.company)} onGoToProject={goToProject} onFeedback={feedbackJob} showVerification={demo} tray={tray} onToggleTray={toggleTray} onRemoveTray={removeTray} folders={folders} folderMode={folderMode} onFolderMode={()=>setFolderMode(value=>!value)} onAssignFolder={assignFolder} onCreateFolder={createFolder} mode={brainxMode} onOpenSources={()=>go("sources")} pagination={recommendationPagination?{...recommendationPagination,searchQuery:recommendationQueue.searchQuery,onSearch:recommendationQueue.search,sort:recommendationQueue.sort,onSort:recommendationQueue.changeSort}:undefined} />}
+    {page==="accepted"&&<ProjectsView projects={brainxProjects} query={query} setQuery={setQuery} focusedProjectId={focusedProjectId} open={project=>openDecision(projectToDecisionJob(project),"engagement")} />}
+    {page==="jobs"&&<WorkbenchJobsPage items={brainxRadar?.items??[]} capabilities={brainxRadar?.fieldCapabilities??[]} projects={brainxProjects.map(project=>project.project_id)} company={jobCompanyFilter} onAddToProjects={addRadarJobToProjects} />}
+   {page==="clients"&&<WorkbenchClientsPage items={brainxClients??[]} onOpenJobs={company=>{setJobCompanyFilter(company);go("jobs")}} />}
+   </>}
+   {page==="alerts"&&<Alerts setExtraTasks={setExtraTasks} notify={notify} setDrawer={setDrawer}/>}
+   {page==="rules"&&<Rules key={`${brainxKeywords.join("|")}:${brainxNote}`} notify={notify} mode={brainxMode} policy={brainxRun.policyVersion} keywords={brainxKeywords} note={brainxNote} onRefresh={async()=>{await loadBrainxSnapshot.current();void loadBrainxSide.current()}} onProfileSaved={(nextKeywords,nextNote)=>{setBrainxKeywords(nextKeywords);setBrainxNote(nextNote)}}/>}
+   {page==="sources"&&<Sources notify={notify}/>}
+  </WorkspaceShell>
+     {panel&&!pendingCommand&&<WorkbenchPanel panel={panel} motion={panelMotion} job={selectedDecisionJob} commitmentJobs={commitmentJobs} auth={auth} sync={sync} notifications={notifications} engagement={engagement} events={decisionEvents} outcomes={outcomes}
+      completed={decisionActions} openmaiResults={openmaiByJob} onRerunOpenmai={rerunOpenmaiForJob} mode={brainxMode} legalMap={Object.fromEntries(allDecisionJobs.map(job=>[job.id,job.brainxLegal||[]]))} replayMap={brainxReplay} dismissReasons={brainxDismissReasons} onReplay={(jobId,data)=>setBrainxReplay(current=>({...current,[jobId]:data}))} onFactsUpdated={async()=>{await loadBrainxSnapshot.current();void loadBrainxSide.current()}}
+      onCommitmentUpdated={jobId=>refreshBrainxJob(jobId,true)} onMembership={confirmJobMembership} onClose={closePanel} onOpenJob={openDecision} onAction={runDecisionAction} onCommand={requestCommand} onOutcome={recordOutcome} onSync={runSync} onSetSync={setSync} onAuth={setAuth} onNotification={openNotification} notify={notify}/>}
   {assistantOpen&&<ChatbotDrawer messages={assistantMessages} input={assistantInput} setInput={setAssistantInput} busy={assistantBusy} onSend={sendAssistant} onStop={()=>assistantAbort.current?.abort()} onClear={()=>setAssistantMessages([])} onClose={()=>setAssistantOpen(false)} mode={brainxMode} page={page} settings={assistantSettings} setSettings={setAssistantSettings} contextJob={selectedDecisionJob}/>}
   {pendingCommand&&<CommandConfirm pending={pendingCommand} reasons={brainxDismissReasons} onClose={()=>setPendingCommand(null)} onConfirm={(reason?:string)=>applyCommand(pendingCommand.job,pendingCommand.command,reason)}/>}
   {drawer&&<><div className="drawer-backdrop" onClick={()=>setDrawer(null)}/><aside className="drawer"><button className="icon-btn" style={{float:"right"}} onClick={()=>setDrawer(null)}><X/></button><span className="eyebrow">Decision evidence</span><h2>判断依据</h2><div className="conclusion"><div className="spark"><Sparkles/></div><div><b>{drawer}</b><p>综合规则计算与AI结构化推断，置信度 91%</p></div></div><div className="score-bars">{["客户招聘意愿 18/20","职位新鲜度 14/15","HC与紧急程度 15/15","客户反馈速度 14/15","转化表现 16/20","竞争与风险 12/15"].map((x,i)=><div className="mini-item" key={x}><span className="num">0{i+1}</span><div><b>{x}</b><p>{i<4?"规则计算 · 内部项目驾驶舱":"AI推断 · 基于近30天事件"}</p></div></div>)}</div><button className="btn primary" style={{marginTop:18}} onClick={()=>{setDrawer(null);notify("依据已复制到项目备注")}}>复制到项目备注</button></aside></>}
+  </>}
   {toast&&<div className="toast"><Check/> <span className="toast-text">{toast.text}</span>{toast.input?<>
     <input ref={toastInputRef} className="toast-input" placeholder={toast.input.placeholder} autoFocus onKeyDown={e=>{if(e.key==="Enter"){const v=e.currentTarget.value.trim();if(v){const fn=toast.input!.onSubmit;setToast(null);fn(v)}}else if(e.key==="Escape")setToast(null)}}/>
     <button className="toast-action" onClick={()=>{const v=toastInputRef.current?.value?.trim();if(v){const fn=toast.input!.onSubmit;setToast(null);fn(v)}}}>提交</button>
@@ -197,10 +301,10 @@ export default function DecisionWorkbench(){
  </div>
 }
 
-function evidenceCoveragePercent(coverage:number|null){return coverage===null?null:Math.round(coverage)}
+function evidenceCoveragePercent(coverage:number|null){return coverage===null?null:Math.round(coverage<=1?coverage*100:coverage)}
 function ChatbotDrawer({messages,input,setInput,busy,onSend,onStop,onClear,onClose,mode,page,settings,setSettings,contextJob}:{messages:AssistantMessage[];input:string;setInput:(value:string)=>void;busy:boolean;onSend:()=>void;onStop:()=>void;onClear:()=>void;onClose:()=>void;mode:"connecting"|"connected"|"offline";page:Page;settings:boolean;setSettings:(value:boolean)=>void;contextJob:DecisionJob|null}){
  const [tab,setTab]=useState<"profile"|"market">("profile");
- const contextLabel=contextJob?`${contextJob.company} · ${contextJob.role}`:page==="today"?"当前精选盘与未接单职位":"当前工作台页面";
+ const contextLabel=contextJob?`${contextJob.company} · ${contextJob.role}`:page==="today"?"当前精选盘与待判断职位":"当前工作台页面";
  const coverage=contextJob?evidenceCoveragePercent(contextJob.evidenceCoverage):null;
  const tags=contextJob?[decisionGroupMeta[contextJob.group].title,contextJob.facts["职位关系"],contextJob.sourceMode==="COCKPIT_CONTEXT"?"驾驶舱上下文":"职位市场"]:["推荐评分","顾问可见范围","实时同步"];
  const insights=contextJob?[contextJob.recommendation,...contextJob.risks].slice(0,3):["推荐基于当前顾问可见的职位、推荐和状态。","硬规则优先于综合评分，UNKNOWN 不会被当成 0。"];
@@ -216,48 +320,19 @@ function ChatbotDrawer({messages,input,setInput,busy,onSend,onStop,onClear,onClo
   </aside>
  </>}
 
-function AcceptedJobsView({jobs,total,query,open}:{jobs:DecisionJob[];total:number;query:string;open:(job:DecisionJob,tab?:"judgement"|"engagement"|"trail"|"replay")=>void}){
- const isFiltered=Boolean(query.trim());
- return <div className="decision-home accepted-home">
-  <Heading code="ACCEPTED / ACTIVE DELIVERY" title="已确定" desc="这里集中显示你已经确认接单、正在推进的职位。"/>
-  <section className="accepted-summary"><div><span>{isFiltered?"当前显示":"当前已确定"}</span><b>{isFiltered?`${jobs.length}/${total}`:total}</b><small>{isFiltered?"个匹配职位":"个职位进入交付列表"}</small></div><p>从精选盘点击“确定”后的职位，会在这里持续跟进。</p></section>
-  <div className="accepted-list">{jobs.length?jobs.map(job=><article className="accepted-card" key={job.id}>
-   <div className="accepted-card-top"><span>{decisionGroupMeta[job.group].title}</span><strong>{job.finalScore}</strong></div>
-   <h2>{job.company}</h2><p>{job.role}</p>
-   <div className="accepted-card-fact"><span>当前进度</span><b>{job.recentSignal}</b></div>
-   <button className="accepted-card-action" onClick={()=>open(job,"engagement")}>打开承接与结果 <ChevronRight/></button>
-  </article>):<div className="empty accepted-empty"><Search/><b>没有匹配的已确定职位</b><p>试试输入公司名、职位名或当前阶段。</p></div>}</div>
- </div>;
-}
-
-function DecisionToday({activeJobId,completed,jobs,engagement,sync,open,onAction,onFeedback,showVerification=true,tray,onToggleTray,onRemoveTray,onConfirmTray,folders,folderMode,onFolderMode,onAssignFolder,onCreateFolder}:{activeJobId:string|null;completed:string[];jobs:DecisionJob[];engagement:Record<string,EngagementState>;sync:SyncStatus;open:(job:DecisionJob,tab?:"judgement"|"engagement"|"trail"|"replay")=>void;onAction:(job:DecisionJob,action:DecisionAction)=>void;onFeedback:(job:DecisionJob,reason?:string)=>void;showVerification?:boolean;tray:string[];onToggleTray:(id:string)=>void;onRemoveTray:(id:string)=>void;onConfirmTray:()=>void;folders:PickFolder[];folderMode:boolean;onFolderMode:()=>void;onAssignFolder:(jobId:string,folderId:string)=>void;onCreateFolder:(name:string)=>void}){
- const [query,setQuery]=useState("");
- const [sort,setSort]=useState<"score"|"recent">("score");
- const [sourceFilter,setSourceFilter]=useState<"all"|SourceMode>("all");
- const [groupFilter,setGroupFilter]=useState<"all"|DecisionGroup>("all");
- const [onlyActionable,setOnlyActionable]=useState(false);
- const acceptedJobs=jobs.filter(job=>engagement[job.id]==="ACCEPTED");
- const pendingJobs=[...jobs.filter(job=>engagement[job.id]!=="ACCEPTED"),...verificationJobs];
- const pendingShown=showVerification?pendingJobs:pendingJobs.filter(job=>!verificationJobs.includes(job));
- const filteredPending=pendingShown.filter(job=>`${job.company} ${job.role} ${job.recommendation} ${Object.values(job.facts).join(" ")}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())).filter(job=>sourceFilter==="all"||job.sourceMode===sourceFilter).filter(job=>groupFilter==="all"||job.group===groupFilter).filter(job=>!onlyActionable||job.actions.length>0);
- const visiblePending=[...filteredPending].sort((left,right)=>sort==="score"?Number(right.finalScore)-Number(left.finalScore):String(left.recentSignal).localeCompare(String(right.recentSignal)));
- const allJobs=[...acceptedJobs,...pendingShown];
- const trayJobs=tray.map(id=>allJobs.find(job=>job.id===id)).filter((job):job is DecisionJob=>!!job);
- const isContext=activeJobId!==null&&pendingShown.some(job=>job.id===activeJobId);
- const jobToolbar=<div className="concept-filter-bar"><label className="concept-search"><Search/><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="搜索职位 / 公司 / JD 关键词" aria-label="搜索职位或公司"/></label><label className="concept-filter-select"><span className="sr-only">数据来源</span><select value={sourceFilter} onChange={event=>setSourceFilter(event.target.value as "all"|SourceMode)} aria-label="数据来源"><option value="all">全部来源</option><option value="COCKPIT_CONTEXT">驾驶舱</option><option value="MARKET_ONLY">职位市场</option></select><ChevronDown/></label><label className="concept-filter-select"><span className="sr-only">推荐阶段</span><select value={groupFilter} onChange={event=>setGroupFilter(event.target.value as "all"|DecisionGroup)} aria-label="推荐阶段"><option value="all">推荐阶段</option>{Object.entries(decisionGroupMeta).map(([value,meta])=><option key={value} value={value}>{meta.title}</option>)}</select><ChevronDown/></label><button type="button" className={`concept-filter-button${onlyActionable?" is-active":""}`} aria-pressed={onlyActionable} onClick={()=>setOnlyActionable(value=>!value)}>{onlyActionable?"显示全部":"可处理职位"}<Filter/></button><label className="concept-filter-select concept-sort"><span className="sr-only">排序</span><select value={sort} onChange={event=>setSort(event.target.value as "score"|"recent")} aria-label="职位排序"><option value="score">综合匹配</option><option value="recent">最新信号</option></select><ChevronDown/></label></div>;
-  return <div className="decision-home">
-
-  <PickTray trayJobs={trayJobs} featuredJobs={visiblePending.slice(0,4)} allJobs={allJobs} folderMode={folderMode} onFolderMode={onFolderMode} folders={folders} onRemoveTray={onRemoveTray} onToggleTray={onToggleTray} onConfirmTray={onConfirmTray} onAssignFolder={onAssignFolder} onCreateFolder={onCreateFolder} open={open}/>
-  {sync.state==="READY"&&sync.warning&&<div className="sync-degraded-banner" role="status" title={sync.warning.detail||undefined}><AlertTriangle/><span>同步失败中：{sync.warning.message} · 当前展示最近完整快照{sync.updatedAt?`（更新于 ${sync.updatedAt}）`:""}</span></div>}
-  {sync.state==="INCOMPLETE"||sync.state==="ERROR"?<section className="decision-blocked"><AlertTriangle/><div><b>{sync.state==="INCOMPLETE"?"本次同步不完整":"同步失败"}</b><p>为避免误导，当前不展示新的项目判断。</p></div><button className="btn" disabled={!jobs.length} onClick={()=>jobs[0]&&open(jobs[0],"judgement")}>查看上次快照</button></section>:<DecisionZone anchorId="opportunity-list" tone="pending" title="未接单" subtitle="" jobs={visiblePending} isContext={isContext} completed={completed} engagement={engagement} open={open} onAction={onAction} onFeedback={onFeedback} tray={tray} onToggleTray={onToggleTray} folderMode={folderMode} folders={folders} onAssignFolder={onAssignFolder} toolbar={jobToolbar}/>}
-  </div>
-}
-
-
-
 function DecisionMetric({label,value,emphasis,helpOpen,onHelpToggle}:{label:string;value:string|number;emphasis?:string;helpOpen?:boolean;onHelpToggle?:()=>void}){return <div className="decision-metric"><small>{label}</small>{onHelpToggle&&<button className="metric-help" type="button" onClick={onHelpToggle} aria-label={`解释${label}`} aria-expanded={helpOpen}>!</button>}<b className={emphasis}>{value}</b></div>}
 
-function WorkbenchPanel({panel,motion,job,commitmentJobs,auth,sync,notifications,engagement,events,outcomes,completed,openmaiResults,onRerunOpenmai,mode,legalMap,replayMap,dismissReasons,onReplay,onFactsUpdated,onMembership,onClose,onOpenJob,onAction,onCommand,onOutcome,onSync,onSetSync,onAuth,onNotification,notify}:{panel:Panel;motion:"idle"|"entering"|"open"|"closing";job:DecisionJob|null;commitmentJobs:DecisionJob[];auth:AuthStatus;sync:SyncStatus;notifications:Notification[];engagement:Record<string,EngagementState>;events:Record<string,DecisionEvent[]>;outcomes:Record<string,Outcome[]>;completed:string[];openmaiResults:Record<string,OpenmaiResult|null>;onRerunOpenmai:(jobId:string)=>void;mode:"connecting"|"connected"|"offline";legalMap:Record<string,EngagementCommand[]>;replayMap:Record<string,BrainxReplay>;dismissReasons:string[];onReplay:(jobId:string,data:BrainxReplay)=>void;onFactsUpdated:()=>Promise<void>;onMembership:(job:DecisionJob,relation:MembershipRelation)=>Promise<void>;onClose:()=>void;onOpenJob:(job:DecisionJob,tab?:"judgement"|"engagement"|"trail"|"replay")=>void;onAction:(job:DecisionJob,action:DecisionAction)=>void;onCommand:(job:DecisionJob,command:EngagementCommand)=>void;onOutcome:(job:DecisionJob,stage:Outcome["stage"],rating?:number,note?:string)=>void;onSync:()=>void;onSetSync:(sync:SyncStatus)=>void;onAuth:(auth:AuthStatus)=>void;onNotification:(notification:Notification)=>void;notify:(text:string)=>void}){
+function WorkbenchPanel({panel,motion,job,commitmentJobs,auth,sync,notifications,engagement,events,outcomes,completed,openmaiResults,onRerunOpenmai,mode,legalMap,replayMap,dismissReasons,onReplay,onFactsUpdated,onCommitmentUpdated,onMembership,onClose,onOpenJob,onAction,onCommand,onOutcome,onSync,onSetSync,onAuth,onNotification,notify}:{panel:Panel;motion:"idle"|"entering"|"open"|"closing";job:DecisionJob|null;commitmentJobs:DecisionJob[];auth:AuthStatus;sync:SyncStatus;notifications:Notification[];engagement:Record<string,EngagementState>;events:Record<string,DecisionEvent[]>;outcomes:Record<string,Outcome[]>;completed:string[];openmaiResults:Record<string,OpenmaiResult|null>;onRerunOpenmai:(jobId:string)=>void;mode:"connecting"|"connected"|"offline";legalMap:Record<string,EngagementCommand[]>;replayMap:Record<string,BrainxReplay>;dismissReasons:string[];onReplay:(jobId:string,data:BrainxReplay)=>void;onFactsUpdated:()=>Promise<void>;onCommitmentUpdated:(jobId:string)=>Promise<void>;onMembership:(job:DecisionJob,relation:MembershipRelation)=>Promise<void>;onClose:()=>void;onOpenJob:(job:DecisionJob,tab?:JobDetailTab)=>void;onAction:(job:DecisionJob,action:DecisionAction)=>void;onCommand:(job:DecisionJob,command:EngagementCommand)=>void;onOutcome:(job:DecisionJob,stage:Outcome["stage"],rating?:number,note?:string)=>void;onSync:()=>void;onSetSync:(sync:SyncStatus)=>void;onAuth:(auth:AuthStatus)=>void;onNotification:(notification:Notification)=>void;notify:(text:string)=>void}){
+ const [enrichedDetail,setEnrichedDetail]=useState<JobDetailReviewData|null>(null);
+ useEffect(()=>{
+  if(panel?.kind!=="job"||!job||mode!=="connected")return;
+  let active=true;
+  const base=toDecisionJobDetail(job,events[job.id]||[]);
+  void getOpportunityDetail(job.id)
+   .then(detail=>{if(active)setEnrichedDetail(mergeOpportunityDetail(base,detail))})
+   .catch(()=>{/* 推荐快照中的基础事实仍可展示，详情失败不伪造内容。 */});
+  return()=>{active=false};
+ },[panel?.kind,job,mode,events]);
  const [dragOffset,setDragOffset]=useState<number|null>(null);
  const panelDrag=useRef<{pointerId:number;startX:number;lastX:number;lastAt:number;velocity:number}|null>(null);
  const startPanelDrag=(event:React.PointerEvent<HTMLDivElement>)=>{
@@ -285,16 +360,40 @@ function WorkbenchPanel({panel,motion,job,commitmentJobs,auth,sync,notifications
   setDragOffset(null);
   if(projected>window.innerWidth*.3)onClose();
  };
- return <aside className={`decision-drawer workbench-panel panel-${motion}${dragOffset!==null?" is-dragging":""}`} style={{"--panel-drag-offset":`${dragOffset??0}px`} as React.CSSProperties} aria-label="工作台详情面板"><div className="drawer-drag-handle" aria-label="向右滑动关闭详情" onPointerDown={startPanelDrag} onPointerMove={movePanelDrag} onPointerUp={finishPanelDrag} onPointerCancel={finishPanelDrag}><i/></div><button className="drawer-close" onClick={onClose} aria-label="关闭详情"><X/></button>{panel?.kind==="job"&&!job?<div style={{padding:24}}><b>该职位已不在本轮推荐</b><p style={{color:"var(--muted)",fontSize:13}}>快照刷新后它离开了当前列表；可关闭面板后在职位市场搜索。</p></div>:panel?.kind==="job"&&job?<DecisionDrawer job={job} tab={panel.tab} completed={completed} engagement={engagement[job.id]||"NEW"} events={events[job.id]||[]} outcomes={outcomes[job.id]||[]} openmai={openmaiResults[job.id]||null} onRerunOpenmai={onRerunOpenmai} mode={mode} legalMap={legalMap} replayData={replayMap[job.id]} onReplay={onReplay} onFactsUpdated={onFactsUpdated} onMembership={onMembership} notify={notify} onTab={tab=>onOpenJob(job,tab)} onAction={onAction} onCommand={onCommand} onOutcome={onOutcome}/>:panel?.kind==="sync"?<SyncPanel sync={sync} onSync={onSync} onSetSync={onSetSync} notify={notify} mode={mode}/>:panel?.kind==="identity"?<IdentityPanel auth={auth} onAuth={onAuth} notify={notify} mode={mode}/>:panel?.kind==="commitments"?<CommitmentsPanel jobs={commitmentJobs} engagement={engagement} onOpen={job=>onOpenJob(job,"engagement")}/>:<NotificationPanel items={notifications} onOpen={onNotification} notify={notify}/>}</aside>
+ if(panel?.kind==="job"&&job){
+  const state=engagement[job.id]||"NEW";
+  const jobEvents=events[job.id]||[];
+  const legal=mode==="connected"?legalMap[job.id]||[]:legalActions(job,state);
+  const baseDetail=toDecisionJobDetail(job,jobEvents);
+  const detail=enrichedDetail?.projectId===job.id?enrichedDetail:baseDetail;
+  return <JobDetailCard
+   job={{...detail,engagementState:stateLabel[state],inMyProjects:job.facts["职位关系"]==="我的职位"}}
+   activeTab={panel.tab}
+   onTabChange={tab=>onOpenJob(job,tab)}
+   onClose={onClose}
+   onAddToProjects={panel.tab==="engagement"?undefined:()=>{void onMembership(job,"MY_JOB")}}
+   onDismiss={panel.tab!=="engagement"&&legal.includes("DISMISS")?()=>onCommand(job,"DISMISS"):undefined}
+   statusLabel={`${stateLabel[state]} · ${decisionGroupMeta[job.group].title}`}
+   detailContent={<DecisionDrawer
+    job={job} tab={panel.tab==="facts"?"judgement":panel.tab} completed={completed}
+    engagement={state} events={jobEvents} outcomes={outcomes[job.id]||[]}
+    openmai={openmaiResults[job.id]||null} onRerunOpenmai={onRerunOpenmai}
+    mode={mode} legalMap={legalMap} replayData={replayMap[job.id]} onReplay={onReplay}
+    onFactsUpdated={onFactsUpdated} onCommitmentUpdated={onCommitmentUpdated} onMembership={onMembership} notify={notify}
+    onTab={tab=>onOpenJob(job,tab)} onAction={onAction} onCommand={onCommand} onOutcome={onOutcome}
+   />}
+  />
+ }
+ return <aside className={`decision-drawer workbench-panel panel-${motion}${dragOffset!==null?" is-dragging":""}`} style={{"--panel-drag-offset":`${dragOffset??0}px`} as React.CSSProperties} aria-label="工作台详情面板"><div className="drawer-drag-handle" aria-label="向右滑动关闭详情" onPointerDown={startPanelDrag} onPointerMove={movePanelDrag} onPointerUp={finishPanelDrag} onPointerCancel={finishPanelDrag}><i/></div><button className="drawer-close" onClick={onClose} aria-label="关闭详情"><X/></button>{panel?.kind==="sync"?<SyncPanel sync={sync} onSync={onSync} onSetSync={onSetSync} notify={notify} mode={mode}/>:panel?.kind==="identity"?<IdentityPanel auth={auth} onAuth={onAuth} notify={notify} mode={mode}/>:panel?.kind==="commitments"?<CommitmentsPanel jobs={commitmentJobs} engagement={engagement} onOpen={job=>onOpenJob(job,"engagement")}/>:<NotificationPanel items={notifications} onOpen={onNotification} notify={notify}/>}</aside>
 }
 
-function CommitmentsPanel({jobs,engagement,onOpen}:{jobs:DecisionJob[];engagement:Record<string,EngagementState>;onOpen:(job:DecisionJob)=>void}){return <><div className="panel-heading"><BriefcaseBusiness/><div><h1>我的承接</h1><p>关注、接单和需要继续处理的职位</p></div></div><div className="mobile-commitment-list">{jobs.length?jobs.map(job=><button key={job.id} onClick={()=>onOpen(job)}><span><b>{job.company} · {job.role}</b><small>{engagement[job.id]==="ACCEPTED"?"接单中 · 推进交付或记录结果":"关注中 · 评估后接单或取消关注"}</small></span><ChevronRight/></button>):<p>暂无承接职位。</p>}</div></>}
+function CommitmentsPanel({jobs,engagement,onOpen}:{jobs:DecisionJob[];engagement:Record<string,EngagementState>;onOpen:(job:DecisionJob)=>void}){return <><div className="panel-heading"><BriefcaseBusiness/><div><h1>我的跟进</h1><p>关注中、跟进中和需要继续处理的职位</p></div></div><div className="mobile-commitment-list">{jobs.length?jobs.map(job=><button key={job.id} onClick={()=>onOpen(job)}><span><b>{job.company} · {job.role}</b><small>{engagement[job.id]==="ACCEPTED"?"跟进中 · 推进行动或记录结果":"关注中 · 评估后开始跟进或取消关注"}</small></span><ChevronRight/></button>):<p>暂无跟进职位。</p>}</div></>}
 
-/** 接单自动找人面板（engagement tab）：接单后自动触发，SSE/刷新回传结果；done 可显式重跑。 */
+/** 开始跟进后自动找人面板（engagement tab）：后端 ACCEPT 成功后触发，SSE/刷新回传结果。 */
 function OpenmaiPanel({jobId,openmai,mode,onRerun}:{jobId:string;openmai:OpenmaiResult|null;mode:"connecting"|"connected"|"offline";onRerun:(jobId:string)=>void}){
  if(mode!=="connected")return null;
  if(!openmai||openmai.status==="none")return null;
- return <DrawerSection title="OpenMai 自动找人（接单后自动触发）">
+ return <DrawerSection title="OpenMai 自动找人（开始跟进后触发）">
    {openmai.status==="running"&&<p className="muted" style={{margin:"0 0 10px"}}>找人中…约 1-2 分钟，完成后自动更新（也可关闭页面稍后回来看）。</p>}
    {openmai.status==="failed"&&<p className="muted" style={{margin:"0 0 10px",color:"#c64b59"}}>找人失败：{openmai.error||"未知错误"}</p>}
    {openmai.status==="done"&&<pre style={{margin:"0 0 10px",padding:"12px",borderRadius:"10px",background:"rgba(23,107,88,.05)",border:"1px solid rgba(23,107,88,.18)",whiteSpace:"pre-wrap",wordBreak:"break-word",fontSize:"12px",lineHeight:"1.7",maxHeight:"420px",overflow:"auto"}}>{openmai.result_text}</pre>}
@@ -302,35 +401,42 @@ function OpenmaiPanel({jobId,openmai,mode,onRerun}:{jobId:string;openmai:Openmai
  </DrawerSection>
 }
 
-function DecisionDrawer({job,tab,completed,engagement,events,outcomes,openmai,onRerunOpenmai,mode,legalMap,replayData,onReplay,onFactsUpdated,onMembership,notify,onTab,onAction,onCommand,onOutcome}:{job:DecisionJob;tab:"judgement"|"engagement"|"trail"|"replay";completed:string[];engagement:EngagementState;events:DecisionEvent[];outcomes:Outcome[];openmai:OpenmaiResult|null;onRerunOpenmai:(jobId:string)=>void;mode:"connecting"|"connected"|"offline";legalMap:Record<string,EngagementCommand[]>;replayData?:BrainxReplay;onReplay:(jobId:string,data:BrainxReplay)=>void;onFactsUpdated:()=>Promise<void>;onMembership:(job:DecisionJob,relation:MembershipRelation)=>Promise<void>;notify:(text:string)=>void;onTab:(tab:"judgement"|"engagement"|"trail"|"replay")=>void;onAction:(job:DecisionJob,action:DecisionAction)=>void;onCommand:(job:DecisionJob,command:EngagementCommand)=>void;onOutcome:(job:DecisionJob,stage:Outcome["stage"],rating?:number,note?:string)=>void}){
+function DecisionDrawer({job,tab,completed,engagement,events,outcomes,openmai,onRerunOpenmai,mode,legalMap,replayData,onReplay,onFactsUpdated,onCommitmentUpdated,onMembership,notify,onTab,onAction,onCommand,onOutcome}:{job:DecisionJob;tab:"judgement"|"engagement"|"trail"|"replay";completed:string[];engagement:EngagementState;events:DecisionEvent[];outcomes:Outcome[];openmai:OpenmaiResult|null;onRerunOpenmai:(jobId:string)=>void;mode:"connecting"|"connected"|"offline";legalMap:Record<string,EngagementCommand[]>;replayData?:BrainxReplay;onReplay:(jobId:string,data:BrainxReplay)=>void;onFactsUpdated:()=>Promise<void>;onCommitmentUpdated:(jobId:string)=>Promise<void>;onMembership:(job:DecisionJob,relation:MembershipRelation)=>Promise<void>;notify:(text:string)=>void;onTab:(tab:"judgement"|"engagement"|"trail"|"replay")=>void;onAction:(job:DecisionJob,action:DecisionAction)=>void;onCommand:(job:DecisionJob,command:EngagementCommand)=>void;onOutcome:(job:DecisionJob,stage:Outcome["stage"],rating?:number,note?:string)=>void}){
  const [replayLoading,setReplayLoading]=useState(false);
  const [factEditRequest,setFactEditRequest]=useState(0);
- const requestFactEdit=()=>{setFactEditRequest(value=>value+1);if(tab!=="judgement")onTab("judgement")}; // 已在 judgement 时再 onTab 会命中 openDecision 同 tab 切换把抽屉关掉（且 decisionActions 持久化后重开立即自闭）
+ const requestFactEdit=()=>{setFactEditRequest(value=>value+1);onTab("judgement")};
  const verifyComplete=job.actions.some(action=>action.kind==="verify"&&completed.includes(`${job.id}:${action.id}`));
  useEffect(()=>{if(verifyComplete&&mode!=="connecting")requestFactEdit()},[job.id,verifyComplete,mode]);
- useEffect(()=>{if(mode!=="connected"||!job?.brainxDecisionId||replayData)return;let cancelled=false;setReplayLoading(true);brainxFetch<BackendReplay>(`/api/v1/decisions/${encodeURIComponent(job.brainxDecisionId)}/replay`).then(data=>{if(!cancelled)onReplay(job.id,mapReplayData(data))}).catch(()=>{}).finally(()=>{if(!cancelled)setReplayLoading(false)});return()=>{cancelled=true}},[mode,job?.id,job?.brainxDecisionId,replayData,onReplay]);
- const tabOptions=["judgement","engagement","trail","replay"] as const;
- const tabLabel={judgement:"判断",engagement:"承接与结果",trail:"决策轨迹",replay:"回放"} as const;
- return <><div className="drawer-title"><h1>{job.company} <span>·</span> {job.role}</h1><span className={`decision-state ${job.eligibility.toLowerCase()}`}>{stateLabel[engagement]} · {decisionGroupMeta[job.group].title}</span></div><DirectGlassSegment value={tab} options={tabOptions.map(value=>({value,label:tabLabel[value]}))} onChange={onTab} className="drawer-tabs" ariaLabel="职位详情视图"/>{tab==="judgement"?<><div className="drawer-metrics"><DecisionMetric label="项目推进" value={job.globalScore}/><DecisionMetric label="探索机会" value={job.explorationScore}/><DecisionMetric label="个人适配" value={job.personalScore}/><DecisionMetric label="最终得分" value={job.finalScore} emphasis="final"/></div><ManualFactSection job={job} mode={mode} onUpdated={onFactsUpdated} notify={notify} editRequest={factEditRequest}/><DrawerSection title="为什么现在做"><ul className="explanations">{job.scoreNotes.map(note=><li key={note}>{note}</li>)}</ul></DrawerSection>{job.risks.length>0&&<DrawerSection title="风险与缺失"><ul className="explanations risks">{job.risks.map(note=><li key={note}>{note}</li>)}</ul></DrawerSection>}<DrawerSection title="证据来源"><div className="evidence-list">{job.evidence.map(item=><span key={item}>{item}</span>)}</div></DrawerSection><TalentSupplySection job={job} mode={mode}/><DrawerSection title="当前建议"><div className="drawer-actions">{job.actions.map(action=>{const complete=completed.includes(`${job.id}:${action.id}`);return <button key={action.id} className={complete?"completed":""} onClick={()=>onAction(job,action)} disabled={complete}><span><b>{complete?"已记录：":""}{action.label}</b><small>{action.detail}</small></span>{complete?<Check/>:<ChevronRight/>}</button>})}</div></DrawerSection></>:tab==="engagement"?<><EngagementPanel job={job} state={engagement} outcomes={outcomes} mode={mode} legalMap={legalMap} onCommand={onCommand} onMembership={onMembership} onVerify={requestFactEdit} onUpdated={onFactsUpdated} notify={notify}/><OpenmaiPanel jobId={job.id} openmai={openmai} mode={mode} onRerun={onRerunOpenmai}/></>:tab==="trail"?<DrawerSection title="决策轨迹"><div className="trail-list">{events.length?events.map(event=><div key={event.id}><time>{event.at}</time><b>{event.type}</b><small>{event.reason||"顾问工作台"}</small></div>):<p className="muted">尚无操作记录</p>}</div></DrawerSection>:<ReplayPanel job={job} events={events} outcomes={outcomes} replayData={replayData} loading={replayLoading}/>}</>
+ useEffect(()=>{
+  if(tab!=="replay"||mode!=="connected"||!job?.brainxDecisionId||replayData)return;
+  let cancelled=false;
+  setReplayLoading(true);
+  brainxFetch<BackendReplay>(`/api/v1/decisions/${encodeURIComponent(job.brainxDecisionId)}/replay`)
+   .then(data=>{if(!cancelled)onReplay(job.id,mapReplayData(data))})
+   .catch(()=>{})
+   .finally(()=>{if(!cancelled)setReplayLoading(false)});
+  return()=>{cancelled=true};
+ },[tab,mode,job?.id,job?.brainxDecisionId,replayData,onReplay]);
+ return <>{tab==="judgement"?<><div className="drawer-metrics"><DecisionMetric label="项目推进" value={job.globalScore}/><DecisionMetric label="探索机会" value={job.explorationScore}/><DecisionMetric label="个人适配" value={job.personalScore}/><DecisionMetric label="最终得分" value={job.finalScore} emphasis="final"/></div><ManualFactSection job={job} mode={mode} onUpdated={onFactsUpdated} notify={notify} editRequest={factEditRequest}/><DrawerSection title="为什么现在做"><ul className="explanations">{job.scoreNotes.map(note=><li key={note}>{note}</li>)}</ul></DrawerSection>{job.risks.length>0&&<DrawerSection title="风险与缺失"><ul className="explanations risks">{job.risks.map(note=><li key={note}>{note}</li>)}</ul></DrawerSection>}<DrawerSection title="证据来源"><div className="evidence-list">{job.evidence.map(item=><span key={item}>{item}</span>)}</div></DrawerSection><TalentSupplySection job={job} mode={mode}/><DrawerSection title="当前建议"><div className="drawer-actions">{job.actions.map(action=>{const complete=completed.includes(`${job.id}:${action.id}`);return <button key={action.id} className={complete?"completed":""} onClick={()=>onAction(job,action)} disabled={complete}><span><b>{complete?"已记录：":""}{action.label}</b><small>{action.detail}</small></span>{complete?<Check/>:<ChevronRight/>}</button>})}</div></DrawerSection></>:tab==="engagement"?<><EngagementPanel job={job} state={engagement} outcomes={outcomes} mode={mode} legalMap={legalMap} onCommand={onCommand} onMembership={onMembership} onVerify={requestFactEdit} onUpdated={()=>onCommitmentUpdated(job.id)} notify={notify}/><OpenmaiPanel jobId={job.id} openmai={openmai} mode={mode} onRerun={onRerunOpenmai}/></>:tab==="trail"?<DrawerSection title="决策轨迹"><div className="trail-list">{events.length?newestEvents(events).map(event=><div key={event.id}><time>{event.at}</time><b>{event.type}</b><small>{event.reason||"顾问工作台"}</small></div>):<p className="muted">尚无操作记录</p>}</div></DrawerSection>:<ReplayPanel job={job} events={events} outcomes={outcomes} replayData={replayData} loading={replayLoading}/>}</>
 }
 
 function engagementStateMessage(state:EngagementState){
  return ({
-  NEW:"尚未纳入个人承接；可先关注，或在判断面板核验后再处理。",
+  NEW:"尚未加入我的项目；可先关注，或在判断面板核验后再处理。",
   RECOMMENDED:"已获得推荐；可先关注，或在判断面板核验后再处理。",
   VIEWED:"已查看当前判断；可加入关注或暂不考虑。",
-  WATCHED:"已保留关注位；评估完成后可接单。",
-  ACCEPTED:"已进入你的交付列表；请持续推进并回写结果。",
-  DISMISSED:"已记录暂不考虑；如出现新信号，可重新关注并回到承接流程。",
-  RELEASED:"已从当前工作区释放；如需继续推进，可重新关注后再接单。",
-  COMPLETED:"本轮承接已完成；结果已归档，可在回放中查看完整过程。",
+  WATCHED:"已保留关注位；评估完成后可开始跟进。",
+  ACCEPTED:"项目正在跟进；请持续推进当前行动并回写结果。",
+  DISMISSED:"已记录暂不考虑；如出现新信号，可重新关注并回到跟进流程。",
+  RELEASED:"已从当前工作区释放；如需继续推进，可重新关注后再开始跟进。",
+  COMPLETED:"本轮跟进已完成；结果已归档，可在回放中查看完整过程。",
   EXPIRED:"关注超过 90 天无动作，已自动过期；可重新关注后继续评估。",
  } satisfies Record<EngagementState,string>)[state];
 }
 
 function engagementCommandLabel(command:EngagementCommand,state:EngagementState){
  if(command==="WATCH"&&(state==="RELEASED"||state==="DISMISSED"))return "重新关注";
- if(command==="RELEASE"&&state==="ACCEPTED")return "退出承接";
+ if(command==="RELEASE"&&state==="ACCEPTED")return "结束跟进";
  return actionLabel[command];
 }
 
@@ -345,9 +451,9 @@ function SyncPanel({sync,onSync,onSetSync,notify,mode}:{sync:SyncStatus;onSync:(
 
 function IdentityPanel({auth,onAuth,notify,mode}:{auth:AuthStatus;onAuth:(auth:AuthStatus)=>void;notify:(text:string)=>void;mode:"connecting"|"connected"|"offline"}){const [consultants,setConsultants]=useState<{consultant_id:string;display_name:string}[]|null>(null);const [loginBusy,setLoginBusy]=useState<string|null>(null);useEffect(()=>{brainxFetch<BackendConsultants>("/api/v1/consultants").then(d=>setConsultants(d.items||[])).catch(()=>setConsultants([]))},[]);const devLogin=(consultantId:string)=>void(async()=>{setLoginBusy(consultantId);try{await brainxFetch<null>("/api/v1/session",{method:"POST",body:{consultant_id:consultantId}});notify("已登录 Brain X，正在加载后端快照…");window.setTimeout(()=>window.location.reload(),600)}catch(error){notify(`登录失败：${error instanceof Error?error.message:"后端未响应"}`);setLoginBusy(null)}})();const logout=()=>void(async()=>{try{await brainxFetch<null>("/api/v1/session",{method:"DELETE"})}catch{}notify("已退出 Brain X 会话");window.setTimeout(()=>window.location.reload(),400)})();return <><div className="panel-heading"><CircleUserRound/><div><h1>{auth.consultant}</h1><p>{mode==="connected"?"Brain X 顾问会话与数据授权":"本地演示身份与后端登录"}</p></div></div><DrawerSection title="账户状态"><dl className="facts"><div><dt>登录状态</dt><dd>{mode==="connected"?"Brain X 已登录":mode==="connecting"?"正在探测后端…":"演示模式（未连接后端）"}</dd></div><div><dt>飞书授权</dt><dd className={auth.needsReauth?"unknown":""}>{mode==="connected"?auth.needsReauth?"已过期":"正常":"—"}</dd></div></dl></DrawerSection>{mode==="connected"?<div className="drawer-actions"><button onClick={logout}><span><b>退出登录</b><small>清除 Brain X 会话并回到演示模式</small></span><ChevronRight/></button></div>:<><DrawerSection title="飞书扫码登录（正式入口）"><p className="panel-caption">跳转飞书统一授权页，用你自己的飞书账号扫码授权。需在顾问花名册内，否则会被拒绝。</p><div className="drawer-actions"><button onClick={()=>{window.location.href="/api/v1/oauth/authorize"}}><span><b>飞书扫码登录</b><small>跳转飞书授权页 · 登录 Brain X 工作台</small></span><ChevronRight/></button></div></DrawerSection><DrawerSection title="登录 Brain X 后端（开发后门）"><p className="panel-caption">后端需以 BRAINX_DEV_AUTH=1 启动；正式环境请使用飞书授权登录。</p><div className="drawer-actions">{consultants===null?<p className="muted">正在读取顾问花名册…</p>:consultants.length?consultants.map(c=><button key={c.consultant_id} onClick={()=>devLogin(c.consultant_id)} disabled={loginBusy!==null}><span><b>{loginBusy===c.consultant_id?"登录中…":c.display_name}</b><small>以该顾问身份进入 Brain X 工作台</small></span>{loginBusy===c.consultant_id?<Clock3/>:<ChevronRight/>}</button>):<p className="muted">后端不可达或花名册为空。</p>}</div></DrawerSection><DrawerSection title="演示状态"><div className="drawer-actions"><button onClick={()=>{onAuth({...auth,needsReauth:!auth.needsReauth,authorized:auth.needsReauth});notify(auth.needsReauth?"已恢复授权演示状态":"已切换为授权过期演示状态")}}><span><b>{auth.needsReauth?"恢复授权状态":"模拟授权过期"}</b><small>用于验证后端授权恢复入口</small></span><ShieldCheck/></button><button onClick={()=>notify("已退出演示会话；刷新页面将恢复本地演示身份")}><span><b>退出演示</b><small>不影响任何外部账号</small></span><ChevronRight/></button></div></DrawerSection></>}</>}
 
-function NotificationPanel({items,onOpen,notify}:{items:Notification[];onOpen:(item:Notification)=>void;notify:(text:string)=>void}){return <><div className="panel-heading"><BellRing/><div><h1>今日提醒</h1><p>同步、承接与每日推荐摘要</p></div></div><div className="notification-list">{items.map(item=><button key={item.id} className={item.read?"read":""} onClick={()=>onOpen(item)}><i/><span><b>{item.title}</b><small>{item.detail}</small></span><ChevronRight/></button>)}</div><DrawerSection title="推送预览"><div className="push-preview"><b>今日职位判断</b><span>Top 3 已生成 · 1 个承接待处理</span></div><button className="btn" onClick={()=>notify("已模拟发送到 Felix 的飞书提醒") }><Send/>模拟发送</button><p className="panel-caption">仅展示推送内容，不会发送到外部系统。</p></DrawerSection></>}
+function NotificationPanel({items,onOpen,notify}:{items:Notification[];onOpen:(item:Notification)=>void;notify:(text:string)=>void}){return <><div className="panel-heading"><BellRing/><div><h1>今日提醒</h1><p>同步、项目跟进与每日推荐摘要</p></div></div><div className="notification-list">{items.map(item=><button key={item.id} className={item.read?"read":""} onClick={()=>onOpen(item)}><i/><span><b>{item.title}</b><small>{item.detail}</small></span><ChevronRight/></button>)}</div><DrawerSection title="推送预览"><div className="push-preview"><b>今日职位判断</b><span>Top 3 已生成 · 1 个项目待处理</span></div><button className="btn" onClick={()=>notify("已模拟发送到 Felix 的飞书提醒") }><Send/>模拟发送</button><p className="panel-caption">仅展示推送内容，不会发送到外部系统。</p></DrawerSection></>}
 
-function CommandConfirm({pending,reasons,onClose,onConfirm}:{pending:{job:DecisionJob;command:EngagementCommand};reasons:string[];onClose:()=>void;onConfirm:(reason?:string)=>void}){const list=reasons&&reasons.length?reasons:["无资源","不符合方向","客户/职位质量不足","当前没精力","已有其他顾问推进","信息不完整","其他"];const [reason,setReason]=useState(list[0]);const dismiss=pending.command==="DISMISS";const reasonOptions:FilterSelectOption[]=list.map(value=>({value,label:value}));return <div className="command-mask" role="presentation"><section className="command-modal" role="dialog" aria-modal="true" aria-label="确认承接操作"><h2>{dismiss?"暂不考虑这个职位？":"确认接单？"}</h2><p>{dismiss?"选择原因后会记录到决策轨迹。":"接单后该职位将进入你的交付列表。"}</p>{dismiss&&<FilterSelect value={reason} onChange={setReason} ariaLabel="暂不考虑原因" options={reasonOptions}/>}<div><button className="btn" onClick={onClose}>取消</button><button className="btn primary" onClick={()=>onConfirm(dismiss?reason:undefined)}>{dismiss?"记录原因":"确认接单"}</button></div></section></div>}
+function CommandConfirm({pending,reasons,onClose,onConfirm}:{pending:{job:DecisionJob;command:EngagementCommand};reasons:string[];onClose:()=>void;onConfirm:(reason?:string)=>void}){const list=reasons&&reasons.length?reasons:["无资源","不符合方向","客户/职位质量不足","当前没精力","已有其他顾问推进","信息不完整","其他"];const [reason,setReason]=useState(list[0]);const dismiss=pending.command==="DISMISS";const reasonOptions:FilterSelectOption[]=list.map(value=>({value,label:value}));return <div className="command-mask" role="presentation"><section className="command-modal" role="dialog" aria-modal="true" aria-label="确认项目操作"><h2>{dismiss?"暂不考虑这个职位？":"确认开始跟进？"}</h2><p>{dismiss?"选择原因后会记录到决策轨迹。":"开始跟进前需要确认目标、第一行动和截止时间。"}</p>{dismiss&&<FilterSelect value={reason} onChange={setReason} ariaLabel="暂不考虑原因" options={reasonOptions}/>}<div className="command-modal-actions"><button className="btn" onClick={onClose}>取消</button><button className="btn primary" onClick={()=>onConfirm(dismiss?reason:undefined)}>{dismiss?"记录原因":"确认开始跟进"}</button></div></section></div>}
 
 // —— 候选供给（人才侧适配层的前端呈现）——
 // 数据形状对齐后端 talent-supply.js 的 TalentSupplySnapshot（GET /opportunities/:id/talent-supply）。
@@ -389,94 +495,4 @@ function TalentSupplySection({job,mode}:{job:DecisionJob;mode:"connecting"|"conn
  </DrawerSection>;
 }
 
-function Today({actions,done,setDone,setSnoozed,extraTasks,setDrawer,openJob,openClient,notify}:any){
- return <><Heading code="TODAY / 07.29" title={<>今天有 <strong>3 个职位</strong>建议优先投入，<strong>1 个客户</strong>需要立即确认需求</>} desc="系统已综合 24 个职位、8 个客户和过去 48 小时的 37 条业务信号。"/>
- <div className="conclusion"><div className="spark"><Zap/></div><div><b>当前最值得投入：AI 广告销售负责人</b><p>星河科技反馈提速且新增 1 个 HC；建议今天补充 2 名高匹配人选。</p></div><button className="btn primary" style={{marginLeft:"auto"}} onClick={()=>openJob(jobs[0])}>进入职位 <ChevronRight/></button></div>
- <div className="grid g2">
-  <section className="card"><div className="card-head"><h2>今日优先动作</h2><span>{actions.length+extraTasks.length} 项待处理</span></div><div className="actions">{extraTasks.map((t:string,i:number)=><div className="action-row" key={t}><StatusTag s="预警转入"/><div className="action-main"><b>{t}</b><small>由动态预警转为今日任务</small></div><div className="impact"><strong>需今日处理</strong>避免风险扩大</div><button className="btn" onClick={()=>notify("任务已完成")}>完成</button></div>)}{actions.map(({a,i}:any)=><div className="action-row" key={i}><StatusTag s={a[0]}/><div className="action-main"><b>{a[1]} · {a[2]}</b><small>{a[3]}</small></div><div className="impact"><strong>{a[4]}</strong>预计影响</div><div className="row-actions"><button title="查看依据" className="icon-btn" onClick={()=>setDrawer(`${a[1]}：${a[3]}`)}><CircleHelp/></button><button title="完成" className="icon-btn" onClick={()=>{setDone([...done,i]);notify("已标记完成")}}><Check/></button><button title="稍后" className="icon-btn" onClick={()=>{setSnoozed((x:number[])=>[...x,i]);notify("已移至稍后处理")}}><Clock3/></button><button title="不采纳" className="icon-btn danger" onClick={()=>{setDone([...done,i]);notify("已记录不采纳，将用于优化建议")}}><X/></button></div></div>)}{actions.length===0&&extraTasks.length===0&&<div className="empty"><Check/>今日建议已处理完毕</div>}</div></section>
-  <section className="card"><div className="card-head"><h2>今日变化</h2><span>实时</span></div><div className="card-body timeline">{events.map(e=><div className="event" key={e[0]}><time>{e[0]}</time><i className="event-dot"/><div><b>{e[1]}</b><p>{e[2]}</p></div></div>)}</div></section>
- </div>
- <section className="card section"><div className="card-head"><h2>今日重点职位</h2><button className="link" onClick={()=>notify("已进入完整职位列表")}>查看全部 24 个</button></div><JobTable rows={jobs.slice(0,5)} open={openJob}/></section>
- <section className="card section"><div className="card-head"><h2>今日重点客户</h2><span>按综合优先级</span></div><ClientTable rows={clients.slice(0,5)} open={openClient}/></section></>
-}
-
-function JobsView({jobs,status,setStatus,sort,setSort,view,setView,selected,setSelected,openJob,notify,mode}:any){
- const [clientFilter,setClientFilter]=useState("全部客户");
- const [cityFilter,setCityFilter]=useState("全部城市");
- const [typeFilter,setTypeFilter]=useState("全部职位类型");
- const [sourceFilter,setSourceFilter]=useState("全部来源");
- const [compareOpen,setCompareOpen]=useState(false);
- const statusOptions:FilterSelectOption[]=[{value:"全部状态",label:"全部状态"},{value:"待同步",label:"待同步"},...statusOrder.map(value=>({value,label:value}))];
- const sortOptions:FilterSelectOption[]=[{value:"score",label:"综合分数 ↓"},{value:"hc",label:"HC ↓"}];
- const positionTypes:PositionType[]=["产品","运营","技术","算法","设计","商业化"];
- const clientOptions:FilterSelectOption[]=[{value:"全部客户",label:"全部客户"},...Array.from(new Set<string>(jobs.map((job:Job)=>job.client))).sort().map((value:string)=>({value,label:value}))];
- const cityOptions:FilterSelectOption[]=[{value:"全部城市",label:"全部城市"},...Array.from(new Set<string>(jobs.map((job:Job)=>job.city))).sort().map((value:string)=>({value,label:value}))];
- const typeOptions:FilterSelectOption[]=[{value:"全部职位类型",label:"全部职位类型"},...positionTypes.map(value=>({value,label:`${value} · ${jobs.filter((job:Job)=>job.positionType===value).length}`}))];
- const sourceOptions:FilterSelectOption[]=[{value:"全部来源",label:"全部来源"},{value:"驾驶舱导入",label:`驾驶舱导入 · ${jobs.filter((job:Job)=>job.source==="驾驶舱导入").length}`},{value:"市场信号",label:`市场信号 · ${jobs.filter((job:Job)=>job.source==="市场信号").length}`}];
- const visibleJobs=jobs.filter((job:Job)=>(clientFilter==="全部客户"||job.client===clientFilter)&&(cityFilter==="全部城市"||job.city===cityFilter)&&(typeFilter==="全部职位类型"||job.positionType===typeFilter)&&(sourceFilter==="全部来源"||job.source===sourceFilter));
- const comparedJobs=visibleJobs.filter((job:Job)=>selected.includes(job.id));
- const toggle=(id:Job["id"])=>{setCompareOpen(false);if(selected.includes(id))setSelected(selected.filter((value:Job["id"])=>value!==id));else if(selected.length<3)setSelected([...selected,id]);else notify("最多对比 3 个职位")};
- return <><Heading code="JOB SIGNAL RADAR" title="职位雷达" desc="把新鲜度、招聘意愿、反馈、转化与竞争信号放在同一决策面上。" action={<button className="btn primary" onClick={()=>notify("新建职位表单已准备（演示数据不写入真实系统）")}><Plus/>新增职位</button>}/>
- <div className="radar-source-summary"><Database/><span>{mode==="connected"?<><b>职位雷达数据池已接入 Brain X</b> · {jobs.filter((job:Job)=>job.source==="驾驶舱导入").length} 个驾驶舱条目 · {jobs.filter((job:Job)=>job.source==="市场信号").length} 个市场条目</>:<><b>驾驶舱全景图已导入</b> · {cockpitRadarJobs.length} 个职位条目来自 93 家公司</>}</span><small>{mode==="connected"?"关系、HC 与阶段来自后端事实；评分与转化指标待后端模型":"评分、HC 与流程指标待后端同步"}</small></div>
- <div className="toolbar"><FilterSelect value={status} onChange={setStatus} ariaLabel="职位状态" options={statusOptions}/><FilterSelect value={typeFilter} onChange={setTypeFilter} ariaLabel="职位类型筛选" options={typeOptions}/><FilterSelect value={sourceFilter} onChange={setSourceFilter} ariaLabel="数据来源筛选" options={sourceOptions}/><FilterSelect value={sort} onChange={setSort} ariaLabel="排序方式" options={sortOptions}/><FilterSelect value={clientFilter} onChange={setClientFilter} ariaLabel="客户筛选" options={clientOptions}/><FilterSelect value={cityFilter} onChange={setCityFilter} ariaLabel="城市筛选" options={cityOptions}/><DirectGlassSegment value={view} options={[{value:"list",label:<><ListFilter/>决策列表</>},{value:"rail",label:<><Activity/>信号轨道</>}]} onChange={setView} className="glass-seg" ariaLabel="职位视图"/>{comparedJobs.length>1&&<button className="btn primary" onClick={()=>setCompareOpen(true)}><GitCompareArrows/>对比 {comparedJobs.length}</button>}</div>
- <section className="card">{view==="list"?<div className="table-wrap"><table className="data-table"><thead><tr><th>对比</th><th>职位 / 客户</th><th>分数</th><th>状态与判断</th><th>HC</th><th>最近反馈</th><th>推荐</th><th>面试</th><th>Offer</th><th>操作</th></tr></thead><tbody>{visibleJobs.map((j:Job)=><tr key={j.id} className={j.source==="驾驶舱导入"?"cockpit-imported-row":""}><td><input type="checkbox" checked={selected.includes(j.id)} onChange={()=>toggle(j.id)} /></td><td className="name-cell"><b>{j.name}</b><small><em>{j.positionType}</em>{j.client} · {j.city}</small></td><td className="score">{j.score??"—"}</td><td><StatusTag s={j.status}/><div className="reason">{j.reason}</div></td><td className="mono">{j.hc??"—"}</td><td>{j.feedback}</td><td>{j.recommended??"—"}</td><td>{j.interview??"—"}</td><td>{j.offer??"—"}</td><td><button className="link" onClick={()=>openJob(j)}>详情 →</button></td></tr>)}</tbody></table>{visibleJobs.length===0&&<div className="empty"><Search/>没有符合当前筛选的职位</div>}</div>:<SignalRail jobs={visibleJobs} open={openJob}/>}</section>
- {compareOpen&&<Compare jobs={comparedJobs} close={()=>setCompareOpen(false)}/>}</>
-}
-function SignalRail({jobs,open}:{jobs:Job[];open:(j:Job)=>void}){return <div className="rail">{jobs.map(j=>{if(j.status==="待同步")return <div className="rail-row cockpit-rail-row" key={j.id}><div className="rail-name"><button className="link" onClick={()=>open(j)}><b>{j.name}</b></button><small>{j.positionType} · {j.client}</small></div><div className="cockpit-signal-pending"><Database/><span>驾驶舱岗位已导入，实时信号待同步</span></div><div className="reason">{j.industry}</div></div>;const ix=statusOrder.indexOf(j.status);const color=j.status==="已关闭"?"#b32636":j.status==="拥挤"||j.status==="降温"?"#7d8795":"#2FD3A7";return <div className="rail-row" key={j.id}><div className="rail-name"><button className="link" onClick={()=>open(j)}><b>{j.name}</b></button><small>{j.positionType} · {j.client} · 评分 {j.score??"—"}</small></div><div><div className="track" style={{"--progress":`${ix/(statusOrder.length-1)*100}%`,"--track-color":color} as React.CSSProperties}>{statusOrder.map((s,i)=><i key={s} className={`node ${i<=ix?"done":""} ${i===ix?"current":""}`} style={{left:`${i/(statusOrder.length-1)*100}%`}} title={s}/>)}</div><div className="track-labels">{statusOrder.map(s=><span key={s}>{s}</span>)}</div></div><div className="reason">{j.reason}</div></div>})}</div>}
-function Compare({jobs,close}:{jobs:Job[];close:()=>void}){const dims=["综合评分","职位新鲜度","招聘意愿","HC / 紧急程度","反馈速度","推荐→面试","面试→Offer","竞争程度","主要风险","建议动作"];const metric=(value:number|null)=>value===null?"—":value;return <><div className="drawer-backdrop" onClick={close}/><div className="modal"><div className="modal-head"><b>职位横向对比</b><button className="icon-btn" onClick={close}><X/></button></div><div className="modal-body compare-grid"><div></div>{jobs.map(j=><div key={j.id}><b>{j.name}</b></div>)}{dims.flatMap((d,i)=><><div key={d}>{d}</div>{jobs.map(j=><div key={`${d}${j.id}`}>{i===0?<span className="score">{metric(j.score)}</span>:i===1?j.score===null?"待同步":`${Math.max(7,j.score-72)}/15`:i===2?j.score===null?"待同步":`${Math.max(8,j.score-72)}/20`:i===3?j.hc===null?"待同步":`${j.hc} HC · ${j.hc>2?"紧急":"正常"}`:i===4?j.feedback:i===5?j.recommended&&j.interview?`${Math.round(j.interview/j.recommended*100)}%`:"—":i===6?j.interview&&j.offer!==null?`${Math.round(j.offer/j.interview*100)}%`:"—":i===7?j.status==="待同步"?"待同步":j.status==="拥挤"?"高":"中":i===8?j.reason:j.status==="待同步"?"先同步实时事实":j.status==="拥挤"?"提高推荐门槛":"优先推进"}</div>)}</>)}</div></div></>}
-
-function JobTable({rows,open}:{rows:Job[];open:(j:Job)=>void}){return <div className="table-wrap"><table className="data-table"><thead><tr><th>职位 / 客户</th><th>综合分</th><th>状态与原因</th><th>HC</th><th>最近反馈</th><th>推荐</th><th>面试</th><th>Offer</th><th>今日建议</th></tr></thead><tbody>{rows.map(j=><tr key={j.id}><td className="name-cell"><button className="link" onClick={()=>open(j)}><b>{j.name}</b></button><small>{j.client}</small></td><td className="score">{j.score}</td><td><StatusTag s={j.status}/><div className="reason">{j.reason}</div></td><td className="mono">{j.hc}</td><td>{j.feedback}</td><td>{j.recommended}</td><td>{j.interview}</td><td>{j.offer}</td><td>{j.status==="拥挤"?"提高标准":j.status==="降温"?"确认预算":"优先推进"}</td></tr>)}</tbody></table></div>}
-
-function CockpitJobDetail({job,onBack,notify}:{job:Job;onBack:()=>void;notify:(text:string)=>void}){return <><button className="back" onClick={onBack}><ArrowLeft/>返回职位雷达</button><div className="detail-top cockpit-detail-top"><div className="detail-title"><span className="eyebrow">COCKPIT IMPORT · {job.sourceColumn}</span><h1>{job.name}</h1><div className="meta"><span>{job.client}</span><span>{job.industry}</span><span>{job.city}</span><span>职位类型 · {job.positionType}</span></div></div><div className="imported-fact"><Database/><span>已导入</span></div></div><div className="conclusion"><div className="spark"><Database/></div><div><b>已从 TTC 驾驶舱全景图带入基础岗位信息</b><p>评分、HC、招聘阶段和转化数据当前没有来源，等待后端同步后再参与职位判断。</p></div></div><div className="grid g2"><section className="card"><div className="card-head"><h2>已导入字段</h2><span>原始工作簿</span></div><dl className="facts card-body"><div><dt>公司</dt><dd>{job.client}</dd></div><div><dt>业务方向</dt><dd>{job.industry}</dd></div><div><dt>地点</dt><dd>{job.city}</dd></div><div><dt>岗位分类</dt><dd>{job.sourceColumn}</dd></div><div><dt>职位类型</dt><dd>{job.positionType}</dd></div></dl></section><section className="card"><div className="card-head"><h2>待同步事实</h2><span>不做前端推断</span></div><div className="card-body side-list">{["当前 HC 与关闭状态","招聘流程及候选人漏斗","最近反馈与客户优先级","评分与推荐排序"].map((item,index)=><div className="mini-item" key={item}><span className="num">0{index+1}</span><div><b>{item}</b><p>等待后端数据适配层返回</p></div></div>)}</div></section></div><button className="btn primary cockpit-copy-action" onClick={()=>notify("岗位基础信息已复制到演示剪贴板")}>复制岗位基础信息 <ChevronRight/></button></>}
-
-function JobDetail({job,onBack,weights,eventType,setEventType,hc,setHc,notify}:any){
- // hooks 必须在条件 return 之前（驾驶舱职位早退曾违反 hooks 规则）
- const [events2,setEvents2]=useState(events.slice(0,3));
- if(job.source==="驾驶舱导入")return <CockpitJobDetail job={job} onBack={onBack} notify={notify}/>;
- const score=job.score??0;const remainingHc=job.hc??0;const recommended=job.recommended??0;const interview=job.interview??0;const offer=job.offer??0;
- const detailWeights=[20,15,15,15,10,10,10,5];
- const add=()=>{setEvents2([[new Date().toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit"}),eventType,eventType==="HC变化"?`HC更新为 ${hc}`:"用户新增项目事件"],...events2]);notify("事件已记录，状态与评分已重新计算")};
- return <><button className="back" onClick={onBack}><ArrowLeft/>返回职位雷达</button><div className="detail-top"><div className="detail-title"><span className="eyebrow">JOB / {String(job.id).padStart(4,"0")}</span><h1>{job.name}</h1><div className="meta"><span>{job.client}</span><span>PM · {job.pm}</span><span>{job.city}</span><span>{job.salary}</span><span>HC {remainingHc}</span><span>更新 {job.feedback}</span></div></div><div className="big-score" style={{"--score":score} as React.CSSProperties}><span>{score}</span></div></div>
- <div className="conclusion"><div className="spark"><Sparkles/></div><div><b>建议优先投入</b><p>{job.reason}。当前推荐到面试转化较高，主要风险是面试池逐渐拥挤，建议提高推荐标准。</p></div><StatusTag s={job.status}/></div>
- <div className="grid g2"><section className="card"><div className="card-head"><h2>评分依据</h2><span>规则计算 + AI推断</span></div><div className="card-body score-bars">{["客户真实招聘意愿","职位新鲜度","HC 和紧急程度","客户反馈速度","推荐到面试转化","面试到 Offer 转化","当前竞争程度","历史交付风险"].map((n,i)=><div className="score-line" key={n}><span>{n}</span><div className="bar"><i style={{width:`${Math.min(100,(detailWeights[i]-(i%3))*100/detailWeights[i])}%`}}/></div><strong>{detailWeights[i]-(i%3)} / {detailWeights[i]}</strong></div>)}</div></section><section className="card"><div className="card-head"><h2>建议动作</h2><span>按影响排序</span></div><div className="card-body side-list">{["向PM确认剩余HC","确认当前面试进度","提高推荐标准","48小时无反馈则降低优先级"].map((x,i)=><div className="mini-item" key={x}><span className="num">0{i+1}</span><div><b>{x}</b><p>{i<2?"今天完成 · 高影响":"本周完成 · 中影响"}</p></div><button className="icon-btn" onClick={()=>notify(`已完成：${x}`)}><Check/></button></div>)}</div></section></div>
- <section className="card section"><div className="card-head"><h2>职位信号轨道</h2><span>每次判断均可追溯</span></div><SignalRail jobs={[job]} open={()=>{}}/></section>
- <div className="grid g2 section"><section className="card"><div className="card-head"><h2>招聘漏斗</h2><span>近 90 天</span></div><div className="card-body funnel">{[["推荐",recommended],["客户查看",Math.max(1,recommended-2)],["初面",interview],["复试",Math.max(1,interview-1)],["终面",offer+1],["Offer",offer],["入职",0]].map(x=><div className="funnel-step" key={x[0]}><b>{x[1]}</b><small>{x[0]}</small></div>)}</div></section><section className="card"><div className="card-head"><h2>当前竞争</h2><span>趋势上升</span></div><div className="card-body g3 grid">{[["参与顾问","4"],["已推荐",recommended],["面试 / Offer",`${interview} / ${offer}`]].map(x=><div className="mini-item" key={x[0]}><div><p>{x[0]}</p><b className="score">{x[1]}</b></div></div>)}</div></section></div>
- <div className="grid g2 section"><section className="card"><div className="card-head"><h2>客户反馈摘要</h2><span>AI结构化提取</span></div><div className="card-body side-list">{["最近反馈：商业化经验通过，需验证团队管理跨度","高频淘汰：行业深度不足、英文沟通欠缺","重点关注：AI广告客户资源、0→1团队经验","待确认：剩余HC与下一轮面试排期"].map(x=><div className="mini-item" key={x}><Sparkles/><b>{x}</b></div>)}</div></section><section className="card"><div className="card-head"><h2>新增项目事件</h2><span>将触发重新计算</span></div><div className="card-body"><div className="toolbar"><FilterSelect value={eventType} onChange={setEventType} ariaLabel="项目事件类型" options={["客户反馈","HC变化","面试变化","Offer变化","职位暂停","职位恢复","职位关闭"].map(value=>({value,label:value}))}/>{eventType==="HC变化"&&<input className="field" type="number" min={0} value={hc} onChange={e=>setHc(+e.target.value)}/>}<button className="btn primary" onClick={add}><Plus/>记录并重算</button></div><div className="timeline">{events2.map((e:string[],i:number)=><div className="event" key={`${e[0]}${i}`}><time>{e[0]}</time><i className="event-dot"/><div><b>{e[1]}</b><p>{e[2]}</p></div></div>)}</div></div></section></div></>
-}
-
-function ClientsView({clients,open,notify}:any){const [compare,setCompare]=useState<string[]>([]);const [stateFilter,setStateFilter]=useState("全部合作状态");const [sortBy,setSortBy]=useState("score");const [compareOpen,setCompareOpen]=useState(false);const visibleClients=[...clients].filter((client:any)=>stateFilter==="全部合作状态"||client.state===stateFilter).sort((a:any,b:any)=>sortBy==="feedback"?(Number.isFinite(parseInt(a.feedback))?parseInt(a.feedback):1e9)-(Number.isFinite(parseInt(b.feedback))?parseInt(b.feedback):1e9):sortBy==="hc"?(b.hc??-1)-(a.hc??-1):(b.score??-1)-(a.score??-1));const comparedClients=visibleClients.filter((client:any)=>compare.includes(client.name));const toggle=(name:string)=>{setCompareOpen(false);if(compare.includes(name))setCompare(compare.filter(x=>x!==name));else if(compare.length<3)setCompare([...compare,name]);else notify("最多对比 3 个客户")};const reset=()=>{setStateFilter("全部合作状态");setSortBy("score");setCompare([]);setCompareOpen(false);notify("客户筛选已重置")};return <><Heading code="CLIENT INTELLIGENCE" title="客户洞察" desc="识别真实招聘窗口、合作温度与交付风险。" action={<button className="btn" onClick={reset}><RotateCcw/>重置筛选</button>}/><div className="toolbar"><FilterSelect value={stateFilter} onChange={setStateFilter} ariaLabel="合作状态筛选" options={["全部合作状态","招聘窗口期","稳定合作","反馈降温"].map(value=>({value,label:value}))}/><FilterSelect value={sortBy} onChange={setSortBy} ariaLabel="客户排序方式" options={[{value:"score",label:"优先级 ↓"},{value:"feedback",label:"反馈速度 ↑"},{value:"hc",label:"总 HC ↓"}]}/>{comparedClients.length>1&&<button className="btn primary" onClick={()=>setCompareOpen(true)}><GitCompareArrows/>对比 {comparedClients.length}</button>}</div><section className="card"><div className="table-wrap"><table className="data-table"><thead><tr><th>对比</th><th>客户 / 行业</th><th>合作状态</th><th>活跃职位</th><th>总HC</th><th>平均反馈</th><th>推荐→面试</th><th>面试→Offer</th><th>历史入职</th><th>意愿</th><th>优先级</th><th>主要风险</th></tr></thead><tbody>{visibleClients.map((c:any)=><tr key={c.name}><td><input type="checkbox" checked={compare.includes(c.name)} onChange={()=>toggle(c.name)}/></td><td className="name-cell"><button className="link" onClick={()=>open(c)}><b>{c.name}</b></button><small>{c.industry}</small></td><td><StatusTag s={c.state}/></td><td>{c.active}</td><td>{c.hc??"—"}</td><td>{c.feedback}</td><td>{c.r2i}</td><td>{c.i2o}</td><td>{c.hires??"—"}</td><td>{c.intent}</td><td className="score">{c.score??"—"}</td><td>{c.risk}</td></tr>)}</tbody></table>{visibleClients.length===0&&<div className="empty"><Search/>没有符合当前筛选的客户</div>}</div></section>{compareOpen&&<ClientCompare clients={comparedClients} close={()=>setCompareOpen(false)}/>}</>}
-function ClientCompare({clients,close}:{clients:any[];close:()=>void}){const dims:[string,(client:any)=>React.ReactNode][]=[["合作状态",client=>client.state],["活跃职位",client=>client.active],["总 HC",client=>client.hc??"待同步"],["平均反馈",client=>client.feedback],["推荐→面试",client=>client.r2i],["面试→Offer",client=>client.i2o],["历史入职",client=>client.hires??"—"],["招聘意愿",client=>client.intent],["优先级",client=><span className="score">{client.score??"—"}</span>],["主要风险",client=>client.risk]];return <><div className="drawer-backdrop" onClick={close}/><div className="modal"><div className="modal-head"><b>客户横向对比</b><button className="icon-btn" onClick={close} aria-label="关闭对比"><X/></button></div><div className="modal-body compare-grid"><div></div>{clients.map(client=><div key={client.name}><b>{client.name}</b></div>)}{dims.flatMap(([label,value])=><><div key={label}>{label}</div>{clients.map(client=><div key={`${label}${client.name}`}>{value(client)}</div>)}</>)}</div></div></>}
-function ClientTable({rows,open}:any){return <div className="table-wrap"><table className="data-table"><thead><tr><th>客户</th><th>状态</th><th>活跃职位</th><th>总 HC</th><th>平均反馈</th><th>招聘意愿</th><th>优先级</th><th>主要风险</th><th>建议动作</th></tr></thead><tbody>{rows.map((c:any)=><tr key={c.name}><td><button className="link" onClick={()=>open(c)}><b>{c.name}</b></button></td><td><StatusTag s={c.state}/></td><td>{c.active}</td><td>{c.hc??"—"}</td><td>{c.feedback}</td><td>{c.intent}</td><td className="score">{c.score??"—"}</td><td>{c.risk}</td><td>确认本周面试排期</td></tr>)}</tbody></table></div>}
-function ClientDetail({c,onBack,notify}:any){return <><button className="back" onClick={onBack}><ArrowLeft/>返回客户洞察</button><Heading code={`CLIENT / ${c.industry}`} title={c.name} desc={`优先级 ${c.score??"—"} · ${c.state} · 平均反馈 ${c.feedback}`} action={<button className="btn primary" onClick={()=>notify("客户反馈已记录并触发重新判断")}><Plus/>添加客户反馈</button>}/><div className="conclusion"><div className="spark"><Sparkles/></div><div><b>{c.name}当前处于集中招聘窗口期</b><p>近30天新增 {c.active} 个职位，平均反馈时间缩短至 {c.feedback}，建议提高交付优先级。</p></div></div><div className="grid g3">{[["活跃职位",c.active],["总 HC",c.hc??"—"],["历史入职",c.hires??"—"]].map(x=><div className="card card-body" key={x[0]}><span className="eyebrow">{x[0]}</span><div className="score" style={{fontSize:28,marginTop:8}}>{x[1]}</div></div>)}</div><div className="grid g2 section"><section className="card"><div className="card-head"><h2>当前活跃职位</h2><span>{c.active} 个</span></div><JobTable rows={jobs.filter(j=>j.client===c.name).concat(jobs.slice(0,Math.max(0,3-jobs.filter(j=>j.client===c.name).length)))} open={()=>notify("已打开关联职位")}/></section><section className="card"><div className="card-head"><h2>合作判断</h2><span>近6个月</span></div><div className="card-body side-list">{["人才偏好：头部AI商业化经验、团队从0到1","高频淘汰：缺少复杂销售经验","需求变更：近30天 2 次，处于可控范围","合作风险：面试标准近期小幅抬高","建议动作：锁定本周业务负责人面试档期"].map((x,i)=><div className="mini-item" key={x}><span className="num">0{i+1}</span><b>{x}</b></div>)}</div></section></div><section className="card section"><div className="card-head"><h2>客户事件时间线</h2><span>可追溯</span></div><div className="card-body timeline">{events.concat([["06-28","新增职位","新增 AI 解决方案销售，HC 3"],["06-04","需求变化","薪资上限提高 15%"]]).map(e=><div className="event" key={e[0]}><time>{e[0]}</time><i className="event-dot"/><div><b>{e[1]}</b><p>{e[2]}</p></div></div>)}</div></section></>}
-
 function Alerts({setExtraTasks,notify,setDrawer}:any){const alerts=["云帆智能连续7天未反馈","商业化增长经理转化率下降12%","海外增长负责人面试池已拥挤","星河科技进入招聘窗口期","Creator Partnership负责人新增2个HC","棱镜互动近14天需求变更3次","AI解决方案销售参与顾问增至6人","用户增长负责人产生Offer"];const [handled,setHandled]=useState<number[]>([]);const [riskFilter,setRiskFilter]=useState("全部风险等级");const [clientFilter,setClientFilter]=useState("全部客户");return <><Heading code="DYNAMIC ALERTS" title="动态预警" desc="聚合需要人工确认的机会、变化和失活信号。"/><div className="toolbar"><FilterSelect value={riskFilter} onChange={setRiskFilter} ariaLabel="预警风险等级" options={["全部风险等级","高风险","机会"].map(value=>({value,label:value}))}/><FilterSelect value={clientFilter} onChange={setClientFilter} ariaLabel="预警客户筛选" options={[{value:"全部客户",label:"全部客户"},...clients.map(client=>({value:client.name,label:client.name}))]}/></div><section className="card"><div className="actions">{alerts.map((x,i)=><div className="action-row" key={x} style={{opacity:handled.includes(i)?.5:1}}><StatusTag s={i%3===0?"高风险":i%3===1?"关注":"机会"}/><div className="action-main"><b>{x}</b><small>{i%2?"基于近7天业务事件变化":"超过预设阈值，建议今天确认"}</small></div><div className="impact"><strong>{i%3===2?"机会升温":"需人工确认"}</strong>置信度 {88+i}%</div><div className="row-actions"><button className="btn" onClick={()=>setDrawer(x)}>依据</button><button className="btn" onClick={()=>{setExtraTasks((v:string[])=>v.includes(x)?v:[...v,x]);notify("已转为今日任务")}}>转任务</button><button className="icon-btn" onClick={()=>{setHandled([...handled,i]);notify("预警已处理")}}><Check/></button></div></div>)}</div></section></>}
-function TalentBackendCard(){
- type Health={backend:string;connected:boolean;schema:string;degraded:string|null;config?:{host:string;port:number;database:string|null;credentials_present:boolean;ssl:boolean};hint:string};
- const [health,setHealth]=useState<Health|null>(null);
- const [state,setState]=useState<"loading"|"live"|"offline">("loading");
- useEffect(()=>{let alive=true;const ctrl=new AbortController();const t=setTimeout(()=>ctrl.abort(),2500);
-  fetch("/api/v1/talent/health",{signal:ctrl.signal,credentials:"include"})
-   .then(async r=>{if(!r.ok)throw new Error("talent health unavailable");return await r.json() as Health})
-   .then((h:Health)=>{if(alive){setHealth(h);setState("live")}})
-   .catch(()=>{if(alive)setState("offline")})
-   .finally(()=>clearTimeout(t));
-  return ()=>{alive=false;ctrl.abort()};
- },[]);
- const isMysql=health?.backend==="mysql"&&health.connected;
- const badge=state==="offline"?{s:"已就绪",cls:""}:isMysql?{s:"已连接",cls:""}:{s:"内存回退",cls:"warn"};
- return <section className="card talent-backend"><div className="source-head"><div className="source-icon"><Database/></div><span className={`supply-badge ${isMysql?"ok":badge.cls==="warn"?"warn":"risk"}`}>{badge.s}</span></div>
-  <h3>人才库（阿里云 RDS）</h3>
-  {state==="loading"&&<p>正在检测人才库连接…</p>}
-  {state==="offline"&&<><p>人才库读写与供给匹配【代码已就绪】。此预览未连后端 API，填写 <code>.env</code> 的 <code>BRAINX_MYSQL_*</code> 凭据并启动服务后，此处会实时显示真库连接状态。</p>
-   <div className="backend-facts"><div><dt>切库方式</dt><dd>填凭据 → <code>npm run talent:health</code> 自检</dd></div><div><dt>连不通</dt><dd>自动降级内存库（功能不中断）</dd></div></div></>}
-  {state==="live"&&health&&<><p>{health.hint}</p>
-   <div className="backend-facts">
-    <div><dt>当前后端</dt><dd className={isMysql?"":"unknown"}>{isMysql?"MySQL 真库":"内存回退"}</dd></div>
-    <div><dt>连通性</dt><dd className={health.connected?"":"unknown"}>{health.connected?"已连通":"未连通"}</dd></div>
-    <div><dt>建表状态</dt><dd>{health.schema}</dd></div>
-    {health.config&&<div><dt>目标库</dt><dd>{health.config.database||"—"} @ {health.config.host}</dd></div>}
-    {health.degraded&&<div><dt>诊断</dt><dd className="unknown">{health.degraded}</dd></div>}
-   </div></>}
- </section>;
-}
-function Sources({notify}:any){return <><Heading code="DATA SOURCES" title="数据源" desc="演示数据源面板；当前后端没有对应的统一数据源 API，不代表真实外部账号已连接。"/><div className="source-grid"><TalentBackendCard/>{sourceNames.map((n,i)=><section className="card source" key={n}><div className="source-head"><div className="source-icon"><Database/></div><StatusTag s="演示"/></div><h3>{n}</h3><p>演示状态 · 尚未接入 BrainX 数据源接口</p><div className="completeness"><span>数据完整度</span><b>—</b></div><div className="bar"><i style={{width:"0%",background:"var(--orange)"}}/></div><button className="btn" style={{marginTop:14}} onClick={()=>notify("数据源字段查看仍为演示交互，不会写入真实系统")}><Settings2/>查看字段</button></section>)}</div></>}

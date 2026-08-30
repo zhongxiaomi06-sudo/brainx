@@ -1,203 +1,268 @@
-// e2e-browser-check.mjs — 手动端到端验证脚本（不在 npm test 内）。
-// 前提：Brain X 单地址服务跑在 127.0.0.1:3100（BRAINX_DEV_AUTH=1）。
-// 如使用独立前端，可用 BRAINX_E2E_BASE 覆盖，例如 http://127.0.0.1:4320/。
-// 用法：node tests/e2e-browser-check.mjs
-// 流程：headless Chrome → 打开前端 → dev 登录 felix → 刷新 → 校验 connected 模式渲染
-//       → 待接单区第一个职位：关注 → 接单（二次确认弹窗）→ 记录进展 → 刷新持久化
-//       → 第二个职位：暂不考虑（原因枚举弹窗）→ 退出会话回退演示模式。
+import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import { mkdtempSync, rmSync } from "node:fs";
+import { createServer } from "node:net";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
+import { fileURLToPath } from "node:url";
+import { chromium } from "playwright";
 
-const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-const DEBUG_PORT = 9333;
-const BASE = process.env.BRAINX_E2E_BASE || "http://127.0.0.1:3100/";
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
+const temp = mkdtempSync(join(tmpdir(), "brainx-browser-gate-"));
+const validationDb = process.env.BRAINX_E2E_DB || "";
+const output = [];
+let app;
+let browser;
 
-const chrome = spawn(CHROME, [
-  "--headless=new", `--remote-debugging-port=${DEBUG_PORT}`,
-  `--user-data-dir=/tmp/brainx-e2e-chrome-${process.pid}`, "--no-first-run", "--no-default-browser-check",
-  "about:blank",
-], { stdio: "ignore" });
+const remember = (chunk) => {
+  output.push(String(chunk));
+  if (output.length > 200) output.shift();
+};
 
-let ws;
-function connect(wsUrl) {
-  return new Promise((resolve, reject) => {
-    const socket = new WebSocket(wsUrl);
-    const pending = new Map();
-    let seq = 0;
-    socket.onopen = () => resolve({
-      send(method, params = {}) {
-        const id = ++seq;
-        socket.send(JSON.stringify({ id, method, params }));
-        return new Promise((res, rej) => pending.set(id, { res, rej }));
-      },
-      close: () => socket.close(),
-    });
-    socket.onerror = () => reject(new Error("ws error"));
-    socket.onmessage = (e) => {
-      const msg = JSON.parse(e.data);
-      if (msg.id && pending.has(msg.id)) {
-        const { res, rej } = pending.get(msg.id);
-        pending.delete(msg.id);
-        if (msg.error) rej(new Error(msg.error.message));
-        else res(msg.result);
-      }
-    };
+async function freePort() {
+  const server = createServer();
+  await new Promise((resolveListen, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolveListen);
   });
+  const address = server.address();
+  assert(address && typeof address === "object");
+  await new Promise((resolveClose) => server.close(resolveClose));
+  return address.port;
 }
 
-async function evaluate(expr, awaitPromise = false) {
-  const r = await ws.send("Runtime.evaluate", {
-    expression: expr, awaitPromise, returnByValue: true,
-  });
-  if (r.exceptionDetails) throw new Error(r.exceptionDetails.text || "eval failed");
-  return r.result.value;
+async function waitForApp(url, child) {
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    if (child.exitCode !== null) {
+      throw new Error(`BrainX 提前退出 code=${child.exitCode}\n${output.join("").slice(-4000)}`);
+    }
+    try {
+      const response = await fetch(`${url}/api/v1/meta/guard`, {
+        signal: AbortSignal.timeout(1_000),
+      });
+      if (response.ok) return;
+    } catch {
+      // 服务和前端子进程仍在启动。
+    }
+    await sleep(200);
+  }
+  throw new Error(`BrainX 启动超时\n${output.join("").slice(-4000)}`);
 }
-const openPendingRow = (i) => evaluate(`(() => { const rows = [...document.querySelectorAll('.decision-zone.pending .decision-row')]; rows[${i}]?.querySelector('.decision-row-toggle')?.click(); return rows[${i}] ? rows[${i}].querySelector('.decision-title b')?.textContent : null; })()`);
-const clickDrawerTab = (label) => evaluate(`(() => { const btns = [...document.querySelectorAll('.drawer-tabs button')]; const b = btns.find(x => x.textContent === '${label}'); b?.click(); return !!b; })()`);
-const drawerChip = () => evaluate(`document.querySelector('.drawer-title .decision-state')?.textContent || ""`);
-const sectionTitles = () => evaluate(`[...document.querySelectorAll('.decision-drawer .drawer-section h2')].map(h => h.textContent).join("|")`);
-const modalButtons = () => evaluate(`[...document.querySelectorAll('.command-modal button')].map(b => b.textContent).join("|")`);
-const closeDrawer = () => evaluate(`(() => { const b = document.querySelector('.decision-drawer .drawer-close'); b ? b.click() : window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'})); return true; })()`);
+
+async function waitForFrontend(page, url, child) {
+  const deadline = Date.now() + 60_000;
+  let lastTitle = "";
+  let lastError = "";
+  while (Date.now() < deadline) {
+    if (child.exitCode !== null) {
+      throw new Error(`BrainX 提前退出 code=${child.exitCode}\n${output.join("").slice(-4000)}`);
+    }
+    try {
+      await page.goto(url, { waitUntil: "domcontentloaded", timeout: 10_000 });
+      lastTitle = await page.title();
+      if (lastTitle === "B-tex · 职位决策工作台"
+        && await page.getByRole("main").count()) return;
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error);
+    }
+    await sleep(500);
+  }
+  throw new Error(`前端启动超时 title=${JSON.stringify(lastTitle)} error=${lastError}\n${output.join("").slice(-4000)}`);
+}
+
+async function stopApp(child) {
+  if (!child || child.exitCode !== null) return;
+  const signal = (name) => {
+    if (process.platform === "win32") child.kill(name);
+    else {
+      try { process.kill(-child.pid, name); } catch { child.kill(name); }
+    }
+  };
+  signal("SIGTERM");
+  await Promise.race([
+    new Promise((resolveExit) => child.once("exit", resolveExit)),
+    sleep(5_000).then(() => signal("SIGKILL")),
+  ]);
+}
 
 try {
-  let version = null;
-  for (let i = 0; i < 30; i++) {
-    try { version = await (await fetch(`http://127.0.0.1:${DEBUG_PORT}/json/version`)).json(); break; }
-    catch { await sleep(300); }
+  const backendPort = await freePort();
+  let frontendPort = await freePort();
+  while (frontendPort === backendPort) frontendPort = await freePort();
+  const base = `http://127.0.0.1:${backendPort}`;
+
+  app = spawn(process.execPath, ["src/server.js"], {
+    cwd: ROOT,
+    env: {
+      ...process.env,
+      BRAINX_ENV_FILE: join(temp, "missing.env"),
+      BRAINX_DB: validationDb || join(temp, "brainx.db"),
+      BRAINX_HOST: "127.0.0.1",
+      BRAINX_PORT: String(backendPort),
+      BRAINX_FRONTEND_HOST: "127.0.0.1",
+      BRAINX_FRONTEND_PORT: String(frontendPort),
+      BRAINX_FRONTEND_OFF: "0",
+      BRAINX_DEV_AUTH: "1",
+      BRAINX_BRIDGE_OFF: "1",
+      BRAINX_PUSH_AUTO: "0",
+      BRAINX_PUSH_SCHEDULE: "0",
+      BRAINX_LLM_DISABLE: "1",
+      BRAINX_MYSQL_USER: "",
+      BRAINX_MYSQL_PASSWORD: "",
+      BRAINX_MYSQL_DATABASE: "",
+    },
+    stdio: ["ignore", "pipe", "pipe"],
+    detached: process.platform !== "win32",
+  });
+  app.stdout.on("data", remember);
+  app.stderr.on("data", remember);
+  await waitForApp(base, app);
+
+  const channel = process.env.BRAINX_E2E_CHANNEL || "chrome";
+  browser = await chromium.launch({ channel, headless: true });
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const page = await context.newPage();
+  const pageErrors = [];
+  const consoleErrors = [];
+  const failedResponses = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") consoleErrors.push(message.text());
+  });
+  page.on("response", (response) => {
+    const url = response.url();
+    const isAsset = /\.(?:js|mjs|css|woff2?|ttf|svg|png)(?:\?|$)/.test(url);
+    if (url.startsWith(base) && (response.status() >= 500 || (isAsset && response.status() >= 400))) {
+      failedResponses.push(`${response.status()} ${url}`);
+    }
+  });
+
+  await waitForFrontend(page, base, app);
+  pageErrors.length = 0;
+  consoleErrors.length = 0;
+  failedResponses.length = 0;
+  assert.equal(await page.title(), "B-tex · 职位决策工作台");
+  await assert.doesNotReject(() => page.getByRole("main").waitFor({ state: "visible" }));
+  const signedOutBody = await page.locator("body").innerText();
+  assert.match(signedOutBody, /登录后查看真实职位/);
+  assert.doesNotMatch(signedOutBody, /39-AI|CurioSea|科漫智能/);
+
+  const loginStatus = await page.evaluate(async () => {
+    const response = await fetch("/api/v1/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ consultant_id: "felix" }),
+    });
+    return response.status;
+  });
+  assert.equal(loginStatus, 204, "开发登录成功契约必须返回 204");
+  pageErrors.length = 0;
+  consoleErrors.length = 0;
+  failedResponses.length = 0;
+  await page.reload({ waitUntil: "networkidle" });
+  const accountEntry = page.getByRole("button", { name: "用户与设置" });
+  await accountEntry.waitFor({ state: "visible" });
+  assert.match(await accountEntry.innerText(), /Felix/);
+
+  const workbenchStatus = await page.evaluate(async () => {
+    const response = await fetch("/api/v1/workbench");
+    await response.text();
+    return response.status;
+  });
+  assert.equal(workbenchStatus, 200, "登录后工作台 API 必须可用");
+
+  const recommendationFixture = await page.evaluate(async (useExistingData) => {
+    const sync = useExistingData ? null : await fetch("/api/v1/sync-runs", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source: "fixture" }),
+    });
+    const run = useExistingData ? null : await fetch("/api/v1/recommendations/run", { method: "POST" });
+    const firstPage = await fetch("/api/v1/recommendations");
+    return {
+      syncStatus: sync?.status || null,
+      runStatus: run?.status || null,
+      pageStatus: firstPage.status,
+      page: await firstPage.json(),
+    };
+  }, Boolean(validationDb));
+  if (!validationDb) {
+    assert.equal(recommendationFixture.syncStatus, 200, "浏览器夹具同步必须成功");
+    assert.equal(recommendationFixture.runStatus, 200, "浏览器夹具推荐必须成功");
   }
-  if (!version) throw new Error("Chrome DevTools 未就绪");
+  assert.equal(recommendationFixture.pageStatus, 200, "推荐分页 API 必须可用");
+  assert(recommendationFixture.page.total_count > 20, "浏览器夹具必须覆盖至少两页推荐");
+  await page.reload({ waitUntil: "networkidle" });
 
-  const tab = await (await fetch(`http://127.0.0.1:${DEBUG_PORT}/json/new?${encodeURIComponent(BASE)}`, { method: "PUT" })).json();
-  ws = await connect(tab.webSocketDebuggerUrl);
-  await ws.send("Runtime.enable");
-  await ws.send("Page.enable");
-  await sleep(4000);
+  const recommendationQueue = page.getByRole("region", { name: "推荐队列" });
+  await recommendationQueue.waitFor({ state: "visible" });
+  const recommendationCards = recommendationQueue.getByRole("article");
+  assert.equal(await recommendationCards.count(), 20, "正式首页必须固定显示 20 条推荐");
+  const firstCard = await recommendationCards.first().getAttribute("aria-label");
+  const firstCardText = await recommendationCards.first().innerText();
+  assert.match(firstCardText, /今天推进|本周观察|待核验/, "正式卡片必须显示后端决策层级");
+  assert.match(firstCardText, /事实充分|部分事实待确认|事实不足/, "正式卡片必须显示规则化事实可信度");
+  assert.match(firstCardText, /职位事实更新|业务群活动|人工核验/, "正式卡片必须显示真实最近活动");
+  const nextPage = recommendationQueue.getByRole("button", { name: /下一页/ });
+  assert.equal(await nextPage.isEnabled(), true,
+    `正式首页应允许翻页，当前摘要：${await recommendationQueue.innerText()}`);
+  await nextPage.click();
+  await recommendationQueue.getByText(/第 2 \/ \d+ 页/).waitFor({ state: "visible" });
+  assert.equal(await recommendationCards.count(), 20, "正式第二页必须固定显示 20 条推荐");
+  assert.notEqual(await recommendationCards.first().getAttribute("aria-label"), firstCard,
+    "下一页不能重复显示首页首条推荐");
+  await recommendationQueue.getByRole("button", { name: "上一页" }).click();
+  await recommendationQueue.getByText(/第 1 \/ \d+ 页/).waitFor({ state: "visible" });
+  assert.equal(await recommendationCards.first().getAttribute("aria-label"), firstCard,
+    "返回上一页必须复用冻结页面，不应重新排序");
 
-  // 1) 未登录 → 演示模式回退
-  const offlineText = await evaluate("document.body.innerText");
-  const offlineMode = await evaluate("document.querySelector('.rail-status')?.getAttribute('title') || ''");
-  console.log(`[1] 未登录回退演示模式: ${(offlineText.includes("演示模式") || offlineMode === "演示模式") ? "PASS" : "FAIL"}`);
-
-  // 2) dev 登录 felix → connected
-  await evaluate(`fetch('/api/v1/session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({consultant_id:'felix'})}).then(r=>r.status)`, true);
-  await ws.send("Page.reload");
-  await sleep(6000);
-  const text = await evaluate("document.body.innerText");
-  console.log(`[2] 连接标识: ${text.includes("BrainX 已连接") ? "PASS" : "FAIL"}`);
-  console.log(`[2] 后端推荐数据（Rockflow）: ${text.includes("Rockflow") ? "PASS" : "FAIL"}`);
-  console.log(`[2] 后端策略版本（baseline-1.0）: ${text.includes("baseline-1.0") ? "PASS" : "FAIL"}`);
-  console.log(`[2] 双分区渲染: ${(text.includes("已接单区") && text.includes("待接单区")) ? "PASS" : "FAIL"}`);
-
-  // 3) 待接单区第一个职位：打开 → 跟进 → 关注 → 接单（确认弹窗）→ 记录进展 → 刷新持久化
-  const company = await openPendingRow(0);
-  await sleep(1200);
-  await clickDrawerTab("跟进");
-  await sleep(600);
-  console.log(`[3] 职位 ${company || "?"} 承接面板打开: ${(await sectionTitles()).includes("承接状态") ? "PASS" : "FAIL"}`);
-  console.log(`[3] 初始允许动作（关注/接单/暂不考虑）: ${await evaluate(`[...document.querySelectorAll('.command-grid button')].map(b=>b.textContent.trim()).join("/")`)}`);
-
-  await evaluate(`(() => { const b = [...document.querySelectorAll('.command-grid button')].find(x => x.textContent.trim() === '关注'); b?.click(); return !!b; })()`);
-  await sleep(1200);
-  console.log(`[3] 关注后状态（关注中）: ${(await drawerChip()).includes("关注中") ? "PASS" : "FAIL"}`);
-
-  await evaluate(`(() => { const b = [...document.querySelectorAll('.command-grid button')].find(x => x.textContent.trim().startsWith('接单')); b?.click(); return !!b; })()`);
-  await sleep(800);
-  console.log(`[3] 接单二次确认弹窗: ${(await modalButtons()).includes("确认接单") ? "PASS" : "FAIL"}`);
-  await evaluate(`(() => { const b = [...document.querySelectorAll('.command-modal button')].find(x => x.textContent === '确认接单'); b?.click(); return !!b; })()`);
-  await sleep(1500);
-  const afterAccept = await drawerChip();
-  const titles3 = await sectionTitles();
-  console.log(`[3] 接单后状态（已接单 + 可回写记录结果）: ${(afterAccept.includes("已接单") && titles3.includes("记录结果")) ? "PASS" : "FAIL"}`);
-
-  await evaluate(`(() => { const b = [...document.querySelectorAll('.outcome-form button')].find(x => x.textContent === '记录'); b?.click(); return !!b; })()`);
-  await sleep(1500);
-  console.log(`[3] 结果回写后列表出现推荐采纳: ${(await evaluate("document.body.innerText")).includes("推荐采纳") ? "PASS" : "FAIL"}`);
-  await closeDrawer();
-  await sleep(400);
-
-  // 4) 刷新持久化：该职位应留在已接单区（后端账本驱动）
-  await ws.send("Page.reload");
-  await sleep(6000);
-  const acceptedZoneText = await evaluate(`document.querySelector('.decision-zone.accepted')?.innerText || ""`);
-  console.log(`[4] 刷新后 ${company || "?"} 保留在已接单区: ${acceptedZoneText.includes(company) ? "PASS" : "FAIL"}`);
-
-  // 5) 第二个职位：暂不考虑（原因枚举弹窗，枚举来自后端 /dismiss-reasons）
-  const company2 = await openPendingRow(0);
-  await sleep(1200);
-  await clickDrawerTab("跟进");
-  await sleep(600);
-  await evaluate(`(() => { const b = [...document.querySelectorAll('.command-grid button')].find(x => x.textContent.trim() === '暂不考虑'); b?.click(); return !!b; })()`);
-  await sleep(800);
-  const modalBtns = await modalButtons();
-  await evaluate(`(() => { const t = document.querySelector('.command-modal .filter-select-trigger'); t?.click(); return !!t; })()`);
-  await sleep(400);
-  const reasonOptions = await evaluate(`[...document.querySelectorAll('.command-modal .filter-select-menu button')].map(b => b.textContent).join("/")`);
-  console.log(`[5] ${company2 || "?"} 暂不考虑弹窗（原因枚举来自后端）: ${(modalBtns.includes("记录原因") && reasonOptions.includes("当前没精力") && reasonOptions.includes("信息不完整")) ? "PASS" : "FAIL"}`);
-  await evaluate(`(() => { const b = [...document.querySelectorAll('.command-modal button')].find(x => x.textContent === '记录原因'); b?.click(); return !!b; })()`);
-  await sleep(1500);
-  const dismissedChip = await drawerChip();
-  const rewatch = await evaluate(`[...document.querySelectorAll('.command-grid button')].map(b => b.textContent.trim()).join("/")`);
-  console.log(`[5] 暂不考虑后状态（暂不考虑 + 可重新关注）: ${(dismissedChip.includes("暂不考虑") && rewatch.includes("重新关注")) ? "PASS" : "FAIL"}`);
-
-  // 5b) 重新关注（后端冷却期内应拒绝并提示）
-  await evaluate(`(() => { const b = [...document.querySelectorAll('.command-grid button')].find(x => x.textContent.trim() === '重新关注'); b?.click(); return !!b; })()`);
-  let toastText = "";
-  for (let i = 0; i < 10; i++) {
-    await sleep(200);
-    toastText = await evaluate(`document.querySelector('.toast')?.textContent || ""`);
-    if (toastText) break;
+  const search = page.getByRole("textbox", { name: "搜索职位或公司" });
+  if (await search.count()) {
+    await search.fill("前端链路验证");
+    assert.equal(await search.inputValue(), "前端链路验证");
+    await search.fill("");
+  } else {
+    await page.getByRole("heading", { name: "还没有可判断的职位" }).waitFor({ state: "visible" });
   }
-  console.log(`[5] 冷却期内重新关注被后端拒绝（toast: ${toastText.trim() || "无"}) : ${(toastText.includes("冷却期") || toastText.includes("操作失败")) ? "PASS" : "FAIL"}`);
+  assert.doesNotMatch(await page.locator("main").innerText(), /TODAY'S DECISIONS|今天只处理最值得推进的职位|待判断\s*\d+\s*待核验\s*\d+\s*我的项目/);
 
-  // 6) 同步面板：连接态点击重新同步 → 触发 fixture 同步 + 新推荐
-  await closeDrawer();
-  await sleep(400);
-  await evaluate(`document.querySelector('.sync-trigger')?.click()`);
-  await sleep(600);
-  const syncCaption = await evaluate(`[...document.querySelectorAll('.panel-caption')].map(p => p.textContent).join("|")`);
-  console.log(`[6] 同步面板连接态文案: ${syncCaption.includes("已连接 Brain X 后端") ? "PASS" : "FAIL"}`);
-  await evaluate(`(() => { const b = [...document.querySelectorAll('.drawer-actions button')].find(x => x.textContent.includes('重新同步')); b?.click(); return !!b; })()`);
-  await sleep(4000);
-  const syncState = await evaluate(`document.querySelector('.sync-trigger')?.textContent || ""`);
-  console.log(`[6] 重新同步后回到已同步（Snapshot #）: ${/Snapshot #/.test(syncState) ? "PASS" : "FAIL"}`);
+  await page.getByRole("button", { name: "全部职位" }).click();
+  await page.getByRole("button", { name: "客户洞察" }).click();
+  await page.getByRole("heading", { name: "客户洞察" }).waitFor({ state: "visible" });
+  await accountEntry.click();
+  await page.getByRole("menuitem", { name: "工作台设置" }).click();
+  await page.getByRole("button", { name: "数据连接" }).click();
+  await page.getByRole("heading", { name: "数据连接" }).waitFor({ state: "visible" });
+  await page.getByText("TTC 职位系统", { exact: true }).waitFor({ state: "visible" });
+  assert.match(await page.locator("main").innerText(), /真实职位来源/);
+  await page.getByRole("button", { name: "返回应用" }).click();
+  await page.getByRole("button", { name: "今日决策", exact: true }).click();
+  await page.getByRole("heading", { name: /推荐队列|还没有可判断的职位/ }).waitFor({ state: "visible" });
 
-  // 6b) 职位雷达：后端候选池 + 驾驶舱导入过滤
-  await closeDrawer();
-  await sleep(400);
-  await evaluate(`(() => { const b = [...document.querySelectorAll('.nav button')].find(x => x.textContent.includes('职位雷达')); b?.click(); return !!b; })()`);
-  await sleep(1500);
-  const radarText = await evaluate("document.body.innerText");
-  const radarRowCount = await evaluate(`document.querySelectorAll('.data-table tbody tr').length`);
-  await evaluate(`(() => { const t = [...document.querySelectorAll('.filter-select-trigger')].find(x => x.textContent.includes('来源')); t?.click(); return true; })()`);
-  await sleep(300);
-  const sourceOptions = await evaluate(`[...document.querySelectorAll('.filter-select-menu button')].map(b => b.textContent).join("|")`);
-  await evaluate(`window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}))`);
-  console.log(`[6b] 雷达显示后端数据池（${radarRowCount} 行，含驾驶舱导入过滤）: ${(radarRowCount > 50 && /驾驶舱导入 · [1-9]/.test(sourceOptions) && radarText.includes("Brain X")) ? "PASS" : "FAIL"}`);
-  await evaluate(`(() => { const b = [...document.querySelectorAll('.data-table tbody .link')].find(x => x.textContent === '蝴蝶梦境' || x.closest('tr')?.textContent.includes('蝴蝶梦境')); if (b) return false; const rows = [...document.querySelectorAll('.data-table tbody tr')]; const row = rows.find(r => r.textContent.includes('蝴蝶梦境')); row?.querySelector('.link')?.click(); return !!row; })()`);
-  await sleep(800);
-  const radarDetail = await evaluate("document.body.innerText");
-  console.log(`[6b] 雷达职位详情可打开（后端事实字段）: ${(radarDetail.includes("已导入字段") || radarDetail.includes("HC") || radarDetail.includes("职位信号轨道")) ? "PASS" : "FAIL"}`);
-  await evaluate(`(() => { const b = document.querySelector('.back'); b?.click(); return !!b; })()`);
-  await sleep(400);
+  const mobile = await context.newPage();
+  await mobile.setViewportSize({ width: 390, height: 844 });
+  mobile.on("pageerror", (error) => pageErrors.push(`mobile: ${error.message}`));
+  mobile.on("console", (message) => {
+    if (message.type() === "error") consoleErrors.push(`mobile: ${message.text()}`);
+  });
+  await mobile.goto(base, { waitUntil: "networkidle" });
+  await mobile.getByRole("main").waitFor({ state: "visible" });
+  assert.doesNotMatch(await mobile.locator("body").innerText(), /页面加载失败|出现了未处理的界面错误/);
+  await mobile.close();
 
-  // 6c) 客户洞察：后端公司聚合
-  await evaluate(`(() => { const b = [...document.querySelectorAll('.nav button')].find(x => x.textContent.includes('客户洞察')); b?.click(); return !!b; })()`);
-  await sleep(1200);
-  const clientsText = await evaluate("document.body.innerText");
-  const clientRowCount = await evaluate(`document.querySelectorAll('.data-table tbody tr').length`);
-  console.log(`[6c] 客户洞察显示后端聚合（${clientRowCount} 行，含活跃职位状态）: ${(clientRowCount > 20 && clientsText.includes("有活跃职位")) ? "PASS" : "FAIL"}`);
-
-  // 7) 退出会话 → 演示模式
-  await evaluate(`fetch('/api/v1/session',{method:'DELETE'}).then(r=>r.status)`, true);
-  await ws.send("Page.reload");
-  await sleep(4000);
-  const afterLogout = await evaluate("document.body.innerText");
-  const afterLogoutMode = await evaluate("document.querySelector('.rail-status')?.getAttribute('title') || ''");
-  console.log(`[7] 退出后回退演示模式: ${(afterLogout.includes("演示模式") || afterLogoutMode === "演示模式") ? "PASS" : "FAIL"}`);
-} catch (e) {
-  console.error("E2E FAILED:", e.message);
+  const guard = await page.evaluate(async () => (await fetch("/api/v1/meta/guard")).json());
+  assert.equal(guard.client_errors_total, 0, "浏览器错误不应上报到服务端看门狗");
+  assert.deepEqual(pageErrors, [], `页面运行错误：${pageErrors.join(" | ")}`);
+  assert.deepEqual(consoleErrors, [], `控制台错误：${consoleErrors.join(" | ")}`);
+  assert.deepEqual(failedResponses, [], `静态资源或服务响应失败：${failedResponses.join(" | ")}`);
+  console.log("浏览器链路通过：桌面/移动端、登录、推荐20条分页、返回不重排、搜索、导航和控制台均正常");
+} catch (error) {
+  console.error(error.stack || error.message || error);
+  console.error(output.join("").slice(-4000));
   process.exitCode = 1;
 } finally {
-  try { ws?.close(); } catch {}
-  chrome.kill();
+  await browser?.close().catch(() => {});
+  await stopApp(app);
+  rmSync(temp, { recursive: true, force: true });
 }

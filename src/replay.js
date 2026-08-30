@@ -8,7 +8,8 @@ export function replay(db, decision_id) {
   const run = db.prepare(`SELECT * FROM decision_runs WHERE run_id=?`).get(r.run_id);
   const job = db.prepare(`SELECT * FROM job_facts WHERE project_id=?`).get(r.project_id);
   const events = db.prepare(`SELECT event_type, actor, occurred_at, reason, prev_state, next_state
-    FROM decision_events WHERE project_id=? ORDER BY occurred_at, id`).all(r.project_id);
+    FROM decision_events WHERE project_id=? AND event_type!='RECOMMENDED'
+    ORDER BY occurred_at, id`).all(r.project_id);
   const outcomes = db.prepare(`SELECT stage, value_json, observed_at FROM job_outcomes
     WHERE project_id=? ORDER BY observed_at`).all(r.project_id);
   return {

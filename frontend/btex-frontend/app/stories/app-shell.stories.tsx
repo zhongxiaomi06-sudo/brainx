@@ -20,6 +20,9 @@ export const FullWorkbench: Story = {
     const canvas = within(canvasElement);
     await expect(canvas.findByRole("main", {}, { timeout: 10_000 })).resolves.toBeInTheDocument();
     await expect(canvas.getByLabelText("主要导航")).toBeInTheDocument();
+    await expect(within(canvas.getByRole("navigation", { name: "日常工作" })).getAllByRole("button")
+      .map((button) => button.getAttribute("aria-label")))
+      .toEqual(["精选盘", "我的项目", "全部职位", "客户洞察"]);
     await expect(canvas.getByRole("button", { name: "全部职位" })).toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: "我的项目" }));
     await expect(canvas.getByRole("heading", { name: "我的项目" })).toBeInTheDocument();
@@ -83,6 +86,9 @@ export const MainBlocksReview: Story = {
     await expect(canvas.getByRole("heading", { name: "待判断职位" })).toBeInTheDocument();
     await expect(canvas.queryByText(/已同步/)).not.toBeInTheDocument();
     await expect(canvas.queryByRole("button", { name: /提醒/ })).not.toBeInTheDocument();
+    await expect(within(canvas.getByRole("navigation", { name: "日常工作" })).getAllByRole("button")
+      .map((button) => button.getAttribute("aria-label")))
+      .toEqual(["精选盘", "我的项目", "全部职位", "客户洞察"]);
     await userEvent.click(canvas.getByRole("button", { name: "用户与设置" }));
     await expect(canvas.getByText("工作台设置")).toBeInTheDocument();
     await userEvent.click(canvas.getByRole("menuitem", { name: "工作台设置" }));

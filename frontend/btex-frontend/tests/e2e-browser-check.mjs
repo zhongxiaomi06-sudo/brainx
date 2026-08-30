@@ -231,6 +231,10 @@ try {
   }
   assert.doesNotMatch(await page.locator("main").innerText(), /TODAY'S DECISIONS|今天只处理最值得推进的职位|待判断\s*\d+\s*待核验\s*\d+\s*我的项目/);
 
+  const dailyNavigation = page.getByRole("navigation", { name: "日常工作" });
+  assert.deepEqual(await dailyNavigation.getByRole("button").evaluateAll((buttons) =>
+    buttons.map((button) => button.getAttribute("aria-label"))),
+  ["精选盘", "我的项目", "全部职位", "客户洞察"], "正式主导航必须把我的项目放在精选盘之后");
   await page.getByRole("button", { name: "全部职位" }).click();
   await page.getByRole("button", { name: "客户洞察" }).click();
   await page.getByRole("heading", { name: "客户洞察" }).waitFor({ state: "visible" });

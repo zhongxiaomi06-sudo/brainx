@@ -87,8 +87,8 @@ const views: Array<{ id: SavedView; label: string }> = [
 
 const navigation = [
   { label: "精选盘", icon: Sparkles },
-  { label: "全部职位", icon: BriefcaseBusiness, active: true },
   { label: "我的项目", icon: ClipboardCheck },
+  { label: "全部职位", icon: BriefcaseBusiness, active: true },
   { label: "客户洞察", icon: Users },
 ];
 

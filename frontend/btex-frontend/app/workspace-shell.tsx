@@ -17,8 +17,8 @@ export type WorkspaceShellPage = "today" | "jobs" | "projects" | "clients" | "se
 
 const primaryNavigation = [
   { id: "today", label: "精选盘", icon: Sparkles },
-  { id: "jobs", label: "全部职位", icon: BriefcaseBusiness },
   { id: "projects", label: "我的项目", icon: ClipboardCheck },
+  { id: "jobs", label: "全部职位", icon: BriefcaseBusiness },
   { id: "clients", label: "客户洞察", icon: Users },
 ] as const;
 

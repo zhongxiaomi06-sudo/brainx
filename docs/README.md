@@ -62,6 +62,7 @@
 - [完整推荐队列排序复核](frontend-reviews/2026-08-30-recommendation-sort.md)：推荐优先级、最近活动、事实可信度三种服务端排序及游标稳定性证据。
 - [精选盘评分与队列视图整改](frontend-reviews/2026-08-30-pick-board-score-views.md)：评分参考恢复、五种完整队列视图、数据来源筛选删除及命名收口证据。
 - [精选盘卡片删除判断摘要区复审](frontend-reviews/2026-08-30-pick-card-remove-assessment.md)：列表卡片删除理由、风险、事实可信度与更新时间区，并保留详情数据边界。
+- [主导航顺序调整复审](frontend-reviews/2026-08-30-main-navigation-order.md)：记录“我的项目”紧跟“精选盘”的正式外壳、审核稿与回归证据。
 - [前端真实数据重构施工清单](frontend-refactor-construction-checklist.md)：TTC 主表、推荐策略、方向画像、导航设置与质量门禁的分阶段实施及审核边界。
 - [内部 Storybook 组件库](storybook-component-library.md)：生产组件的隔离展示、交互测试与维护规则。
 - [BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md)：产品定位、功能范围、已知问题、路线图与验收指标。

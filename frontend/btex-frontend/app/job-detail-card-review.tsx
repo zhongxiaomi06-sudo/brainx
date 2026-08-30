@@ -11,6 +11,7 @@ import {
   MapPin,
   X,
 } from "lucide-react";
+import { newestEvents } from "./job-detail-data";
 import "./job-detail-card-review.css";
 
 export type JobDetailPipeline = Record<string, number> | null;
@@ -137,9 +138,7 @@ export function JobDetailCard({
   const selectedTab = activeTab || localTab;
   const pipeline = pipelineItems(job.pipeline);
   const recommendation = job.recommendation?.reasons.length ? job.recommendation : null;
-  const recentEvents = (job.events || []).slice()
-    .sort((a, b) => String(b.at || "").localeCompare(String(a.at || "")))
-    .slice(0, 3);
+  const recentEvents = newestEvents(job.events || []);
   const tabs: { id: JobDetailTab; label: string }[] = [
     { id: "facts", label: "职位事实" },
     { id: "judgement", label: "判断" },

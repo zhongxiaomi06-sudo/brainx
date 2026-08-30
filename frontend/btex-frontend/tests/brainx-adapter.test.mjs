@@ -17,7 +17,7 @@ import {
   mapSyncStatus,
   BrainxApiError,
 } from "../app/brainx-api.ts";
-import { mergeOpportunityDetail, toDecisionJobDetail, toRadarJobDetail } from "../app/job-detail-data.ts";
+import { mergeOpportunityDetail, newestEvents, toDecisionJobDetail, toRadarJobDetail } from "../app/job-detail-data.ts";
 import { projectToDecisionJob } from "../app/brainx-projects-api.ts";
 import { mapRecommendationPage } from "../app/brainx-recommendation-pages-api.ts";
 
@@ -79,6 +79,16 @@ const samplePresentation = {
   presentation_version: "recommendation-presentation-1.0",
   presentation_source: "FROZEN",
 };
+
+test("decision trail keeps only the newest three events", () => {
+  const ordered = newestEvents([
+    { id: "old", at: "08/30 12:42" },
+    { id: "latest", at: "08/30 17:49" },
+    { id: "middle", at: "08/30 17:16" },
+    { id: "older", at: "08/30 13:52" },
+  ]);
+  assert.deepEqual(ordered.map(event => event.id), ["latest", "middle", "older"]);
+});
 
 test("maps a backend recommendation into a workbench decision job", () => {
   const job = mapRecommendation(sampleRec);

@@ -23,6 +23,10 @@ const eventLabels: Record<string, string> = {
   FACT_UPDATED: "职位事实已更新",
 };
 
+export function newestEvents<T extends { at?: string | null }>(events: T[], limit = 3): T[] {
+  return events.slice().sort((a, b) => String(b.at || "").localeCompare(String(a.at || ""))).slice(0, limit);
+}
+
 function jobStatus(value?: string | null): JobDetailReviewData["activeState"] {
   if (value === "OPEN" || value === "招聘中") return "OPEN";
   if (value === "COOLING" || value === "冷却期") return "COOLING";

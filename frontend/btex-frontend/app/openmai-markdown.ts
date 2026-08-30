@@ -50,3 +50,10 @@ export function OpenmaiMarkdown({ text }: { text: string }): ReactElement {
     createElement("style", null, SCOPED_CSS),
     createElement("div", { dangerouslySetInnerHTML: { __html: openmaiToHtml(text) } }));
 }
+
+/** 裸版:不带卡片包裹(背景/边框/限高),由调用方自己的容器定外观——BrainX 助手气泡复用。 */
+export function MarkdownBody({ text, className = "" }: { text: string; className?: string }): ReactElement {
+  return createElement("div", { className: `openmai-md ${className}`.trim() },
+    createElement("style", null, SCOPED_CSS),
+    createElement("div", { dangerouslySetInnerHTML: { __html: openmaiToHtml(text) } }));
+}

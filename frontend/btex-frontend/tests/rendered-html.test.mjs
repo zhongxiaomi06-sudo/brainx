@@ -67,7 +67,7 @@ test("uses the reference three-column shell and a single-column opportunity work
   assert.match(workbench, /type OpportunityRowModel/);
   assert.match(workbench, /function OpportunityRow/);
   assert.doesNotMatch(workbench, /<div className="pick-card-rail"><div className="pick-card-publish"/);
-  assert.match(workbench, /onClick=\{\(\)\s*=>\s*setTab\("market"\)\}/);
+  assert.doesNotMatch(workbench, /assistant-tabs|assistant-insight/); // 2026-08-31 洞察区(岗位画像/职位市场 tabs)已按产品决定移除,不得回加
   assert.match(workbench, /<RecommendationQueueV2Review items=\{queueItems\}/);
   assert.doesNotMatch(workbench, /today-brief|今天只处理最值得推进的职位|TODAY&apos;S DECISIONS/);
   assert.match(workbench, /onOpen=\{item => \{ const job = queueJobs\.get\(item\.projectId\); if \(job\) open\(job, "judgement"\); \}\}/);

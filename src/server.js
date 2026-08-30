@@ -271,7 +271,7 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       json(res, 200, { ok: true, ...prefs, updatedAt });
     },
     'GET /api/v1/recommendations': (req, res, cid, q) => {
-      const out = recommendationPage(db, cid, { cursor: q.get('cursor') });
+      const out = recommendationPage(db, cid, { cursor: q.get('cursor'), search: q.get('q') });
       if (out.ok === false) return err(res, out.status, out.code, out.message);
       json(res, 200, out);
     },

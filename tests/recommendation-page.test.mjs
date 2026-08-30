@@ -78,6 +78,46 @@ test('游标翻页无重复无遗漏，末页数量正确', () => {
   assert.equal(new Set(seen).size, expected);
 });
 
+test('搜索覆盖整轮推荐并忽略职位备注中的内部注释标记', () => {
+  const first = recommendationPage(db, CID);
+  const second = recommendationPage(db, CID, { cursor: first.next_cursor });
+  const target = second.items[0];
+  const row = db.prepare('SELECT notes FROM job_facts WHERE project_id=?').get(target.job.project_id);
+  try {
+    db.prepare('UPDATE job_facts SET notes=? WHERE project_id=?').run(
+      '真实职位描述 EntireQueueSearchToken <!-- INTERNALONLYTOKEN -->', target.job.project_id,
+    );
+    const found = recommendationPage(db, CID, { search: 'entirequeuesearchtoken' });
+    assert.equal(found.total_count, 1);
+    assert.equal(found.items[0].job.project_id, target.job.project_id);
+    assert.ok(found.items[0].rank > RECOMMENDATION_PAGE_SIZE);
+    assert.equal(recommendationPage(db, CID, { search: 'internalonlytoken' }).total_count, 0);
+  } finally {
+    db.prepare('UPDATE job_facts SET notes=? WHERE project_id=?').run(row?.notes ?? null, target.job.project_id);
+  }
+});
+
+test('搜索条件绑定分页游标，变化后必须从第一页重新搜索', () => {
+  const ids = recommendationPage(db, CID).items.map((item) => item.job.project_id);
+  const second = recommendationPage(db, CID, { cursor: recommendationPage(db, CID).next_cursor });
+  ids.push(...second.items.slice(0, 5).map((item) => item.job.project_id));
+  const originals = ids.map((id) => db.prepare('SELECT project_id, notes FROM job_facts WHERE project_id=?').get(id));
+  try {
+    const update = db.prepare('UPDATE job_facts SET notes=? WHERE project_id=?');
+    for (const row of originals) update.run(`${row.notes || ''} BulkQueueSearchToken`, row.project_id);
+    const page = recommendationPage(db, CID, { search: 'bulkqueuesearchtoken' });
+    assert.equal(page.total_count, 25);
+    assert.ok(page.next_cursor);
+    const mismatch = recommendationPage(db, CID, { cursor: page.next_cursor });
+    assert.equal(mismatch.code, 'INVALID_RECOMMENDATION_CURSOR');
+    const next = recommendationPage(db, CID, { cursor: page.next_cursor, search: 'bulkqueuesearchtoken' });
+    assert.equal(next.items.length, 5);
+  } finally {
+    const update = db.prepare('UPDATE job_facts SET notes=? WHERE project_id=?');
+    for (const row of originals) update.run(row.notes ?? null, row.project_id);
+  }
+});
+
 test('翻页途中出现新运行仍读取原运行，并提示有新队列', () => {
   const first = recommendationPage(db, CID);
   const newer = recommend(db, CID, { top: RECOMMENDATION_PAGE_SIZE, persistLimit: 200 });
@@ -114,6 +154,12 @@ test('正式推荐接口返回同一分页契约', async () => {
     assert.equal(payload.items[0].presentation_version, 'recommendation-presentation-1.0');
     assert.ok(payload.items[0].recent_activity === null || payload.items[0].recent_activity.occurred_at);
     assert.ok(payload.next_cursor);
+    const query = payload.items[0].job.role;
+    const searchedResponse = await fetch(`${base}/api/v1/recommendations?q=${encodeURIComponent(query)}`, { headers: { cookie } });
+    assert.equal(searchedResponse.status, 200);
+    const searched = await searchedResponse.json();
+    assert.ok(searched.total_count > 0);
+    assert.ok(searched.total_count <= payload.total_count);
   } finally {
     server.close();
     if (previous === undefined) delete process.env.BRAINX_DEV_AUTH;

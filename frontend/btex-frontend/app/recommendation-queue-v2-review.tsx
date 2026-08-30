@@ -58,6 +58,7 @@ type RecommendationQueueV2ReviewProps = {
   loading?: boolean;
   error?: string | null;
   newRunAvailable?: boolean;
+  emptyMessage?: string;
   onPrevious?: () => void;
   onNext?: () => void;
   onRefreshRun?: () => void;
@@ -160,7 +161,7 @@ function RecommendationCard({ item, onOpen, onAction }: {
 export function RecommendationQueueV2Review({
   items, pageIndex, totalCount, evaluatedCount, generatedAt,
   loading = false, error = null, newRunAvailable = false, onPrevious, onNext,
-  onRefreshRun, onOpen, onAction,
+  onRefreshRun, emptyMessage = "这一页没有推荐岗位", onOpen, onAction,
 }: RecommendationQueueV2ReviewProps) {
   const pageItems = items.slice(0, PAGE_SIZE);
   const start = pageItems.length ? pageIndex * PAGE_SIZE + 1 : 0;
@@ -175,7 +176,7 @@ export function RecommendationQueueV2Review({
     {error && <div className="recommendation-v2-page-error" role="alert"><AlertTriangle /><span><b>这一页没有加载成功</b>{error}</span><button type="button" onClick={onNext}>重试</button></div>}
     <div className={`recommendation-v2-list${loading ? " is-loading" : ""}`} aria-busy={loading}>
       {pageItems.map(item => <RecommendationCard key={item.projectId} item={item} onOpen={onOpen} onAction={onAction} />)}
-      {!pageItems.length && !error && <div className="recommendation-v2-empty">这一页没有推荐岗位</div>}
+      {!pageItems.length && !error && <div className="recommendation-v2-empty">{emptyMessage}</div>}
     </div>
     <footer className="recommendation-v2-pagination">
       <span>参与计算 {evaluatedCount} · 已显示 {start}–{end} / {totalCount}</span>

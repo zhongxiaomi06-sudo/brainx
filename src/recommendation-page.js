@@ -5,8 +5,24 @@ import { latestRealSync } from './sync.js';
 
 export const RECOMMENDATION_PAGE_SIZE = 20;
 
-function encodeCursor(runId, afterRank) {
-  return Buffer.from(JSON.stringify({ version: 1, run_id: runId, after_rank: afterRank }))
+function normalizeSearch(value) {
+  return String(value || '').trim().normalize('NFKC').toLocaleLowerCase('zh-CN').slice(0, 120);
+}
+
+function cleanJobDescription(value) {
+  return String(value || '').replace(/<!--[\s\S]*?-->/g, ' ');
+}
+
+function matchesSearch(item, search) {
+  if (!search) return true;
+  const job = item.job || {};
+  const searchable = [job.role, job.company, job.city, cleanJobDescription(job.notes)]
+    .filter(Boolean).join('\n').normalize('NFKC').toLocaleLowerCase('zh-CN');
+  return search.split(/\s+/).every((term) => searchable.includes(term));
+}
+
+function encodeCursor(runId, afterRank, search) {
+  return Buffer.from(JSON.stringify({ version: 2, run_id: runId, after_rank: afterRank, search }))
     .toString('base64url');
 }
 
@@ -14,9 +30,9 @@ function decodeCursor(value) {
   if (!value) return null;
   try {
     const parsed = JSON.parse(Buffer.from(String(value), 'base64url').toString('utf8'));
-    if (parsed?.version !== 1 || typeof parsed.run_id !== 'string'
+    if (![1, 2].includes(parsed?.version) || typeof parsed.run_id !== 'string'
         || !Number.isInteger(parsed.after_rank) || parsed.after_rank < 0) return null;
-    return parsed;
+    return { ...parsed, search: parsed.version === 2 ? normalizeSearch(parsed.search) : '' };
   } catch {
     return null;
   }
@@ -43,10 +59,14 @@ function emptyPage(extra = {}) {
  * 读取同一冻结运行内的一页。游标同时携带 run_id 与最后 rank，避免新运行或
  * “暂不考虑”导致偏移量漂移、重复或遗漏。
  */
-export function recommendationPage(db, consultantId, { cursor = null } = {}) {
+export function recommendationPage(db, consultantId, { cursor = null, search = '' } = {}) {
+  const normalizedSearch = normalizeSearch(search);
   const decoded = cursor ? decodeCursor(cursor) : null;
   if (cursor && !decoded) {
     return { ok: false, status: 400, code: 'INVALID_RECOMMENDATION_CURSOR', message: '推荐页游标无效，请刷新队列' };
+  }
+  if (decoded && decoded.search !== normalizedSearch) {
+    return { ok: false, status: 400, code: 'INVALID_RECOMMENDATION_CURSOR', message: '搜索条件已变化，请从第一页重新搜索' };
   }
 
   if (!decoded) {
@@ -68,7 +88,9 @@ export function recommendationPage(db, consultantId, { cursor = null } = {}) {
 
   const hidden = new Set(db.prepare(`SELECT project_id FROM recommendation_feedback
     WHERE consultant_id=?`).all(consultantId).map((row) => row.project_id));
-  const visible = selected.items.filter((item) => !hidden.has(item.job.project_id));
+  const visible = selected.items
+    .filter((item) => !hidden.has(item.job.project_id))
+    .filter((item) => matchesSearch(item, normalizedSearch));
   const afterRank = decoded?.after_rank || 0;
   const items = visible.filter((item) => item.rank > afterRank).slice(0, RECOMMENDATION_PAGE_SIZE);
   const lastRank = items.at(-1)?.rank || afterRank;
@@ -87,7 +109,7 @@ export function recommendationPage(db, consultantId, { cursor = null } = {}) {
     evaluated_count: selected.run.candidate_count,
     total_count: visible.length,
     page_size: RECOMMENDATION_PAGE_SIZE,
-    next_cursor: hasMore ? encodeCursor(selected.run.run_id, lastRank) : null,
+    next_cursor: hasMore ? encodeCursor(selected.run.run_id, lastRank, normalizedSearch) : null,
     new_run_available: latestRunId !== selected.run.run_id,
     items: items.map((item) => {
       const state = states.get(item.job.project_id)?.state || 'NEW';

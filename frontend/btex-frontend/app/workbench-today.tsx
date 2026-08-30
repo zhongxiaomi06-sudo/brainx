@@ -48,6 +48,8 @@ type TodayDecisionQueueProps = {
     loading: boolean;
     error: string | null;
     newRunAvailable: boolean;
+    searchQuery?: string;
+    onSearch?: (query: string) => void;
     onPrevious: () => void;
     onNext: () => void;
     onRefreshRun: () => void;
@@ -109,7 +111,7 @@ export function TodayDecisionQueue(props: TodayDecisionQueueProps) {
     folders, folderMode, onFolderMode, onAssignFolder, onCreateFolder, mode,
     onOpenSources, pagination,
   } = props;
-  const [query, setQuery] = useState("");
+  const [localQuery, setLocalQuery] = useState("");
   const [sort, setSort] = useState<"score" | "recent">("score");
   const [sourceFilter, setSourceFilter] = useState<"all" | SourceMode>("all");
   const [groupFilter, setGroupFilter] = useState<"all" | DecisionGroup>("all");
@@ -118,10 +120,13 @@ export function TodayDecisionQueue(props: TodayDecisionQueueProps) {
   const pendingJobs = [...jobs.filter(job => engagement[job.id] !== "ACCEPTED"), ...verificationJobs];
   const pendingShown = showVerification
     ? pendingJobs : pendingJobs.filter(job => !verificationJobs.includes(job));
+  const usesQueueSearch = Boolean(pagination?.onSearch);
+  const query = usesQueueSearch ? pagination?.searchQuery || "" : localQuery;
   const normalizedQuery = query.trim().toLocaleLowerCase();
-  const filteredPending = pendingShown
-    .filter(job => `${job.company} ${job.role} ${job.recommendation} ${Object.values(job.facts).join(" ")}`
-      .toLocaleLowerCase().includes(normalizedQuery))
+  const searchFilteredPending = usesQueueSearch ? pendingShown : pendingShown
+    .filter(job => `${job.company} ${job.role} ${job.facts["备注"] || ""}`
+      .replace(/<!--[\s\S]*?-->/g, " ").toLocaleLowerCase().includes(normalizedQuery));
+  const filteredPending = searchFilteredPending
     .filter(job => sourceFilter === "all" || job.sourceMode === sourceFilter)
     .filter(job => groupFilter === "all" || job.group === groupFilter)
     .filter(job => !onlyActionable || job.actions.length > 0);
@@ -143,9 +148,12 @@ export function TodayDecisionQueue(props: TodayDecisionQueueProps) {
   };
 
   const toolbar = <div className="concept-filter-bar">
-    <label className="concept-search"><Search/><input value={query}
-      onChange={event => setQuery(event.target.value)} placeholder="搜索职位 / 公司 / JD 关键词"
-      aria-label="搜索职位或公司"/></label>
+    <label className="concept-search"><Search/><input value={query} maxLength={120}
+      onChange={event => usesQueueSearch ? pagination?.onSearch?.(event.target.value) : setLocalQuery(event.target.value)}
+      placeholder="搜索完整队列：职位 / 公司 / JD" aria-label="搜索职位或公司"/>
+      {usesQueueSearch && query.trim() && <small className="concept-search-status" role="status">
+        {pagination?.loading ? "搜索中…" : `${pagination?.totalCount || 0} 条结果`}</small>}
+    </label>
     <label className="concept-filter-select"><span className="sr-only">数据来源</span>
       <select value={sourceFilter} onChange={event => setSourceFilter(event.target.value as "all" | SourceMode)}
         aria-label="数据来源"><option value="all">全部来源</option>
@@ -167,7 +175,7 @@ export function TodayDecisionQueue(props: TodayDecisionQueueProps) {
   </div>;
 
   return <div className="decision-home today-workspace">
-    {mode === "connected" && jobs.length === 0 ? <section className="decision-empty-source"><Database/>
+    {mode === "connected" && jobs.length === 0 && !(usesQueueSearch && query.trim()) ? <section className="decision-empty-source"><Database/>
       <div><h2>还没有可判断的职位</h2><p>TTC 是真实职位的权威来源；RDS 只保存人才数据，不会自动产生职位。请检查 TTC 连接或等待下一次同步。</p></div>
       <button className="btn primary" onClick={onOpenSources}>检查职位连接</button>
     </section> : <>
@@ -186,6 +194,7 @@ export function TodayDecisionQueue(props: TodayDecisionQueueProps) {
           policyVersion={queuePagination.policyVersion} loading={queuePagination.loading} error={queuePagination.error}
           newRunAvailable={queuePagination.newRunAvailable} onPrevious={queuePagination.onPrevious}
           onNext={queuePagination.onNext} onRefreshRun={queuePagination.onRefreshRun}
+          emptyMessage={query.trim() ? `没有找到与“${query.trim()}”匹配的推荐职位` : undefined}
           onOpen={item => { const job = queueJobs.get(item.projectId); if (job) open(job, "judgement"); }}
           onAction={(item, action) => { const job = queueJobs.get(item.projectId); if (!job) return;
             if (action === "DISMISS") { onFeedback(job); return; }

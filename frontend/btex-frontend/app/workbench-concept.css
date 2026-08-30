@@ -106,6 +106,7 @@ body.btex-document textarea{
 .concept-search svg,.concept-filter-select svg,.concept-filter-button svg{width:15px;height:15px;flex:none}
 .concept-search input{width:100%;min-width:0;border:0;outline:0;background:transparent;color:var(--concept-ink);font-size:12px}
 .concept-search input::placeholder{color:#9aa8a3}
+.concept-search-status{flex:none;white-space:nowrap;color:#6f807a;font-size:11px;font-weight:650}
 .concept-filter-select{position:relative;display:flex;align-items:center;min-width:118px;padding:0 10px}
 .concept-filter-select select{width:100%;border:0;outline:0;appearance:none;background:transparent;color:var(--concept-ink);font-size:12px;cursor:pointer}
 .concept-filter-select svg{position:absolute;right:9px;pointer-events:none}

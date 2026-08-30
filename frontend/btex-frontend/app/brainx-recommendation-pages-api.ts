@@ -100,8 +100,11 @@ export function mapRecommendationPage(payload: BackendRecommendationPage): Recom
   };
 }
 
-export async function getRecommendationPage(cursor?: string | null): Promise<RecommendationPage> {
-  const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
+export async function getRecommendationPage(cursor?: string | null, search = ""): Promise<RecommendationPage> {
+  const params = new URLSearchParams();
+  if (cursor) params.set("cursor", cursor);
+  if (search.trim()) params.set("q", search.trim());
+  const query = params.size ? `?${params.toString()}` : "";
   const payload = await brainxFetch<BackendRecommendationPage>(`/api/v1/recommendations${query}`);
   return mapRecommendationPage(payload);
 }

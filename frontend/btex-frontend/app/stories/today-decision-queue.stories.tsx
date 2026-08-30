@@ -6,6 +6,7 @@ import { TodayDecisionQueue } from "../workbench-today";
 
 const open = fn();
 const nextPage = fn();
+const searchQueue = fn();
 
 const meta = {
   title: "业务组件/今日决策队列",
@@ -56,6 +57,7 @@ export const FormalV2CardIntegration: Story = {
       pageIndex: 0, totalCount: 45, evaluatedCount: 5313, runId: "run-formal-1",
       generatedAt: "2026-08-29T08:00:00Z", policyVersion: "baseline-1.1",
       loading: false, error: null, newRunAvailable: false,
+      searchQuery: "", onSearch: searchQueue,
       onPrevious: fn(), onNext: nextPage, onRefreshRun: fn(),
     },
   },
@@ -68,6 +70,10 @@ export const FormalV2CardIntegration: Story = {
     await expect(canvas.getByLabelText("今天推进，3格信号")).toBeInTheDocument();
     await expect(canvas.getByText("事实充分")).toBeInTheDocument();
     await expect(canvas.getByText("业务群活动 · 08/29")).toBeInTheDocument();
+    const search = canvas.getByRole("textbox", { name: "搜索职位或公司" });
+    await expect(search).toHaveAttribute("placeholder", "搜索完整队列：职位 / 公司 / JD");
+    await userEvent.type(search, "A");
+    await expect(searchQueue).toHaveBeenCalledWith("A");
     const card = canvas.getByRole("article", { name: `${decisionJobs[0].role} · ${decisionJobs[0].company}` });
     await expect(card).toHaveAttribute("tabindex", "0");
     await expect(Array.from(card.querySelectorAll(".recommendation-v2-actions button"), button => button.textContent?.trim()))

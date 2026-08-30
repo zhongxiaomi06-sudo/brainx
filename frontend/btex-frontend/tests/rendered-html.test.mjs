@@ -173,6 +173,21 @@ test("preserves engagement, result recording, replay, sync and notifications", a
   assert.match(demo, /export type EngagementState = "NEW"\|"RECOMMENDED"\|"VIEWED"\|"WATCHED"\|"ACCEPTED"/);
 });
 
+test("searches the complete frozen recommendation queue instead of only the visible page", async () => {
+  const [today, workbench, pagesApi, pageHook] = await Promise.all([
+    source("app/workbench-today.tsx"), source("app/workbench.tsx"),
+    source("app/brainx-recommendation-pages-api.ts"), source("app/use-recommendation-pages.ts"),
+  ]);
+  assert.match(today, /搜索完整队列：职位 \/ 公司 \/ JD/);
+  assert.match(today, /usesQueueSearch \? pendingShown/);
+  assert.match(today, /jobs\.length === 0 && !\(usesQueueSearch && query\.trim\(\)\)/);
+  assert.doesNotMatch(today, /Object\.values\(job\.facts\)/);
+  assert.match(workbench, /searchQuery:recommendationQueue\.searchQuery,onSearch:recommendationQueue\.search/);
+  assert.match(pagesApi, /params\.set\("q", search\.trim\(\)\)/);
+  assert.match(pageHook, /getRecommendationPage\(current\.nextCursor, searchQuery\)/);
+  assert.match(pageHook, /const search = \(value: string\)/);
+});
+
 test("uses 加入项目、关注 and 开始跟进 as separate user-facing concepts", async () => {
   const [workbench, demo, editor, api] = await Promise.all([
     workbenchSource(),

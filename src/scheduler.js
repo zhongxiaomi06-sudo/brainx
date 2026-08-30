@@ -12,7 +12,7 @@ import { now } from './db.js';
 import { latestRun } from './recommend.js';
 import { latestRealSync, latestCompleteSnapshot } from './sync.js';
 import { commitmentSummary } from './engagement.js';
-import { buildDailyCard, buildSyncAlertCard, pushCard } from './push.js';
+import { buildDailyCard, buildSyncAlertCard, pushCard, syncAlertKey } from './push.js';
 
 const SLOTS = [7, 19]; //  CST 小时
 const WINDOW_MS = 30 * 60 * 1000;
@@ -44,7 +44,8 @@ export async function pushSlotFor(db, consultant_id, open_id, slotKey, { send = 
   const card = kind === 'SYNC_ALERT' ? buildSyncAlertCard(sync)
     : buildDailyCard({ consultant_name: name, consultant_id, run: run.run, items: run.items,
                        commitments: c, sync, snapshot_id: snapshot?.sync_id });
-  return pushCard(db, { consultant_id, kind, run_id: slotKey, card,
+  return pushCard(db, { consultant_id, kind,
+                        run_id: kind === 'SYNC_ALERT' ? syncAlertKey() : slotKey, card,
                         target: open_id, send }); // pushCard 为 async，返回值透传 Promise
 }
 

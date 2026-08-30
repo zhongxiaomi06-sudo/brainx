@@ -1,4 +1,5 @@
 import { currentStateMap, legalActionsForState } from './engagement.js';
+import { markServed } from './tier.js';
 import { latestRun, recommendationRun } from './recommend.js';
 import { presentationForRecommendation } from './recommendation-presentation.js';
 import { latestRealSync } from './sync.js';
@@ -151,6 +152,10 @@ export function recommendationPage(db, consultantId, { cursor = null, search = '
   const latestRunId = db.prepare(`SELECT run_id FROM decision_runs
     WHERE consultant_id=? AND status='COMPLETED'
     ORDER BY created_at DESC, rowid DESC LIMIT 1`).get(consultantId)?.run_id || null;
+
+  // 曝光回填（§2.4/§2.5）：本页真实下发的条目标 served_at；未下发永远不进负反馈统计
+  markServed(db, { run_id: selected.run.run_id, consultant_id: consultantId,
+    project_ids: entries.map(({ item }) => item.job.project_id) });
 
   return {
     blocked: false,

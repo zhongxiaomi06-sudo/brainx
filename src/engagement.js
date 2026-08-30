@@ -135,7 +135,14 @@ export function engage(db, consultant_id, project_id, action,
 
 export function legalActions(db, consultant_id, project_id) {
   const { state } = currentState(db, consultant_id, project_id);
-  return legalActionsForState(state);
+  let acts = legalActionsForState(state);
+  // 与 engage() 同一判定：冷却期/关注榜满时不 advertise 必失败的 WATCH（防死循环引导按钮）
+  if (acts.includes('WATCH')) {
+    const full = db.prepare(`SELECT COUNT(*) n FROM current_engagement
+      WHERE consultant_id=? AND state='WATCHED'`).get(consultant_id).n >= WATCH_LIMIT;
+    if (full || inCooldown(db, consultant_id, project_id)) acts = acts.filter((a) => a !== 'WATCH');
+  }
+  return acts;
 }
 
 /** 已批量取得状态时复用，避免列表逐职位重复查询状态视图。 */
@@ -174,7 +181,10 @@ export function commitmentSummary(db, consultant_id) {
   return {
     accepted_count: accepted.length, watched_count: watched.length,
     watched_limit: WATCH_LIMIT, need_action_count: need.length,
-    items: items.sort((a, b) => (a.state > b.state ? -1 : 1)),
+    items: items.sort((a, b) => {
+      if (a.state === b.state) return 0;
+      return a.state > b.state ? -1 : 1;
+    }),
   };
 }
 

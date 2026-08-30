@@ -48,7 +48,7 @@ function parseCsv(text) {
   return rows;
 }
 
-const lines = parseCsv(readFileSync(file, 'utf8'));
+const lines = parseCsv(readFileSync(file, 'utf8').replace(/^\uFEFF/, '')); // 剥 BOM：Excel「CSV UTF-8」另存必带
 const header = lines.shift().map((s) => s.trim());
 for (const c of ['consultant', 'project_id', 'label', 'reason']) {
   if (!header.includes(c)) { console.error(`CSV 缺列：${c}`); process.exit(2); }

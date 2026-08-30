@@ -69,13 +69,13 @@ export async function fetchBitablePayloadApi(token, fetchImpl = fetch) {
 
 /** 拉某群增量消息（游标之后；重叠由 message_id 主键去重）。lark-cli 通道（兼容保留）。
  * 冷启动（无游标）用 desc 拿最新一页建游标；有游标后 asc 向前走。 */
-export function fetchNewMessages(db, chat_id, execImpl = lark, consultant_id = null) {
+export async function fetchNewMessages(db, chat_id, execImpl = lark, consultant_id = null) {
   const key = cursorKey(chat_id, consultant_id);
   const cur = db.prepare('SELECT checkpoint FROM bridge_cursor WHERE source=?').get(key);
   const args = ['im', '+chat-messages-list', '--chat-id', chat_id,
     '--order', cur ? 'asc' : 'desc', '--page-size', '50', '--no-reactions', '--format', 'json'];
   if (cur) args.push('--start', toIso(cur.checkpoint));
-  const d = execImpl(args);
+  const d = await execImpl(args); // lark 是 async：缺 await 时 d 是 Promise，消息静默恒空
   const msgs = d?.data?.messages || [];
   return msgs.filter((m) => !m.deleted && m.message_id);
 }
@@ -426,7 +426,10 @@ export function startBridge(db, bus, { intervalMs, recommendFn, consultantIdsFn,
               try { result = await recommendFn(cid); } catch { /* 阻断不致命 */ }
               // 节流/阻断只复用旧轮次，不得伪装成“推荐已更新”或重复推卡。
               if (!result?.run_id || result.skipped || result.blocked) continue;
-              try { onRecommended?.(cid); } catch { /* 推卡失败不影响桥接 */ }
+              try {
+                const r = onRecommended?.(cid);
+                if (r && typeof r.catch === 'function') r.catch(() => {}); // async 闭包的 rejection 也要接住
+              } catch { /* 推卡失败不影响桥接 */ }
               bus?.emit({ type: 'recommend', consultant_id: cid, at: now() });
             }
           }
@@ -434,7 +437,8 @@ export function startBridge(db, bus, { intervalMs, recommendFn, consultantIdsFn,
         // 判定依据 sources_ok：所有源都不可达才是失败（2026-08-26 修正——
         // 「源畅通但零新增」曾被误判为全断，健康状态被无限退避 + 误报横幅）。
         // 真实部分失败（errors 非空）仍走退避；仅令牌失效不算源失败。
-        if (out.sources_ok === 0 && out.errors.length === 0) {
+        // 无人托管凭据（skipped 全员）≠ 源断：sources_ok=0 且零错误时静默跳过即可
+        if (out.sources_ok === 0 && out.errors.length === 0 && out.skipped.length === 0) {
           failed = true;
           bus?.emit({ type: 'sync_error', message: '职位源拉取失败（TTC 与 Bitable 均不可用）', at: now() });
         }

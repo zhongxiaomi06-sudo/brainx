@@ -36,7 +36,7 @@ const TOOLS = {
       consultant_id: { type: 'string' } } },
     run: ({ consultant_id: cid }) => {
       const sync = latestSync(db, cid);
-      const run = latestRun(db, cid);
+      const run = latestRun(db, cid, { hideEngaged: true });
       const c = commitmentSummary(db, cid);
       return {
         consultant_id: cid,
@@ -57,7 +57,7 @@ const TOOLS = {
       consultant_id: { type: 'string' }, limit: { type: 'number' } } },
     run: ({ consultant_id: cid, limit = 10 }) => {
       const sync = latestSync(db, cid);
-      const run = latestRun(db, cid);
+      const run = latestRun(db, cid, { hideEngaged: true });
       if (sync && !sync.complete) return { blocked: true, reason: '本次同步不完整，为避免误导，暂不生成正式推荐', items: [] };
       if (!run) return { blocked: false, empty: true, items: [] };
       return { blocked: false, run_id: run.run.run_id, policy_version: run.run.policy_version,
@@ -76,10 +76,13 @@ const TOOLS = {
       consultant_id: { type: 'string' }, project_id: { type: 'string' },
       reason: { type: 'string' }, undo: { type: 'boolean' },
       idempotency_key: { type: 'string' } } },
-    run: ({ consultant_id: cid, project_id, reason = 'agent 会话反馈', undo = false, idempotency_key }) =>
-      undo ? recommendationUndoFeedback(db, cid, { project_id })
-           : recommendationFeedback(db, cid, { project_id, feedback: 'NOT_INTERESTED', reason,
-              idempotency_key: idempotency_key || `mcp-feedback:${cid}:${project_id}` }),
+    run: ({ consultant_id: cid, project_id, reason = 'agent 会话反馈', undo = false, idempotency_key }) => {
+      // 默认键含当前快照：后续反馈走 existingForProject 更新 reason（补充原因），固定键会 already 短路
+      if (undo) return recommendationUndoFeedback(db, cid, { project_id });
+      const snap = latestRun(db, cid)?.run?.snapshot_id || 'nosnap';
+      return recommendationFeedback(db, cid, { project_id, feedback: 'NOT_INTERESTED', reason,
+        idempotency_key: idempotency_key || `mcp-feedback:${cid}:${project_id}:${snap}` });
+    },
   },
   brainx_opportunity: {
     description: '单个职位全量：事实/关系/承接状态/合法操作/事件/结果/最近推荐',
@@ -205,7 +208,7 @@ const TOOLS = {
     run: ({ consultant_id: cid }) => {
       const sync = latestSync(db, cid);
       const snapshot = latestCompleteSnapshot(db, cid);
-      const run = latestRun(db, cid);
+      const run = latestRun(db, cid, { hideEngaged: true });
       const c = commitmentSummary(db, cid);
       const name = loadConsultants(db).find((x) => x.consultant_id === cid)?.display_name || cid;
       return sync && !sync.complete ? buildSyncAlertCard(sync)

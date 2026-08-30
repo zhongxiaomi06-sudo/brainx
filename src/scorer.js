@@ -158,8 +158,9 @@ export function scoreJob(job, relation, ctx) {
   let act = null;
   if (job.active_state === 'OPEN') {
     let base = 50;
-    if (job.chat_last_at) {
-      const cd = (Date.parse(ctx.now) - chatTs(job.chat_last_at)) / 86400000;
+    const chatMs = job.chat_last_at ? chatTs(job.chat_last_at) : NaN;
+    if (Number.isFinite(chatMs)) {
+      const cd = (Date.parse(ctx.now) - chatMs) / 86400000;
       // 连续指数衰减（baseline-1.1）：替代阶梯分档（65/60/55/45/35/20）。
       // 阶梯在边界跳变（昨天 65 今天 60），且平顶段无区分度；τ=14 拟合原档位：
       // d0≈65 d1≈62 d3≈56 d7≈47 d14≈36 d30≈25 d44≈22（>30 天渐近 20，活跃假象破除保留）。
@@ -206,6 +207,9 @@ export function scoreJob(job, relation, ctx) {
 
   // 顾问级权重覆盖（ctx.weights，经 normalizeWeights 归一）优先于全局基线
   const weights = ctx.weights || WEIGHTS;
+  // NaN 护栏：脏输入算出非有限值的维记 null 按缺失处理——NaN 进 available 会把 score 算成
+  // NaN，INSERT recommendations(score REAL NOT NULL) 绑 NULL 整轮回滚，recommend 全灭。
+  for (const k of Object.keys(dims)) if (dims[k] != null && !Number.isFinite(dims[k])) dims[k] = null;
   const available = Object.entries(weights).filter(([k]) => dims[k] != null);
   const coverage = available.reduce((s, [, w]) => s + w, 0);
   const score = available.reduce((s, [k, w]) => s + dims[k] * w, 0) / (coverage || 1);
@@ -257,7 +261,10 @@ export function explain(job, relation, scored, ctx) {
   if (ctx.negative_companies?.includes(job.company)) risks.push(`该公司此前被你标记不感兴趣/暂不考虑，方向维已降权`);
   const zombieRounds = (ctx.rec_rounds?.[job.project_id] || 0);
   if (zombieRounds >= 3 && !ctx.engaged_projects?.has(job.project_id)) risks.push(`已连续 ${zombieRounds} 轮推荐未互动，活跃度降权防霸榜`);
-  if ((ctx.watched_count || 0) >= 7) risks.push(`关注榜已 ${ctx.watched_count}/10，接近上限`);
+  const capLimit = Number(ctx.capacity_limit) > 0 ? Number(ctx.capacity_limit) : CAPACITY_LIMIT;
+  if ((ctx.watched_count || 0) >= Math.max(3, Math.floor(capLimit * 0.7))) {
+    risks.push(`关注榜已 ${ctx.watched_count}/${capLimit}，接近上限`);
+  }
   if (job.hc != null && job.hc <= 1) risks.push('HC 仅剩 1，窗口小');
   if (job.hc == null) risks.push('HC 未知（飞书源无此字段，待 ATS 补齐）');
   if (b.outcomes == null) risks.push('历史结果维度缺失：冷启动期，证据覆盖率被拉低');

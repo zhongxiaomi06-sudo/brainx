@@ -41,6 +41,34 @@ test('NEW 状态可直接 ACCEPT（未触碰推荐不再强制先关注）', () 
   assert.equal(currentState(db, CID, pid).state, 'ACCEPTED');
 });
 
+test('DISMISSED 可直接 ACCEPT：冷却期只管 WATCH，不锁接单（2026-08-31 放开）', () => {
+  const db = openDb(':memory:');
+  const pid = seedRecommended(db);
+  const d = engage(db, CID, pid, 'DISMISS', { idempotency_key: `cd:${pid}`, reason: '当前没精力' });
+  assert.ok(d.ok);
+  assert.equal(currentState(db, CID, pid).state, 'DISMISSED');
+  // WATCH 仍被 30 天冷却拦（关注榜卫生，设计保留）
+  const w = engage(db, CID, pid, 'WATCH', { idempotency_key: `cw:${pid}` });
+  assert.equal(w.ok, false);
+  assert.match(w.error, /冷却期/);
+  // ACCEPT 无 confirm 仍拦（门槛不变）；带 confirm 放行
+  assert.equal(engage(db, CID, pid, 'ACCEPT', { idempotency_key: `ca0:${pid}` }).ok, false);
+  const acc = engage(db, CID, pid, 'ACCEPT', { idempotency_key: `ca1:${pid}`, confirm: true });
+  assert.ok(acc.ok, `DISMISSED→ACCEPT 应允许: ${acc.error}`);
+  assert.equal(currentState(db, CID, pid).state, 'ACCEPTED');
+});
+
+test('RELEASED 可直接 ACCEPT（结束跟进后重新接单，无需先关注）', () => {
+  const db = openDb(':memory:');
+  const pid = seedRecommended(db);
+  assert.ok(engage(db, CID, pid, 'ACCEPT', { idempotency_key: `ra:${pid}`, confirm: true }).ok);
+  assert.ok(engage(db, CID, pid, 'RELEASE', { idempotency_key: `rr:${pid}` }).ok);
+  assert.equal(currentState(db, CID, pid).state, 'RELEASED');
+  const acc = engage(db, CID, pid, 'ACCEPT', { idempotency_key: `ra2:${pid}`, confirm: true });
+  assert.ok(acc.ok, `RELEASED→ACCEPT 应允许: ${acc.error}`);
+  assert.equal(currentState(db, CID, pid).state, 'ACCEPTED');
+});
+
 test('chatTs 带秒格式（HH:mm:ss）不再静默掉 20 分', () => {
   const withSeconds = { company: 'X', role: 'Y', active_state: 'OPEN',
     chat_last_at: new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 19).replace('T', ' '), // 2 天前带秒

@@ -1,8 +1,14 @@
 /** engagement.js — 职位状态机 + 幂等 + 关注上限 + 冷却期（PRD §7）。
  *
  * 状态机：NEW→RECOMMENDED→VIEWED→WATCHED→ACCEPTED→RELEASED/COMPLETED
- *   DISMISSED 冷却 30 天（冷却后可重新关注）；WATCHED 90 天无动作 → EXPIRED；关注 ≤10。
+ *   DISMISSED 冷却 30 天（冷却约束 WATCH 关注，不约束 ACCEPT 接单）；WATCHED 90 天无动作 → EXPIRED；关注 ≤10。
  * 单一事实源 = decision_events 账本（current_engagement 视图推导）。
+ *
+ * 2026-08-31 冷却期放开（Felix 反馈：加入项目后取消/暂不考虑，再接单被锁 1 个月）：
+ *   - ACCEPT.from 补 RELEASED/DISMISSED——冷却期的设计意图是「关注榜卫生」
+ *     （防暂不考虑↔关注反复横跳污染反馈/结果标签、防 DISMISSED 职位立即弹回 ≤10 关注榜），
+ *     从来不是阻断真实接单（客户重启、HC 重开、顾问改主意都该能接，ACCEPT 自带 confirm 门槛）；
+ *   - WATCH 冷却（inCooldown 30 天）保持不变。
  *
  * 2026-08-14 前后端对齐修正：
  *   - WATCH.from 补 RELEASED/DISMISSED、DISMISS.from 补 RELEASED——与前端交付契约
@@ -29,7 +35,9 @@ const TRANSITIONS = {
   UNWATCH: { from: ['WATCHED'], to: 'VIEWED', event: 'RELEASED', note: '关注回滚' },
   // 2026-08-24 修复：EXPIRED/NEW 可直接接单——90 天过期曾无出口（永远 409），
   // 未被推荐触碰过的职位（NEW）也不应强制先关注再接单；ACCEPT 自带 confirm 门槛。
-  ACCEPT:  { from: ['NEW', 'WATCHED', 'VIEWED', 'RECOMMENDED', 'EXPIRED'], to: 'ACCEPTED', event: 'ACCEPTED', confirm: true },
+  // 2026-08-31 放开：RELEASED/DISMISSED 也可直接接单——冷却期只管 WATCH（关注榜卫生），
+  // 不阻断真实业务接单（客户重启/HC 重开/顾问改主意）；confirm 门槛不变。
+  ACCEPT:  { from: ['NEW', 'WATCHED', 'VIEWED', 'RECOMMENDED', 'EXPIRED', 'RELEASED', 'DISMISSED'], to: 'ACCEPTED', event: 'ACCEPTED', confirm: true },
   DISMISS: { from: ['NEW', 'RECOMMENDED', 'VIEWED', 'WATCHED', 'RELEASED', 'EXPIRED'], to: 'DISMISSED', event: 'DISMISSED', reason: true },
   RELEASE: { from: ['ACCEPTED'], to: 'RELEASED', event: 'RELEASED' },
   COMPLETE:{ from: ['ACCEPTED'], to: 'COMPLETED', event: 'COMPLETED' },

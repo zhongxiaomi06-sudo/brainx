@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";import { OpenmaiMarkdown } from "./openmai-markdown";
 import {
   Activity, AlertTriangle, ArrowLeft, BarChart3, Bell, BriefcaseBusiness,
   Check, ChevronDown, ChevronRight, CircleHelp, Clock3, Database, Filter,
@@ -396,7 +396,7 @@ function OpenmaiPanel({jobId,openmai,mode,onRerun}:{jobId:string;openmai:Openmai
  return <DrawerSection title="OpenMai 自动找人（开始跟进后触发）">
    {openmai.status==="running"&&<p className="muted" style={{margin:"0 0 10px"}}>找人中…约 1-2 分钟，完成后自动更新（也可关闭页面稍后回来看）。</p>}
    {openmai.status==="failed"&&<p className="muted" style={{margin:"0 0 10px",color:"#c64b59"}}>找人失败：{openmai.error||"未知错误"}</p>}
-   {openmai.status==="done"&&<pre style={{margin:"0 0 10px",padding:"12px",borderRadius:"10px",background:"rgba(23,107,88,.05)",border:"1px solid rgba(23,107,88,.18)",whiteSpace:"pre-wrap",wordBreak:"break-word",fontSize:"12px",lineHeight:"1.7",maxHeight:"420px",overflow:"auto"}}>{openmai.result_text}</pre>}
+   {openmai.status==="done"&&<OpenmaiMarkdown text={openmai.result_text||""}/>}
    <button onClick={()=>onRerun(jobId)} disabled={openmai.status==="running"} style={{border:"1px solid rgba(23,107,88,.3)",background:"#fff",color:"#215a4c",borderRadius:"999px",padding:"6px 14px",fontSize:"12px",cursor:openmai.status==="running"?"not-allowed":"pointer"}}>{openmai.status==="running"?"找人中…":"重新找人"}</button>
  </DrawerSection>
 }

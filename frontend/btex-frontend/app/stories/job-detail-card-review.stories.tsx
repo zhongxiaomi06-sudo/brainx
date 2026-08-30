@@ -193,13 +193,29 @@ export const AllPositionsEntry: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(canvas.getByRole("button", { name: /打开全部职位/ }));
-    await expect(canvas.getByRole("dialog", { name: completeJob.role })).toBeInTheDocument();
+    const dialog = canvas.getByRole("dialog", { name: completeJob.role });
+    await Promise.all(dialog.getAnimations().map(animation => animation.finished));
+    const dialogSize = () => {
+      const rect = dialog.getBoundingClientRect();
+      return { width: Math.round(rect.width), height: Math.round(rect.height) };
+    };
+    const initialSize = dialogSize();
+    await expect(dialog).toBeInTheDocument();
     await expect(canvas.getByText("TTC CRM 职位快照")).toBeInTheDocument();
     await expect(canvas.getByText("备注与职位描述")).toBeInTheDocument();
+    for (const tab of ["判断", "跟进与结果", "决策轨迹", "回放", "职位事实"]) {
+      await userEvent.click(canvas.getByRole("button", { name: tab }));
+      await expect(dialogSize()).toEqual(initialSize);
+    }
     await userEvent.click(canvas.getByRole("button", { name: "判断" }));
     await expect(canvas.getByText("评分依据")).toBeInTheDocument();
     await expect(canvas.getByText("推荐指数")).toBeInTheDocument();
     await expect(canvas.queryByText("客户真实招聘意愿")).not.toBeInTheDocument();
+    const actionFooter = canvasElement.querySelector<HTMLElement>(".job-detail-review-actions");
+    const actionButtons = [...(actionFooter?.querySelectorAll<HTMLElement>("button") || [])];
+    await expect(actionFooter).not.toBeNull();
+    await expect(actionButtons).toHaveLength(2);
+    await expect(actionButtons.every(button => button.getBoundingClientRect().width < 180)).toBe(true);
     await userEvent.click(canvas.getByRole("button", { name: "暂不考虑" }));
     await expect(canvas.queryByRole("dialog")).not.toBeInTheDocument();
     await expect(canvas.getByText("当前列表没有待处理职位")).toBeInTheDocument();

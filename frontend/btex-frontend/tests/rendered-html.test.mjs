@@ -94,7 +94,7 @@ test("uses the reference three-column shell and a single-column opportunity work
   assert.match(css, /\.drawer-section-head h2\{margin:0\}/);
 });
 
-test("splits candidates by their live engagement state and keeps verification jobs pending", async () => {
+test("keeps joined candidates visible in the recommendation queue and verification jobs pending", async () => {
   const workbench = await workbenchSource();
 
   for (const id of ["JU87P01", "J3NBVPJ", "JPG4HAS", "JNDLIXO", "JPZ5RC5", "JVS2PHH", "J90P3H0", "JBWXJ7W", "JU2GCAC", "JX3S2YU"]) {
@@ -104,8 +104,8 @@ test("splits candidates by their live engagement state and keeps verification jo
   assert.match(workbench, /"JS6ZVBW",\s*"Nooklab",\s*"DTC负责人",\s*"Offer 1 覆盖剩余 HC 1，入职未确认"/);
   assert.match(workbench, /eligibility:\s*"VERIFY_REQUIRED"/);
   assert.match(workbench, /const initialEngagement:\s*Record<string,\s*EngagementState>\s*=\s*\{[^}]*JU87P01:\s*"ACCEPTED"[^}]*JNDLIXO:\s*"ACCEPTED"[^}]*JVS2PHH:\s*"ACCEPTED"/);
-  assert.match(workbench, /const acceptedJobs\s*=\s*jobs\.filter\(job\s*=>\s*engagement\[job\.id\]\s*===\s*"ACCEPTED"\)/);
-  assert.match(workbench, /const pendingJobs\s*=\s*\[\.\.\.jobs\.filter\(job\s*=>\s*engagement\[job\.id\]\s*!==\s*"ACCEPTED"\),\s*\.\.\.verificationJobs\]/);
+  assert.doesNotMatch(workbench, /jobs\.filter\(job\s*=>\s*engagement\[job\.id\]\s*!==\s*"ACCEPTED"\)/);
+  assert.match(workbench, /const pendingJobs\s*=\s*\[\.\.\.jobs,\s*\.\.\.verificationJobs\]/);
   assert.match(workbench, /const pendingShown\s*=\s*showVerification/);
   assert.match(workbench, /const isContext\s*=\s*activeJobId\s*!==\s*null\s*&&\s*pendingShown\.some/);
   assert.match(workbench, /className=\{`formal-recommendation-v2\$\{isContext \? " is-context" : ""\}`\}/);
@@ -182,10 +182,15 @@ test("searches the complete frozen recommendation queue instead of only the visi
   assert.match(today, /usesQueueSearch \? pendingShown/);
   assert.match(today, /jobs\.length === 0 && !\(usesQueueSearch && query\.trim\(\)\)/);
   assert.doesNotMatch(today, /Object\.values\(job\.facts\)/);
-  assert.match(workbench, /searchQuery:recommendationQueue\.searchQuery,onSearch:recommendationQueue\.search/);
+  assert.match(workbench, /searchQuery:recommendationQueue\.searchQuery,onSearch:recommendationQueue\.search,sort:recommendationQueue\.sort,onSort:recommendationQueue\.changeSort/);
   assert.match(pagesApi, /params\.set\("q", search\.trim\(\)\)/);
-  assert.match(pageHook, /getRecommendationPage\(current\.nextCursor, searchQuery\)/);
+  assert.match(pagesApi, /params\.set\("sort", sort\)/);
+  assert.match(pageHook, /getRecommendationPage\(current\.nextCursor, searchQuery, sort\)/);
   assert.match(pageHook, /const search = \(value: string\)/);
+  assert.match(pageHook, /const changeSort = \(value: RecommendationSort\)/);
+  assert.match(today, /推荐优先级/);
+  assert.match(today, /最近活动/);
+  assert.match(today, /事实可信度/);
 });
 
 test("uses 加入项目、关注 and 开始跟进 as separate user-facing concepts", async () => {

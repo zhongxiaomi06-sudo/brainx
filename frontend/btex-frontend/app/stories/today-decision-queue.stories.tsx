@@ -7,6 +7,7 @@ import { TodayDecisionQueue } from "../workbench-today";
 const open = fn();
 const nextPage = fn();
 const searchQueue = fn();
+const sortQueue = fn();
 
 const meta = {
   title: "业务组件/今日决策队列",
@@ -58,6 +59,7 @@ export const FormalV2CardIntegration: Story = {
       generatedAt: "2026-08-29T08:00:00Z", policyVersion: "baseline-1.1",
       loading: false, error: null, newRunAvailable: false,
       searchQuery: "", onSearch: searchQueue,
+      sort: "priority", onSort: sortQueue,
       onPrevious: fn(), onNext: nextPage, onRefreshRun: fn(),
     },
   },
@@ -74,6 +76,8 @@ export const FormalV2CardIntegration: Story = {
     await expect(search).toHaveAttribute("placeholder", "搜索完整队列：职位 / 公司 / JD");
     await userEvent.type(search, "A");
     await expect(searchQueue).toHaveBeenCalledWith("A");
+    await userEvent.selectOptions(canvas.getByRole("combobox", { name: "职位排序" }), "recent");
+    await expect(sortQueue).toHaveBeenCalledWith("recent");
     const card = canvas.getByRole("article", { name: `${decisionJobs[0].role} · ${decisionJobs[0].company}` });
     await expect(card).toHaveAttribute("tabindex", "0");
     await expect(Array.from(card.querySelectorAll(".recommendation-v2-actions button"), button => button.textContent?.trim()))

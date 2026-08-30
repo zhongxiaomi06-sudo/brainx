@@ -57,6 +57,7 @@
 - [前端审核台账](frontend-reviews/README.md)：前端审核、正式接入、发布与真实数据验证状态的唯一权威入口。
 - [前端交互架构](frontend-interaction-architecture.md)：BrainX 页面分层、状态诚实性和核心用户动作链。
 - [推荐队列与职位决策产品架构](recommendation-queue-product-architecture.md)：完整200条推荐队列、20条分页、决策分层、卡片字段、动作闭环与全部职位进入详情规则。
+- [完整推荐队列排序复核](frontend-reviews/2026-08-30-recommendation-sort.md)：推荐优先级、最近活动、事实可信度三种服务端排序及游标稳定性证据。
 - [前端真实数据重构施工清单](frontend-refactor-construction-checklist.md)：TTC 主表、推荐策略、方向画像、导航设置与质量门禁的分阶段实施及审核边界。
 - [内部 Storybook 组件库](storybook-component-library.md)：生产组件的隔离展示、交互测试与维护规则。
 - [BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md)：产品定位、功能范围、已知问题、路线图与验收指标。

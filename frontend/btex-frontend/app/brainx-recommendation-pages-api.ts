@@ -6,6 +6,8 @@ import {
 } from "./brainx-api.ts";
 import { brainxFetch } from "./brainx-http.ts";
 
+export type RecommendationSort = "priority" | "recent" | "confidence";
+
 type BackendRecommendationPageItem = BackendRecommendation & {
   decision_tier: "TODAY" | "WEEK" | "VERIFY";
   decision_tier_reason: { code: string; text: string };
@@ -39,6 +41,7 @@ export type BackendRecommendationPage = {
   evaluated_count: number;
   total_count: number;
   page_size: number;
+  sort?: RecommendationSort;
   next_cursor: string | null;
   new_run_available: boolean;
   items: BackendRecommendationPageItem[];
@@ -54,6 +57,7 @@ export type RecommendationPage = {
   evaluatedCount: number;
   totalCount: number;
   pageSize: number;
+  sort: RecommendationSort;
   nextCursor: string | null;
   newRunAvailable: boolean;
   jobs: BrainxJob[];
@@ -93,6 +97,7 @@ export function mapRecommendationPage(payload: BackendRecommendationPage): Recom
     evaluatedCount: payload.evaluated_count,
     totalCount: payload.total_count,
     pageSize: payload.page_size,
+    sort: payload.sort || "priority",
     nextCursor: payload.next_cursor,
     newRunAvailable: payload.new_run_available,
     jobs,
@@ -100,10 +105,15 @@ export function mapRecommendationPage(payload: BackendRecommendationPage): Recom
   };
 }
 
-export async function getRecommendationPage(cursor?: string | null, search = ""): Promise<RecommendationPage> {
+export async function getRecommendationPage(
+  cursor?: string | null,
+  search = "",
+  sort: RecommendationSort = "priority",
+): Promise<RecommendationPage> {
   const params = new URLSearchParams();
   if (cursor) params.set("cursor", cursor);
   if (search.trim()) params.set("q", search.trim());
+  if (sort !== "priority") params.set("sort", sort);
   const query = params.size ? `?${params.toString()}` : "";
   const payload = await brainxFetch<BackendRecommendationPage>(`/api/v1/recommendations${query}`);
   return mapRecommendationPage(payload);

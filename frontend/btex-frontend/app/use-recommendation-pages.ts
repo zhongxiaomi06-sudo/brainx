@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { getRecommendationPage, type RecommendationPage } from "./brainx-recommendation-pages-api";
+import {
+  getRecommendationPage, type RecommendationPage, type RecommendationSort,
+} from "./brainx-recommendation-pages-api";
 
 export function useRecommendationPages(onShow: (page: RecommendationPage) => void) {
   const [pages, setPages] = useState<RecommendationPage[]>([]);
@@ -9,6 +11,7 @@ export function useRecommendationPages(onShow: (page: RecommendationPage) => voi
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [sort, setSort] = useState<RecommendationSort>("priority");
   const requestInFlight = useRef(false);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchRequest = useRef(0);
@@ -28,6 +31,7 @@ export function useRecommendationPages(onShow: (page: RecommendationPage) => voi
     setPages([page]);
     setPageIndex(0);
     setSearchQuery(query);
+    setSort(page.sort);
     setError(null);
     onShow(page);
   };
@@ -44,7 +48,7 @@ export function useRecommendationPages(onShow: (page: RecommendationPage) => voi
     requestInFlight.current = true;
     setLoading(true);
     setError(null);
-    void getRecommendationPage(current.nextCursor, searchQuery).then(page => {
+    void getRecommendationPage(current.nextCursor, searchQuery, sort).then(page => {
       if (request !== searchRequest.current) return;
       if (page.runId !== current.runId) throw new Error("推荐运行已变化，请刷新队列");
       setPages(value => [...value.slice(0, pageIndex + 1), page]);
@@ -66,7 +70,7 @@ export function useRecommendationPages(onShow: (page: RecommendationPage) => voi
     requestInFlight.current = true;
     setLoading(true);
     setError(null);
-    void getRecommendationPage(null, searchQuery).then(page => {
+    void getRecommendationPage(null, searchQuery, sort).then(page => {
       if (request !== searchRequest.current) return;
       setPages([page]);
       setPageIndex(0);
@@ -89,7 +93,7 @@ export function useRecommendationPages(onShow: (page: RecommendationPage) => voi
     if (searchTimer.current) clearTimeout(searchTimer.current);
     const request = ++searchRequest.current;
     searchTimer.current = setTimeout(() => {
-      void getRecommendationPage(null, query).then(page => {
+      void getRecommendationPage(null, query, sort).then(page => {
         if (request !== searchRequest.current) return;
         setPages([page]);
         setPageIndex(0);
@@ -100,6 +104,29 @@ export function useRecommendationPages(onShow: (page: RecommendationPage) => voi
         if (request === searchRequest.current) setLoading(false);
       });
     }, 280);
+  };
+
+  const changeSort = (value: RecommendationSort) => {
+    if (value === sort || requestInFlight.current) return;
+    const previousSort = sort;
+    const request = ++searchRequest.current;
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    setSort(value);
+    setLoading(true);
+    setError(null);
+    void getRecommendationPage(null, searchQuery, value).then(page => {
+      if (request !== searchRequest.current) return;
+      setPages([page]);
+      setPageIndex(0);
+      onShow(page);
+    }).catch(cause => {
+      if (request === searchRequest.current) {
+        setSort(previousSort);
+        setError(cause instanceof Error ? cause.message : "排序失败，请重试");
+      }
+    }).finally(() => {
+      if (request === searchRequest.current) setLoading(false);
+    });
   };
 
   useEffect(() => () => {
@@ -116,7 +143,9 @@ export function useRecommendationPages(onShow: (page: RecommendationPage) => voi
   const restore = (snapshot: { pages: RecommendationPage[]; pageIndex: number }) => {
     setPages(snapshot.pages);
     setPageIndex(snapshot.pageIndex);
+    setSort(snapshot.pages[snapshot.pageIndex]?.sort || "priority");
   };
 
-  return { pages, pageIndex, current, loading, error, searchQuery, search, reset, previous, next, refresh, markNewRun, removeJob, restore };
+  return { pages, pageIndex, current, loading, error, searchQuery, search, sort, changeSort,
+    reset, previous, next, refresh, markNewRun, removeJob, restore };
 }

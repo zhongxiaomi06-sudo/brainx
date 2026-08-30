@@ -118,6 +118,7 @@ test("maps run-bound recommendation page metadata and legal state", () => {
     evaluated_count: 5313,
     total_count: 45,
     page_size: 20,
+    sort: "recent",
     next_cursor: "cursor-20",
     new_run_available: false,
     items: [{ ...sampleRec, ...samplePresentation,
@@ -127,6 +128,7 @@ test("maps run-bound recommendation page metadata and legal state", () => {
   assert.equal(page.totalCount, 45);
   assert.equal(page.evaluatedCount, 5313);
   assert.equal(page.nextCursor, "cursor-20");
+  assert.equal(page.sort, "recent");
   assert.equal(page.engagement["P-FIX-E5FC611B"], "WATCHED");
   assert.deepEqual(page.jobs[0].brainxLegal, ["UNWATCH", "ACCEPT"]);
   assert.equal(page.jobs[0].facts["决策层级"], "VERIFY");

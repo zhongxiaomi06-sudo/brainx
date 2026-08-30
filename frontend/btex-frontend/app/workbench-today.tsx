@@ -9,6 +9,7 @@ import {
   type RecommendationQueueItem,
 } from "./recommendation-queue-v2-review";
 import type { ProjectSummary } from "./brainx-projects-api";
+import type { RecommendationSort } from "./brainx-recommendation-pages-api";
 import { PickTray } from "./workbench-pick-tray";
 import {
   decisionGroupMeta, verificationJobs, type DecisionAction, type DecisionGroup,
@@ -50,6 +51,8 @@ type TodayDecisionQueueProps = {
     newRunAvailable: boolean;
     searchQuery?: string;
     onSearch?: (query: string) => void;
+    sort?: RecommendationSort;
+    onSort?: (sort: RecommendationSort) => void;
     onPrevious: () => void;
     onNext: () => void;
     onRefreshRun: () => void;
@@ -112,15 +115,16 @@ export function TodayDecisionQueue(props: TodayDecisionQueueProps) {
     onOpenSources, pagination,
   } = props;
   const [localQuery, setLocalQuery] = useState("");
-  const [sort, setSort] = useState<"score" | "recent">("score");
+  const [localSort, setLocalSort] = useState<RecommendationSort>("priority");
   const [sourceFilter, setSourceFilter] = useState<"all" | SourceMode>("all");
   const [groupFilter, setGroupFilter] = useState<"all" | DecisionGroup>("all");
   const [onlyActionable, setOnlyActionable] = useState(false);
-  const acceptedJobs = jobs.filter(job => engagement[job.id] === "ACCEPTED");
-  const pendingJobs = [...jobs.filter(job => engagement[job.id] !== "ACCEPTED"), ...verificationJobs];
+  const pendingJobs = [...jobs, ...verificationJobs];
   const pendingShown = showVerification
     ? pendingJobs : pendingJobs.filter(job => !verificationJobs.includes(job));
   const usesQueueSearch = Boolean(pagination?.onSearch);
+  const usesQueueSort = Boolean(pagination?.onSort);
+  const sort = pagination?.sort || localSort;
   const query = usesQueueSearch ? pagination?.searchQuery || "" : localQuery;
   const normalizedQuery = query.trim().toLocaleLowerCase();
   const searchFilteredPending = usesQueueSearch ? pendingShown : pendingShown
@@ -130,13 +134,19 @@ export function TodayDecisionQueue(props: TodayDecisionQueueProps) {
     .filter(job => sourceFilter === "all" || job.sourceMode === sourceFilter)
     .filter(job => groupFilter === "all" || job.group === groupFilter)
     .filter(job => !onlyActionable || job.actions.length > 0);
-  const visiblePending = [...filteredPending].sort((left, right) => sort === "score"
-    ? Number(right.finalScore) - Number(left.finalScore)
-    : String(left.recentSignal).localeCompare(String(right.recentSignal)));
+  const visiblePending = usesQueueSort ? filteredPending : [...filteredPending].sort((left, right) => {
+    if (sort === "priority") return left.rank - right.rank;
+    if (sort === "recent") return String(right.facts["最近活动时间"] || "")
+      .localeCompare(String(left.facts["最近活动时间"] || "")) || left.rank - right.rank;
+    const confidenceOrder = { SUFFICIENT: 0, PARTIAL: 1, INSUFFICIENT: 2 };
+    return (confidenceOrder[left.facts["事实可信度"] as keyof typeof confidenceOrder] ?? 3)
+      - (confidenceOrder[right.facts["事实可信度"] as keyof typeof confidenceOrder] ?? 3)
+      || left.rank - right.rank;
+  });
   const joinedProjects = new Set(projects.map(project => project.project_id));
   const queueItems = visiblePending.map(job => toQueueItem(job, engagement[job.id], joinedProjects.has(job.id)));
   const queueJobs = new Map(visiblePending.map(job => [job.id, job]));
-  const allJobs = [...acceptedJobs, ...pendingShown];
+  const allJobs = pendingShown;
   const trayJobs = tray.map(id => allJobs.find(job => job.id === id))
     .filter((job): job is DecisionJob => Boolean(job));
   const isContext = activeJobId !== null && pendingShown.some(job => job.id === activeJobId);
@@ -169,8 +179,10 @@ export function TodayDecisionQueue(props: TodayDecisionQueueProps) {
       {onlyActionable ? "显示全部" : "可处理职位"}<Filter/>
     </button>
     <label className="concept-filter-select concept-sort"><span className="sr-only">排序</span>
-      <select value={sort} onChange={event => setSort(event.target.value as "score" | "recent")}
-        aria-label="职位排序"><option value="score">综合匹配</option><option value="recent">最新信号</option>
+      <select value={sort} onChange={event => { const value = event.target.value as RecommendationSort;
+        if (usesQueueSort) pagination?.onSort?.(value); else setLocalSort(value); }}
+        aria-label="职位排序"><option value="priority">推荐优先级</option><option value="recent">最近活动</option>
+        <option value="confidence">事实可信度</option>
       </select><ChevronDown/></label>
   </div>;
 

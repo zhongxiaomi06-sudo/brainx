@@ -78,6 +78,44 @@ test('游标翻页无重复无遗漏，末页数量正确', () => {
   assert.equal(new Set(seen).size, expected);
 });
 
+test('完整冻结队列支持推荐优先级、最近活动和事实可信度稳定排序', () => {
+  const collect = (sort) => {
+    const items = [];
+    let cursor = null;
+    do {
+      const page = recommendationPage(db, CID, { cursor, sort });
+      assert.equal(page.sort, sort);
+      items.push(...page.items);
+      cursor = page.next_cursor;
+    } while (cursor);
+    assert.equal(new Set(items.map((item) => item.job.project_id)).size, items.length);
+    return items;
+  };
+  const priority = collect('priority');
+  assert.deepEqual(priority.map((item) => item.rank), priority.map((item) => item.rank).sort((a, b) => a - b));
+
+  const recent = collect('recent');
+  const recentKeys = recent.map((item) => item.recent_activity?.occurred_at || null);
+  assert.deepEqual(recentKeys, recentKeys.slice().sort((left, right) => {
+    if (left === null) return right === null ? 0 : 1;
+    if (right === null) return -1;
+    return right.localeCompare(left);
+  }));
+
+  const confidence = collect('confidence');
+  const bands = { SUFFICIENT: 0, PARTIAL: 1, INSUFFICIENT: 2 };
+  const confidenceKeys = confidence.map((item) => bands[item.data_confidence.band]);
+  assert.deepEqual(confidenceKeys, confidenceKeys.slice().sort((a, b) => a - b));
+});
+
+test('排序方式绑定分页游标，变化后必须从第一页重新排序', () => {
+  const first = recommendationPage(db, CID, { sort: 'recent' });
+  assert.ok(first.next_cursor);
+  const mismatch = recommendationPage(db, CID, { cursor: first.next_cursor, sort: 'confidence' });
+  assert.equal(mismatch.code, 'INVALID_RECOMMENDATION_CURSOR');
+  assert.equal(recommendationPage(db, CID, { sort: 'unknown' }).code, 'INVALID_RECOMMENDATION_SORT');
+});
+
 test('搜索覆盖整轮推荐并忽略职位备注中的内部注释标记', () => {
   const first = recommendationPage(db, CID);
   const second = recommendationPage(db, CID, { cursor: first.next_cursor });
@@ -150,6 +188,7 @@ test('正式推荐接口返回同一分页契约', async () => {
     assert.equal(response.status, 200);
     const payload = await response.json();
     assert.equal(payload.page_size, RECOMMENDATION_PAGE_SIZE);
+    assert.equal(payload.sort, 'priority');
     assert.equal(payload.items.length, RECOMMENDATION_PAGE_SIZE);
     assert.equal(payload.items[0].presentation_version, 'recommendation-presentation-1.0');
     assert.ok(payload.items[0].recent_activity === null || payload.items[0].recent_activity.occurred_at);
@@ -160,6 +199,9 @@ test('正式推荐接口返回同一分页契约', async () => {
     const searched = await searchedResponse.json();
     assert.ok(searched.total_count > 0);
     assert.ok(searched.total_count <= payload.total_count);
+    const recentResponse = await fetch(`${base}/api/v1/recommendations?sort=recent`, { headers: { cookie } });
+    assert.equal(recentResponse.status, 200);
+    assert.equal((await recentResponse.json()).sort, 'recent');
   } finally {
     server.close();
     if (previous === undefined) delete process.env.BRAINX_DEV_AUTH;

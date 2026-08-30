@@ -129,7 +129,6 @@ test('影子日报：分歧 TopN 形状与位移计算', async () => {
     assert.ok(t.rule_rank >= 1 && t.shadow_rank >= 1 && t.delta >= 0);
   }
 });
-
 test('feedback 唯一索引：同三元组重复插入被拒', () => {
   assert.throws(() => {
     db.prepare(`INSERT INTO recommendation_feedback

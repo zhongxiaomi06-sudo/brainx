@@ -42,7 +42,8 @@
     "frontend:health": "node scripts/frontend-health.mjs",
     "storybook": "npm --prefix frontend/btex-frontend run storybook",
     "storybook:build": "npm --prefix frontend/btex-frontend run storybook:build",
-    "storybook:test": "npm --prefix frontend/btex-frontend run storybook:test"
+    "storybook:test": "npm --prefix frontend/btex-frontend run storybook:test",
+    "eval:ranking": "node scripts/eval-ranking.mjs"
   },
   "bin": {
     "braintex-local-sync": "bin/brainx-sync.mjs",

@@ -1,14 +1,16 @@
 /** engagement.js — 职位状态机 + 幂等 + 关注上限 + 冷却期（PRD §7）。
  *
  * 状态机：NEW→RECOMMENDED→VIEWED→WATCHED→ACCEPTED→RELEASED/COMPLETED
- *   DISMISSED 冷却 30 天（冷却约束 WATCH 关注，不约束 ACCEPT 接单）；WATCHED 90 天无动作 → EXPIRED；关注 ≤10。
+ *   DISMISSED 冷却约束 WATCH 关注（默认 30 天，BRAINX_COOLDOWN_DAYS 可调、0=暂时取消；不约束 ACCEPT 接单）；
+ *   WATCHED 90 天无动作 → EXPIRED；关注 ≤10。
  * 单一事实源 = decision_events 账本（current_engagement 视图推导）。
  *
  * 2026-08-31 冷却期放开（Felix 反馈：加入项目后取消/暂不考虑，再接单被锁 1 个月）：
  *   - ACCEPT.from 补 RELEASED/DISMISSED——冷却期的设计意图是「关注榜卫生」
  *     （防暂不考虑↔关注反复横跳污染反馈/结果标签、防 DISMISSED 职位立即弹回 ≤10 关注榜），
  *     从来不是阻断真实接单（客户重启、HC 重开、顾问改主意都该能接，ACCEPT 自带 confirm 门槛）；
- *   - WATCH 冷却（inCooldown 30 天）保持不变。
+ *   - WATCH 冷却改为 BRAINX_COOLDOWN_DAYS 可调（默认 30；同日 Felix 要求暂时取消 → 生产设 0，
+ *     恢复时删该 env 即回默认）。
  *
  * 2026-08-14 前后端对齐修正：
  *   - WATCH.from 补 RELEASED/DISMISSED、DISMISS.from 补 RELEASED——与前端交付契约
@@ -25,7 +27,9 @@ import { now, uuid } from './db.js';
 import { relationOf } from './relations.js';
 
 const WATCH_LIMIT = 10;
-const COOLDOWN_DAYS = 30;
+/** 冷却天数：默认 30（PRD §7）；BRAINX_COOLDOWN_DAYS=0 暂时取消（2026-08-31 Felix 要求放开）。
+ * 惰性读取（非模块常量）：测试与运维改 env 即时生效。 */
+const cooldownDays = () => Math.max(0, Number(process.env.BRAINX_COOLDOWN_DAYS ?? 30) || 0);
 const EXPIRE_DAYS = 90;
 
 /** 合法迁移表。to 为函数时按当前态求 next_state（VIEW 不降级 WATCHED）。 */
@@ -89,7 +93,7 @@ export function inCooldown(db, consultant_id, project_id, at = now()) {
     WHERE actor=? AND project_id=? AND event_type='DISMISSED'
     ORDER BY occurred_at DESC LIMIT 1`).get(consultant_id, project_id);
   if (!d) return null;
-  const until = new Date(Date.parse(d.occurred_at) + COOLDOWN_DAYS * 86400000).toISOString();
+  const until = new Date(Date.parse(d.occurred_at) + cooldownDays() * 86400000).toISOString();
   return until > at ? until : null;
 }
 
@@ -170,7 +174,8 @@ export function commitmentSummary(db, consultant_id) {
     active_state: jm[r.project_id]?.active_state,
     next_action: r.state === 'ACCEPTED' ? '推进交付或记录结果'
                : r.state === 'WATCHED' ? '评估后接单或取消关注'
-               : `冷却中（${COOLDOWN_DAYS} 天）`,
+               : cooldownDays() > 0 ? `冷却中（${cooldownDays()} 天）`
+               : '可重新关注或接单',
   }));
   const accepted = rows.filter((r) => r.state === 'ACCEPTED');
   const watched = rows.filter((r) => r.state === 'WATCHED');

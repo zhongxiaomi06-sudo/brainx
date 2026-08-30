@@ -69,6 +69,22 @@ test('RELEASED 可直接 ACCEPT（结束跟进后重新接单，无需先关注�
   assert.equal(currentState(db, CID, pid).state, 'ACCEPTED');
 });
 
+test('BRAINX_COOLDOWN_DAYS=0 暂时取消冷却：DISMISSED→WATCH 放行（2026-08-31）', () => {
+  const db = openDb(':memory:');
+  const pid = seedRecommended(db);
+  assert.ok(engage(db, CID, pid, 'DISMISS', { idempotency_key: `zd:${pid}`, reason: '当前没精力' }).ok);
+  process.env.BRAINX_COOLDOWN_DAYS = '0';
+  try {
+    const w = engage(db, CID, pid, 'WATCH', { idempotency_key: `zw:${pid}` });
+    assert.ok(w.ok, `冷却关闭后 DISMISSED→WATCH 应允许: ${w.error}`);
+  } finally { delete process.env.BRAINX_COOLDOWN_DAYS; }
+  // env 恢复默认 30 天后，同一职位再 DISMISS → WATCH 重新被冷却拦（开关往返）
+  assert.ok(engage(db, CID, pid, 'DISMISS', { idempotency_key: `zd2:${pid}`, reason: '当前没精力' }).ok);
+  const blocked = engage(db, CID, pid, 'WATCH', { idempotency_key: `zw2:${pid}` });
+  assert.equal(blocked.ok, false);
+  assert.match(blocked.error, /冷却期/);
+});
+
 test('chatTs 带秒格式（HH:mm:ss）不再静默掉 20 分', () => {
   const withSeconds = { company: 'X', role: 'Y', active_state: 'OPEN',
     chat_last_at: new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 19).replace('T', ' '), // 2 天前带秒

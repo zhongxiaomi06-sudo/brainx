@@ -8,12 +8,15 @@ export type AssistantChatOptions = {
   context: AssistantContext;
   signal?: AbortSignal;
 };
+/** agent 工具活动帧(SSE event: tool);协议后向兼容,老客户端可忽略。 */
+export type AssistantToolEvent = { tool: string; status: "start" | "ok"; round?: number; ms?: number };
 
 /** 只读助手流式接口；直接消费 SSE，避免通用 JSON 客户端吞掉增量。 */
 export async function streamAssistant(
   options: AssistantChatOptions,
   onText: (text: string) => void,
   onError: (message: string) => void,
+  onTool?: (event: AssistantToolEvent) => void,
 ): Promise<void> {
   const res = await fetch("/api/v1/assistant/chat", {
     method: "POST",
@@ -43,9 +46,10 @@ export async function streamAssistant(
       for (const line of lines) {
         if (!line.startsWith("data:")) continue;
         try {
-          const data = JSON.parse(line.slice(5).trim()) as { text?: string; message?: string };
+          const data = JSON.parse(line.slice(5).trim()) as { text?: string; message?: string; tool?: string; status?: "start" | "ok" };
           if (data.text) onText(data.text);
           if (data.message) onError(data.message);
+          if (data.tool && data.status) onTool?.(data as AssistantToolEvent);
         } catch { /* ignore malformed provider frame */ }
       }
       if (done) break;

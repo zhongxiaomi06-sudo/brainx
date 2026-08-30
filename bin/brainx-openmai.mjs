@@ -50,7 +50,7 @@ function usage() {
 }
 
 async function ttcFetch(path, jwt, method = 'POST', body = undefined, timeoutMs = CRM_TIMEOUT) {
-  const resp = await fetch(`${API_BASE}${path}`, {
+  const resp = await fetch(path.startsWith('http') ? path : `${API_BASE}${path}`, {
     method,
     headers: { Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json', Accept: 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),

@@ -94,6 +94,7 @@ export async function exchangeCode(code, fetchImpl = fetch) {
   if (!userToken) throw new Error('oidc/access_token 未返回 access_token');
   const r3 = await fetchImpl('https://open.feishu.cn/open-apis/authen/v1/user_info', {
     headers: { Authorization: `Bearer ${userToken}` },
+    signal: AbortSignal.timeout(45000), // 同函数前两步都有 45s 超时，这步漏了会永久悬挂
   });
   const d3 = await r3.json();
   if (d3.code !== 0) throw new Error(`user_info 失败: ${d3.msg || d3.code}`);

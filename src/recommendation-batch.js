@@ -14,6 +14,14 @@ function batchFor(db, consultantId, snapshotId, size = LIMIT) {
       (batch_id, consultant_id, snapshot_id, cursor, size, created_at, updated_at)
       VALUES (?,?,?,?,?,?,?)`).run(batchId, consultantId, snapshotId, 0, Math.min(size, LIMIT), at, at);
     batch = db.prepare('SELECT * FROM recommendation_batches WHERE batch_id=?').get(batchId);
+  } else {
+    // 后续更大的 size 请求不被创建时值静默锁死
+    const want = Math.min(size, LIMIT);
+    if (want > batch.size) {
+      db.prepare('UPDATE recommendation_batches SET size=?, updated_at=? WHERE batch_id=?')
+        .run(want, now(), batch.batch_id);
+      batch = { ...batch, size: want };
+    }
   }
   return batch;
 }
@@ -97,7 +105,8 @@ export function undoFeedback(db, consultantId, body) {
   }
   const run = latestRun(db, consultantId);
   if (!run) return { ok: false, status: 409, code: 'NO_RECOMMENDATION', message: '暂无完整推荐快照' };
+  // 不分快照全删：isHidden 判定本就不看 snapshot_id，只删当前快照行会让旧行继续隐藏 → 撤销假成功
   const removed = db.prepare(`DELETE FROM recommendation_feedback
-    WHERE consultant_id=? AND project_id=? AND snapshot_id=?`).run(consultantId, body.project_id, run.run.snapshot_id);
+    WHERE consultant_id=? AND project_id=?`).run(consultantId, body.project_id);
   return { ok: true, removed: removed.changes > 0, replacement: pickTray(db, consultantId, { limit: LIMIT }) };
 }

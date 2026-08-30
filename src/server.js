@@ -80,8 +80,7 @@ export function createServer(db = openDb(), deps = {}) {
         .map((c) => ({ consultant_id: c.consultant_id, display_name: c.display_name })) });
     },
 
-    // —— 人才库（MySQL 人才库，异步；连不通自动内存回退）——
-    // 注意：人才库读写独立于 SQLite 决策库，绝不进入职位/客户基础评分。
+    // —— 人才库（MySQL 异步，连不通自动内存回退；读写独立于决策库，绝不进基础评分）——
     'GET /api/v1/talent/status': async (req, res, cid) => {
       try { json(res, 200, { ...(await talentBackendStatus()), supply_enabled: talentSupplyEnabled() }); }
       catch (e) { err(res, 502, 'TALENT_BACKEND_ERROR', String(e.message).slice(0, 200)); }
@@ -225,7 +224,7 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
     'GET /api/v1/workbench': (req, res, cid) => {
       const sync = latestRealSync(db, cid);
       const bridgeErr = latestBridgeError(db, cid, sync?.completed_at || '');
-      const run = latestRun(db, cid);
+      const run = latestRun(db, cid, { hideEngaged: true });
       const c = commitmentSummary(db, cid);
       json(res, 200, {
         consultant_id: cid,
@@ -446,7 +445,8 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       const st = currentState(db, cid, id)?.state;
       if (!['ACCEPTED', 'COMPLETED'].includes(st)) return err(res, 404, 'NOT_FOUND', '职位不存在或未接单');
       const cur = getOpenmaiResult(db, cid, id);
-      if (cur.status === 'running') return err(res, 409, 'RUNNING', '找人在进行中，请等待完成后再试');
+      const staleMs = Date.now() - Date.parse(cur.started_at || 0); // 超 60min 视为僵死放行（曾永久 409）
+      if (cur.status === 'running' && !(Number.isFinite(staleMs) && staleMs > 60 * 60 * 1000)) return err(res, 409, 'RUNNING', '找人在进行中，请等待完成后再试');
       const out = startOpenmaiTask(db, bus, cid, id, { force: true });
       json(res, 200, { ok: true, openmai: out });
     },
@@ -524,7 +524,7 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
     'POST /api/v1/push/preview': (req, res, cid) => {
       const sync = latestRealSync(db, cid);
       const snapshot = latestCompleteSnapshot(db, cid);
-      const run = latestRun(db, cid);
+      const run = latestRun(db, cid, { hideEngaged: true });
       const c = commitmentSummary(db, cid);
       const name = loadConsultants(db).find((x) => x.consultant_id === cid)?.display_name || cid;
       const card = sync && !sync.complete
@@ -538,7 +538,7 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       const b = await body(req);
       const sync = latestRealSync(db, cid);
       const snapshot = latestCompleteSnapshot(db, cid);
-      const run = latestRun(db, cid);
+      const run = latestRun(db, cid, { hideEngaged: true });
       const c = commitmentSummary(db, cid);
       const name = loadConsultants(db).find((x) => x.consultant_id === cid)?.display_name || cid;
       const kind = sync && !sync.complete ? 'SYNC_ALERT' : 'DAILY_TOP3';

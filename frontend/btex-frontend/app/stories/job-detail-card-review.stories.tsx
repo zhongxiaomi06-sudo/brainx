@@ -104,13 +104,13 @@ function EntryHarness({ mode, initialJob = completeJob }: { mode: "today" | "all
           {mode === "today" ? "TODAY DECISION" : "ALL POSITIONS"}
         </small>
         <h1 style={{ margin: "10px 0 24px", fontSize: 28 }}>
-          {mode === "today" ? "今日决策" : "全部职位"}
+          {mode === "today" ? "精选盘" : "全部职位"}
         </h1>
         {jobs.map((job) => mode === "today" ? (
           <button
             key={job.projectId}
             type="button"
-            aria-label={`打开今日决策职位：${job.role}`}
+            aria-label={`打开精选盘职位：${job.role}`}
             onClick={() => setSelected(job)}
             style={{ width: 360, padding: 22, border: "1px solid #d9e5e0", borderRadius: 18, background: "#fff", textAlign: "left", cursor: "pointer", boxShadow: "0 8px 26px rgba(27,55,46,.08)" }}
           >
@@ -152,11 +152,11 @@ function EntryHarness({ mode, initialJob = completeJob }: { mode: "today" | "all
 }
 
 export const TodayDecisionEntry: Story = {
-  name: "从今日决策打开",
+  name: "从精选盘打开",
   render: () => <EntryHarness mode="today" />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await userEvent.click(canvas.getByRole("button", { name: /打开今日决策职位/ }));
+    await userEvent.click(canvas.getByRole("button", { name: /打开精选盘职位/ }));
     await expect(canvas.getByRole("dialog", { name: completeJob.role })).toBeInTheDocument();
     await expect(canvas.getByText("核心职位事实")).toBeInTheDocument();
     await expect(canvas.getByText("寻访")).toBeInTheDocument();

@@ -39,6 +39,9 @@ export type RecommendationQueueItem = {
   currentStage: string | null;
   recentActivity: { label: string; occurredAt: string | null } | null;
   pipeline: string | null;
+  score: number | string;
+  evidenceCoverage: number | null;
+  explorationScore: number | string;
   reasons: RecommendationReason[];
   risk: string | null;
   confidence: RecommendationConfidence;
@@ -89,6 +92,11 @@ function displayDate(value: string | null) {
   return new Intl.DateTimeFormat("zh-CN", { month: "2-digit", day: "2-digit" }).format(date);
 }
 
+function displayCoverage(value: number | null) {
+  if (value === null) return "—";
+  return `${Math.round(value <= 1 ? value * 100 : value)}%`;
+}
+
 function DecisionPriorityBadge({ tier }: { tier: RecommendationDecisionTier }) {
   const meta = tierMeta[tier];
   return <span className={`recommendation-tier is-${tier.toLowerCase()}`} aria-label={`${meta.label}，${meta.signal}格信号`}>
@@ -126,6 +134,11 @@ function RecommendationCard({ item, onOpen, onAction }: {
     </header>
 
     <div className="recommendation-v2-body">
+      <dl className="recommendation-v2-scores" aria-label="评分参考">
+        <div><dt>AI 匹配分</dt><dd>{display(item.score)}</dd></div>
+        <div><dt>证据覆盖</dt><dd>{displayCoverage(item.evidenceCoverage)}</dd></div>
+        <div><dt>探索价值</dt><dd>{display(item.explorationScore)}</dd></div>
+      </dl>
       <dl className="recommendation-v2-facts">
         <div><dt>关系</dt><dd>{display(item.relation)}</dd></div>
         <div><dt>状态</dt><dd>{display(item.activeState)}</dd></div>

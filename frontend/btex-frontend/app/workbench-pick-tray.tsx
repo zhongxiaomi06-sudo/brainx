@@ -122,7 +122,7 @@ export function PickTray({
             <b>文件夹</b>
           </div>
           <button className="btn quiet" onClick={onFolderMode}>
-            <Sparkles />返回精选盘
+            <Sparkles />返回已收藏
           </button>
         </div>
         <div className="folder-create">
@@ -169,10 +169,10 @@ export function PickTray({
 
   const showcaseJobs = (trayJobs.length ? trayJobs : featuredJobs).slice(0, 4);
   return (
-    <section className="pick-tray concept-showcase" aria-label="精选盘">
+    <section className="pick-tray concept-showcase" aria-label="已收藏职位">
       <div className="pick-tray-head">
         <div className="pick-tray-title">
-          <b>精选盘</b>
+          <b>已收藏</b>
           <span className="decision-zone-kicker">MY PICK TRAY</span>
           <em>{trayJobs.length ? `${trayJobs.length} 已收藏` : "推荐预览"}</em>
         </div>
@@ -241,8 +241,8 @@ function ShowcaseCard({
           if (selected) onRemove();
           else onToggle();
         }}
-        aria-label={selected ? `从精选盘移除 ${job.company}` : `收藏 ${job.company}`}
-        title={selected ? "移出精选盘" : "收藏到精选盘"}
+        aria-label={selected ? `从已收藏移除 ${job.company}` : `收藏 ${job.company}`}
+        title={selected ? "移出已收藏" : "收藏职位"}
       >
         {selected ? <Check /> : <Star />}
       </button>

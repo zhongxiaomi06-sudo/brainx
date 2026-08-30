@@ -6,7 +6,7 @@ import {
 } from "./brainx-api.ts";
 import { brainxFetch } from "./brainx-http.ts";
 
-export type RecommendationSort = "priority" | "recent" | "confidence";
+export type RecommendationSort = "priority" | "activity" | "recent" | "confidence" | "exploration";
 
 type BackendRecommendationPageItem = BackendRecommendation & {
   decision_tier: "TODAY" | "WEEK" | "VERIFY";

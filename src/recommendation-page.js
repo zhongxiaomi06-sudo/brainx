@@ -4,7 +4,7 @@ import { presentationForRecommendation } from './recommendation-presentation.js'
 import { latestRealSync } from './sync.js';
 
 export const RECOMMENDATION_PAGE_SIZE = 20;
-export const RECOMMENDATION_SORTS = ['priority', 'recent', 'confidence'];
+export const RECOMMENDATION_SORTS = ['priority', 'activity', 'recent', 'confidence', 'exploration'];
 
 function normalizeSearch(value) {
   return String(value || '').trim().normalize('NFKC').toLocaleLowerCase('zh-CN').slice(0, 120);
@@ -46,7 +46,9 @@ function decodeCursor(value) {
     }
     const sort = normalizeSort(parsed.sort);
     if (!sort || (sort === 'recent' && parsed.after_value !== null && typeof parsed.after_value !== 'string')
-        || (sort === 'confidence' && !Number.isInteger(parsed.after_value))) return null;
+        || (sort === 'confidence' && !Number.isInteger(parsed.after_value))
+        || (['activity', 'exploration'].includes(sort) && parsed.after_value !== null
+          && typeof parsed.after_value !== 'number')) return null;
     return { ...parsed, search: normalizeSearch(parsed.search), sort };
   } catch {
     return null;
@@ -58,6 +60,12 @@ function sortValue(entry, sort) {
   if (sort === 'confidence') {
     return { SUFFICIENT: 0, PARTIAL: 1, INSUFFICIENT: 2 }[entry.presentation.data_confidence.band] ?? 3;
   }
+  if (sort === 'activity') {
+    return entry.item.breakdown?.find((dimension) => dimension.dim === 'activity')?.score ?? null;
+  }
+  if (sort === 'exploration') {
+    return entry.item.breakdown?.find((dimension) => dimension.dim === 'exploration')?.score ?? null;
+  }
   return entry.item.rank;
 }
 
@@ -66,11 +74,11 @@ function compareSortKeys(leftValue, leftRank, rightValue, rightRank, sort) {
   if (leftValue === null && rightValue !== null) return 1;
   if (leftValue !== null && rightValue === null) return -1;
   if (leftValue !== rightValue) {
-    return sort === 'recent'
-      ? String(rightValue).localeCompare(String(leftValue))
-      : Number(leftValue) - Number(rightValue);
+    if (sort === 'recent') return String(rightValue).localeCompare(String(leftValue));
+    if (sort === 'confidence') return Number(leftValue) - Number(rightValue);
+    return Number(rightValue) - Number(leftValue);
   }
-  return leftRank - rightRank;
+  return sort === 'exploration' ? rightRank - leftRank : leftRank - rightRank;
 }
 
 function compareEntries(left, right, sort) {

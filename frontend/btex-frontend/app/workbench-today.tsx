@@ -12,8 +12,7 @@ import type { ProjectSummary } from "./brainx-projects-api";
 import type { RecommendationSort } from "./brainx-recommendation-pages-api";
 import { PickTray } from "./workbench-pick-tray";
 import {
-  decisionGroupMeta, verificationJobs, type DecisionAction, type DecisionGroup,
-  type DecisionJob, type PickFolder, type SourceMode,
+  verificationJobs, type DecisionAction, type DecisionJob, type PickFolder,
 } from "./workbench-model";
 
 type TodayDecisionQueueProps = {
@@ -92,6 +91,9 @@ function toQueueItem(job: DecisionJob, engagement: EngagementState | undefined, 
       ? { label: job.facts["最近活动"], occurredAt: job.facts["最近活动时间"] || null }
       : null,
     pipeline: job.facts["历史 Pipeline"] || null,
+    score: job.finalScore,
+    evidenceCoverage: job.evidenceCoverage,
+    explorationScore: job.explorationScore,
     reasons: job.scoreNotes.slice(0, 2).map((text, index) => ({
       code: `FORMAL_REASON_${index + 1}`,
       text,
@@ -116,8 +118,6 @@ export function TodayDecisionQueue(props: TodayDecisionQueueProps) {
   } = props;
   const [localQuery, setLocalQuery] = useState("");
   const [localSort, setLocalSort] = useState<RecommendationSort>("priority");
-  const [sourceFilter, setSourceFilter] = useState<"all" | SourceMode>("all");
-  const [groupFilter, setGroupFilter] = useState<"all" | DecisionGroup>("all");
   const [onlyActionable, setOnlyActionable] = useState(false);
   const pendingJobs = [...jobs, ...verificationJobs];
   const pendingShown = showVerification
@@ -131,11 +131,13 @@ export function TodayDecisionQueue(props: TodayDecisionQueueProps) {
     .filter(job => `${job.company} ${job.role} ${job.facts["备注"] || ""}`
       .replace(/<!--[\s\S]*?-->/g, " ").toLocaleLowerCase().includes(normalizedQuery));
   const filteredPending = searchFilteredPending
-    .filter(job => sourceFilter === "all" || job.sourceMode === sourceFilter)
-    .filter(job => groupFilter === "all" || job.group === groupFilter)
     .filter(job => !onlyActionable || job.actions.length > 0);
   const visiblePending = usesQueueSort ? filteredPending : [...filteredPending].sort((left, right) => {
     if (sort === "priority") return left.rank - right.rank;
+    if (sort === "activity") return Number(right.globalScore) - Number(left.globalScore)
+      || left.rank - right.rank;
+    if (sort === "exploration") return Number(right.explorationScore) - Number(left.explorationScore)
+      || right.rank - left.rank;
     if (sort === "recent") return String(right.facts["最近活动时间"] || "")
       .localeCompare(String(left.facts["最近活动时间"] || "")) || left.rank - right.rank;
     const confidenceOrder = { SUFFICIENT: 0, PARTIAL: 1, INSUFFICIENT: 2 };
@@ -164,26 +166,17 @@ export function TodayDecisionQueue(props: TodayDecisionQueueProps) {
       {usesQueueSearch && query.trim() && <small className="concept-search-status" role="status">
         {pagination?.loading ? "搜索中…" : `${pagination?.totalCount || 0} 条结果`}</small>}
     </label>
-    <label className="concept-filter-select"><span className="sr-only">数据来源</span>
-      <select value={sourceFilter} onChange={event => setSourceFilter(event.target.value as "all" | SourceMode)}
-        aria-label="数据来源"><option value="all">全部来源</option>
-        <option value="COCKPIT_CONTEXT">驾驶舱</option><option value="MARKET_ONLY">职位市场</option>
-      </select><ChevronDown/></label>
-    <label className="concept-filter-select"><span className="sr-only">推荐阶段</span>
-      <select value={groupFilter} onChange={event => setGroupFilter(event.target.value as "all" | DecisionGroup)}
-        aria-label="推荐阶段"><option value="all">推荐阶段</option>
-        {Object.entries(decisionGroupMeta).map(([value, meta]) => <option key={value} value={value}>{meta.title}</option>)}
+    <label className="concept-filter-select"><span className="sr-only">队列视图</span>
+      <select value={sort} onChange={event => { const value = event.target.value as RecommendationSort;
+        if (usesQueueSort) pagination?.onSort?.(value); else setLocalSort(value); }} aria-label="队列视图">
+        <option value="priority">综合推荐</option><option value="activity">推进活跃</option>
+        <option value="recent">最近活跃</option><option value="confidence">事实优先</option>
+        <option value="exploration">探索发现</option>
       </select><ChevronDown/></label>
     <button type="button" className={`concept-filter-button${onlyActionable ? " is-active" : ""}`}
       aria-pressed={onlyActionable} onClick={() => setOnlyActionable(value => !value)}>
       {onlyActionable ? "显示全部" : "可处理职位"}<Filter/>
     </button>
-    <label className="concept-filter-select concept-sort"><span className="sr-only">排序</span>
-      <select value={sort} onChange={event => { const value = event.target.value as RecommendationSort;
-        if (usesQueueSort) pagination?.onSort?.(value); else setLocalSort(value); }}
-        aria-label="职位排序"><option value="priority">推荐优先级</option><option value="recent">最近活动</option>
-        <option value="confidence">事实可信度</option>
-      </select><ChevronDown/></label>
   </div>;
 
   return <div className="decision-home today-workspace">
@@ -216,7 +209,7 @@ export function TodayDecisionQueue(props: TodayDecisionQueueProps) {
             open(job, "engagement");
           }} />
       </section>}
-      <details className="saved-picks"><summary><span>精选盘</span>
+      <details className="saved-picks"><summary><span>已收藏</span>
         <small>{trayJobs.length ? `已收藏 ${trayJobs.length} 个职位` : "从上方列表收藏职位，稍后逐个判断"}</small>
         <ChevronDown/></summary><PickTray trayJobs={trayJobs} featuredJobs={visiblePending.slice(0, 4)}
           allJobs={allJobs} folderMode={folderMode} onFolderMode={onFolderMode} folders={folders}

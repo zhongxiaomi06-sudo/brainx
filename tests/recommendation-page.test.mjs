@@ -78,7 +78,7 @@ test('游标翻页无重复无遗漏，末页数量正确', () => {
   assert.equal(new Set(seen).size, expected);
 });
 
-test('完整冻结队列支持推荐优先级、最近活动和事实可信度稳定排序', () => {
+test('完整冻结队列支持五种非空视图稳定排序', () => {
   const collect = (sort) => {
     const items = [];
     let cursor = null;
@@ -94,6 +94,15 @@ test('完整冻结队列支持推荐优先级、最近活动和事实可信度�
   const priority = collect('priority');
   assert.deepEqual(priority.map((item) => item.rank), priority.map((item) => item.rank).sort((a, b) => a - b));
 
+  const activity = collect('activity');
+  const activityKeys = activity.map((item) => item.breakdown
+    .find((dimension) => dimension.dim === 'activity')?.score ?? null);
+  assert.deepEqual(activityKeys, activityKeys.slice().sort((left, right) => {
+    if (left === null) return right === null ? 0 : 1;
+    if (right === null) return -1;
+    return right - left;
+  }));
+
   const recent = collect('recent');
   const recentKeys = recent.map((item) => item.recent_activity?.occurred_at || null);
   assert.deepEqual(recentKeys, recentKeys.slice().sort((left, right) => {
@@ -106,6 +115,15 @@ test('完整冻结队列支持推荐优先级、最近活动和事实可信度�
   const bands = { SUFFICIENT: 0, PARTIAL: 1, INSUFFICIENT: 2 };
   const confidenceKeys = confidence.map((item) => bands[item.data_confidence.band]);
   assert.deepEqual(confidenceKeys, confidenceKeys.slice().sort((a, b) => a - b));
+
+  const exploration = collect('exploration');
+  const explorationKeys = exploration.map((item) => item.breakdown
+    .find((dimension) => dimension.dim === 'exploration')?.score ?? null);
+  assert.deepEqual(explorationKeys, explorationKeys.slice().sort((left, right) => {
+    if (left === null) return right === null ? 0 : 1;
+    if (right === null) return -1;
+    return right - left;
+  }));
 });
 
 test('排序方式绑定分页游标，变化后必须从第一页重新排序', () => {
@@ -202,6 +220,9 @@ test('正式推荐接口返回同一分页契约', async () => {
     const recentResponse = await fetch(`${base}/api/v1/recommendations?sort=recent`, { headers: { cookie } });
     assert.equal(recentResponse.status, 200);
     assert.equal((await recentResponse.json()).sort, 'recent');
+    const explorationResponse = await fetch(`${base}/api/v1/recommendations?sort=exploration`, { headers: { cookie } });
+    assert.equal(explorationResponse.status, 200);
+    assert.equal((await explorationResponse.json()).sort, 'exploration');
   } finally {
     server.close();
     if (previous === undefined) delete process.env.BRAINX_DEV_AUTH;

@@ -237,7 +237,7 @@ try {
   await page.getByText("TTC 职位系统", { exact: true }).waitFor({ state: "visible" });
   assert.match(await page.locator("main").innerText(), /真实职位来源/);
   await page.getByRole("button", { name: "返回应用" }).click();
-  await page.getByRole("button", { name: "今日决策", exact: true }).click();
+  await page.getByRole("button", { name: "精选盘", exact: true }).click();
   await page.getByRole("heading", { name: /推荐队列|还没有可判断的职位/ }).waitFor({ state: "visible" });
 
   const mobile = await context.newPage();

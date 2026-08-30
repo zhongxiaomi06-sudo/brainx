@@ -71,7 +71,7 @@
 > 本节记录当前已实现能力。推荐队列、决策分层、卡片信息和动作闭环的目标产品架构，以[推荐队列与职位决策产品架构](recommendation-queue-product-architecture.md)为准；现有 Top20 与综合分展示不得被理解为已经完成目标架构。
 - **六维确定性评分**：`FinalScore = ProcessScore×60% + ExplorationScore×25% + PersonalScore×15%`，同批输入同排序，禁随机数；UNKNOWN 关系硬阻断；FILLED/CLOSED/EXCLUDE 出榜。
 - **快照闸门**：同步不完整 → 推荐 blocked 不落库，前端出「数据不完整」提示。
-- **推荐分页**：精选盘 pick tray + 下一批 + 不感兴趣反馈（含撤销/补充原因）。
+- **推荐分页**：已收藏职位 + 下一批 + 不感兴趣反馈（含撤销/补充原因）。
 - **冻结回放**：任何一轮推荐可完整回放（decision_id），同一快照 + 同一 policy_version → 同一 Top20。
 - 规模实证：984 职位 / 680 轮 / 612,595 条冻结推荐 / 7 顾问。
 

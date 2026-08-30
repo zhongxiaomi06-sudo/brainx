@@ -130,7 +130,7 @@ export function ProjectsView({ projects, query, setQuery, focusedProjectId, open
             <button type="button" onClick={() => open(project)}>{actionLabel(project)}<ChevronRight /></button>
           </div>
         </article>;
-      }) : <div className="empty projects-empty"><Search /><b>{isFiltered ? "当前条件下没有项目" : "还没有加入任何项目"}</b><p>{isFiltered ? "切换状态或修改搜索内容。" : "从今日决策或全部职位点击“加入我的项目”。"}</p></div>}
+      }) : <div className="empty projects-empty"><Search /><b>{isFiltered ? "当前条件下没有项目" : "还没有加入任何项目"}</b><p>{isFiltered ? "切换状态或修改搜索内容。" : "从精选盘或全部职位点击“加入我的项目”。"}</p></div>}
     </div>
   </div>;
 }

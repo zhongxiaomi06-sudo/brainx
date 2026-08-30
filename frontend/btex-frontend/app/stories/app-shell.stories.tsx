@@ -66,7 +66,7 @@ function ShellReviewHarness() {
       onNavigate={setPage}
       assistantOpen={assistantOpen}
       onAssistantToggle={() => setAssistantOpen(value => !value)}
-      assistant={<div className="shell-assistant-preview"><p>助手按需出现，只读取当前页面上下文。</p><div>当前页面：{page === "today" ? "今日决策" : page}</div></div>}
+      assistant={<div className="shell-assistant-preview"><p>助手按需出现，只读取当前页面上下文。</p><div>当前页面：{page === "today" ? "精选盘" : page}</div></div>}
     >
       {page === "today" ? <TodayBlocks /> : (
         <div className="shell-settings-page"><header><p className="shell-review-kicker">WORKSPACE</p><h1>{page === "jobs" ? "全部职位" : page === "projects" ? "我的项目" : "客户洞察"}</h1><p>{pageCopy[page]}</p></header><section className="shell-review-section">此阶段只审核页面归属和大板块，不改造内部业务组件。</section></div>
@@ -91,7 +91,7 @@ export const MainBlocksReview: Story = {
     await userEvent.click(canvas.getByRole("button", { name: "返回应用" }));
     await userEvent.click(canvas.getByRole("button", { name: "全部职位" }));
     await expect(canvas.getByRole("heading", { name: "全部职位" })).toBeInTheDocument();
-    await userEvent.click(canvas.getByRole("button", { name: "今日决策" }));
+    await userEvent.click(canvas.getByRole("button", { name: "精选盘" }));
     await expect(canvas.getByRole("heading", { name: "待判断职位" })).toBeInTheDocument();
   },
 };

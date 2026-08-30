@@ -57,7 +57,7 @@ test("uses the reference three-column shell and a single-column opportunity work
 
   assert.match(page, /import DecisionWorkbench from "\.\/workbench"/);
   assert.match(workbench, /type DecisionDirection = "paid"\s*\|\s*"growth"\s*\|\s*"marketing"/);
-  assert.match(workbench, /id: "today", label: "今日决策", icon: Sparkles/);
+  assert.match(workbench, /id: "today", label: "精选盘", icon: Sparkles/);
   assert.match(workbench, /<WorkspaceShell activePage=\{shellPage\}/);
   assert.match(workbench, /page==="settings"\?<WorkbenchSettingsPage/);
   assert.doesNotMatch(workbench, /page==="settings"&&<WorkbenchSettingsPage/);
@@ -71,7 +71,7 @@ test("uses the reference three-column shell and a single-column opportunity work
   assert.match(workbench, /<RecommendationQueueV2Review items=\{queueItems\}/);
   assert.doesNotMatch(workbench, /today-brief|今天只处理最值得推进的职位|TODAY&apos;S DECISIONS/);
   assert.match(workbench, /onOpen=\{item => \{ const job = queueJobs\.get\(item\.projectId\); if \(job\) open\(job, "judgement"\); \}\}/);
-  assert.match(workbench, /aria-label="精选盘"/);
+  assert.match(workbench, /aria-label="已收藏职位"/);
   assert.match(css, /\.pick-tray/);
   assert.match(css, /grid-template-columns:216px minmax\(0,1fr\)/);
   assert.match(css, /touch-action:manipulation/);
@@ -188,9 +188,12 @@ test("searches the complete frozen recommendation queue instead of only the visi
   assert.match(pageHook, /getRecommendationPage\(current\.nextCursor, searchQuery, sort\)/);
   assert.match(pageHook, /const search = \(value: string\)/);
   assert.match(pageHook, /const changeSort = \(value: RecommendationSort\)/);
-  assert.match(today, /推荐优先级/);
-  assert.match(today, /最近活动/);
-  assert.match(today, /事实可信度/);
+  assert.doesNotMatch(today, /aria-label="数据来源"/);
+  assert.match(today, /综合推荐/);
+  assert.match(today, /推进活跃/);
+  assert.match(today, /最近活跃/);
+  assert.match(today, /事实优先/);
+  assert.match(today, /探索发现/);
 });
 
 test("uses 加入项目、关注 and 开始跟进 as separate user-facing concepts", async () => {

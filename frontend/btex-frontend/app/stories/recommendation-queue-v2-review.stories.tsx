@@ -26,6 +26,9 @@ function itemAt(index: number): RecommendationQueueItem {
     currentStage: rank % 3 === 0 ? "面试" : "寻访",
     recentActivity: { label: rank % 3 === 0 ? "新增面试" : "职位事实更新", occurredAt: "2026-08-28T09:00:00+08:00" },
     pipeline: rank % 3 === 0 ? "推荐 8 · 面试 2" : "寻访 12 · 推荐 3",
+    score: 96 - rank / 2,
+    evidenceCoverage: rank % 6 === 0 ? 68 : 92,
+    explorationScore: rank % 5 === 0 ? 100 : 50,
     reasons: [
       { code: "NEXT_ACTION_READY", text: "存在明确的下一步动作，可以直接开始推进。", evidence: "驾驶舱下一动作", occurredAt: "2026-08-28T09:00:00+08:00" },
       { code: "PIPELINE_RECENT", text: "近期 Pipeline 有可核验的真实变化。", evidence: "TTC Pipeline 快照", occurredAt: "2026-08-27T15:20:00+08:00" },
@@ -73,8 +76,9 @@ export const FirstPage: Story = {
     await expect(canvas.getByText("更新时间：", { exact: false })).toHaveTextContent("08/28");
     await expect(canvas.queryByText("DECISION QUEUE · V2")).not.toBeInTheDocument();
     await expect(canvas.getAllByText("为什么值得看")[0]).toBeInTheDocument();
-    await expect(canvas.queryByText("AI 匹配分")).not.toBeInTheDocument();
-    await expect(canvas.queryByText("探索价值")).not.toBeInTheDocument();
+    await expect(canvas.getAllByText("AI 匹配分")[0]).toBeInTheDocument();
+    await expect(canvas.getAllByText("证据覆盖")[0]).toBeInTheDocument();
+    await expect(canvas.getAllByText("探索价值")[0]).toBeInTheDocument();
     const firstCard = canvas.getByRole("article", { name: "高级算法工程师 · 脱敏客户 A" });
     await expect(within(firstCard).getByLabelText("今天推进，3格信号")).toBeInTheDocument();
     await expect(within(firstCard).queryByRole("button", { name: "查看 高级算法工程师 判断" })).not.toBeInTheDocument();

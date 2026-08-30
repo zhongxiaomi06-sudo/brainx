@@ -7,11 +7,9 @@ import {
   ArrowRight,
   BriefcaseBusiness,
   Check,
-  Clock3,
   Eye,
   MapPin,
   RefreshCw,
-  ShieldCheck,
 } from "lucide-react";
 import "./recommendation-queue-v2-review.css";
 
@@ -75,11 +73,6 @@ const tierMeta: Record<RecommendationDecisionTier, { label: string; signal: numb
   WEEK: { label: "本周观察", signal: 2 },
   VERIFY: { label: "待核验", signal: 1 },
 };
-const confidenceLabel: Record<RecommendationConfidence, string> = {
-  SUFFICIENT: "事实充分",
-  PARTIAL: "部分事实待确认",
-  INSUFFICIENT: "事实不足",
-};
 function display(value: string | number | null | undefined) {
   if (value === null || value === undefined || value === "" || value === "UNKNOWN") return "待确认";
   return String(value);
@@ -111,8 +104,6 @@ function RecommendationCard({ item, onOpen, onAction }: {
 }) {
   const [busy, setBusy] = useState<RecommendationCardAction | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
-  const reasons = item.reasons.slice(0, 2);
-  const risk = item.risk || "暂未发现阻断风险";
   const perform = async (action: RecommendationCardAction) => {
     if (busy) return;
     setBusy(action);
@@ -147,16 +138,6 @@ function RecommendationCard({ item, onOpen, onAction }: {
         <div><dt>最近活动</dt><dd>{item.recentActivity ? `${item.recentActivity.label}${item.recentActivity.occurredAt ? ` · ${displayDate(item.recentActivity.occurredAt)}` : ""}` : "待确认"}</dd></div>
         <div><dt>Pipeline</dt><dd>{display(item.pipeline)}</dd></div>
       </dl>
-
-      <section className="recommendation-v2-reasons">
-        <h4>为什么值得看</h4>
-        {reasons.length ? <ol>{reasons.map(reason => <li key={reason.code}><span>{reason.text}</span><small>{reason.evidence}{reason.occurredAt ? ` · ${displayDate(reason.occurredAt)}` : ""}</small></li>)}</ol> : <p>暂无已验证推荐理由</p>}
-        {reasons.length === 1 && <small className="recommendation-v2-missing">暂无第二条已验证理由</small>}
-      </section>
-      <aside className="recommendation-v2-assessment" aria-label="判断状态">
-        <div className={`recommendation-v2-risk${item.risk ? "" : " is-clear"}`}><AlertTriangle /><span><b>{item.risk ? "需要注意" : "风险检查"}</b><small>{risk}</small></span></div>
-        <div className="recommendation-v2-confidence"><ShieldCheck /><span><b>{confidenceLabel[item.confidence]}</b><small><Clock3 />{item.factsUpdatedAt ? `${displayDate(item.factsUpdatedAt)} 更新` : "更新时间待确认"}</small></span></div>
-      </aside>
     </div>
 
     <footer onClick={event => event.stopPropagation()}>

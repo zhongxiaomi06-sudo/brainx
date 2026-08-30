@@ -70,7 +70,9 @@ export const FormalV2CardIntegration: Story = {
     await expect(canvas.getByRole("heading", { name: "推荐队列" })).toBeInTheDocument();
     await expect(canvas.getByText("参与计算 5313 · 已显示 1–1 / 45")).toBeInTheDocument();
     await expect(canvas.getByLabelText("今天推进，3格信号")).toBeInTheDocument();
-    await expect(canvas.getByText("事实充分")).toBeInTheDocument();
+    await expect(canvas.queryByText("事实充分")).not.toBeInTheDocument();
+    await expect(canvas.queryByText("为什么值得看")).not.toBeInTheDocument();
+    await expect(canvas.queryByText("需要注意")).not.toBeInTheDocument();
     await expect(canvas.getByText("业务群活动 · 08/29")).toBeInTheDocument();
     const search = canvas.getByRole("textbox", { name: "搜索职位或公司" });
     await expect(search).toHaveAttribute("placeholder", "搜索完整队列：职位 / 公司 / JD");

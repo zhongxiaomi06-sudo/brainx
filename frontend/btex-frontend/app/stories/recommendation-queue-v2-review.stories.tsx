@@ -75,7 +75,9 @@ export const FirstPage: Story = {
     await expect(canvas.getByText("岗位数量：", { exact: false })).toHaveTextContent("45");
     await expect(canvas.getByText("更新时间：", { exact: false })).toHaveTextContent("08/28");
     await expect(canvas.queryByText("DECISION QUEUE · V2")).not.toBeInTheDocument();
-    await expect(canvas.getAllByText("为什么值得看")[0]).toBeInTheDocument();
+    await expect(canvas.queryByText("为什么值得看")).not.toBeInTheDocument();
+    await expect(canvas.queryByText("需要注意")).not.toBeInTheDocument();
+    await expect(canvas.queryByLabelText("判断状态")).not.toBeInTheDocument();
     await expect(canvas.getAllByText("AI 匹配分")[0]).toBeInTheDocument();
     await expect(canvas.getAllByText("证据覆盖")[0]).toBeInTheDocument();
     await expect(canvas.getAllByText("探索价值")[0]).toBeInTheDocument();
@@ -128,7 +130,7 @@ export const MissingFacts: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getAllByText("待确认").length).toBeGreaterThanOrEqual(5);
-    await expect(canvas.getByText("暂无第二条已验证理由")).toBeInTheDocument();
+    await expect(canvas.queryByText("暂无第二条已验证理由")).not.toBeInTheDocument();
     await expect(canvas.queryByRole("button", { name: "加入我的项目" })).not.toBeInTheDocument();
   },
 };
@@ -155,8 +157,8 @@ export const StaleFacts: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByLabelText("待核验，1格信号")).toBeInTheDocument();
-    await expect(canvas.getByText("事实不足")).toBeInTheDocument();
-    await expect(canvas.getByText("职位事实已超过有效窗口，请先核验招聘状态和 HC。")).toBeInTheDocument();
+    await expect(canvas.queryByText("事实不足")).not.toBeInTheDocument();
+    await expect(canvas.queryByText("职位事实已超过有效窗口，请先核验招聘状态和 HC。")).not.toBeInTheDocument();
   },
 };
 

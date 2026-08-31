@@ -110,7 +110,10 @@ test('数据隔离：source_mode 唯一权威=cockpit_facts 行存在；报告�
   assert.equal(sourceModeOf(db, pid).source_mode, 'COCKPIT_CONTEXT');
   const rep = isolationReport(db);
   assert.ok(rep.totals.cockpit_context >= 1 && rep.weak_ownership.count >= 1);
-  assert.equal(rep.same_company_shadow.count, 0);
+  // shadow 对 = 同公司 market-only 行 × 异 pid 驾驶舱行(WHERE NOT EXISTS 排除自身):
+  // 插入 cockpit(pid) 后 pid 绝不得出现在 market 侧;count 取决于 fixture 里同公司兄弟行数,
+  // 不断言具体值(#41 后 Top1 公司有 2 行,旧断言 count===0 随数据漂移失效)。
+  assert.ok(rep.same_company_shadow.pairs.every((p) => p.market_pid !== pid));
 });
 
 test('影子日报：分歧 TopN 形状与位移计算', async () => {

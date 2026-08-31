@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Native 猎头工作流 · 技术架构图</title>
+<style>
+  :root{
+    --brainx:#2563eb; --reloop:#059669; --ai:#0891b2; --ext:#7c3aed; --data:#b45309;
+    --bg:#f8fafc; --card:#fff; --ink:#0f172a; --muted:#64748b; --line:#e2e8f0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--ink);padding:28px}
+  .wrap{max-width:1240px;margin:0 auto}
+  h1{font-size:22px;text-align:center}
+  .sub{text-align:center;color:var(--muted);font-size:13px;margin-top:6px}
+  .layer{margin-top:18px}
+  .layer-title{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+  .layer-title .bar{width:6px;height:18px;border-radius:3px}
+  .layer-title h2{font-size:14px}
+  .layer-title small{color:var(--muted);font-size:12px}
+  .boxes{display:flex;gap:12px;flex-wrap:wrap}
+  .box{flex:1;min-width:230px;background:var(--card);border:1.5px solid var(--line);border-radius:12px;padding:12px 14px}
+  .box h3{font-size:13px;display:flex;align-items:center;gap:6px}
+  .box ul{list-style:none;margin-top:8px;font-size:11.5px;color:#334155;line-height:1.75}
+  .box ul li::before{content:"· ";color:var(--muted)}
+  .badge{font-size:9.5px;padding:1px 7px;border-radius:99px;color:#fff;font-weight:400}
+  .b-now{background:#166534} .b-temp{background:#b45309} .b-final{background:var(--ext)} .b-gap{background:#dc2626}
+  .flow-down{text-align:center;color:#94a3b8;font-size:16px;line-height:1;margin:6px 0}
+  .bridge-band{margin-top:18px;background:linear-gradient(90deg,#eff6ff,#ecfdf5,#fdf4ff);border:1px solid var(--line);border-radius:12px;padding:12px 16px}
+  .bridge-band h2{font-size:13px;margin-bottom:8px}
+  .bridge-items{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:8px;font-size:12px;line-height:1.6}
+  .bridge-items div{background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 12px}
+  .bridge-items b{color:var(--ext)}
+  .warn{color:#dc2626;font-weight:700}
+  .ok{color:#166534;font-weight:700}
+  footer{text-align:center;margin-top:24px;font-size:11px;color:var(--muted);line-height:1.8}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10.5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>AI Native 猎头工作流 · 技术架构图</h1>
+<div class="sub">2026-08-31 v1.1 · 五层结构 · 两产品三套桥 · Felix v0 素材事实已回填</div>
+
+<!-- 入口层 -->
+<div class="layer">
+  <div class="layer-title"><span class="bar" style="background:var(--ext)"></span><h2>① 入口层</h2><small>用户触达面:前端是临时载体,对话是终态</small></div>
+  <div class="boxes">
+    <div class="box" style="border-color:var(--brainx)"><h3>B-tex Web 工作台 <span class="badge b-temp">临时载体</span></h3><ul>
+      <li>今日决策(冻结推荐 Top200 + 理由/风险)</li><li>我的项目(行动/截止/阻塞/下一步)</li><li>统一职位详情 · 客户洞察 · 助手抽屉</li></ul></div>
+    <div class="box" style="border-color:var(--ext)"><h3>飞书机器人(对话入口) <span class="badge b-final">终态</span></h3><ul>
+      <li>对话里:查 Top3 / 接单 / 推人 / 录结果</li><li>推送卡片:今日推荐 + 行动提醒(已上线)</li><li>触发插件完成操作,无需跳页面</li></ul></div>
+    <div class="box" style="border-color:var(--reloop)"><h3>reloop Web + TalentLens 扩展 <span class="badge b-now">已上线</span></h3><ul>
+      <li>推荐列表(双因子同屏 + 排序滑块)</li><li>人才详情:公司库补充 + 简历文本卡片</li><li>扩展:猎聘/直聘/脉脉/领英撞库 + 拦截自动入库</li></ul></div>
+  </div>
+</div>
+<div class="flow-down">▼</div>
+
+<!-- 产品服务层 -->
+<div class="layer">
+  <div class="layer-title"><span class="bar" style="background:var(--brainx)"></span><h2>② 产品服务层</h2><small>两个产品,各自独立部署,桥接互联</small></div>
+  <div class="boxes">
+    <div class="box" style="border-color:var(--brainx)"><h3>BrainX(职位决策)</h3><ul>
+      <li><span class="mono">bin/ 15 CLI</span>:sync / recommend / engage / push / outcome / replay…(天然插件化)</li>
+      <li><span class="mono">mcp/ MCP server</span>:15 只读工具 + 承接/结果写工具</li>
+      <li>推荐引擎:方向画像硬筛 + 冻结运行(200 条,可回放)</li>
+      <li>承接模型:VIEW/WATCH/ACCEPT/RELEASE + commitment_actions</li>
+      <li>助手 agent:src/agent/(step-3.7-flash + 技能)</li>
+      <li>存储:SQLite <span class="mono">data/brainx.db</span>(事件账本)</li></ul></div>
+    <div class="box" style="border-color:var(--reloop)"><h3>reloop(人选匹配与触达)</h3><ul>
+      <li>FastAPI + SQLAlchemy;RDS MySQL <span class="mono">reloop_app</span></li>
+      <li>两阶段推荐:初筛秒出(纯本地)+ 后台 LLM 精算,缓存栈 <span class="mono">recommend_runs</span></li>
+      <li>双因子:活跃度(事件衰减)× 匹配度(LLM Top30 + 五维结构化)</li>
+      <li>同步编排:TTC 分页拉取 → 归一化 → LLM 增强 → 按 owner 隔离</li>
+      <li>飞书 OAuth 扫码登录,token Fernet 加密</li></ul></div>
+  </div>
+</div>
+<div class="flow-down">▼</div>
+
+<!-- AI 能力层 -->
+<div class="layer">
+  <div class="layer-title"><span class="bar" style="background:var(--ai)"></span><h2>③ AI 能力层</h2><small>可插拔;连续失败自动熔断,降级本地算法,全流程离线可跑</small></div>
+  <div class="boxes">
+    <div class="box" style="border-color:var(--ai)"><h3>OpenMai 寻访</h3><ul><li>BrainX 接单自动触发,结果落 <span class="mono">openmai_results</span></li><li>= 循环第 ② 步"获取简历"的自动通道</li></ul></div>
+    <div class="box" style="border-color:var(--ai)"><h3>LLM 服务(OpenAI 兼容)</h3><ul>
+      <li>简历结构化 / embedding 向量(降级:本地哈希)</li><li>职位名语义相似度(去重分批+缓存)</li><li>JD×简历批量评分(Top30,分位校准)</li><li>逐人联系理由生成(并发 8)</li></ul></div>
+    <div class="box" style="border-color:var(--ai)"><h3>蒸馏知识库 <span class="badge b-gap">建设中</span></h3><ul>
+      <li>Felix v0 素材稿:约 35%,待本人确认</li><li>已证:接单/承接/简历搜寻/事实维护/结果回流</li><li>缺口:推荐报告/面试辅导/offer → 回填话术与判断</li></ul></div>
+  </div>
+</div>
+<div class="flow-down">▼</div>
+
+<!-- 数据源层 -->
+<div class="layer">
+  <div class="layer-title"><span class="bar" style="background:var(--data)"></span><h2>④ 数据源层</h2><small>TTC 保存权威事实;两产品只读 + 各自沉淀行为账本</small></div>
+  <div class="boxes">
+    <div class="box" style="border-color:var(--data)"><h3>TTC CRM</h3><ul><li>职位事实(状态/HC/阶段/Pipeline)</li><li>人才私域池(共享池 token + 每用户凭据)</li><li>⚠️ PDF 简历接口被 TTC 服务端卡死(R7,外部依赖)</li></ul></div>
+    <div class="box" style="border-color:var(--data)"><h3>飞书</h3><ul><li>群消息(项目群留痕,job_messages)</li><li>机器人推送卡片 + 对话入口</li><li>OAuth 身份(两产品统一登录)</li></ul></div>
+    <div class="box" style="border-color:var(--data)"><h3>招聘网站(经扩展)</h3><ul><li>猎聘/直聘/脉脉/领英页面撞库</li><li>网络捕获身份,不依赖 URL</li><li>DNR 硬拦 3 个写接口(只匹配不入库)</li></ul></div>
+  </div>
+</div>
+
+<!-- 桥接带 -->
+<div class="bridge-band">
+  <h2>⑤ 两产品三套桥(9/3 – 9/10 施工)</h2>
+  <div class="bridge-items">
+    <div><b>桥 1 · 接单 → 建岗</b><br>BrainX <span class="mono">ACCEPTED</span> 事件 → reloop 自动建岗位(positions,上限 10 策略待定)→ 触发双因子推荐。<span class="warn">9/3-9/4 联调</span></div>
+    <div><b>桥 2 · 推荐 → 对话推人</b><br>reloop TopN + 联系理由 → 飞书机器人 → 人审后发。话术库来自蒸馏。<span class="warn">9/8 打通</span></div>
+    <div><b>桥 3 · 结果 → 双写回流</b><br>推人回复 → BrainX <span class="mono">job_outcomes</span> + reloop <span class="mono">interaction_records</span>,不成功触发下一轮。前置:修 reloop <span class="warn">BUG-101/103</span>(反馈丢失)。<span class="ok">BrainX record_outcome 已就绪</span></div>
+  </div>
+</div>
+
+<footer>依据:BrainX 最终交付蓝图 / 推荐队列产品架构;reloop README / 架构评审 2026-08-28 / gap-audit 2026-08-30 / Felix v0 素材稿 · 配套:工作流架构图(同目录 architecture-workflow.html)<br>安全基线:业务表 owner_user_id 隔离 · 生产强制 X-Auth-Token · 脱敏先于输出(蒸馏铁律 7)</footer>
+</div>
+</body>
+</html>

@@ -2,6 +2,16 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-01｜build(workflow): 接入 spec-kit 规范驱动研发流程
+
+- 改动：安装 github/spec-kit specify CLI v1.0.4（uv tool，仓库外），在仓库根初始化 `.specify/`（模板/scripts/workflow）与 `.codebuddy/commands/`（10 个 /speckit.* 命令）；把 constitution 模板填成 BrainX 工程原则 v1.0.0（零依赖、账本先行、安全边界不可协商、规格先行、最小 diff 五条 + 时间盒/成本/权限最小集约束）；新增 `docs/standards/SPEC_DRIVEN_WORKFLOW.md` 说明用法与 AGENTS.md 分工。
+- 验证：`specify --version` 输出 1.0.4.dev0；init 产物 30 文件结构检查正常；constitution 为纯文档无代码影响。
+
+## 2026-09-01｜docs(prd): 复用与自建边界及权限需求 PRD
+
+- 改动：基于 30 个仓库 GitHub API 逐仓核实结果——新增 `prd-2026-09-01-reuse-selfbuild-boundary.md`：三色总判断（直接可用/借鉴设计/必须自建）、Step 0-7 逐步"可用代码+借鉴+自建+所需权限+可避开项"、必须自建七件事清单（账本/状态机/五信任域/能力令牌/权限引擎/投影/Saga）、权限最小集（飞书 3+1 项 + MySQL 只读 + reloop token）、明确不采用清单（LangBot 仅兜底、lark-openapi-mcp 停更一年、文档导出全家桶避开、死链级项目点名）；蓝图新增 §9.2 核实修订（勘误三个仓库名大小写、移除停维护项、新增 larksuite/cli 与 LangBot 等核实数据）；README 登记两个新文档、spec-kit 流程文档与任务路由。
+- 验证：`git diff --check` 通过；PRD 内外链与表格渲染检查正常；核实数据来自本日 GitHub API 查询会话，仓库地址以 API 返回为准。
+
 ## 2026-09-01｜docs(architecture): 蓝图补 §9.1 GitHub 同类开源项目映射
 
 - 改动：回应"GitHub 有没有同类开源项目、可直接用的代码仓库"，全网搜索后在蓝图新增 §9.1，分四类映射：A 同类产品（open_recruiter/Resume-Matcher/ai-job-search/TalentWizard——抄业务与交互设计）；B SQLite 持久执行引擎（sledge 账本设计一一对应、reflow-ts 唯一零依赖可直装候选、durabletasks 生产参考、拒绝 Postgres 系）；C 飞书侧（官方 node-sdk + lark-samples 直接用）；D Agent 权限治理（Cedar 抄模型不引引擎、awesome-ai-agent-governance 作索引）。总判断：直接可装 3+1 件；抄设计 3 家；五信任域投影/disclosure_bundles/Case 双轴无人可抄必须自建。

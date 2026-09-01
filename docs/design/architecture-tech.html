@@ -29,7 +29,7 @@
 <body>
 <div class="wrap">
   <h1>AI Native 猎头工作流 · 技术架构图</h1>
-  <div class="sub">2026-09-01 v1.2 · 五层架构 · Workflow Hub 是契约与持久事件层，不是第三套业务产品</div>
+  <div class="sub">2026-09-01 v1.3 · 五层架构 · Workflow Hub 是契约与持久事件层，不是第三套业务产品</div>
 
   <section class="layer">
     <div class="title"><span class="bar" style="background:var(--hub)"></span><h2>① 入口层</h2><small>页面是工作面，对话是动作入口；所有写动作仍经过领域守卫</small></div>
@@ -67,7 +67,7 @@
     <div class="title"><span class="bar" style="background:var(--ai)"></span><h2>④ AI、知识与证据层</h2><small>AI 读投影和证据引用；建议本身也可回放</small></div>
     <div class="boxes">
       <div class="box" style="border-color:var(--ai)"><h3>OpenMai / LLM</h3><ul><li>sourcing run、简历结构化、匹配解释、话术与下一行动草稿</li><li>ai.context_built / shown / accepted / edited / rejected</li></ul></div>
-      <div class="box" style="border-color:var(--ai)"><h3>蒸馏知识库 <span class="badge draft">分级发布</span></h3><ul><li>Felix v0.5：确认项与待确认项分离</li><li>Miya v0：仅 DRAFT，不进入自动执行规则</li><li>DRAFT → CONFIRMED → PUBLISHED → RETIRED</li></ul></div>
+      <div class="box" style="border-color:var(--ai)"><h3>蒸馏知识库 <span class="badge live">本人确认</span></h3><ul><li>Felix v0.5 / Miya v0：均为 CONFIRMED</li><li>确认状态 ≠ 自动执行授权；细节缺口单独标注</li><li>DRAFT → CONFIRMED → PUBLISHED → RETIRED</li></ul></div>
       <div class="box" style="border-color:var(--data)"><h3>Evidence Store / PII Vault</h3><ul><li>简历、消息、录音、附件只存 evidence_ref</li><li>TTL、访问审计、candidate data key、删除与 crypto-shredding</li></ul></div>
     </div>
   </section>
@@ -96,7 +96,7 @@
     <div class="note"><b>首日指标：</b>source freshness、event lag、DLQ depth、case SLA violations、saga stuck count。</div>
     <div class="note"><b>不可逆边界：</b>错合并可拆分；阶段回退只发 correction；旧事件只 upcast 不改写；未确认知识不自动执行。</div>
   </div>
-  <footer>权威方案：docs/workflow-hub-architecture.md · 素材：Felix v0.5（部分本人确认）/ Miya v0（待本人确认） · 配套：architecture-workflow.html</footer>
+  <footer>权威方案：docs/workflow-hub-architecture.md · 素材：Felix v0.5 / Miya v0（均为本人确认） · 配套：architecture-workflow.html</footer>
 </div>
 </body>
 </html>

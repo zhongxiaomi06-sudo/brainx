@@ -2,6 +2,11 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-02｜feat(hub): US2 消费者幂等事务模板 + processed_events 主键修正
+
+- 改动：按 tasks.md T009-T010 测试先行——新增 `tests/hub-consumer.test.mjs`（4 用例：恰好一次执行、已标记跳过零副作用、不同消费者各自幂等、崩溃注入回滚后重放与恰好一次一致）；实现 `src/hub/consumer.js`（consumeOnce：BEGIN IMMEDIATE 内二次确认→fn(db)→标记→COMMIT，抛错整体回滚）。测试暴露 0024 契约矛盾（event_id 单列 PK 使"不同消费者各自幂等"失效）：新增 `migrations/0028_processed_events_pk_fix.sql` 重建为复合主键（迁移 append-only 不改写 0024），并同步修正 data-model.md 契约与修正记录。
+- 验证：测试先行确认初始失败（第二消费者标记触发 UNIQUE 冲突）；`node --test tests/hub-consumer.test.mjs` 4/4 通过；0028 在 :memory: 迁移链自动应用。
+
 ## 2026-09-02｜feat(hub): US1 事件只落账一次（信封校验 + 幂等账本）
 
 - 改动：按 tasks.md T006-T008 测试先行落地——新增 `tests/hub-event-log.test.mjs`（5 用例：重复 idem_key 幂等、1000 次投递恒 1 行、并发双连接唯一索引兜底、信封缺字段拒绝、payload 超 64KB 拒绝）与 fixtures `tests/fixtures/step0/`；实现 `src/hub/envelope.js`（zod 信封 schema + validateEnvelope，evidence_refs 仅 {table,id} 引用）与 `src/hub/event-log.js`（appendEvent：校验→64KB 上限→INSERT，唯一冲突读回既有行，≤80 行）。package.json 引入 zod（蓝图 §6.2 采购清单既定项）。

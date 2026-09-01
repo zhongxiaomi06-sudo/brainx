@@ -21,16 +21,19 @@ CREATE INDEX IF NOT EXISTS idx_wel_case ON workflow_event_log(case_id, occurred_
 -- append-only：不提供 UPDATE/DELETE 路径；修正以补偿事件表达
 ```
 
-## processed_events（0024）
+## processed_events（0024 + 0028 修正）
 
 ```sql
 CREATE TABLE IF NOT EXISTS processed_events (
-  event_id      TEXT PRIMARY KEY,
+  event_id      TEXT NOT NULL,
   consumer_name TEXT NOT NULL,               -- e.g. bridge1-push-person
   processed_at  TEXT NOT NULL,
-  UNIQUE(event_id, consumer_name)            -- 不同消费者各自幂等
+  PRIMARY KEY (event_id, consumer_name)      -- 不同消费者各自幂等
 );
 ```
+
+> 修正记录：0024 初版误写 `event_id TEXT PRIMARY KEY` 单列主键，与"不同消费者各自幂等"矛盾，
+> 由 hub-consumer 测试暴露，0028 重建为复合主键（迁移 append-only，不改写已落地迁移）。
 
 ## entity_links（0025）
 

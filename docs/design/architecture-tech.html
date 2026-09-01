@@ -18,6 +18,13 @@
   .bridge{margin-top:17px;background:linear-gradient(90deg,#eff6ff,#ecfdf5,#faf5ff);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
   .bridge h2{font-size:13px}.gate{margin:7px 0;background:#fff7ed;border:1px dashed #fb923c;border-radius:8px;padding:7px 10px;font-size:10.5px;color:#9a3412}
   .status-strip{margin-top:12px;background:#fef2f2;border:1.5px dashed var(--danger);border-radius:10px;padding:9px 13px;font-size:10.6px;line-height:1.65;color:#7f1d1d}.status-strip b{color:var(--danger)}
+  .timeline{margin:10px 0 0;display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:10.8px;color:#42526a}
+  .timeline b{color:var(--hub);font-size:11.5px}
+  .timeline span{border:1px solid var(--line);border-radius:99px;padding:3px 10px;background:#fff}
+  .timeline .hot{border-color:#fb923c;background:#fff7ed;color:#9a3412;font-weight:600}
+  .timeline .fin{border-color:#c4b5fd;background:#f5f3ff;color:#4c1d95;font-weight:600}
+  .chips{display:flex;flex-wrap:wrap;gap:5px;margin:6px 0 2px}
+  .chips span{border:1px solid #c4b5fd;background:#faf5ff;border-radius:99px;padding:3px 10px;font-size:10.3px;color:#4c1d95}
   .bridge-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
   .bridge-card{background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:10.4px;line-height:1.55}
   .bridge-card b{display:block;color:var(--hub);font-size:11px}
@@ -30,8 +37,17 @@
 <body>
 <div class="wrap">
   <h1>AI Native 猎头工作流 · 技术架构图</h1>
-  <div class="sub">2026-09-01 v1.4 · 五层架构 · Workflow Hub 是契约与持久事件层，不是第三套业务产品 · 本版新增施工现状对照</div>
+  <div class="sub">2026-09-01 v1.5 · 五层架构 · Workflow Hub 是契约与持久事件层，不是第三套业务产品 · 本版新增决赛时间线与第 0 步最小集清单</div>
   <div class="status-strip"><b>施工现状（2026-09-01 代码审计）：</b>本图描述目标架构，不等于已实现。第 0 步不可逆边界落地率 <b>0%</b>——workflow_event_log、entity_links、case_id、processed_events、upcaster 在 migrations/src/tests 全部零命中；reloop / position_id 在 BrainX 代码零命中；openmai_results 仍是覆盖式 Markdown（正命中权威方案 §3 禁止项）；BrainX SQLite 与人才库 MySQL 物理分库，project_id ↔ position_id 暂无落点。</div>
+  <div class="timeline"><b>D-13 · 9/1 → 9/14</b>
+    <span>9/2 架构图 × York 对齐 + Felix 确认访谈</span>
+    <span class="hot">9/3 🚀 全员真实使用</span>
+    <span>9/4 桥 1 联调</span>
+    <span class="hot">9/8 推人循环打通</span>
+    <span>9/11 联排① + 录 demo</span>
+    <span>9/12 联排② + 物料</span>
+    <span class="fin">9/14 🏁 决赛</span>
+  </div>
 
   <section class="layer">
     <div class="title"><span class="bar" style="background:var(--hub)"></span><h2>① 入口层</h2><small>页面是工作面，对话是动作入口；所有写动作仍经过领域守卫</small></div>
@@ -86,7 +102,16 @@
 
   <section class="bridge">
     <h2>三座桥 = 三组 Saga</h2>
-    <div class="gate"><b>桥 1 上线前门禁：</b>先完成 envelope、entity_links、Case 状态机、消费者幂等、upcaster/DLQ，并用 fixtures 回放成功、失败、超时、重复、乱序和补偿。施工窗口 9/3–9/4 不等于跳过门禁。<b>现状：</b>上述前置项代码落地率 0%，9/4 联调前须先补第 0 步最小集（事件信封 + 持久账本 + entity_links + 桥 1 事件族 + fixtures 回放）。</div>
+    <div class="gate"><b>桥 1 上线前门禁：</b>先完成 envelope、entity_links、Case 状态机、消费者幂等、upcaster/DLQ，并用 fixtures 回放成功、失败、超时、重复、乱序和补偿。施工窗口 9/3–9/4 不等于跳过门禁。<b>现状：</b>上述前置项代码落地率 0%，9/4 联调前须先补第 0 步最小集。</div>
+    <div class="gate" style="border-style:solid;background:#faf5ff;border-color:#c4b5fd;color:#4c1d95"><b>第 0 步最小集（9/4 桥 1 联调前的五项交付）：</b>
+      <div class="chips">
+        <span>① 事件信封 + workflow_event_log 迁移</span>
+        <span>② entity_links + 人工确认队列</span>
+        <span>③ 桥 1 事件族（requested / created / failed / timed_out）</span>
+        <span>④ processed_events 消费者幂等</span>
+        <span>⑤ fixtures 回放六场景（成功/失败/超时/重复/乱序/补偿）</span>
+      </div>
+    </div>
     <div class="bridge-grid">
       <div class="bridge-card"><b>桥 1 · 接单 → 建岗</b> <span class="badge draft">上游已实现 · Saga/下游 0%</span><span class="mono">job.accepted → position.create_requested → created | failed | timed_out</span><br>成功写 project_id ↔ position_id；释放后发 close_requested 补偿。<br><b>现状：</b>engagement ACCEPTED 状态机已有；position.create_requested 无人发出，reloop 侧零代码。</div>
       <div class="bridge-card"><b>桥 2 · Case → 审核 → 推人</b> <span class="badge draft">触发已有 · 结构化未做</span><span class="mono">candidates.ready → case.created → draft → consent → approved → sent</span><br>9/8 目标；送达失败用 <span class="err">bounced</span>，不能混为无回应。<br><b>现状：</b>接单已自动触发 OpenMai，但结果存 openmai_results 覆盖式 Markdown，无 sourcing run / candidate_ref / case。</div>
@@ -98,7 +123,7 @@
     <div class="note"><b>首日指标：</b>source freshness、event lag、DLQ depth、case SLA violations、saga stuck count。</div>
     <div class="note"><b>不可逆边界：</b>错合并可拆分；阶段回退只发 correction；旧事件只 upcast 不改写；未确认知识不自动执行。</div>
   </div>
-  <footer>权威方案：docs/workflow-hub-architecture.md · 素材：Felix v0.5 / Miya v0（均为本人确认） · 配套：architecture-workflow.html · 施工现状来源：2026-09-01 Workflow Hub 架构完整度代码审计（grep migrations/src/tests/scripts/bin）</footer>
+  <footer>权威方案：docs/workflow-hub-architecture.md · 素材：Felix v0.5 / Miya v0（均为本人确认） · 配套：architecture-workflow.html · 时间线来源：week-plan-brainx-reloop.html · 施工现状来源：2026-09-01 Workflow Hub 架构完整度代码审计（grep migrations/src/tests/scripts/bin）</footer>
 </div>
 </body>
 </html>

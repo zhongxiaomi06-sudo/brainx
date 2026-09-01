@@ -7,7 +7,8 @@
     "node": ">=22.5"
   },
   "dependencies": {
-    "mysql2": "^3.23.3"
+    "mysql2": "^3.23.3",
+    "zod": "^4.5.4"
   },
   "scripts": {
     "dev": "node src/server.js",

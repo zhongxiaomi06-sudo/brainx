@@ -2,6 +2,11 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-02｜feat(hub): US1 事件只落账一次（信封校验 + 幂等账本）
+
+- 改动：按 tasks.md T006-T008 测试先行落地——新增 `tests/hub-event-log.test.mjs`（5 用例：重复 idem_key 幂等、1000 次投递恒 1 行、并发双连接唯一索引兜底、信封缺字段拒绝、payload 超 64KB 拒绝）与 fixtures `tests/fixtures/step0/`；实现 `src/hub/envelope.js`（zod 信封 schema + validateEnvelope，evidence_refs 仅 {table,id} 引用）与 `src/hub/event-log.js`（appendEvent：校验→64KB 上限→INSERT，唯一冲突读回既有行，≤80 行）。package.json 引入 zod（蓝图 §6.2 采购清单既定项）。
+- 验证：测试先行确认初始失败；`node --test tests/hub-event-log.test.mjs` 5/5 通过；修正 node:sqlite 唯一冲突识别（code=ERR_SQLITE_ERROR 而非 SQLITE_CONSTRAINT_UNIQUE）。
+
 ## 2026-09-02｜feat(hub): Step 0 迁移落库（0023-0027 五张表）
 
 - 改动：按 specs/001-step0-event-ledger/data-model.md 契约新增五个迁移——0023 `workflow_event_log`（账本 + `idx_wel_idem` 唯一索引 + `idx_wel_case`）、0024 `processed_events`（消费幂等标记，UNIQUE(event_id, consumer_name)）、0025 `entity_links`（跨系统 ID 链接，case_id 锚点）、0026 `cases`（双轴状态机 + version 乐观锁 + UNIQUE(position_id, candidate_ref)）、0027 `event_dlq`（不可 upcast 事件落表）。对应 tasks.md T001-T005。

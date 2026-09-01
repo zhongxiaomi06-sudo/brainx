@@ -1,0 +1,10 @@
+{
+  "event_id": "3f2c9a1e-6b7d-4c8e-9a0f-1d2e3f4a5b6c",
+  "idem_key": "sourcing.run_finished:job-43:run-1",
+  "event_type": "sourcing.run_finished",
+  "case_id": null,
+  "occurred_at": "2026-09-02T01:31:00Z",
+  "payload": { "run_id": "run-1" },
+  "evidence_refs": [],
+  "schema_version": 1
+}

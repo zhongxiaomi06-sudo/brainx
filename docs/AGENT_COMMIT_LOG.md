@@ -2,6 +2,11 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-02｜feat(hub): US3 Case 双轴状态机（合法推进 + 乐观锁留痕）
+
+- 改动：按 tasks.md T011-T012 测试先行——新增 `tests/hub-case-machine.test.mjs`（5 用例：合法相邻推进版本+1 并落 case.stage_advanced、全链 DISCOVERED→PLACED 七步推进、非法跳跃拒绝且落 case.transition_rejected 留痕、未知 Case 显式 case_not_found、持陈旧快照并发推进 version_conflict 显式失败）；实现 `src/hub/case-machine.js`（合法迁移表常量 + advanceCase 乐观锁推进，≤100 行）。advanceCase 支持可选 caseRow 快照入参，使"读取后他人已推进"的并发冲突路径可确定性测试（同步单进程事件循环会串行化双连接调用，重读必然拿到最新状态）。
+- 验证：测试先行确认初始失败；修正拒绝事件 payload 与测试约定一致（{from,to}，event_type 已区分）；`node --test tests/hub-case-machine.test.mjs` 5/5 通过。
+
 ## 2026-09-02｜feat(hub): US2 消费者幂等事务模板 + processed_events 主键修正
 
 - 改动：按 tasks.md T009-T010 测试先行——新增 `tests/hub-consumer.test.mjs`（4 用例：恰好一次执行、已标记跳过零副作用、不同消费者各自幂等、崩溃注入回滚后重放与恰好一次一致）；实现 `src/hub/consumer.js`（consumeOnce：BEGIN IMMEDIATE 内二次确认→fn(db)→标记→COMMIT，抛错整体回滚）。测试暴露 0024 契约矛盾（event_id 单列 PK 使"不同消费者各自幂等"失效）：新增 `migrations/0028_processed_events_pk_fix.sql` 重建为复合主键（迁移 append-only 不改写 0024），并同步修正 data-model.md 契约与修正记录。

@@ -355,6 +355,23 @@ OpenMai 结果从 `openmai_results`(覆盖式 Markdown) 迁移为 `sourcing_run`
 
 本文是**导航层**：施工细节以 [Workflow Hub 架构](workflow-hub-architecture.md)为契约权威；交互与安全以[群聊工作流 PRD](prd-2026-09-01-braintex-group-workflow.md)为准；工具授权以 Codex Agent 职责规范（入库后）为准；产品验收以[最终交付蓝图](brainx-final-delivery-blueprint.md)为准。Codex 规范的 P0-P5 与群聊 PRD 的 P0-P3 映射：PRD-P0(查询)≈规范-P1、PRD-P1(内部写)≈P3、PRD-P2(对外)≈P4、PRD-P3(高风险)≈P4+审批/P5 禁区——**合并评审时统一编号**。
 
+## 9. 每一步现状不足与云端可获组件映射（2026-09-01 代码审计）
+
+依据：同日 Workflow Hub 完整度审计（grep migrations/src/tests/scripts/bin 证据）与 package.json 依赖确认。"云端可获"指 npm 公网可安装组件；结论遵循 §6 选型原则——账本/状态机/权限/投影无可靠现成库，必须自建；云端只取 3 件（zod、官方飞书 SDK、pino）。
+
+| 步 | 当前不足（代码证据） | 云端可获组件 | 自建 / 引入判断 |
+|---|---|---|---|
+| 0 不可逆边界 | `workflow_event_log`/`entity_links`/`case_id`/`processed_events`/upcaster **全部零命中**；30 张表无 Case 相关表；`openmai_results` 覆盖式 Markdown（0015）正命中账本禁令 | `node:sqlite`（内建已用）、`node:test`（fixtures 回放）、**zod**（信封 schema 校验） | 账本/状态机/幂等**自建**（§5 Step 0 逻辑，约百行级）；zod 引入校验信封 |
+| 1 事件网关 | lark-gateway **不存在**；无 `chat_contexts` 注册表；未登记群默认 DENY 未实现；无 HMAC 验签 | **@larksuiteoapi/node-sdk**（官方，WebSocket 长连接免公网回调，自带验签/解密/challenge）、zod | SDK **引入**；网关薄层（路由→信封→inbox）自建 |
+| 2 能力令牌 | 卡片回调无 capability_token；无单次使用 nonce，防重放缺失 | `node:crypto`（内建 HMAC-SHA256 + `timingSafeEqual`） | **纯内建自建**，§5 Step 2 逻辑已自包含，不引 JWT 库 |
+| 3 权限引擎 | Policy & Approval Service **不存在**；P0-P3 ∩ 五态输出未实现；persona.js 只有系统提示词级"严格只读"，无引擎级裁决 | 可选 `casl`（轻量 JS 授权库）；zod | `decide()` 决策表**自建**（LLM 不参与权限判断）；casl 仅当需要对象级能力组合时引入，**默认不引** |
+| 4 外部投影 | 无 `disclosure_bundles`/`case_context_external`；bridge.js 仅"非成员不可见"一条隐私边界 | zod（投影 schema 白名单定义） | **自建**——投影是裁决权威所在，不可外包给通用库 |
+| 5 写工具注册 | agent loop 无工具注册表/审批/复读闭环；写动作无幂等键与重读验证 | zod（工具 input/output 严格 schema，对齐 Codex 规范 §12）、**pino**（审计日志 run_id/trace_id/脱敏） | registry JSON 契约**自建**；zod + pino 引入 |
+| 6 桥 1 推人 | `reloop`/`position_id` 在 src/scripts/bin/tests **零命中**；SQLite(BrainX) 与 MySQL(人才库) 物理分库无 ID 映射 | `mysql2`（仓库唯一既有依赖） | 映射即 Step 0 的 `entity_links`（自建）；跨库查询用 mysql2 裸查询 |
+| 7 结果回流 | `job_outcomes` 全表仅 2 行；Saga 三态（succeeded/failed/timed_out）与补偿**零实现** | 无现成组件；`node:sqlite` + 事件账本 | **自建**——Saga 补偿逻辑是本仓库核心竞争力，不外购 |
+
+横切补充：结构化日志 pino（第 1/5 步受益）；短 ID 用内建 `crypto.randomUUID()`（nanoid 仅在长度敏感时引入）；`@opentelemetry/api` 推迟到 Phase C+。
+
 ## 相关文档
 
 - [Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) · [群聊工作流技术 PRD](prd-2026-09-01-braintex-group-workflow.md) · [最终交付蓝图](brainx-final-delivery-blueprint.md)

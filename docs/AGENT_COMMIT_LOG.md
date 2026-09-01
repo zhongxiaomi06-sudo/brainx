@@ -2,6 +2,11 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-01｜docs(architecture): 蓝图补 §9 每步不足与云端组件映射
+
+- 改动：在 `architecture-2026-09-01-full-blueprint.md` 新增 §9——按 Step 0-7 逐项给出"当前不足（代码审计证据：账本/状态机/网关/令牌/权限引擎/投影/写工具/桥接各缺口）↔ 云端可获 npm 组件（zod、@larksuiteoapi/node-sdk、pino、mysql2、node 内建，可选 casl）↔ 自建/引入判断"；横切补充 pino/randomUUID/otel 的引入时机。结论：云端只取 3 件，其余内建 + 自建，与 §6 选型原则一致。
+- 验证：`git diff --check` 通过；表格渲染检查正常；仅暂存蓝图与本日志两个文件。
+
 ## 2026-09-01｜docs(architecture): 全景架构与技术施工蓝图
 
 - 改动：收拢本机全部规范（交付蓝图、Workflow Hub 权威架构、群聊工作流 PRD、Codex 职责权限规范、package.json 零依赖栈确认）与 workflow 项目开发目标，落成 `architecture-2026-09-01-full-blueprint.md`：§1 规范清单与关系矩阵（含 P0-P3 ↔ P0-P5 映射）；§2 开发目标锚定 9/14 决赛演示闭环；§3 完整业务架构图（单机器人分层 + Case 双轴 + 三座桥）；§4 技术架构安排（server/worker/gateway/lark-gateway 四进程拓扑、新代码落点 `src/hub/*.js` 与 `src/gateway/*.js`、9 张新表清单）；§5 七个施工步骤的分步代码逻辑（Step 0 事件账本 SQL 与 `idx_wel_idem` 唯一索引、entity_links、advanceCase 乐观锁、consumeOnce 幂等事务模板、fixtures 回放门禁；Step 1 lark-gateway HMAC 校验；Step 2 能力令牌 seal/verify；Step 3 权限引擎 decide()；Step 4 projectExternal 白名单投影；Step 5 agent 写工具注册与审批重读流；Step 6/7 桥接）；§6 开源组件选型（保留 node 内建，推荐 zod/@larksuiteoapi/node-sdk/pino，明确拒绝 Kafka/Express/Prisma/LangChain）；§7 施工顺序对齐 14 天计划；§8 规范关系与权限等级映射。登记文档总目录任务路由与目录。未改动蒸馏素材、架构图及其他既有文件。

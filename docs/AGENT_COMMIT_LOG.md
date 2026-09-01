@@ -2,6 +2,11 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-02｜docs(standards): 建立参考代码本地镜像清单
+
+- 改动：新增 `docs/standards/REFERENCE_REPOS.md`——5 个经 GitHub API 核实的参考仓库（open_recruiter/Resume-Matcher/sledge/reflow-ts/lark-samples）源码快照落位仓库外 `/Users/ashley/Downloads/brainx-refs/`，逐项标注学习用途与许可证；明确三条使用规则（读设计不复制代码、设计引用需标注出处、镜像无历史可覆盖重取）；获取方式记录 git 通道代理 502、改走 api.github.com tarball 端点的实操路径。README 登记路由与目录。
+- 验证：`git diff --check` 通过；五个源码包 tar 校验通过（Resume-Matcher 首包截断已重取）；仅暂存新文档、README 与本日志。
+
 ## 2026-09-02｜docs(spec): Step 0 规格补 plan/data-model/quickstart/tasks 四件套
 
 - 改动：完成 specs/001-step0-event-ledger/ 的 speckit Phase 0-2 产物——plan.md（Technical Context、Constitution Check 五条全过、按仓库平铺惯例确定 src/hub/ 六模块 + migrations 0023-0027 + 五个测试文件的真实落点）；data-model.md（四张新表 + DLQ 的 DDL 契约与合法迁移表）；quickstart.md（回放门禁运行方法与 Codex 交回核对清单）；tasks.md（16 个任务按 US1-US4 分组、测试先行标注、依赖与并行关系），作为 Codex 施工清单。

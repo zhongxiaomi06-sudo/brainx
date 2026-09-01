@@ -27,6 +27,7 @@
   ],
   "excludedPrefixes": [
     "_archive/",
+    ".specify/scripts/bash/",
     ".prd_pages/",
     ".quality-gate/reports/",
     "fixtures/",

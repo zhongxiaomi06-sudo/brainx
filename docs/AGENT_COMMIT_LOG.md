@@ -2,6 +2,11 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-02｜build(workflow): 补齐 Codex Spec Kit 集成
+
+- 改动：保留既有 CodeBuddy 默认集成，通过官方 Specify CLI 为 BrainX 并存安装 Codex skills 集成，新增 `.agents/skills/speckit-*` 10 个项目级技能及 Codex manifest；更新研发流程文档，明确 CodeBuddy `/speckit.*` 与 Codex `$speckit-*` 双入口、全局新项目询问门禁，以及官方 `v1.0.2` 标签与运行时 `1.0.4.dev0` 的版本显示差异。质量门禁仅精确排除可重建的 Spec Kit 官方 bash 脚本的手写源码行数检查，秘密与文本卫生检查仍保留，并补最小回归测试。
+- 验证：`specify integration install codex --integration-options=--skills` 成功；`specify integration list` 显示 `codebuddy` 与 `codex` 均已安装且允许并存；10 个 Codex `SKILL.md` 全部存在；质量门禁专项测试 19/19、`git diff --check` 通过；`npm run verify:quick` 中本次新增的 Spec Kit 行数问题已清零、前端 40/40 通过，整体仍被既有未跟踪 `week-plan-brainx-reloop.html` 超长行和 `health-brief-2026-09-01.md` 行尾空白阻断。本次不 push。
+
 ## 2026-09-01｜build(workflow): 接入 spec-kit 规范驱动研发流程
 
 - 改动：安装 github/spec-kit specify CLI v1.0.4（uv tool，仓库外），在仓库根初始化 `.specify/`（模板/scripts/workflow）与 `.codebuddy/commands/`（10 个 /speckit.* 命令）；把 constitution 模板填成 BrainX 工程原则 v1.0.0（零依赖、账本先行、安全边界不可协商、规格先行、最小 diff 五条 + 时间盒/成本/权限最小集约束）；新增 `docs/standards/SPEC_DRIVEN_WORKFLOW.md` 说明用法与 AGENTS.md 分工。

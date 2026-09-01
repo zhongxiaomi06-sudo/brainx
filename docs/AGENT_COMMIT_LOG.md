@@ -2,6 +2,11 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-02｜feat(hub): T015 upcaster 逐级转换 + Step 0 门禁收口
+
+- 改动：新增 `tests/hub-upcaster.test.mjs`（5 用例：当前版本直通、upcastTo 逐级转换 1→2→3、转换链缺口落 DLQ upcast_failed、转换抛错落 DLQ、比当前更新的未知版本落 DLQ schema_invalid）与 `src/hub/upcaster.js`（注册表驱动的逐级 upcast + event_dlq 落表，upcastTo 承载机制、upcastEvent 以 CURRENT_SCHEMA_VERSION 为目标）；quickstart.md 运行命令/手工验证片段修正并逐项打勾（另经 :memory: 单行验证 SC-002 rows=1）；tasks.md T001-T016 全部勾选。
+- 验证：`node --test tests/hub-*.test.mjs` 23/23 全绿；SC-004 grep 真实命中 src/hub/event-log.js 与 migrations/0023；package.json 依赖仅 mysql2+zod；`npm run verify:quick` 14/16——仅余其他协作者未跟踪文件的 2 项既有失败（week-plan HTML 超长行、health-brief 行尾空白），与本任务无关，未触碰。Step 0（specs/001 T001-T016）实施完成，push 仍按门禁暂缓。
+
 ## 2026-09-02｜feat(hub): US4 跨系统身份链接（linkEntities / resolveEntity）
 
 - 改动：按 tasks.md T013-T014 测试先行——新增 `tests/hub-entity-links.test.mjs`（4 用例：任一侧 ID 解析全链、未知 ID 返回 null、同一外键重复链接到新实体拒绝 already_linked、对不存在 case 链接被外键拒绝 case_not_found）；实现 `src/hub/entity-links.js`（≤60 行：resolveEntity 五列任一解析全链；linkEntities 先查 case 存在、再查别名是否被其他 case 占用、同一 case 重复链接按 upsert 刷新）。

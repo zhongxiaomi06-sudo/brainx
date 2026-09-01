@@ -2,6 +2,11 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-02｜docs(spec): 建立 Step 0 事件账本规格
+
+- 改动：按复用与自建边界 PRD §3"七件必须自建件"之首，新建 spec-kit 规格 `specs/001-step0-event-ledger/spec.md`：4 个用户故事（P1 事件只落账一次、P1 消费者崩溃重放无副作用、P2 Case 双轴状态机合法推进、P3 entity_links 跨系统解析）+ 边界用例（64KB 负载上限、upcaster/DLQ）+ 9 条功能需求（idx_wel_idem 唯一索引、consumeOnce 同事务标记、乐观锁推进、zod 信封校验、evidence_refs 不存 PII、零新增依赖、fixtures 先行）+ 5 条可测成功标准（含 `grep workflow_event_log` 归零转命中）。规格对应 Codex 施工输入，实现细节以蓝图 §5 Step 0 为准。
+- 验证：`git diff --check` 通过；规格内链接与表格检查正常；仅暂存 specs/ 与本日志。
+
 ## 2026-09-02｜build(workflow): 补齐 Codex Spec Kit 集成
 
 - 改动：保留既有 CodeBuddy 默认集成，通过官方 Specify CLI 为 BrainX 并存安装 Codex skills 集成，新增 `.agents/skills/speckit-*` 10 个项目级技能及 Codex manifest；更新研发流程文档，明确 CodeBuddy `/speckit.*` 与 Codex `$speckit-*` 双入口、全局新项目询问门禁，以及官方 `v1.0.2` 标签与运行时 `1.0.4.dev0` 的版本显示差异。质量门禁仅精确排除可重建的 Spec Kit 官方 bash 脚本的手写源码行数检查，秘密与文本卫生检查仍保留，并补最小回归测试。

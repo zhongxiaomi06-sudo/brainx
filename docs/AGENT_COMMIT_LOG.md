@@ -2,6 +2,11 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-01｜docs(design): 架构图 v1.4 增补施工现状对照
+
+- 改动：依据同日 Workflow Hub 架构完整度代码审计，为工作流架构图与技术架构图新增"施工现状"对照层：第 0 步不可逆边界落地率 0%（workflow_event_log、entity_links、case_id、processed_events、upcaster 零命中）、reloop/position_id 零命中、openmai_results 覆盖式 Markdown、SQLite/MySQL 分库无映射落点；三座桥卡片补现状徽标（桥 1 上游已实现/Saga 与下游 0%，桥 2 触发已有/结构化未做，桥 3 仅职位级），桥 1 门禁补最小集要求；两图升级 v1.4，文档总目录描述同步。未改动蒸馏工作稿、周计划、蒸馏素材及其他既有文件。
+- 验证：两张静态 HTML 浏览器渲染无横向溢出、控制台无错误（Playwright 1440px/390px）；`git diff --check` 通过；`npm run verify:quick` 如实记录（既有未跟踪 health-brief 行尾空格失败为存量问题，非本次改动引入）。
+
 ## 2026-09-01｜docs(log): 解决提交记录遗留冲突标记
 
 - 改动：`docs/AGENT_COMMIT_LOG.md` 此前被以含冲突标记的状态直接提交，`<<<<<<< / ======= / >>>>>>>`（HEAD 与 origin/codex/app-shell-layout-review-20260827）滞留在 2026-08-30～08-31 区段。按"保留双方记录、按日期排序"的最小方式解决：删除三处标记，将 2026-08-30 merge 记录移至 08-31 记录之后，未删改任何一条既有记录的内容。

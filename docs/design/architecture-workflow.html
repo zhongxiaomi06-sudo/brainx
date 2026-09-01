@@ -42,14 +42,15 @@
   .panel h3{font-size:12.5px;margin-bottom:7px}.panel ul{padding-left:17px;font-size:10.8px;line-height:1.75;color:#42526a}
   .panel b{color:var(--case)}
   .gap{margin:12px 0 0 94px;border:1.5px dashed var(--gap);border-radius:10px;background:#fff7f7;padding:9px 13px;color:#991b1b;font-size:10.8px;line-height:1.55}
+  .status{margin:14px 0 0 94px;border:1.5px dashed var(--warn);border-radius:10px;background:#fffbeb;padding:9px 13px;color:#92400e;font-size:10.8px;line-height:1.6}.status b{color:var(--warn)}
   footer{text-align:center;margin-top:18px;color:var(--muted);font-size:10px;line-height:1.6}
-  @media(max-width:900px){body{padding:16px}.rail{display:grid;grid-template-columns:1fr;padding:9px 0}.node{min-width:0;width:100%}.arrow{justify-self:center;transform:rotate(90deg)}.case-spine,.loop,.bottom,.gap{margin-left:0}.loop{grid-template-columns:1fr 1fr}.bottom{grid-template-columns:1fr}.lane{grid-template-columns:1fr}.lane-name{text-align:left}}
+  @media(max-width:900px){body{padding:16px}.rail{display:grid;grid-template-columns:1fr;padding:9px 0}.node{min-width:0;width:100%}.arrow{justify-self:center;transform:rotate(90deg)}.case-spine,.loop,.bottom,.gap,.status{margin-left:0}.loop{grid-template-columns:1fr 1fr}.bottom{grid-template-columns:1fr}.lane{grid-template-columns:1fr}.lane-name{text-align:left}}
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>AI Native 猎头工作流 · 工作流架构图</h1>
-  <div class="sub">2026-09-01 v1.3 · 职位主轴 + 人选 Case 主轴 · Felix v0.5 / Miya v0 均为本人确认素材</div>
+  <div class="sub">2026-09-01 v1.4 · 职位主轴 + 人选 Case 主轴 · Felix v0.5 / Miya v0 均为本人确认素材 · 本版新增施工现状对照</div>
   <div class="thesis"><b>一条职位可以并行多个“职位 × 人选 Case”。</b>职位侧决定是否投入，人选 Case 负责把每一次触达、推荐、面试、Offer 和结果连成可回放闭环。</div>
   <div class="legend">
     <span><i class="dot" style="background:var(--brainx)"></i>BrainX 职位与行动</span>
@@ -58,6 +59,7 @@
     <span><i class="dot" style="background:var(--warn)"></i>本人确认、细节仍需补证</span>
     <span><i class="dot" style="background:var(--gap)"></i>明确缺口</span>
   </div>
+  <div class="status"><b>施工现状（2026-09-01 代码审计）：</b>职位侧已上线——验真、接单、跟进、结果回写的黄金路径可走；人选侧未落地——reloop / case_id 在代码零命中，OpenMai 结果仍是覆盖式 Markdown；转化侧纯人工补位。桥 1 上游触发（ACCEPTED 状态机）已实现，Saga 与 reloop 建岗未开工；第 0 步不可逆边界落地率 0%。下图为目标架构，不是已建成系统。</div>
 
   <section class="lane">
     <div class="lane-name">职位侧<br>验真与投入</div>
@@ -122,7 +124,7 @@
   </div>
 
   <div class="gap"><b>本人确认的待补证项：</b>Felix/Miya 各环节的 automation、detectability 与真实漏斗；电话录音的告知、授权、保存位置和期限；Miya 的 Offer/保过具体案例；Felix 的 Offer 实际记录与可自动化边界。缺口补齐并完成发布审核前，不进入自动执行策略。</div>
-  <footer>依据：Felix v0.5 + Miya v0（均于 2026-09-01 明确为本人确认素材）+ Workflow Hub 架构审计 · 权威契约见 workflow-hub-architecture.md</footer>
+  <footer>依据：Felix v0.5 + Miya v0（均于 2026-09-01 明确为本人确认素材）+ Workflow Hub 架构审计 · 权威契约见 workflow-hub-architecture.md · 施工现状来源：2026-09-01 代码完整度审计</footer>
 </div>
 </body>
 </html>

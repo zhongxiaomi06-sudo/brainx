@@ -56,8 +56,8 @@
 ### 设计与数据
 
 - [Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md)：BrainX、reloop、TTC、飞书与 OpenMai 的身份纠错、Case 状态机、持久事件、Saga、隐私和施工顺序。
-- [AI Native 猎头工作流架构图](design/architecture-workflow.html)：面向业务与 York 的三泳道主循环、人工边界、缺口和数据沉淀视图。
-- [AI Native 猎头技术架构图](design/architecture-tech.html)：面向研发的五层架构与 BrainX、reloop 三套桥接施工视图。
+- [AI Native 猎头工作流架构图](design/architecture-workflow.html)：面向业务与 York 的三泳道主循环、人工边界、缺口和数据沉淀视图，附 2026-09-01 施工现状对照。
+- [AI Native 猎头技术架构图](design/architecture-tech.html)：面向研发的五层架构与 BrainX、reloop 三套桥接施工视图，附 2026-09-01 施工现状对照与桥 1 门禁现状。
 - [BrainX 最终交付蓝图与施工总清单](brainx-final-delivery-blueprint.md)：基于当前代码审计定义最终产品形态、黄金路径、跨前后端施工顺序和端到端验收。
 - [前端审核台账](frontend-reviews/README.md)：前端审核、正式接入、发布与真实数据验证状态的唯一权威入口。
 - [前端交互架构](frontend-interaction-architecture.md)：BrainX 页面分层、状态诚实性和核心用户动作链。

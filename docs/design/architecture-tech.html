@@ -17,6 +17,7 @@
   .flow{text-align:center;color:#94a3b8;font-size:15px;line-height:1;margin:6px}.hub{background:linear-gradient(125deg,#eef2ff,#faf5ff);border:2px solid #c4b5fd}.hub-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px}.hub-cell{background:#fff;border:1px solid #ddd6fe;border-radius:8px;padding:8px}.hub-cell b{display:block;color:#5b21b6;font-size:11px}.hub-cell span{display:block;color:#5e5872;font-size:9.8px;line-height:1.5;margin-top:3px}
   .bridge{margin-top:17px;background:linear-gradient(90deg,#eff6ff,#ecfdf5,#faf5ff);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
   .bridge h2{font-size:13px}.gate{margin:7px 0;background:#fff7ed;border:1px dashed #fb923c;border-radius:8px;padding:7px 10px;font-size:10.5px;color:#9a3412}
+  .status-strip{margin-top:12px;background:#fef2f2;border:1.5px dashed var(--danger);border-radius:10px;padding:9px 13px;font-size:10.6px;line-height:1.65;color:#7f1d1d}.status-strip b{color:var(--danger)}
   .bridge-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
   .bridge-card{background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:10.4px;line-height:1.55}
   .bridge-card b{display:block;color:var(--hub);font-size:11px}
@@ -29,7 +30,8 @@
 <body>
 <div class="wrap">
   <h1>AI Native 猎头工作流 · 技术架构图</h1>
-  <div class="sub">2026-09-01 v1.3 · 五层架构 · Workflow Hub 是契约与持久事件层，不是第三套业务产品</div>
+  <div class="sub">2026-09-01 v1.4 · 五层架构 · Workflow Hub 是契约与持久事件层，不是第三套业务产品 · 本版新增施工现状对照</div>
+  <div class="status-strip"><b>施工现状（2026-09-01 代码审计）：</b>本图描述目标架构，不等于已实现。第 0 步不可逆边界落地率 <b>0%</b>——workflow_event_log、entity_links、case_id、processed_events、upcaster 在 migrations/src/tests 全部零命中；reloop / position_id 在 BrainX 代码零命中；openmai_results 仍是覆盖式 Markdown（正命中权威方案 §3 禁止项）；BrainX SQLite 与人才库 MySQL 物理分库，project_id ↔ position_id 暂无落点。</div>
 
   <section class="layer">
     <div class="title"><span class="bar" style="background:var(--hub)"></span><h2>① 入口层</h2><small>页面是工作面，对话是动作入口；所有写动作仍经过领域守卫</small></div>
@@ -84,11 +86,11 @@
 
   <section class="bridge">
     <h2>三座桥 = 三组 Saga</h2>
-    <div class="gate"><b>桥 1 上线前门禁：</b>先完成 envelope、entity_links、Case 状态机、消费者幂等、upcaster/DLQ，并用 fixtures 回放成功、失败、超时、重复、乱序和补偿。施工窗口 9/3–9/4 不等于跳过门禁。</div>
+    <div class="gate"><b>桥 1 上线前门禁：</b>先完成 envelope、entity_links、Case 状态机、消费者幂等、upcaster/DLQ，并用 fixtures 回放成功、失败、超时、重复、乱序和补偿。施工窗口 9/3–9/4 不等于跳过门禁。<b>现状：</b>上述前置项代码落地率 0%，9/4 联调前须先补第 0 步最小集（事件信封 + 持久账本 + entity_links + 桥 1 事件族 + fixtures 回放）。</div>
     <div class="bridge-grid">
-      <div class="bridge-card"><b>桥 1 · 接单 → 建岗</b><span class="mono">job.accepted → position.create_requested → created | failed | timed_out</span><br>成功写 project_id ↔ position_id；释放后发 close_requested 补偿。</div>
-      <div class="bridge-card"><b>桥 2 · Case → 审核 → 推人</b><span class="mono">candidates.ready → case.created → draft → consent → approved → sent</span><br>9/8 目标；送达失败用 <span class="err">bounced</span>，不能混为无回应。</div>
-      <div class="bridge-card"><b>桥 3 · 结果 → 下一轮</b><span class="mono">interaction.resulted → case/project projection → followup | retry | conversion</span><br>前置修 BUG-101/103；采用事件投影，<span class="good">禁止同步双写两库</span>。</div>
+      <div class="bridge-card"><b>桥 1 · 接单 → 建岗</b> <span class="badge draft">上游已实现 · Saga/下游 0%</span><span class="mono">job.accepted → position.create_requested → created | failed | timed_out</span><br>成功写 project_id ↔ position_id；释放后发 close_requested 补偿。<br><b>现状：</b>engagement ACCEPTED 状态机已有；position.create_requested 无人发出，reloop 侧零代码。</div>
+      <div class="bridge-card"><b>桥 2 · Case → 审核 → 推人</b> <span class="badge draft">触发已有 · 结构化未做</span><span class="mono">candidates.ready → case.created → draft → consent → approved → sent</span><br>9/8 目标；送达失败用 <span class="err">bounced</span>，不能混为无回应。<br><b>现状：</b>接单已自动触发 OpenMai，但结果存 openmai_results 覆盖式 Markdown，无 sourcing run / candidate_ref / case。</div>
+      <div class="bridge-card"><b>桥 3 · 结果 → 下一轮</b> <span class="badge draft">仅职位级已有</span><span class="mono">interaction.resulted → case/project projection → followup | retry | conversion</span><br>前置修 BUG-101/103；采用事件投影，<span class="good">禁止同步双写两库</span>。<br><b>现状：</b>commitment_actions / job_outcomes 已覆盖职位级进展与终局；Case 级投影、面试/Offer/重搜未建模。</div>
     </div>
   </section>
 
@@ -96,7 +98,7 @@
     <div class="note"><b>首日指标：</b>source freshness、event lag、DLQ depth、case SLA violations、saga stuck count。</div>
     <div class="note"><b>不可逆边界：</b>错合并可拆分；阶段回退只发 correction；旧事件只 upcast 不改写；未确认知识不自动执行。</div>
   </div>
-  <footer>权威方案：docs/workflow-hub-architecture.md · 素材：Felix v0.5 / Miya v0（均为本人确认） · 配套：architecture-workflow.html</footer>
+  <footer>权威方案：docs/workflow-hub-architecture.md · 素材：Felix v0.5 / Miya v0（均为本人确认） · 配套：architecture-workflow.html · 施工现状来源：2026-09-01 Workflow Hub 架构完整度代码审计（grep migrations/src/tests/scripts/bin）</footer>
 </div>
 </body>
 </html>

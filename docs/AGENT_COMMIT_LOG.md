@@ -2,6 +2,11 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-02｜docs(spec): Step 0 规格补 plan/data-model/quickstart/tasks 四件套
+
+- 改动：完成 specs/001-step0-event-ledger/ 的 speckit Phase 0-2 产物——plan.md（Technical Context、Constitution Check 五条全过、按仓库平铺惯例确定 src/hub/ 六模块 + migrations 0023-0027 + 五个测试文件的真实落点）；data-model.md（四张新表 + DLQ 的 DDL 契约与合法迁移表）；quickstart.md（回放门禁运行方法与 Codex 交回核对清单）；tasks.md（16 个任务按 US1-US4 分组、测试先行标注、依赖与并行关系），作为 Codex 施工清单。
+- 验证：`git diff --check` 通过；迁移编号 0023-0027 与现有 0022 尾序核对一致；文件路径与 src/ tests/ 平铺惯例核对一致；仅暂存 specs/ 与本日志。
+
 ## 2026-09-02｜docs(spec): 建立 Step 0 事件账本规格
 
 - 改动：按复用与自建边界 PRD §3"七件必须自建件"之首，新建 spec-kit 规格 `specs/001-step0-event-ledger/spec.md`：4 个用户故事（P1 事件只落账一次、P1 消费者崩溃重放无副作用、P2 Case 双轴状态机合法推进、P3 entity_links 跨系统解析）+ 边界用例（64KB 负载上限、upcaster/DLQ）+ 9 条功能需求（idx_wel_idem 唯一索引、consumeOnce 同事务标记、乐观锁推进、zod 信封校验、evidence_refs 不存 PII、零新增依赖、fixtures 先行）+ 5 条可测成功标准（含 `grep workflow_event_log` 归零转命中）。规格对应 Codex 施工输入，实现细节以蓝图 §5 Step 0 为准。

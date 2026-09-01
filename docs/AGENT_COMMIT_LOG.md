@@ -2,6 +2,11 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-02｜feat(hub): US4 跨系统身份链接（linkEntities / resolveEntity）
+
+- 改动：按 tasks.md T013-T014 测试先行——新增 `tests/hub-entity-links.test.mjs`（4 用例：任一侧 ID 解析全链、未知 ID 返回 null、同一外键重复链接到新实体拒绝 already_linked、对不存在 case 链接被外键拒绝 case_not_found）；实现 `src/hub/entity-links.js`（≤60 行：resolveEntity 五列任一解析全链；linkEntities 先查 case 存在、再查别名是否被其他 case 占用、同一 case 重复链接按 upsert 刷新）。
+- 验证：测试先行确认初始失败；`node --test tests/hub-entity-links.test.mjs` 4/4 通过。
+
 ## 2026-09-02｜feat(hub): US3 Case 双轴状态机（合法推进 + 乐观锁留痕）
 
 - 改动：按 tasks.md T011-T012 测试先行——新增 `tests/hub-case-machine.test.mjs`（5 用例：合法相邻推进版本+1 并落 case.stage_advanced、全链 DISCOVERED→PLACED 七步推进、非法跳跃拒绝且落 case.transition_rejected 留痕、未知 Case 显式 case_not_found、持陈旧快照并发推进 version_conflict 显式失败）；实现 `src/hub/case-machine.js`（合法迁移表常量 + advanceCase 乐观锁推进，≤100 行）。advanceCase 支持可选 caseRow 快照入参，使"读取后他人已推进"的并发冲突路径可确定性测试（同步单进程事件循环会串行化双连接调用，重读必然拿到最新状态）。

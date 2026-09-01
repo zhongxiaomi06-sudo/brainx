@@ -2,6 +2,11 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-01｜docs(architecture): 蓝图补 §9.1 GitHub 同类开源项目映射
+
+- 改动：回应"GitHub 有没有同类开源项目、可直接用的代码仓库"，全网搜索后在蓝图新增 §9.1，分四类映射：A 同类产品（open_recruiter/Resume-Matcher/ai-job-search/TalentWizard——抄业务与交互设计）；B SQLite 持久执行引擎（sledge 账本设计一一对应、reflow-ts 唯一零依赖可直装候选、durabletasks 生产参考、拒绝 Postgres 系）；C 飞书侧（官方 node-sdk + lark-samples 直接用）；D Agent 权限治理（Cedar 抄模型不引引擎、awesome-ai-agent-governance 作索引）。总判断：直接可装 3+1 件；抄设计 3 家；五信任域投影/disclosure_bundles/Case 双轴无人可抄必须自建。
+- 验证：`git diff --check` 通过；外链均为搜索结果中核实的仓库地址；仅暂存蓝图与本日志两个文件。
+
 ## 2026-09-01｜docs(architecture): 蓝图补 §9 每步不足与云端组件映射
 
 - 改动：在 `architecture-2026-09-01-full-blueprint.md` 新增 §9——按 Step 0-7 逐项给出"当前不足（代码审计证据：账本/状态机/网关/令牌/权限引擎/投影/写工具/桥接各缺口）↔ 云端可获 npm 组件（zod、@larksuiteoapi/node-sdk、pino、mysql2、node 内建，可选 casl）↔ 自建/引入判断"；横切补充 pino/randomUUID/otel 的引入时机。结论：云端只取 3 件，其余内建 + 自建，与 §6 选型原则一致。

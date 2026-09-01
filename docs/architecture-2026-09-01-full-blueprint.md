@@ -372,6 +372,45 @@ OpenMai 结果从 `openmai_results`(覆盖式 Markdown) 迁移为 `sourcing_run`
 
 横切补充：结构化日志 pino（第 1/5 步受益）；短 ID 用内建 `crypto.randomUUID()`（nanoid 仅在长度敏感时引入）；`@opentelemetry/api` 推迟到 Phase C+。
 
+### 9.1 GitHub 同类开源项目映射（2026-09-01 全网搜索）
+
+搜索范围：AI 招聘 Agent、SQLite 持久执行引擎、飞书机器人框架、Agent 权限治理。结论先行：**没有与"群聊驱动猎头工作流（五信任域 + capability_token + disclosure_bundles）"直接对等的仓库——这一层无人可抄，必须自建**；但每一步都有可"抄设计"或"直接 npm 装"的仓库。
+
+**A. 同类产品（抄业务与交互设计，代码栈不同不直接用）**
+
+| 仓库 | 定位 | 对我们的参考价值 |
+|---|---|---|
+| [miao4ai/open_recruiter](https://github.com/miao4ai/open_recruiter) | 本地优先 AI 招聘助手：SQLite + ChromaDB、LangGraph 多 Agent 评分、human-in-the-loop 审批、Pipeline 看板、Slack 收简历 | **最像 BrainX 的开源实现**——本地 SQLite、审批队列、IM 集成、自动化任务（APScheduler 无 Redis）与我们的零依赖哲学同源；看它的审批 checkpoint 与 duplicate detection 设计 |
+| [srbhr/Resume-Matcher](https://github.com/srbhr/Resume-Matcher)（约 2.7 万星） | 简历-JD 匹配量化打分（Next.js+FastAPI，兼容 Ollama/DeepSeek） | 简历评分维度与可视化口径参考（TTC 打分侧） |
+| [MadsLorentzen/ai-job-search](https://github.com/MadsLorentzen/ai-job-search)（约 1.9 万星） | Claude Code 驱动的求职全链路流水线 | Agent 流水线编排与投递追踪参考（求职者视角反向） |
+| [austenknu/TalentWizard](https://github.com/austenknu/TalentWizard) | 多平台 sourcing（GitHub/StackOverflow/Kaggle）+ 个性化 outreach | 桥 1 推人的"找人→排序→outreach"链路参考 |
+
+**B. 工作流引擎（Step 0 的"抄设计"或"直接装"候选）**
+
+| 仓库 | 定位 | 对我们的判断 |
+|---|---|---|
+| [torkbot/sledge](https://github.com/torkbot/sledge) | **SQLite 持久事件账本引擎**：dedupeKey 生产者幂等、事务化物化、队列 lease/重试/DLQ、重启恢复 | 与我们 Step 0（workflow_event_log + processed_events + DLQ）**设计几乎一一对应**；MIT 但体量小（约 58 星），抄设计不引依赖 |
+| [danfry1/reflow-ts](https://github.com/danfry1/reflow-ts) | TypeScript 持久执行引擎，**官方 node:sqlite 适配器、零原生依赖**，自动重试 + 崩溃恢复 | 唯一与零依赖哲学兼容、可直接 `npm i` 的候选；若 Saga 补偿自建吃力，9/8 推人循环前可评估引入 |
+| [recipediary/durabletasks](https://github.com/recipediary/durabletasks) | 单节点 BYO-storage 持久执行（SQLite provider），Tangia 生产使用 | at-least-once + 任务幂等的工程说明值得读；不引入 |
+| dbos-transact-ts / hatchet / pg-boss | Postgres 系持久执行/队列 | 拒绝——绑定 Postgres，与 SQLite/MySQL 分库现状冲突 |
+
+**C. 飞书侧（Step 1/2 直接用）**
+
+| 仓库 | 判断 |
+|---|---|
+| [larksuite/node-sdk](https://github.com/larksuite/node-sdk)（官方） | 已在 §6.2 采购清单；`EventDispatcher`/`CardActionHandler`/WSClient 长连接直接覆盖事件订阅 + 卡片回调 + 验签解密 |
+| [larksuite/lark-samples](https://github.com/larksuite/lark-samples)（官方示例） | 卡片 JSON 与回调处理的最小可跑样例，9/3 联调前照抄即可 |
+
+**D. Agent 权限治理（Step 3 的"抄模型"）**
+
+| 仓库 | 定位 | 对我们的判断 |
+|---|---|---|
+| [cedar-policy/cedar](https://github.com/cedar-policy/cedar)（AWS） | 形式化验证的细粒度授权引擎；2025 Dogwood 扩展支持**工具调用序列级**约束，已成 Agent 授权事实参考架构 | **抄模型不引引擎**——deny-by-default、principal/action/resource 三元组与"LLM 提议、引擎裁决"的分离原则直接写进 decide() 的决策表；Rust/WASM 集成成本不值 |
+| [awesome-ai-agent-governance](https://github.com/smq9sn5jck-coder/awesome-ai-agent-governance) | Agent 治理工具总目录（OPA/Casbin/Presidio/Guardrails 等） | 作为 Codex 规范入库评审时的工具选型索引 |
+| casl（npm） | JS 同构授权库 | 维持 §9 判断：默认不引 |
+
+**总判断**：直接可装 = `@larksuiteoapi/node-sdk` + `zod` + `pino`（+ 可选 reflow-ts）；抄设计 = sledge（账本幂等/DLQ）、Cedar（权限模型）、open_recruiter（审批流/IM 集成形态）；无人可抄 = 五信任域投影、disclosure_bundles、Case 双轴状态机——这三件是本仓库的差异化，自建。
+
 ## 相关文档
 
 - [Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) · [群聊工作流技术 PRD](prd-2026-09-01-braintex-group-workflow.md) · [最终交付蓝图](brainx-final-delivery-blueprint.md)

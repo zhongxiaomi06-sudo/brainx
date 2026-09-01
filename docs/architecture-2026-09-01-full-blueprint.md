@@ -411,6 +411,29 @@ OpenMai 结果从 `openmai_results`(覆盖式 Markdown) 迁移为 `sourcing_run`
 
 **总判断**：直接可装 = `@larksuiteoapi/node-sdk` + `zod` + `pino`（+ 可选 reflow-ts）；抄设计 = sledge（账本幂等/DLQ）、Cedar（权限模型）、open_recruiter（审批流/IM 集成形态）；无人可抄 = 五信任域投影、disclosure_bundles、Case 双轴状态机——这三件是本仓库的差异化，自建。
 
+### 9.2 GitHub API 逐仓核实修订（2026-09-01 深夜，30 个仓库全部验证）
+
+上表为搜索快照，本节为核实后的权威修订。全部仓库已走 GitHub API 验证存在性、star、最后推送、归档状态与许可证；自建边界与每步权限的正式结论以 [复用与自建边界及权限需求 PRD](prd-2026-09-01-reuse-selfbuild-boundary.md) 为准。
+
+**勘误（上表仓库大小写）**：`MudFeishu` 正确为 `mudtools/MudFeishu`；`larkpy` 正确为 `Benature/larkpy`；`Lark-GitHub-bot` 正确为 `idea2app/Lark-GitHub-bot`——按原名 clone 会 404。
+
+**核实移除（不通过）**：`BlueSkyXN/Feishu-Bitable-Python-API`（作者声明停维护，GPL-3.0）；`lark-openapi-mcp`（官方但最后推送停在 2025-08-14，一年未动）；`fastwego/feishu`（2022 停更）；`joyqi/go-lafi`（2022）；`caiguanhao/feishu-dark-mode`（2021 且无许可证）；`oioiovo/lark-api-extensions`、`larksuite/channel-sdk-go`（0 star）。二手 awesome 列表仍挂着，引用前先 API 核实。
+
+**核实新增（本轮新发现，均为活跃仓库）**：
+
+| 仓库 | 核实数据 | 对本项目的用途 |
+|---|---|---|
+| `larksuite/cli` | 16,924 star，持续更新；本机已装 v1.0.92 | **开发/运营期工具（不进运行时）**：18 领域 200+ 命令、一键建应用、交互式登录 |
+| `cso1z/Feishu-MCP` | 734 star，2026-08-17 推送 | 运营期 AI 操作飞书的 MCP 备选（比官方活跃）；运行时不需要 |
+| `langbot-app/LangBot` | 17,628 star，Apache-2.0，当天更新 | 内置飞书适配器的机器人平台——**9/3 前自建网关赶不上时的兜底**；主链路不采用（框架接管事件流会模糊权限边界，且需更宽 scope） |
+| `koishijs/koishi` | 6,154 star | 同上，备选不采用 |
+| `Wsine/feishu2md` | 2,203 star，已转社区维护 | 文档导出场景专用；本工作流不需要，**避开** |
+| `longbridge/feishu-pages` | 303 star，MIT | Wiki 转静态站；不需要，避开 |
+| `tllovesxs/wandao` | 1,032 star，**AGPL-3.0** | 多平台互导；AGPL 商用传染风险，**避开** |
+| `larksuite/oapi-sdk-go`（615）/ `chyroc/lark`（476，1630 API 最全）/ `foxzool/openlark`（105）/ `mudtools/MudFeishu`（23，.NET） | 全部活跃 | 各语言 SDK 备忘；本项目 Node 栈，仅 reloop 侧若用 Go 可参考 |
+
+核实后采购清单不变：运行时三件套 `zod` + `@larksuiteoapi/node-sdk` + `pino`（+ 可选 reflow-ts），运营期工具 `lark-cli`；其余全部内建或自建。
+
 ## 相关文档
 
 - [Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) · [群聊工作流技术 PRD](prd-2026-09-01-braintex-group-workflow.md) · [最终交付蓝图](brainx-final-delivery-blueprint.md)

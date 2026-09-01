@@ -2,6 +2,11 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-01｜docs(architecture): 全景架构与技术施工蓝图
+
+- 改动：收拢本机全部规范（交付蓝图、Workflow Hub 权威架构、群聊工作流 PRD、Codex 职责权限规范、package.json 零依赖栈确认）与 workflow 项目开发目标，落成 `architecture-2026-09-01-full-blueprint.md`：§1 规范清单与关系矩阵（含 P0-P3 ↔ P0-P5 映射）；§2 开发目标锚定 9/14 决赛演示闭环；§3 完整业务架构图（单机器人分层 + Case 双轴 + 三座桥）；§4 技术架构安排（server/worker/gateway/lark-gateway 四进程拓扑、新代码落点 `src/hub/*.js` 与 `src/gateway/*.js`、9 张新表清单）；§5 七个施工步骤的分步代码逻辑（Step 0 事件账本 SQL 与 `idx_wel_idem` 唯一索引、entity_links、advanceCase 乐观锁、consumeOnce 幂等事务模板、fixtures 回放门禁；Step 1 lark-gateway HMAC 校验；Step 2 能力令牌 seal/verify；Step 3 权限引擎 decide()；Step 4 projectExternal 白名单投影；Step 5 agent 写工具注册与审批重读流；Step 6/7 桥接）；§6 开源组件选型（保留 node 内建，推荐 zod/@larksuiteoapi/node-sdk/pino，明确拒绝 Kafka/Express/Prisma/LangChain）；§7 施工顺序对齐 14 天计划；§8 规范关系与权限等级映射。登记文档总目录任务路由与目录。未改动蒸馏素材、架构图及其他既有文件。
+- 验证：`git diff --check` 通过；文档内部链接与章节锚点检查正常；改动仅限蓝图新文件、docs/README.md 与本日志三处，工作区其他未提交改动（蒸馏稿、架构图）未触碰。
+
 ## 2026-09-01｜docs(prd): 新增 BrainTex 群聊工作流技术 PRD
 
 - 改动：整合三轮架构讨论（外部安全视图/事件入口/卡片回调、五信任域与三阶段试点、群聊驱动架构判断）为最终信息架构并落成技术 PRD `prd-2026-09-01-braintex-group-workflow.md`：确立"飞书机器人是嘴耳、BrainTex 是大脑、BrainX/Hub 是规则账本、Codex 是建设执行"的单机器人分层；定义五类群信任域与 chat_contexts（未登记默认 DENY）、事件入口十步与标准信封、卡片能力令牌、内外部动作隔离清单、P0-P3 四级权限与五态引擎输出、8 张权限数据表；给出鉴权模块"实现者/裁决权威/验收审核"三列归属表（严格鉴权代码可由 Codex 写，裁决权威必须落在 BrainX 侧，LLM 不参与权限判断）；列明 persona.js 只读、事件网关不存在等六项现状差距；阶段验收不绑定具体日期，外部群上线门禁一票否决。登记文档总目录任务路由与目录。未改动架构图、蒸馏素材及其他既有文件；两张正式架构图按 PRD §1 升级为群聊驱动视图 v2 列为后续任务。

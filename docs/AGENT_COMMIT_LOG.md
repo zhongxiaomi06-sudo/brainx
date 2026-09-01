@@ -2,6 +2,11 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-02｜feat(hub): Step 0 迁移落库（0023-0027 五张表）
+
+- 改动：按 specs/001-step0-event-ledger/data-model.md 契约新增五个迁移——0023 `workflow_event_log`（账本 + `idx_wel_idem` 唯一索引 + `idx_wel_case`）、0024 `processed_events`（消费幂等标记，UNIQUE(event_id, consumer_name)）、0025 `entity_links`（跨系统 ID 链接，case_id 锚点）、0026 `cases`（双轴状态机 + version 乐观锁 + UNIQUE(position_id, candidate_ref)）、0027 `event_dlq`（不可 upcast 事件落表）。对应 tasks.md T001-T005。
+- 验证：`:memory:` 库经 src/db.js migrate() 自动应用后五表两索引全部存在；idem_key 重复插入触发 UNIQUE 冲突；entity_links 对 cases 的外键前向引用在 DML 时正常解析；schema_migrations 记账正常。
+
 ## 2026-09-02｜docs(standards): 建立参考代码本地镜像清单
 
 - 改动：新增 `docs/standards/REFERENCE_REPOS.md`——5 个经 GitHub API 核实的参考仓库（open_recruiter/Resume-Matcher/sledge/reflow-ts/lark-samples）源码快照落位仓库外 `/Users/ashley/Downloads/brainx-refs/`，逐项标注学习用途与许可证；明确三条使用规则（读设计不复制代码、设计引用需标注出处、镜像无历史可覆盖重取）；获取方式记录 git 通道代理 502、改走 api.github.com tarball 端点的实操路径。README 登记路由与目录。

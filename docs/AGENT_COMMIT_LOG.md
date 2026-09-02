@@ -2,6 +2,18 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-02｜chore(cleanup): 清除化石归档并统一项目命名为 brainx
+
+- **背景**：仓库存在三个并存的项目身份（`brainx-local` / `site-creator-vinext-starter` / `braintex`·`brianx`），另有 217 个化石文件占 27% 被跟踪文件。用户裁定：统一为 `brainx`、清除化石、保留 git 历史、前端目录 `btex-frontend` 不改、历史文档叙述不改。
+- **清除化石 217 个**（`git rm -r`，保留历史可追溯）：`_archive/` 210 个（braintex 88 / brainx-dev 63 / decision-workbench 47 / public 12）+ `docs/archive/` 7 个。被跟踪文件数 760 → 543。磁盘上另有 11 个未被 git 跟踪的残留（含 `.DS_Store`、`.pytest_cache`、`dist/*.tar.gz`、以及 **`_archive/brainx-dev/data/.secret`，64 字节、权限 600**），整体移出未删除。
+- **统一命名 6 处**：根 `package.json` + `package-lock.json`（2 处）`brainx-local` → `brainx`；`frontend/btex-frontend/` 的 `package.json` + `package-lock.json`（2 处）`site-creator-vinext-starter` → `@brainx/frontend`。目录名未动（该字符串散落在 40 个文件，含已执行的 `migrations/0009_switch_app.sql` 与 `src/server.js`，改名风险大于收益）。
+- **清理死链 7 行**：`.dockerignore` 3 行（含同样已不存在的 `frontend/decision-workbench`）、`.quality-gate/config.json` 3 行（`excludedPrefixes` 与 `textHygieneExcludedPrefixes` 里的化石前缀）、`README.md` 1 行（目录结构说明）。
+- **按裁定保留**：`docs/AGENT_COMMIT_LOG.md:693`、`docs/audits/2026-08-26-quality-gate-frontend-test-audit.md:9,15` 中的 `braintex`/`brianx` 叙述属于历史事实，未替换。
+- **清理前置**：`.git/index.lock` 为陈旧锁（20:45:14 创建、0 字节、`lsof` 无持有者、`pgrep` 无 git 进程、`.git/index` 停在 20:42:16 未再写入），移出至 `/tmp/index.lock.removed-20260902-2058`（另有备份 `/tmp/index.lock.backup-20260902-2053`）。清除后 `git add` 探针退出码 0，确认其为此前写操作被阻塞的原因。
+- **化石备份**：`/tmp/brainx-fossil-backup-20260902/`（4.0M，含 221 个磁盘文件与 11 个残留）。
+- **行尾保持**：根目录 `package.json`/`package-lock.json`/`.quality-gate/config.json`/`AGENT_COMMIT_LOG.md` 为 LF，`.dockerignore`/`README.md`/前端两个 lock 相关文件为 CRLF，改动后逐文件复核含 CR 行数不变，未产生行尾 diff。
+- **验证结果**：`npm run verify:quick` 16 项检查 11 通过 5 失败，**5 项失败均与本次改动无关**：①`docs/design/week-plan-brainx-reloop.html` 超长行 1 条（529 字符）与 ②`docs/health-brief-2026-09-01.md` 行尾空白 4 处——两者均为他人遗留的**未跟踪**文件；③④⑤前端 ESLint（退出码 127）/ TypeScript / 前端测试——根因为 `frontend/node_modules` 缺 `marked`，且尝试 `npm install` 补装时被宿主文件系统代理拒绝（`CODEBUDDY_BROKER_DENY: Brokered host mkdir`），该操作反而使 `eslint` 从 node_modules 丢失，**需用户在普通终端执行 `cd frontend/btex-frontend && npm install` 恢复**。与本次改动直接相关的检查全部通过：依赖清单与 lockfile 一致、Node.js 语法检查 192 文件、秘密扫描、禁止跟踪文件、个人绝对路径、500 行基线、Lint 豁免审计。
+
 ## 2026-09-02｜docs(prd): 后端架构 PRD（代码核实版）+ 全面差距盘点
 
 - **背景**：用户问「距后端全部完成还缺哪些架构」。对仓库做**独立代码核实**（非复述文档），产出架构 PRD 并开新 PR 交付。

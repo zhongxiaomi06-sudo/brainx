@@ -26,6 +26,8 @@
 | OpenClaw 壳子、Skill 编写、飞书渠道接入或外部 Agent 边界 | [OpenClaw 壳子 + 自写 Skill 架构](2026-09-02-openclaw-shell-architecture.md)、[复用与自建边界及权限需求 PRD](prd-2026-09-01-reuse-selfbuild-boundary.md) |
 | DataClaw 交流会索取清单、接口谈判或外部 Agent 边界 | [OpenClaw 壳子 + 自写 Skill 架构](2026-09-02-openclaw-shell-architecture.md)、[DataClaw 集成交流会历史底稿](2026-09-02-dataclaw-integration-brief.md) |
 | **BrainX 下游交付、MCP server 工具契约、接口打包或部署** | **[BrainX 下游交付文档](2026-09-02-brainx-mcp-deliverable.md)**（用户职责边界内）、[OpenClaw 壳子架构 §6 接口挂载](2026-09-02-openclaw-shell-architecture.md) |
+| **后端侧有哪些模块、各自什么状态、下一步做什么（不负责 OpenClaw 接口）** | **[后端侧模块结构与下一步安排](2026-09-02-backend-module-structure.md)**（六层结构 + 已建成/待补对照 + 9/3 排期）、[下游交付文档](2026-09-02-brainx-mcp-deliverable.md) |
+| **群消息读取归谁（OpenClaw 还是后端）** | **[后端侧模块结构 §1 边界裁定](2026-09-02-backend-module-structure.md)**（**关键纠正：通道层 `src/gateway/ws-client.js` 已在后端仓库建成，不依赖 OpenClaw**）、[飞书权限清单 §6.1](2026-09-02-feishu-permission-scopes.md) |
 | **飞书后台要勾选哪些权限/scope、事件订阅、敏感权限审批** | **[飞书权限清单（9/2 研发对齐会定论版）](2026-09-02-feishu-permission-scopes.md)**、`src/oauth.js` 用户身份 scope 实证注释 |
 | **这个架构承担哪些业务工作、每段业务走哪个工具** | **[业务工作全景](2026-09-02-business-work-breakdown.md)**（全链路六段 + MVP 每日循环 + 权限对照）、**[AI leader 工作流 + 日历助手](2026-09-02-ai-leader-workflow.md)**（一面前后两种形态）、[Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) |
 | **一面之前怎么串联 AI leader 工作流 / 一面之后的待办提醒** | **[AI leader 工作流 + 日历助手](2026-09-02-ai-leader-workflow.md)**、`src/scheduler.js` `src/engagement.js` `src/push.js` |
@@ -83,6 +85,7 @@
 - [AI Native 猎头技术架构图](design/architecture-tech.html)：面向研发的五层架构与 BrainX、reloop 三套桥接施工视图，附 2026-09-01 施工现状对照与桥 1 门禁现状。
 - [OpenClaw 壳子分层架构图](design/openclaw-shell-architecture.svg)：[OpenClaw 壳子 + 自写 Skill 架构](2026-09-02-openclaw-shell-architecture.md) §3 的可视化版本——飞书渠道 → OpenClaw Gateway → Skill 层 / MCP 层 → BrainX 领域权威层，标注 7 个已合规 Skill 与 3 个 MCP server。同目录提供 PNG 版 `openclaw-shell-architecture.png`（1360×1332，白底），可直接用于交流会与演示材料。
 - [BrainX 下游交付文档（用户职责边界内）](2026-09-02-brainx-mcp-deliverable.md)：把 BrainX 决策库/人才库/reloop/官方接口以 MCP server 形式交付给 OpenClaw 侧。**责任边界**：用户只管工具集、接口契约、数据源读写、打包部署、环境凭据；OpenClaw 侧负责 Skill 编写、飞书渠道、open_id↔consultant_id 映射、Gateway 配置。含 15 个已暴露工具清单、JSON-RPC 2.0 协议、数据源现状、P0/P2 推进计划与红线。
+- [后端侧模块结构与下一步安排](2026-09-02-backend-module-structure.md)：用户 9/2 晚明确边界「openclaw 的接口我不负责，我只负责后端其他点」后的**后端侧权威结构**。§1 **边界裁定**：群消息读取拆三段——①飞书后台配置（你手动）②**通道层 `src/gateway/ws-client.js` 已在后端仓库建成（118 行完整实现，非骨架，不依赖 OpenClaw）**③OpenClaw 插件只负责前台对话。**关键纠正：能读群消息的那条通道本来就在后端，OpenClaw 挂了不影响收消息**。§2 六层结构（L0 飞书网关 / L1 事件账本 / L2 领域数据 / L3 业务领域 / L4 调度推送 / L5 MCP 交付）。§3 已建成 vs 待补对照（**待补第 5 项「群消息提炼成业务字段」尚无代码，是 MVP ① 段缺的那一块**）。§4 今晚三件事 + 9/3 优先级。§5 与 OpenClaw 只有三个接缝。
 - [AI Native 猎头全链路轨迹图](design/ai-native-headhunter-workflow.html)：环节级轨迹、人工/自动分工与证据来源的蒸馏工作稿，阶段三回填进行中。
 - [双项目 14 天作战计划](design/week-plan-brainx-reloop.html)：BrainX × reloop 至 9/14 决赛的双泳道排期、底线条件与不做清单。
 - [BrainX 最终交付蓝图与施工总清单](brainx-final-delivery-blueprint.md)：基于当前代码审计定义最终产品形态、黄金路径、跨前后端施工顺序和端到端验收。

@@ -2,6 +2,18 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-02｜docs(architecture): 后端侧模块结构与下一步安排（职责边界裁定）
+
+- **改动**：用户明确边界「现在是对于群里的信息的读取，这个是 openclaw 的事情，还是我后端多的，**openclaw 的接口这一块我不负责，我就负责后端的其他点**；现在按照这个架构还有模块，给结构还有下一步的安排」。据此新建 `docs/2026-09-02-backend-module-structure.md`（155 行），只写后端侧。README 任务路由新增 2 行（后端模块结构 / 群消息读取归谁）、文档书目录登记 1 条。
+- **核心纠正（最重要，代码核实得出）**：之前架构文档 §7 写「两条都不能砍」，容易被读成"群消息读取要依赖 OpenClaw"。**实读 `src/gateway/ws-client.js` 后确认：它是一条完整的、独立的、已在后端仓库里的飞书 WS 长连接客户端**——118 行（不是注释里写的"骨架"），用 `@larksuiteoapi/node-sdk` 的 `WSClient` + `EventDispatcher` 订阅 `im.message.receive_v1`，解密后交 `processLarkEvent()`，启动时调 `bot/v3/info` 拿机器人真实 open_id（已修 `BOT_OPEN_ID` 占位符缺陷）。**配好 4 个凭证就能跑，不依赖 OpenClaw 任何东西**。OpenClaw 那条是**额外的前台对话通道**，挂了不影响后端收消息。
+- **§1 边界裁定（群消息读取拆三段）**：①飞书后台配置（建应用/勾 scope/订阅事件/**建版本发布**）→ **你手动**，谁都替不了；②**通道层 WS 长连接 → 后端（你），已建成**；③OpenClaw 飞书插件 → OpenClaw 侧，只负责前台 @机器人 对话。
+- **§2 六层结构**：L0 飞书网关（`src/gateway/` 4 文件）/ L1 事件账本（`src/hub/` 6 文件，`consumeOnce` 幂等 + `workflow_event_log`）/ L2 领域数据（`src/db.js` + 31 个 migrations）/ L3 业务领域（`src/*.js` 48 个模块）/ L4 调度推送（`scheduler.js` 早7晚7 **默认开** + `push.js` 只推私聊）/ L5 MCP 交付（`mcp/server.mjs` 15 工具）。
+- **§3 待补清单的关键发现**：**「把一段群消息提炼成结构化的 `job_facts` 字段」这段还没有代码**。L0 网关只负责收到消息并落成事件，提炼逻辑缺失——**这正是 MVP ① 段缺的那一块，2 天工期的来源**。此前所有文档都没点破这一层。
+- **顺带发现的小坑**：`bin/brainx-lark-gateway.mjs` 这个 CLI **存在但没挂 npm script**（package.json 里只在 `bin` 字段登记了 `braintex-lark-gateway`）。已建议补一条 `"gateway": "bin/brainx-lark-gateway.mjs"`，避免每次手敲全路径。
+- **§5 与 OpenClaw 只有三个接缝**：①工具调用（`mcp/server.mjs` stdio）②身份映射（**后端只认 `consultant_id`，不碰飞书 open_id**）③Skill 素材（`skills/` 8 个 md）。**红线：后端不实现任何飞书 open_id 相关业务逻辑**，这条划清楚两边才能各改各的。
+- **§4 下一步**：今晚三件事（配 4 凭证启网关 / 做挂 MCP 前三个硬前置 / `verify:quick` 确认基线）；9/3 优先级（跑通群主邀请端到端 demo → 扫 7 个 offer 群群主 → 验 OpenClaw 透传 → OpenMai 暴露 MCP → engage 挂找人钩子）；**9/3 第 3 条不影响第 1 条，自建网关照跑**。
+- 验证：全部基于源码实读（`src/gateway/ws-client.js` 118 行全文、`src/hub/consumer.js`、`bin/brainx-lark-gateway.mjs`、package.json scripts 与 bin 字段、specs 目录）与既有文档交叉引用；新文档 155 行 ≤500；与既有表述一致无冲突（README 已同步）。
+
 ## 2026-09-02｜docs(product): York 团队实证 + 群主邀请低敏感路径（9/2 晚更新）
 
 - **改动**：Mia 通过 York 飞书账号提供 4 张截图（Offer 项目 7 个、团队职位优先级 9/1 评分 10 人、Wendy 名下 11 个群、DataClaw 自建定时任务 8 个），把"York 团队"从抽象对手盘**实证为**真实工作面，并据此发现了一条**全新低敏感路径**：York 作为群主把 BrainX 机器人拉进特定群即可群维度读消息，无需全局 `im:message.group_msg` 高敏感权限。同步更新三份权威文档：

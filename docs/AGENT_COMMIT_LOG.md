@@ -2,6 +2,11 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-02｜feat(gateway): Step 1 网关纯逻辑层 + 信封映射
+
+- 改动：按 tasks.md T005-T008 测试先行——新增 `tests/fixtures/step1/` 6 场景 JSON（已登记@消息/未登记群/已登记非@/无 message_id 非法/无 chat_scope/已登记禁用群）与 `tests/gateway-process.test.mjs`（8 用例：通过落 lark.message_received、未登记 DENY unregistered_chat、禁用群 DENY chat_disabled、非@ DENY not_mentioned、重复投递 duplicate、malformed 拒绝不落账、no_chat_scope DENY、同一 message_id 既 DENY 又登记后通过两类事件各自幂等不被吃掉）；实现 `src/gateway/envelope-mapper.js`（通过/DENY 两类信封，DENY idem_key 独立，≤80 行）与 `src/gateway/lark-gateway.js`（processLarkEvent 纯逻辑：解析→chat_contexts 查询→MENTION 过滤→映射→appendEvent，≤100 行）。
+- 验证：测试先行确认初始失败；`node --test tests/gateway-process.test.mjs` 8/8 通过；payload 不含消息正文 PII 经断言核对。
+
 ## 2026-09-02｜feat(gateway): Step 1 chat_contexts 注册工具
 
 - 改动：按 tasks.md T003-T004 测试先行——新增 `tests/gateway-chat-contexts.test.mjs`（6 用例：注册写入查询、默认 bot_mode=MENTION_ONLY 且未登记返回 null、重复 chat_id upsert 不重置 enabled、启停、未登记 setChatEnabled 返回 not_found、listChatContexts 列举）；实现 `src/gateway/chat-contexts.js`（registerChatContext upsert/setChatEnabled/getChatContext/listChatContexts，≤60 行）。

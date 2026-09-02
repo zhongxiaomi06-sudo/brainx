@@ -1,17 +1,9 @@
 import { createHash } from 'node:crypto';
+import { AGENT_TOOL_ROWS } from './tool-registry.js';
 
-const TOOL_PURPOSES = Object.freeze({
-  brainx_me_context: ['self_context'],
-  brainx_daily_brief: ['daily_brief'],
-  brainx_job_assessment: ['job_review'],
-  brainx_candidate_shortlist: ['candidate_review'],
-  brainx_candidate_facts: ['candidate_review', 'interview_prep'],
-  brainx_candidate_fit: ['candidate_review'],
-  brainx_gap_questions: ['job_review', 'candidate_review'],
-  brainx_interview_prep: ['interview_prep'],
-  brainx_personal_review: ['personal_review'],
-  brainx_run_status: ['run_status'],
-});
+const TOOL_PURPOSES = Object.freeze(Object.fromEntries(
+  AGENT_TOOL_ROWS.map((row) => [row.name, row.purpose]),
+));
 
 export class AgentAuthorizationError extends Error {
   constructor(code) {
@@ -85,6 +77,7 @@ export function authorizePrincipal(db, payload, options = {}) {
   if (payload.chat_type === 'p2p') {
     if (payload.chat_id !== payload.requester_sender_id) fail();
   } else {
+    if (options.requireProjectScope && projectRef === null) fail();
     authorizeGroup(db, payload, binding, projectRef);
   }
   return Object.freeze({

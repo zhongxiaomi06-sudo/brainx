@@ -27,6 +27,7 @@
     "push": "node bin/brainx-push.mjs",
     "web": "node src/server.js",
     "gateway": "node bin/brainx-lark-gateway.mjs",
+    "agent:gateway": "node bin/brainx-agent-gateway.mjs",
     "gateway:start": "node --env-file=.env bin/brainx-lark-gateway.mjs start",
     "gateway:list-chats": "node --env-file=.env bin/brainx-lark-gateway.mjs list-chats",
     "fixture": "node scripts/build_fixture.mjs",
@@ -59,7 +60,8 @@
     "braintex-local-replay": "bin/brainx-replay.mjs",
     "braintex-local-push": "bin/brainx-push.mjs",
     "braintex-local-web": "bin/brainx-web.mjs",
-    "braintex-lark-gateway": "bin/brainx-lark-gateway.mjs"
+    "braintex-lark-gateway": "bin/brainx-lark-gateway.mjs",
+    "brainx-agent-gateway": "bin/brainx-agent-gateway.mjs"
   },
   "devDependencies": {
     "playwright": "^1.62.1",

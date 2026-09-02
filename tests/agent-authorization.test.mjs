@@ -103,6 +103,9 @@ test('群聊同时校验白名单群、sender、purpose 与项目范围', () => 
   assert.throws(() => authorizePrincipal(db, group, {
     feishuAppKeyHash: APP_HASH, projectRef: 'job-b',
   }), /NOT_FOUND_OR_FORBIDDEN/);
+  assert.throws(() => authorizePrincipal(db, {
+    ...group, tool_name: 'brainx_candidate_facts',
+  }, { feishuAppKeyHash: APP_HASH, requireProjectScope: true }), /NOT_FOUND_OR_FORBIDDEN/);
 });
 
 test('损坏的群 scope JSON 和缺失 App 配置不能降级放行', () => {

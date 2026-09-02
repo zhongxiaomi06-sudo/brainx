@@ -43,7 +43,9 @@ export function successEnvelope(input) {
 }
 
 export function errorEnvelope(error, options = {}) {
-  const code = Object.hasOwn(ERRORS, error?.code) ? error.code : 'INTERNAL';
+  const assertionFailure = String(error?.code || '').startsWith('ASSERTION_');
+  const candidateCode = assertionFailure ? 'UNAUTHENTICATED' : error?.code;
+  const code = Object.hasOwn(ERRORS, candidateCode) ? candidateCode : 'INTERNAL';
   const [status, message, retryable] = ERRORS[code];
   const response = {
     status,

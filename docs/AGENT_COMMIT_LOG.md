@@ -2,6 +2,12 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-03｜feat(agent): 建立生产身份审计与任务账本
+
+- 任务：完成 T003-T004；先以 4 个失败测试证明 App 身份、群范围、Agent 审计、nonce、限流、持久任务和 outbox 均不存在，再新增两份 additive SQLite migration。
+- 安全：ACTIVE 身份与群范围使用部分唯一索引阻止冲突；状态均有 CHECK；审计表不提供 prompt、简历、联系方式、secret 或 token 字段；任务通知按 job+payload 去重。
+- 验证：迁移专项 4/4 通过，完整后端测试与 `npm run verify:quick` 通过；迁移在内存新库和重复打开路径均由现有文件名账本管理。
+
 ## 2026-09-03｜chore(security): 排除插件与解析器敏感产物
 
 - 任务：完成 T002，扩展 Git 排除规则覆盖所有本地 `.env` 变体、npm tarball、Python 虚拟环境、缓存、解析工作目录和输出；保留可提交的 `.env.example` 与部署环境模板。

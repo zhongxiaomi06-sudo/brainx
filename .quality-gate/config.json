@@ -26,7 +26,7 @@
     ".toml"
   ],
   "excludedPrefixes": [
-    "_archive/",
+    ".specify/scripts/bash/",
     ".prd_pages/",
     ".quality-gate/reports/",
     "fixtures/",
@@ -46,8 +46,6 @@
     ".quality-gate/reports/"
   ],
   "textHygieneExcludedPrefixes": [
-    "_archive/",
-    "docs/archive/",
     ".prd_pages/",
     ".quality-gate/reports/"
   ],

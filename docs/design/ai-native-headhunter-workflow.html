@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Native 猎头工作流 · 全链路轨迹图 v1</title>
+<style>
+  :root{
+    --brainx:#2563eb; --reloop:#059669; --gap:#dc2626; --human:#7c3aed;
+    --bg:#f8fafc; --card:#ffffff; --ink:#0f172a; --muted:#64748b; --line:#e2e8f0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--ink);padding:24px}
+  header{max-width:1400px;margin:0 auto 20px}
+  h1{font-size:22px}
+  .badge-v1{display:inline-block;background:#dcfce7;color:#166534;font-size:12px;padding:2px 10px;border-radius:99px;margin-left:8px;vertical-align:middle}
+  .sub{color:var(--muted);font-size:13px;margin-top:6px}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;font-size:12px;color:var(--muted)}
+  .legend span{display:inline-flex;align-items:center;gap:5px}
+  .dot{width:10px;height:10px;border-radius:3px;display:inline-block}
+  .loop-banner{max-width:1400px;margin:0 auto 6px;background:linear-gradient(90deg,#fdf4ff,#eff6ff);border:1px solid #e9d5ff;border-radius:12px;padding:12px 18px;font-size:13px;line-height:1.7}
+  .loop-banner b{color:var(--human)}
+  .phase-title{max-width:1400px;margin:22px auto 8px;font-size:14px;font-weight:700;color:var(--muted)}
+  .flow{max-width:1400px;margin:0 auto;display:flex;gap:10px;overflow-x:auto;padding-bottom:8px}
+  .step{min-width:190px;max-width:190px;background:var(--card);border:1px solid var(--line);border-top:4px solid var(--line);border-radius:10px;padding:12px;cursor:pointer;transition:transform .12s,box-shadow .12s;position:relative}
+  .step:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(15,23,42,.08)}
+  .step.active{outline:2px solid var(--ink)}
+  .step.brainx{border-top-color:var(--brainx)}
+  .step.reloop{border-top-color:var(--reloop)}
+  .step.gap{border-top-color:var(--gap)}
+  .step.shared{border-top-color:var(--human)}
+  .step .name{font-size:14px;font-weight:700;line-height:1.3}
+  .step .arrow{position:absolute;right:-9px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:14px;z-index:1}
+  .tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+  .tag{font-size:10px;padding:1px 7px;border-radius:99px;border:1px solid var(--line);color:var(--muted);background:#fff}
+  .tag.ai{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}
+  .tag.human{background:#f5f3ff;color:#6d28d9;border-color:#ddd6fe}
+  .tag.mix{background:#ecfeff;color:#0e7490;border-color:#a5f3fc}
+  .tag.autoA{background:#dcfce7;color:#166534;border-color:#bbf7d0}
+  .tag.autoB{background:#fef9c3;color:#854d0e;border-color:#fde68a}
+  .tag.autoC{background:#fee2e2;color:#991b1b;border-color:#fecaca}
+  .tag.tbc{background:#fff7ed;color:#9a3412;border-color:#fed7aa}
+  .detail{max-width:1400px;margin:14px auto 0;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 22px;min-height:120px}
+  .detail h2{font-size:16px;margin-bottom:10px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;font-size:13px}
+  .kv{background:#f8fafc;border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+  .kv b{display:block;font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:600}
+  .bridges{max-width:1400px;margin:26px auto 0}
+  .bridges h2{font-size:15px;margin-bottom:10px}
+  .bridge-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+  .bridge{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--human);border-radius:10px;padding:14px 16px;font-size:13px}
+  .bridge b{font-size:13px}
+  .bridge p{color:var(--muted);margin-top:6px;line-height:1.6}
+  .ok{color:#166534}
+  .tbc-text{color:#b45309}
+  footer{max-width:1400px;margin:26px auto 0;font-size:11px;color:var(--muted);line-height:1.8}
+</style>
+</head>
+<body>
+<header>
+  <h1>AI Native 猎头工作流 · 全链路轨迹图<span class="badge-v1">v1.1 · 2026-09-01 对齐（Felix/Miya 素材已本人确认）</span></h1>
+  <div class="sub">终点:9/14 决赛 · 人工只保留最终决策与打标 · 演示:真实用户 + 真实数据</div>
+  <div class="legend">
+    <span><i class="dot" style="background:var(--brainx)"></i>BrainX 覆盖</span>
+    <span><i class="dot" style="background:var(--reloop)"></i>reloop 覆盖</span>
+    <span><i class="dot" style="background:var(--gap)"></i>缺口(Felix 蒸馏回填中)</span>
+    <span><i class="dot" style="background:var(--human)"></i>打通点/贯穿</span>
+    <span>🤖 AI 主导 · 🧑 人主导 · 🤝 人机混合</span>
+    <span>自动化:A 可全自动 / B AI起草+人工决策 / C 纯人工</span>
+  </div>
+</header>
+
+<div class="loop-banner">
+  🔁 <b>核心业务循环(已与 Mia 确认):接单 → 获取简历(来源不重要)→ 对话推人 → 不成功 → 继续找人推人</b>。
+  这循环就是「AI native 猎头工作流」的主引擎:BrainX 负责接单判断,OpenMai/reloop 负责"找人",飞书对话负责"推人",结果回流决定"继续找谁"。演示故事 = 把这个循环在真实用户面前完整转一圈。
+</div>
+
+<div class="phase-title">阶段一 · 前端决策(职位侧)</div>
+<div class="flow" id="flow1"></div>
+<div class="phase-title">阶段二 · 寻访与匹配(人选侧,= 循环里的"找人")</div>
+<div class="flow" id="flow2"></div>
+<div class="phase-title">阶段三 · 触达与转化(= 循环里的"推人",蒸馏回填中)</div>
+<div class="flow" id="flow3"></div>
+<div class="phase-title">阶段四 · 闭环与数据(贯穿全程)</div>
+<div class="flow" id="flow4"></div>
+
+<div class="detail" id="detail"><div style="color:var(--muted);font-size:13px">↑ 点击任意环节卡片查看动作 / 判断依据 / 痛点 / 自动化边界 / 证据</div></div>
+
+<div class="bridges">
+  <h2>🔗 两产品打通点(组合演示的接缝)</h2>
+  <div class="bridge-cards">
+    <div class="bridge"><b>桥 1 · 接单 → 找人 <span class="ok">✓ 业务流已确认</span></b><p>BrainX 中 ACCEPT → 获取简历(来源不重要:OpenMai 自动寻访 + reloop 私域池双因子推荐并行)。工程接缝:ACCEPT 自动在 reloop 建岗位(positions 上限 10 策略待定)。<b>工程现状(9/1 审计):上游 ACCEPTED 状态机已实现,Saga 与 reloop 建岗零代码,9/4 联调前须补第 0 步最小集——见技术架构图门禁。</b></p></div>
+    <div class="bridge"><b>桥 2 · 找人 → 对话推人 <span class="ok">✓ 演示形式已定</span></b><p>reloop 双因子 TopN(活跃度×匹配度 + 逐人联系理由)→ 对话里推给人选/客户。终态:飞书机器人按话术库起草,人审后发。<span class="ok">演示用真实用户、真实数据</span></p></div>
+    <div class="bridge"><b>桥 3 · 推人结果 → 回流再推</b><p>推人回复(成功/不成功)→ BrainX job_outcomes + reloop interaction_records,不成功自动触发"继续找人推人"下一轮。⚠️ 依赖 reloop 修 BUG-101/103(反馈状态丢失),否则现场露馅</p></div>
+    <div class="bridge"><b>桥 R10/R13 · 撞库互通(演示外,决赛后)</b><p>lookup.py 已备好未挂路由;扩展↔Reloop 鉴权待拍板。PDF 简历(R7)被 TTC 服务端卡死,外部依赖,不挡演示</p></div>
+  </div>
+</div>
+
+<footer>
+  数据来源:① 飞书智能纪要《研发对一下 2026-08-31》;② Mia 确认(2026-08-31):业务循环/演示形式/蒸馏对象;③ brainx/distilled/felix.md(BrainX 生产库事件账本);④ Reloop README + gap-audit-08-30 + architecture-review-08-28;⑤ BrainX 最终交付蓝图 + 推荐队列产品架构。<br>
+  阶段三橙色「回填中」环节：Felix v0.5 / Miya v0 已于 2026-09-01 明确为本人确认素材（知识状态 CONFIRMED），具体环节的案例密度与 automation / detectability 细节由 9/2 确认访谈填实后出 v1.2。权威契约见 workflow-hub-architecture.md。
+</footer>
+
+<script>
+const STEPS = [
+ // phase 1
+ {p:1,name:"获客与职位来源",owner:"gap",actor:"human",auto:"C",tags:["客户/BD"],d:{
+   "动作":"客户发出 JD / BD 获客,职位进入 TTC 池","工具":"TTC CRM、飞书客户群","数据沉淀":"TTC CRM(职位事实)","痛点":"职位质量参差,大量不值得做的单混入池子"}},
+ {p:1,name:"接单判断(值不值得做)",owner:"brainx",actor:"mix",auto:"B",tags:["BrainX 已覆盖","有库内证据"],d:{
+   "动作":"推荐榜扫读 → 快速划过 / 不感兴趣反馈(带原因)→ ACCEPT 接单","工具":"BrainX 工作台(今日决策→加入我的项目→开始跟进)","耗时":"单职位数秒(\"快速划过\"×9 佐证)","判断依据":"方向匹配一票否决(23/35 条反馈为\"方向不符\");低分低置信不细看;精力不够宁放不接;岗位重复即放","AI 已在做":"按方向画像初筛降权、不感兴趣反馈回流排序、推荐理由/风险冻结可回放","绝不交给机器":"接单/放弃的最终决定(待 Felix 确认)","数据沉淀":"BrainX recommendation_feedback / decision_events"}},
+ {p:1,name:"需求澄清与 JD 解读",owner:"gap",actor:"human",auto:"",tags:["回填中 · Felix"],tbc:true,d:{
+   "状态":"两产品均未覆盖,库内无数据","蒸馏计划":"9/2 Felix 确认访谈:开工前向客户问什么?需求说不清怎么办?按 JD 做方向错了怎么校准?"}},
+ // phase 2
+ {p:2,name:"获取简历(来源不重要)",owner:"shared",actor:"mix",auto:"A",tags:["已确认 · 循环第 2 步"],d:{
+   "动作":"接单后获取简历——来源不重要:OpenMai 自动寻访(接单即触发)+ reloop 私域池检索 + 公开渠道撞库并行","工具":"OpenMai / reloop / TalentLens 扩展","自动化":"A(进行中)","待确认":"机器结果的人工复核比例(Felix 9/2)","数据沉淀":"BrainX openmai_results + reloop talent_profiles"}},
+ {p:2,name:"评估筛选 / 查重 / 打标",owner:"reloop",actor:"mix",auto:"B",tags:["reloop 核心 · 演示段已定"],d:{
+   "动作":"双因子评分:活跃度(简历更新/平台活跃等事件加权衰减)× 匹配度(LLM 精算 Top30 + 结构化五维)→ 分位校准排序;撞库标注私库/公库","工具":"reloop 两阶段推荐引擎(初筛秒出 + 后台 LLM 精算)","演示":"✓ 决赛演示段落 = 私域池双因子推荐","待蒸馏":"资深顾问 10 秒否一份简历看哪一行(人工打标经验)","数据沉淀":"recommendations / recommend_runs / feedback_logs"}},
+ // phase 3
+ {p:3,name:"对话推人",owner:"reloop",actor:"mix",auto:"B",tags:["已确认 · 循环第 3 步"],d:{
+   "动作":"reloop \"今天最该联系谁\":TopN + 逐人联系理由(LLM)→ 对话中推给人选/客户","当前载体":"reloop 工作台 + 飞书;终态:飞书机器人按话术库起草 → 人审后发","缺口":"话术库(触达开场/催反馈/拒人选原话)——Felix 9/2 访谈 + 授权提取 job_messages","演示":"真实用户在场,真实推人对话"}},
+ {p:3,name:"不成功 → 继续找人推人",owner:"shared",actor:"mix",auto:"",tags:["已确认 · 循环第 4 步"],d:{
+   "动作":"推人结果(回复/拒绝/无回应)回流 → 触发下一轮找人 → 再推人,直到推荐采纳/面试","工程依赖":"桥 3 双写回流 + reloop 修 BUG-101(状态刷新即丢)/BUG-103(跨天反馈静默丢)","待蒸馏":"跟几次、隔多久、何时放弃、\"不看机会\"后续动作(Felix 9/2)"}},
+ {p:3,name:"推荐报告与推给客户",owner:"gap",actor:"human",auto:"",tags:["回填中 · Felix"],tbc:true,d:{"蒸馏计划":"推荐报告写什么、客户最看重什么;素材:一份脱敏推荐报告"}},
+ {p:3,name:"面试安排与辅导",owner:"gap",actor:"human",auto:"",tags:["回填中 · Felix"],tbc:true,d:{"蒸馏计划":"面试前辅导吗?辅导什么?"}},
+ {p:3,name:"offer 谈判",owner:"gap",actor:"human",auto:"C",tags:["回填中 · Felix","高价值人工环节"],tbc:true,d:{"蒸馏计划":"介入到什么程度?压价/抬价站哪边、怎么谈?","预判":"大概率 C 级纯人工——AI 只做情报供给(薪资基准/人选动机画像)"}},
+ {p:3,name:"入职跟进 / 保过期维护",owner:"gap",actor:"human",auto:"",tags:["回填中 · Felix"],tbc:true,d:{"蒸馏计划":"保过期怎么维护?跑掉的案例为什么?"}},
+ // phase 4
+ {p:4,name:"结果反馈与复盘",owner:"brainx",actor:"human",auto:"C",tags:["BrainX 已覆盖","有库内证据"],d:{
+   "动作":"结果录入:推荐采纳→面试(→offer→入职,幂等)","工具":"BrainX record_outcome / job_outcomes","实测":"库内期漏斗:推荐采纳 2 → 面试 1(Felix)","待确认":"库外结果还有多少没回流"}},
+ {p:4,name:"CRM 录入与数据维护(贯穿)",owner:"shared",actor:"mix",auto:"B",tags:["BrainX 覆盖层 + TTC"],d:{
+   "动作":"系统数据滞后时人工覆盖真实状态(状态/阶段/管线/HC/备注)","证据":"爱诗科技五连改:active_state→COMPLETED、pipeline→Onboarding×1、remaining_hc→1","判断":"\"系统滞后→人工改成真实状态\"——人工覆盖=最强判断信号","数据沉淀":"BrainX manual_fact_overrides + TTC CRM"}}
+];
+
+const ACTOR = {ai:["🤖 AI 主导","ai"], human:["🧑 人主导","human"], mix:["🤝 人机","mix"]};
+function card(s,i){
+  const a = ACTOR[s.actor];
+  const auto = s.auto ? `<span class="tag auto${s.auto}">${s.auto} 级</span>` : "";
+  const tbc = s.tbc ? `<span class="tag tbc">回填中</span>` : "";
+  return `<div class="step ${s.owner}" data-i="${i}">
+    <div class="name">${s.name}</div>
+    <div class="tags"><span class="tag ${a[1]}">${a[0]}</span>${auto}${tbc}</div>
+    <div class="arrow">→</div></div>`;
+}
+const all = [];
+["flow1","flow2","flow3","flow4"].forEach(id=>{
+  const ph = +id.slice(-1);
+  const el = document.getElementById(id);
+  el.innerHTML = STEPS.map((s,i)=>({s,i})).filter(x=>x.s.p===ph).map(x=>{all[x.i]=x.s;return card(x.s,x.i)}).join("");
+});
+document.querySelectorAll(".step").forEach(el=>{
+  el.onclick = ()=>{
+    document.querySelectorAll(".step").forEach(e=>e.classList.remove("active"));
+    el.classList.add("active");
+    const s = all[+el.dataset.i];
+    const kvs = Object.entries(s.d).map(([k,v])=>`<div class="kv"><b>${k}</b>${v}</div>`).join("");
+    document.getElementById("detail").innerHTML = `<h2>${s.name}</h2><div class="grid">${kvs}</div>`;
+  }
+});
+</script>
+</body>
+</html>

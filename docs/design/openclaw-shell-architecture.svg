@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 666" width="680" height="666" role="img" font-family="system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif">
+<title>BrainX 基于 OpenClaw 壳子的分层架构图</title>
+<desc>自上而下五层：飞书群接入、OpenClaw 飞书渠道、OpenClaw Gateway 壳子、并列的 Skill 层与 MCP 层、BrainX 领域权威层。</desc>
+<defs>
+<marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+<path d="M2 1L8 5L2 9" fill="none" stroke="#888780" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</marker>
+</defs>
+
+<rect x="0" y="0" width="680" height="666" fill="#FFFFFF"/>
+
+<rect x="170" y="40" width="340" height="48" rx="10" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+<text x="340" y="64" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="500" fill="#0C447C">飞书群 · 顾问群 / 项目群 / 客户群</text>
+
+<path d="M340 88 V110" fill="none" stroke="#888780" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<rect x="170" y="112" width="340" height="52" rx="10" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+<text x="340" y="133" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="500" fill="#0C447C">OpenClaw 飞书渠道 · 官方插件</text>
+<text x="340" y="151" text-anchor="middle" dominant-baseline="central" font-size="12" font-weight="400" fill="#185FA5">WS 长连接 · 仅需 App ID + App Secret</text>
+
+<path d="M340 164 V186" fill="none" stroke="#888780" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<rect x="90" y="188" width="500" height="74" rx="12" fill="#B5D4F4" stroke="#185FA5" stroke-width="0.5"/>
+<text x="340" y="211" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="500" fill="#042C53">OpenClaw 壳子 · Gateway 常驻</text>
+<text x="340" y="231" text-anchor="middle" dominant-baseline="central" font-size="12" font-weight="400" fill="#185FA5">ws://127.0.0.1:18789</text>
+<text x="340" y="250" text-anchor="middle" dominant-baseline="central" font-size="12" font-weight="400" fill="#185FA5">会话路由 · 意图识别 · 多轮对话 · 记忆三层 · 权限/审计</text>
+
+<path d="M340 262 V281 H185 V298" fill="none" stroke="#888780" stroke-width="1.5" marker-end="url(#arrow)"/>
+<path d="M340 262 V281 H495 V298" fill="none" stroke="#888780" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<rect x="40" y="300" width="290" height="210" rx="12" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+<text x="58" y="322" dominant-baseline="central" font-size="14" font-weight="500" fill="#3C3489">Skill 层 · WHAT</text>
+<text x="312" y="322" text-anchor="end" dominant-baseline="central" font-size="12" font-weight="400" fill="#0F6E56">全部已合规</text>
+<text x="58" y="341" dominant-baseline="central" font-size="12" font-weight="400" fill="#534AB7">~/.openclaw/workspace/skills/</text>
+<path d="M58 354 H312" fill="none" stroke="#AFA9EC" stroke-width="0.5"/>
+<circle cx="60" cy="374" r="2.5" fill="#7F77DD"/>
+<text x="70" y="374" dominant-baseline="central" font-size="12" font-weight="400" fill="#3C3489">brainx-workbench</text>
+<circle cx="60" cy="393" r="2.5" fill="#7F77DD"/>
+<text x="70" y="393" dominant-baseline="central" font-size="12" font-weight="400" fill="#3C3489">brainx-talent</text>
+<circle cx="60" cy="412" r="2.5" fill="#7F77DD"/>
+<text x="70" y="412" dominant-baseline="central" font-size="12" font-weight="400" fill="#3C3489">brainx-engagement</text>
+<circle cx="60" cy="431" r="2.5" fill="#7F77DD"/>
+<text x="70" y="431" dominant-baseline="central" font-size="12" font-weight="400" fill="#3C3489">brainx-report</text>
+<circle cx="60" cy="450" r="2.5" fill="#7F77DD"/>
+<text x="70" y="450" dominant-baseline="central" font-size="12" font-weight="400" fill="#3C3489">brainx-ops</text>
+<circle cx="60" cy="469" r="2.5" fill="#7F77DD"/>
+<text x="70" y="469" dominant-baseline="central" font-size="12" font-weight="400" fill="#3C3489">brainx-data-explorer</text>
+<circle cx="60" cy="488" r="2.5" fill="#7F77DD"/>
+<text x="70" y="488" dominant-baseline="central" font-size="12" font-weight="400" fill="#3C3489">brainx-hunter-playbook</text>
+
+<rect x="350" y="300" width="290" height="210" rx="12" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+<text x="368" y="322" dominant-baseline="central" font-size="14" font-weight="500" fill="#3C3489">MCP 层 · HOW</text>
+<text x="622" y="322" text-anchor="end" dominant-baseline="central" font-size="12" font-weight="400" fill="#534AB7">3 个 server</text>
+<text x="368" y="341" dominant-baseline="central" font-size="12" font-weight="400" fill="#534AB7">openclaw.json · mcp.servers</text>
+<path d="M368 354 H622" fill="none" stroke="#AFA9EC" stroke-width="0.5"/>
+
+<rect x="366" y="358" width="258" height="40" rx="8" fill="#FFFFFF" stroke="#CECBF6" stroke-width="0.5"/>
+<text x="378" y="376" dominant-baseline="central" font-size="13" font-weight="500" fill="#3C3489">brainx-domain</text>
+<text x="378" y="392" dominant-baseline="central" font-size="12" font-weight="400" fill="#534AB7">本地 stdio · 15 个只读工具</text>
+
+<rect x="366" y="406" width="258" height="40" rx="8" fill="#FFFFFF" stroke="#CECBF6" stroke-width="0.5"/>
+<text x="378" y="424" dominant-baseline="central" font-size="13" font-weight="500" fill="#3C3489">vendor-official</text>
+<text x="378" y="440" dominant-baseline="central" font-size="12" font-weight="400" fill="#534AB7">远程 http · 你手上的官方数据接口</text>
+
+<rect x="366" y="454" width="258" height="40" rx="8" fill="#FFFFFF" stroke="#CECBF6" stroke-width="0.5"/>
+<text x="378" y="472" dominant-baseline="central" font-size="13" font-weight="500" fill="#3C3489">reloop-api</text>
+<text x="378" y="488" dominant-baseline="central" font-size="12" font-weight="400" fill="#534AB7">远程 http · 候选人域（只经 token）</text>
+
+<path d="M185 510 V529 H340" fill="none" stroke="#888780" stroke-width="1.5"/>
+<path d="M495 510 V529 H340" fill="none" stroke="#888780" stroke-width="1.5"/>
+<path d="M340 529 V548" fill="none" stroke="#888780" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<rect x="90" y="550" width="500" height="96" rx="12" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+<text x="340" y="572" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="500" fill="#2C2C2A">BrainX 领域权威层 · 不因换壳子而改变</text>
+<text x="340" y="594" text-anchor="middle" dominant-baseline="central" font-size="12" font-weight="400" fill="#444441">workflow_event_log + idx_wel_idem 账本</text>
+<text x="340" y="613" text-anchor="middle" dominant-baseline="central" font-size="12" font-weight="400" fill="#444441">entity_links · TTC ↔ BrainX ↔ reloop 映射</text>
+<text x="340" y="632" text-anchor="middle" dominant-baseline="central" font-size="12" font-weight="400" fill="#444441">决策库 SQLite / 人才库 RDS / reloop 桥</text>
+</svg>

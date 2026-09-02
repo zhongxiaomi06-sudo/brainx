@@ -1,0 +1,9 @@
+{
+  "message_id": "om_disabled_1",
+  "chat_id": "oc_disabled",
+  "open_id": "ou_user_1",
+  "mentions": ["ou_bot"],
+  "message_type": "text",
+  "create_time": "2026-09-02T10:35:00Z",
+  "body": { "content": "@_user_bot 你好" }
+}

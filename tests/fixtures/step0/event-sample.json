@@ -1,0 +1,11 @@
+{
+  "event_id": "0f0e8a4e-6b7d-4c8e-9a0f-1d2e3f4a5b6c",
+  "idem_key": "sourcing.run_finished:job-42:run-1",
+  "event_type": "sourcing.run_finished",
+  "case_id": null,
+  "actor": "system:sourcing-daemon",
+  "occurred_at": "2026-09-02T01:30:00Z",
+  "payload": { "run_id": "run-1", "candidates_found": 12 },
+  "evidence_refs": [{ "table": "opportunities", "id": "job-42" }],
+  "schema_version": 1
+}

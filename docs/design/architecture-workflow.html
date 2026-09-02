@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Native 猎头工作流 · 工作流架构图</title>
+<style>
+  :root{
+    --brainx:#2563eb;--reloop:#059669;--case:#7c3aed;--human:#9333ea;--warn:#d97706;--gap:#dc2626;
+    --bg:#f6f8fb;--card:#fff;--ink:#0f172a;--muted:#64748b;--line:#dbe3ee;--soft:#eef2ff;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--ink);padding:26px}
+  .wrap{max-width:1280px;margin:0 auto}
+  h1{text-align:center;font-size:23px;letter-spacing:.01em}
+  .sub{text-align:center;color:var(--muted);font-size:12.5px;margin-top:6px}
+  .thesis{margin:14px auto 18px;max-width:960px;background:#fff;border:1px solid #ddd6fe;border-radius:12px;padding:10px 16px;text-align:center;font-size:13px;color:#4c1d95}
+  .legend{display:flex;justify-content:center;gap:16px;flex-wrap:wrap;margin-bottom:20px;font-size:11px;color:var(--muted)}
+  .legend span{display:inline-flex;align-items:center;gap:5px}.dot{width:9px;height:9px;border-radius:3px}
+  .lane{display:grid;grid-template-columns:84px 1fr;gap:10px;margin-bottom:14px}
+  .lane-name{align-self:center;text-align:right;padding-right:7px;font-size:12px;font-weight:800;color:#475569;line-height:1.45}
+  .rail{display:flex;align-items:stretch;gap:9px;min-width:0}
+  .node{flex:1;min-width:165px;background:var(--card);border:1.5px solid var(--line);border-radius:12px;padding:13px 14px;position:relative;box-shadow:0 3px 12px rgba(15,23,42,.04)}
+  .node .owner{position:absolute;top:-9px;left:11px;border-radius:99px;padding:2px 8px;color:#fff;font-size:9px;font-weight:700}
+  .node h2{font-size:13.5px;margin-top:2px}.node p{font-size:10.8px;line-height:1.55;color:#526176;margin-top:5px}
+  .node .tag{display:inline-block;margin-top:7px;border-radius:99px;padding:2px 7px;color:#fff;font-size:9px}
+  .bx{border-color:var(--brainx)}.bx .tag,.owner.bx-o{background:var(--brainx)}
+  .rl{border-color:var(--reloop)}.rl .tag,.owner.rl-o{background:var(--reloop)}
+  .case{border-color:var(--case);background:linear-gradient(145deg,#fff,#f5f3ff)}.case .tag,.owner.case-o{background:var(--case)}
+  .human{border-color:var(--human)}.human .tag,.owner.human-o{background:var(--human)}
+  .partial{border-color:var(--warn);border-style:dashed}.partial .tag{background:var(--warn)}
+  .arrow{align-self:center;color:#94a3b8;font-size:19px;font-weight:800}
+  .case-spine{margin:0 0 15px 94px;border:1px solid #ddd6fe;background:var(--soft);border-radius:12px;padding:8px 14px;display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center}
+  .case-id{background:var(--case);color:#fff;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:800;white-space:nowrap}
+  .case-spine p{font-size:11px;line-height:1.6;color:#51456f}
+  .loop{margin:0 0 16px 94px;position:relative;border-top:2px dashed var(--case);padding-top:11px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .loop::before{content:"↶";position:absolute;left:-5px;top:-17px;color:var(--case);font-size:25px;font-weight:800}
+  .rule{background:#fff;border:1px solid #ddd6fe;border-radius:9px;padding:8px 10px;font-size:10.5px;line-height:1.45;color:#4c1d95}
+  .rule b{display:block;font-size:11px;margin-bottom:2px}
+  .bottom{margin:22px 0 0 94px;display:grid;grid-template-columns:1fr 1.1fr;gap:12px}
+  .panel{background:#fff;border:1px solid var(--line);border-radius:12px;padding:13px 15px}
+  .panel h3{font-size:12.5px;margin-bottom:7px}.panel ul{padding-left:17px;font-size:10.8px;line-height:1.75;color:#42526a}
+  .panel b{color:var(--case)}
+  .gap{margin:12px 0 0 94px;border:1.5px dashed var(--gap);border-radius:10px;background:#fff7f7;padding:9px 13px;color:#991b1b;font-size:10.8px;line-height:1.55}
+  .timeline{margin:0 0 15px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:10.8px;color:#42526a}
+  .timeline b{color:var(--case);font-size:11.5px;margin-right:2px}
+  .timeline span{border:1px solid var(--line);border-radius:99px;padding:3px 10px;background:#fff}
+  .timeline .hot{border-color:var(--warn);background:#fffbeb;color:#92400e;font-weight:600}
+  .timeline .fin{border-color:var(--case);background:#f5f3ff;color:#4c1d95;font-weight:600}
+  .node.demo{border-width:2px;border-color:var(--case);box-shadow:0 0 0 3px #ede9fe}
+  .node.demo::after{content:"演示段";position:absolute;top:-9px;right:9px;background:var(--case);color:#fff;border-radius:99px;padding:2px 8px;font-size:9px;font-weight:700}
+  .status{margin:14px 0 0 94px;border:1.5px dashed var(--warn);border-radius:10px;background:#fffbeb;padding:9px 13px;color:#92400e;font-size:10.8px;line-height:1.6}.status b{color:var(--warn)}
+  footer{text-align:center;margin-top:18px;color:var(--muted);font-size:10px;line-height:1.6}
+  @media(max-width:900px){body{padding:16px}.rail{display:grid;grid-template-columns:1fr;padding:9px 0}.node{min-width:0;width:100%}.arrow{justify-self:center;transform:rotate(90deg)}.case-spine,.loop,.bottom,.gap,.status{margin-left:0}.loop{grid-template-columns:1fr 1fr}.bottom{grid-template-columns:1fr}.lane{grid-template-columns:1fr}.lane-name{text-align:left}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>AI Native 猎头工作流 · 工作流架构图</h1>
+  <div class="sub">2026-09-01 v1.5 · 职位主轴 + 人选 Case 主轴 · 本版新增决赛时间线与演示主线标注 · 配套排期：week-plan-brainx-reloop.html</div>
+  <div class="thesis"><b>一条职位可以并行多个“职位 × 人选 Case”。</b>职位侧决定是否投入，人选 Case 负责把每一次触达、推荐、面试、Offer 和结果连成可回放闭环。</div>
+  <div class="legend">
+    <span><i class="dot" style="background:var(--brainx)"></i>BrainX 职位与行动</span>
+    <span><i class="dot" style="background:var(--reloop)"></i>reloop 人选与触达</span>
+    <span><i class="dot" style="background:var(--case)"></i>Workflow Case</span>
+    <span><i class="dot" style="background:var(--warn)"></i>本人确认、细节仍需补证</span>
+    <span><i class="dot" style="background:var(--gap)"></i>明确缺口</span>
+    <span><i class="dot" style="background:var(--case);box-shadow:0 0 0 2px #ede9fe"></i>演示主线节点（9/14 决赛路径）</span>
+  </div>
+  <div class="status"><b>施工现状（2026-09-01 代码审计）：</b>职位侧已上线——验真、接单、跟进、结果回写的黄金路径可走；人选侧未落地——reloop / case_id 在代码零命中，OpenMai 结果仍是覆盖式 Markdown；转化侧纯人工补位。桥 1 上游触发（ACCEPTED 状态机）已实现，Saga 与 reloop 建岗未开工；第 0 步不可逆边界落地率 0%。下图为目标架构，不是已建成系统。</div>
+
+  <div class="timeline"><b>D-13 · 9/1 → 9/14</b>
+    <span>9/2 架构图 × York 对齐 + Felix 确认访谈</span>
+    <span class="hot">9/3 🚀 全员真实使用</span>
+    <span>9/4 桥 1 联调</span>
+    <span class="hot">9/8 推人循环打通</span>
+    <span>9/11 联排① + 录 demo</span>
+    <span>9/12 联排② + 物料</span>
+    <span class="fin">9/14 🏁 决赛</span>
+  </div>
+
+  <section class="lane">
+    <div class="lane-name">职位侧<br>验真与投入</div>
+    <div class="rail">
+      <article class="node human"><span class="owner human-o">客户 / BD / 市场</span><h2>职位与机会进入</h2><p>TTC 已公开职位、内部合作、人选反向发现、市场与融资线索。</p><span class="tag">TTC / 外部市场</span></article>
+      <div class="arrow">→</div>
+      <article class="node bx"><span class="owner bx-o">AI 整理 · 人核验</span><h2>需求验真与项目评分</h2><p>核对方向、真实招聘动作、合同/预付款、反馈质量、竞争度、人才资产和机会成本。</p><span class="tag">BrainX 证据层</span></article>
+      <div class="arrow">→</div>
+      <article class="node bx demo"><span class="owner human-o">人工拍板</span><h2>① 接单与优先级</h2><p>决定投入、后调或释放；目标和第一行动进入项目。方向、反馈速度、单值、可控性与单位时间 ROI 都是判断信号。</p><span class="tag">decision + commitment</span></article>
+    </div>
+  </section>
+
+  <section class="lane">
+    <div class="lane-name">人选侧<br>Case 主循环</div>
+    <div class="rail">
+      <article class="node rl demo"><span class="owner rl-o">AI 主导</span><h2>② Mapping / 获取简历</h2><p>公司库、个人库、OpenMai、招聘网站、转介绍；同人多简历先归一，保留来源与版本。</p><span class="tag">sourcing run</span></article>
+      <div class="arrow">→</div>
+      <article class="node case demo"><span class="owner case-o">稳定主键</span><h2>职位 × 人选 Case</h2><p>candidate_ref、match、触达、同意、客户阶段、当前行动和证据都挂在同一个 case_id。</p><span class="tag">case_id</span></article>
+      <div class="arrow">→</div>
+      <article class="node human demo"><span class="owner human-o">AI 辅助 · 人判断</span><h2>③ 评估、沟通与同意</h2><p>区分候选人实力与岗位匹配；核验个人贡献、动机、底线和风险。具体推荐前必须取得候选人同意。</p><span class="tag">evidence + consent</span></article>
+      <div class="arrow">→</div>
+      <article class="node rl demo"><span class="owner human-o">人工终审</span><h2>④ 推荐报告 / 推给客户</h2><p>AI 按客户关注点生成证据化草稿，人确认事实归属、风险与背书后发送；草稿展示不等于已发送。</p><span class="tag">outreach / submission</span></article>
+      <div class="arrow">→</div>
+      <article class="node bx demo"><span class="owner bx-o">事件回流</span><h2>结果与下一行动</h2><p>明确否决、无回应、约面、暂停、Offer 等都更新 Case，并生成跟进、补人、暂停或关闭建议。</p><span class="tag">case event</span></article>
+    </div>
+  </section>
+
+  <div class="case-spine"><div class="case-id">CASE-职位-人选</div><p><b>信息脊柱：</b>project_id ↔ position_id ↔ candidate_ref ↔ case_id。飞书消息、推荐报告、面试材料和结果只保存证据引用，不再靠公司名或职位名猜归属。</p></div>
+
+  <div class="loop">
+    <div class="rule"><b>明确否决 + 理由清楚</b>校准画像，继续找下一批。</div>
+    <div class="rule"><b>流程中约 3–5 人</b>提示暂停新增，让现有流程先跑。</div>
+    <div class="rule"><b>后期人选存在单点风险</b>提示补 1–2 名 backup。</div>
+    <div class="rule"><b>已经产生 Offer</b>停止新增交付；Offer 不等于入职终局。</div>
+  </div>
+
+  <section class="lane">
+    <div class="lane-name">转化侧<br>深水区</div>
+    <div class="rail">
+      <article class="node human"><span class="owner human-o">人主导</span><h2>面试安排与辅导</h2><p>约面后电话沟通、补充客户资料、记录顾虑；不能解答的问题转客户侧，必要时补项目证据包。</p><span class="tag">INTERVIEW</span></article>
+      <div class="arrow">→</div>
+      <article class="node partial"><span class="owner human-o">人承诺</span><h2>Offer 谈判</h2><p>拆现金/奖金/期权/职级/地点与职业价值，双向探底。两份素材均经本人确认；Felix 的实际记录与自动化边界、Miya 的具体案例仍需补证。</p><span class="tag">已确认缺口</span></article>
+      <div class="arrow">→</div>
+      <article class="node human"><span class="owner human-o">关系维护</span><h2>入职 / 保过 / 关闭</h2><p>Felix 已确认入职前一周至三个月的节点跟进；Case 终局区分入职、关闭和候选人退出。</p><span class="tag">PLACED / CLOSED</span></article>
+    </div>
+  </section>
+
+  <div class="bottom">
+    <div class="panel"><h3>人工保留四类决策权</h3><ul>
+      <li><b>项目拍板：</b>需求是否真实、是否值得投入、何时后调或释放。</li>
+      <li><b>候选人判断：</b>事实核验、动机与风险判断、推荐同意。</li>
+      <li><b>对外背书：</b>话术/报告终审、是否发送、是否向客户背书。</li>
+      <li><b>承诺与关系：</b>Offer 条件、双方承诺、入职与关键关系维护。</li>
+    </ul></div>
+    <div class="panel"><h3>总线沉淀的闭环信息</h3><ul>
+      <li>职位验真、接单/释放、项目目标和当前行动。</li>
+      <li>sourcing run、候选人身份链接、简历版本和匹配证据。</li>
+      <li>候选人同意、触达、送达、回复、退回和客户反馈。</li>
+      <li>面试、Offer、入职、关闭，以及 AI 建议接受/拒绝。</li>
+      <li>所有事件带 case_id、来源、时间质量、知识版本和 evidence_ref。</li>
+    </ul></div>
+  </div>
+
+  <div class="gap"><b>本人确认的待补证项：</b>Felix/Miya 各环节的 automation、detectability 与真实漏斗；电话录音的告知、授权、保存位置和期限；Miya 的 Offer/保过具体案例；Felix 的 Offer 实际记录与可自动化边界。缺口补齐并完成发布审核前，不进入自动执行策略。</div>
+  <footer>依据：Felix v0.5 + Miya v0（均于 2026-09-01 明确为本人确认素材）+ Workflow Hub 架构审计 · 权威契约见 workflow-hub-architecture.md · 时间线来源：week-plan-brainx-reloop.html（8-31 会议纪要定稿）· 施工现状来源：2026-09-01 代码完整度审计</footer>
+</div>
+</body>
+</html>

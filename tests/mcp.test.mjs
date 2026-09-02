@@ -54,9 +54,10 @@ test('MCP：initialize → tools/list → tools/call 全链', async () => {
     const names = list.result.tools.map((t) => t.name);
     for (const t of ['brainx_consultants', 'brainx_workbench', 'brainx_recommendations',
                      'brainx_opportunity', 'brainx_engage', 'brainx_replay',
-                     'brainx_record_outcome', 'brainx_sync_now', 'brainx_push_preview']) {
+                     'brainx_record_outcome', 'brainx_push_preview']) {
       assert.ok(names.includes(t), `缺工具 ${t}`);
     }
+    assert.equal(names.includes('brainx_sync_now'), false, '高风险同步工具不得外露');
 
     // 花名册（openDb 自动播种）
     const cons = await c.call('tools/call', { name: 'brainx_consultants', arguments: {} });

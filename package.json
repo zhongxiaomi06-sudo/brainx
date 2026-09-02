@@ -1,5 +1,5 @@
 {
-  "name": "brainx-local",
+  "name": "brainx",
   "version": "1.0.0",
   "description": "Brain X 职位决策工作台（本地版）：SQLite + node:http + 零依赖前端",
   "type": "module",
@@ -7,7 +7,9 @@
     "node": ">=22.5"
   },
   "dependencies": {
-    "mysql2": "^3.23.3"
+    "@larksuiteoapi/node-sdk": "^1.73.1",
+    "mysql2": "^3.23.3",
+    "zod": "^4.5.4"
   },
   "scripts": {
     "dev": "node src/server.js",
@@ -24,6 +26,9 @@
     "replay": "node bin/brainx-replay.mjs",
     "push": "node bin/brainx-push.mjs",
     "web": "node src/server.js",
+    "gateway": "node bin/brainx-lark-gateway.mjs",
+    "gateway:start": "node --env-file=.env bin/brainx-lark-gateway.mjs start",
+    "gateway:list-chats": "node --env-file=.env bin/brainx-lark-gateway.mjs list-chats",
     "fixture": "node scripts/build_fixture.mjs",
     "init-talent": "node scripts/init-talent-schema.mjs",
     "talent:e2e": "node scripts/e2e-talent-flow.mjs",
@@ -51,7 +56,8 @@
     "braintex-local-recommend": "bin/brainx-recommend.mjs",
     "braintex-local-replay": "bin/brainx-replay.mjs",
     "braintex-local-push": "bin/brainx-push.mjs",
-    "braintex-local-web": "bin/brainx-web.mjs"
+    "braintex-local-web": "bin/brainx-web.mjs",
+    "braintex-lark-gateway": "bin/brainx-lark-gateway.mjs"
   },
   "devDependencies": {
     "playwright": "^1.62.1",

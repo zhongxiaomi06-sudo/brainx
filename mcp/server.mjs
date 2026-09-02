@@ -13,6 +13,7 @@ import { runSync, latestSync, latestCompleteSnapshot } from '../src/sync.js';
 import { recommend, latestRun, loadConsultants } from '../src/recommend.js';
 import { engage, commitmentSummary, currentState, legalActions } from '../src/engagement.js';
 import { replay, recordOutcome } from '../src/replay.js';
+import { confirmDraft, rejectDraft } from '../src/job-extract/confirm.js';
 import { acceptCommitment, commitmentDetails, recordProgress, recordTerminalResult,
   releaseCommitment, suggestedAction, RELEASE_REASONS, CLOSE_REASONS } from '../src/commitment.js';
 import { buildDailyCard, buildSyncAlertCard } from '../src/push.js';
@@ -24,6 +25,17 @@ import { feedback as recommendationFeedback, undoFeedback as recommendationUndoF
 const db = openDb();
 
 // —— 工具实现（与 server.js 路由同一套领域函数，输出原样 JSON）——
+
+// 黑名单：外露前必须先补守门的工具（工具外露白名单 §4 硬前置 1a/1c）。
+// brainx_sync_now —— 默认 source='fixture' + dry_run=false 会把决策库刷成测试数据；
+// brainx_talent  —— 无 cid 隔离（补完 brainx_talent_mine 改造后才可移出）。
+// 定义保留在 TOOLS 里（tests/mcp-write-guard.test.mjs 静态扫描依赖），但 list/call 双拦。
+const BLOCKED_TOOLS = new Set(['brainx_sync_now', 'brainx_talent']);
+
+// brainx_recommend_run 进程内限流状态（每顾问上次调用时间戳；白名单 §3 P0 第 3 件）
+const RECOMMEND_RUN_MIN_MS = 60_000;
+const RECOMMEND_RUN_AT = new Map();
+
 const TOOLS = {
   brainx_consultants: {
     description: '顾问花名册（consultant_id/显示名；open_id 不出 MCP）',
@@ -65,10 +77,29 @@ const TOOLS = {
     },
   },
   brainx_recommend_run: {
-    description: '生成一轮新推荐（写 recommendations + RECOMMENDED 事件）',
+    description: '生成一轮新推荐（写 recommendations + RECOMMENDED 事件；每顾问 60s 限一次）',
     inputSchema: { type: 'object', required: ['consultant_id'], properties: {
       consultant_id: { type: 'string' }, top: { type: 'number' } } },
-    run: ({ consultant_id: cid, top = 10 }) => recommend(db, cid, { top }),
+    run: ({ consultant_id: cid, top = 10 }) => {
+      // 白名单 §3 P0 第 3 件：防反复调用重置推荐轮次（进程内每顾问最小间隔）
+      const last = RECOMMEND_RUN_AT.get(cid) ?? 0;
+      const wait = RECOMMEND_RUN_MIN_MS - (Date.now() - last);
+      if (wait > 0) return { error: 'rate_limited', retry_after_ms: wait };
+      RECOMMEND_RUN_AT.set(cid, Date.now());
+      return recommend(db, cid, { top });
+    },
+  },
+  brainx_confirm_facts: {
+    description: '确认群消息提炼草稿转正 job_facts（E3 确认闭环；project_id 缺省新建职位，指定时须本人可见）',
+    inputSchema: { type: 'object', required: ['consultant_id', 'draft_id'], properties: {
+      consultant_id: { type: 'string' }, draft_id: { type: 'string' },
+      project_id: { type: 'string' }, action: { type: 'string', enum: ['confirm', 'reject'] } } },
+    run: ({ consultant_id: cid, draft_id, project_id: pid, action = 'confirm' }) => {
+      if (action === 'reject') return rejectDraft(db, { draft_id, consultant_id: cid });
+      return pid && !jobVisibleTo(db, cid, pid)
+        ? { error: 'NOT_FOUND', project_id: pid }
+        : confirmDraft(db, { draft_id, consultant_id: cid, project_id: pid });
+    },
   },
   brainx_feedback: {
     description: '对推荐职位表态（F3）：NOT_INTERESTED 标记不感兴趣（可从排序降权）；undo=true 撤销。与工作台 × 按钮同一写入路径',
@@ -176,7 +207,9 @@ const TOOLS = {
     inputSchema: { type: 'object', required: ['consultant_id', 'project_id', 'stage'], properties: {
       consultant_id: { type: 'string' }, project_id: { type: 'string' }, stage: { type: 'string' },
       value: { type: 'object' }, decision_id: { type: 'string' }, idempotency_key: { type: 'string' } } },
-    run: ({ consultant_id: cid, ...b }) => recordOutcome(db, cid, b),
+    run: ({ consultant_id: cid, project_id: pid, ...b }) =>
+      jobVisibleTo(db, cid, pid) ? recordOutcome(db, cid, { project_id: pid, ...b })
+                                 : { error: 'NOT_FOUND', project_id: pid },
   },
   brainx_sync_now: {
     description: '触发一次同步（source: fixture|feishu；dry_run=true 只校验不落库）',
@@ -240,9 +273,14 @@ function handle(msg) {
       case 'ping':
         return respond(id, { result: {} });
       case 'tools/list':
-        return respond(id, { result: { tools: Object.entries(TOOLS).map(([name, t]) => ({
-          name, description: t.description, inputSchema: t.inputSchema })) } });
+        return respond(id, { result: { tools: Object.entries(TOOLS)
+          .filter(([name]) => !BLOCKED_TOOLS.has(name))
+          .map(([name, t]) => ({ name, description: t.description, inputSchema: t.inputSchema })) } });
       case 'tools/call': {
+        if (BLOCKED_TOOLS.has(params?.name)) {
+          return respond(id, { error: { code: -32602,
+            message: `tool blocked by policy: ${params?.name}（外露白名单硬前置未完成，见 docs/2026-09-02-tool-exposure-whitelist.md）` } });
+        }
         const t = TOOLS[params?.name];
         if (!t) return respond(id, { error: { code: -32601, message: `unknown tool: ${params?.name}` } });
         try {

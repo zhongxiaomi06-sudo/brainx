@@ -6,12 +6,16 @@ import { detectMaterialChange, makeAutoPush } from '../src/autopush.js';
 
 let db;
 before(() => {
+  process.env.BRAINX_BASE_URL = 'https://base.example.test';
   db = openDb(':memory:');
   // job_facts.sync_id → sync_runs 外键：造一条占位 sync
   db.prepare(`INSERT INTO sync_runs (sync_id, consultant_id, source, as_of, rows_expected, rows_read, complete, errors, input_hash, started_at, completed_at)
     VALUES ('s','felix','test','2026-08-07',0,0,1,'[]','h','2026-08-07 09:00','2026-08-07 09:00')`).run();
 });
-after(() => { delete process.env.BRAINX_PUSH_AUTO; });
+after(() => {
+  delete process.env.BRAINX_PUSH_AUTO;
+  delete process.env.BRAINX_BASE_URL;
+});
 
 /** 直接插两轮 run + recs（绕过 recommend 全链，专注 diff 逻辑）。 */
 function twoRuns(db, cid, prevTop3, curTop3) {

@@ -1,5 +1,5 @@
 /** scheduler.test.mjs — 每日两次定时推送（07:00/19:00 CST）+ 0012 占位清理。 */
-import { test, before } from 'node:test';
+import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { openDb } from '../src/db.js';
 import { runSync } from '../src/sync.js';
@@ -7,7 +7,11 @@ import { recommend } from '../src/recommend.js';
 import { slotState, pushSlotFor } from '../src/scheduler.js';
 
 let db;
-before(() => { db = openDb(':memory:'); });
+before(() => {
+  process.env.BRAINX_BASE_URL = 'https://base.example.test';
+  db = openDb(':memory:');
+});
+after(() => { delete process.env.BRAINX_BASE_URL; });
 
 test('slotState：07:00/19:00 CST 窗口识别，窗口外不触发', () => {
   // 2026-08-14 07:00:30 CST = 2026-08-13T23:00:30Z

@@ -11,6 +11,7 @@ const execFileP = promisify(execFile);
 import { now, uuid } from './db.js';
 import { larkProfileArgs } from './env.js';
 import { quickLink } from './quickfb.js';
+import { sendInteractiveCard } from './feishu-bot.js';
 
 const BASE_URL = process.env.BRAINX_BASE_URL || 'http://127.0.0.1:3000';
 
@@ -129,20 +130,24 @@ export async function pushCard(db, { consultant_id, kind, run_id, card, target, 
   let status = 'SENT', message_id = null, error = null;
   if (send) {
     try {
-      // lark-cli 1.0.67 无 im messages create 打字命令 → 走 api 逃生舱（bot 身份，im:message:send_as_bot）。
-      // 卡片 content 需要二次 stringify（Feishu 契约：content 是 JSON 字符串）。
-      const { stdout } = await execFileP('lark-cli', [...larkProfileArgs(), 'api', 'POST', '/open-apis/im/v1/messages', '--as', 'bot',
-        '--params', JSON.stringify({ receive_id_type: target.startsWith('oc_') ? 'chat_id' : 'open_id' }),
-        '--data', JSON.stringify({ receive_id: target, msg_type: 'interactive',
-                                   content: JSON.stringify(card) })],
-        { encoding: 'utf8', maxBuffer: 4 * 1024 * 1024, timeout: 45000, killSignal: 'SIGKILL' });
-      const d = JSON.parse(stdout.slice(stdout.indexOf('{')));
-      // api 逃生舱可能直出 Feishu 响应（{code,data:{message_id}}）或包一层 {ok,data}
-      const feishu = d?.data?.code != null ? d.data : d;
-      if (feishu?.code !== 0 && feishu?.ok !== true) {
-        throw new Error(feishu?.msg || feishu?.error?.message || JSON.stringify(d).slice(0, 200));
+      if ((process.env.BRAINX_FEISHU_APP_ID || process.env.LARK_APP_ID)
+          && (process.env.BRAINX_FEISHU_APP_SECRET || process.env.LARK_APP_SECRET)) {
+        const out = await sendInteractiveCard({ target, card });
+        message_id = out.message_id;
+      } else {
+        // 兼容旧环境：未配置直连凭证时仍可使用 lark-cli profile。
+        const { stdout } = await execFileP('lark-cli', [...larkProfileArgs(), 'api', 'POST', '/open-apis/im/v1/messages', '--as', 'bot',
+          '--params', JSON.stringify({ receive_id_type: target.startsWith('oc_') ? 'chat_id' : 'open_id' }),
+          '--data', JSON.stringify({ receive_id: target, msg_type: 'interactive',
+                                     content: JSON.stringify(card) })],
+          { encoding: 'utf8', maxBuffer: 4 * 1024 * 1024, timeout: 45000, killSignal: 'SIGKILL' });
+        const d = JSON.parse(stdout.slice(stdout.indexOf('{')));
+        const feishu = d?.data?.code != null ? d.data : d;
+        if (feishu?.code !== 0 && feishu?.ok !== true) {
+          throw new Error(feishu?.msg || feishu?.error?.message || JSON.stringify(d).slice(0, 200));
+        }
+        message_id = feishu?.data?.message_id || d?.data?.data?.message_id || null;
       }
-      message_id = feishu?.data?.message_id || d?.data?.data?.message_id || null;
     } catch (e) {
       // execFileSync 的 e.message 是命令本体（含整张卡片 JSON），真实 Feishu 错误在
       // e.stderr —— 优先 stderr，截断保护放在最后（2026-08-24 修复：push_log 曾全是无效命令回显）

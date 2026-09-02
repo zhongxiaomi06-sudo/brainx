@@ -69,6 +69,24 @@
 - 方法：`initialize` / `tools/list` / `tools/call`。对方接入后先调 `tools/list` 拿实时清单——**清单以运行时返回为准**，本文表格是快照。
 - 部署与打包细节（Docker、环境凭据、版本）：见[下游交付文档](2026-09-02-brainx-mcp-deliverable.md)，本文不重复。
 
+#### 当天最短闭环：OpenClaw 定时触发个人推荐卡（2026-09-03）
+
+在正式的“飞书对话 → 可信身份 → Agent Gateway”完工前，可以先用 OpenClaw 的 command cron 触发 BrainX 现有推荐卡，验证真实机器人、真实推荐与真实私聊送达：
+
+```text
+OpenClaw cron
+→ node --env-file=.env bin/brainx-push.mjs --consultant <cid> --slot 0700|1900 --send
+→ BrainX 冻结推荐 + 顾问 open_id
+→ 飞书官方 tenant_access_token
+→ 机器人互动卡片私聊
+```
+
+- `src/feishu-bot.js` 使用 `BRAINX_FEISHU_APP_ID` / `BRAINX_FEISHU_APP_SECRET` 直连飞书官方接口，不再要求本机安装 `lark-cli`。
+- 接收人默认从 `consultants.open_id` 按 `consultant_id` 解析；自动任务不得传群 `chat_id`。
+- `--slot` 会生成“日期 + 时段”幂等键，同一顾问同一时段重复触发只发送一次。
+- 这是单顾问、私聊、只推卡的临时闭环，不代表 OpenClaw 飞书对话渠道、Skill 或生产身份网关已经接通。
+- 创建任务前必须先手动运行一次真实发送并确认接收人、机器人权限和卡片内容正确。
+
 ### 2.2 工具清单（15 个快照，2026-09-02）
 
 | 工具 | 读/写 | 用途一句话 | 外露状态 |

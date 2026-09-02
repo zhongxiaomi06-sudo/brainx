@@ -23,6 +23,7 @@
 | spec-kit、规格驱动开发或 constitution 修订 | [规范驱动研发流程](standards/SPEC_DRIVEN_WORKFLOW.md)、[多 Agent 协作准则](../AGENTS.md) |
 | 参考代码镜像、开源仓库学习或外部设计对照 | [参考代码本地镜像清单](standards/REFERENCE_REPOS.md)、[全景架构与技术施工蓝图](architecture-2026-09-01-full-blueprint.md) |
 | 飞书群聊工作流、BrainTex 机器人、事件/卡片回调或信息鉴权分工 | [BrainTex 群聊工作流技术 PRD](prd-2026-09-01-braintex-group-workflow.md)、[Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) |
+| DataClaw 集成、群入口归属、外部 Agent 边界或接口谈判 | [DataClaw 集成交流与架构重排简报](2026-09-02-dataclaw-integration-brief.md)、[复用与自建边界及权限需求 PRD](prd-2026-09-01-reuse-selfbuild-boundary.md) |
 | 任何代码、测试或配置改动 | [上传前完整验证](standards/PRE_PUSH_VERIFICATION.md)、[质量门禁操作手册](standards/QUALITY_GATE_OPERATIONS.md) |
 | 前端组件、视觉状态或交互样例 | [内部 Storybook 组件库](storybook-component-library.md)、[上传前完整验证](standards/PRE_PUSH_VERIFICATION.md) |
 | 前端审核、Storybook 确认、正式接入或发布状态 | [前端审核台账](frontend-reviews/README.md)、[内部 Storybook 组件库](storybook-component-library.md) |
@@ -62,6 +63,7 @@
 
 ### 设计与数据
 
+- [DataClaw 集成交流与架构重排简报](2026-09-02-dataclaw-integration-brief.md)：DataClaw 纳入后的三层分工（群脑 / 领域权威 / 共享账本）、集成谈判 10 项索取清单、可复现与可接入二分表与隐私红线。
 - [Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md)：BrainX、reloop、TTC、飞书与 OpenMai 的身份纠错、Case 状态机、持久事件、Saga、隐私和施工顺序。
 - [BrainTex 群聊工作流技术 PRD](prd-2026-09-01-braintex-group-workflow.md)：群聊驱动的最终信息架构、五信任域、事件与卡片回调、内外部安全视图、P0-P3 权限模型、鉴权模块实现归属与上线门禁。
 - [全景架构与技术施工蓝图](architecture-2026-09-01-full-blueprint.md)：全本机规范收拢后的完整业务架构、四进程技术拓扑、9 张新表、分步代码逻辑（Step 0-7）与开源组件选型结论，附 §9.2 逐仓核实修订。

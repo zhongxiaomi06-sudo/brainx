@@ -2,6 +2,11 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-02｜docs(architecture): DataClaw 集成交流与架构重排简报
+
+- 改动：用户提供 DataClaw 事实（自研 AI 数据管理 Agent，已跑通"读群消息→核对后台数据→打分→建议"闭环，York 用它搭团队目标评分系统，约一面 17→25→36、推荐→约面转化 35%→80%，支持一切皆插件，9/2 下午谈集成），据此重排架构并产出 `docs/2026-09-02-dataclaw-integration-brief.md`：①一句话结论——BrainX 不再做通用 IM Agent，收缩为"职位决策与推人的领域权威 + 安全边界"，DataClaw 承担群脑层；②三层分工（群入口 / DataClaw 群脑 + BrainX 领域权威 / 共享 workflow_event_log 与 entity_links 契约层）与三条分工铁律；③今天下午交流会 10 项索取清单（每项含为什么问、可接受答案、谈不拢时的红线），按 1 插件协议→2 结构化原始消息→6 数据边界→8 排期责任人的谈判顺序；④三种集成拓扑（A BrainX 作 DataClaw 插件、B BrainX 作数据源、C 双向事件留到决赛后）与 A+B 并行的推荐；⑤可复现 vs 可接入二分表（账本/幂等/确定性评分/只读工具注册表自建保留；群入口/意图识别/经营诊断/目标评分/权限审计不重造）；⑥你重点做的事（今天谈集成 + 并行配飞书凭证保底 + York 对齐；9/3 全员使用；9/4 桥 1；9/7-9/8 推人循环优先于集成）；⑦四条风险红线（All-in 风险、候选人隐私、两套评分口径打架、留痕分裂）；⑧仍不完整的信息（需从 DataClaw 拿 10 项、需从用户拿 6 项）。`docs/README.md` 同步登记任务路由与文档书目录。
+- 验证：纯文档改动，不触碰代码与他人未提交改动；结论全部标注依据来源（week-plan 9/3 全员使用与 9/14 决赛、blueprint §9 已有可靠基础、reuse PRD §3 七件自建、Step 0/1 已完成事实）；`git status --short` 仅本次两个文件。
+
 ## 2026-09-02｜fix(gateway): 修复 BOT_OPEN_ID 占位符缺陷 + bin 启动脚本
 
 - 改动：用户指出 `src/gateway/lark-gateway.js` 的 `BOT_OPEN_ID='ou_bot'` 占位符缺陷——真实飞书事件机器人 open_id 是 ou_xxxx 永不匹配，会导致所有 @机器人 消息误判 not_mentioned 落 lark.ignored。按 A 方案修：① `processLarkEvent(db, evt, botOpenId)` 第三参数化（默认 BOT_OPEN_ID 测试约定，真实运行注入）；② `src/gateway/ws-client.js` 新增 `getBotOpenId(credentials)` 用 fetch 调 tenant_access_token/internal + bot/v3/info 拿真实 open_id，live 模式启动时注入 onMessage 回调，失败显式返回 bot_info_failed 不静默回落占位值；③ 新增 `bin/brainx-lark-gateway.mjs` 启动脚本（start [--mock] / list-chats / register 子命令，import '../src/env.js' 加载 .env，SIGINT/SIGTERM 自动 stopGateway）；④ quickstart 真实联调清单重写：分工表（用户跑 1-5/6，助手跑 5.5/7/8）、.env 键名约定（新增 LARK_* 不改旧 BRAINX_FEISHU_*）、可跑命令、版本发布关键一步、已知修复记录；⑤ package.json bin 登记 braintex-lark-gateway。

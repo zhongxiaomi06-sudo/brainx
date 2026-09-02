@@ -2,6 +2,18 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-02｜feat(job-extract): E1 群消息提炼规则层 MVP（挂账本消费者）
+
+- **改动**：按 [job_facts 提炼层研发路径](2026-09-02-job-facts-extraction-roadmap.md) §6 E1 实施。新增 `migrations/0030_lark_messages.sql`（消息正文落库，补齐规格 002 留待后续决定的缺口——evidence_refs 引用目标此前不存在）、`migrations/0031_job_facts_drafts.sql`（草稿 staging：字段对齐 job_facts + 逐字段 evidence 列 + status=pending/confirmed/rejected）；新增 `src/job-extract/`（classify.js 规则层纯函数 / schema.js zod 输出契约 / index.js `consumeJobExtract` 消费者主入口）；新增 `src/gateway/lark-messages.js`（`persistLarkMessage` INSERT OR IGNORE 幂等落正文，`processLarkEvent` 通过事件时调用，DENY 不落）；新增 `tests/job-extract-rules.test.mjs`（12 用例）+ `tests/job-extract-consumer.test.mjs`（7 用例）；roadmap 文档补 E1 实施记录；specs/002 data-model 修订 `lark_messages` 决定条目。
+- **关键实现决策**：①提炼层是 L1 账本的一个消费者——`consumeOnce(db, eventId, 'job-extract', fn)` 直接复用 Step 0 幂等模板，同事件重放不重复抽（有测试）；②规则层全部保守正则，每个命中字段带 evidence 原文锚定片段，无证据不编造（company/role/city/pipeline/hc 无命中即 null）；③skip 三路径显式返回：not_message_event（DENY 不抽）/ message_text_missing（旧事件无正文不编造）/ irrelevant（分类先行，零成本砍无关消息）；④zod `safeParse` 剥离未知键——校验只针对 schema 覆盖字段，元数据用原始 draft 插库（测试暴露后修正）；⑤node:sqlite 正则坑：`\b` 是锚点不能加量词（`\b?` 抛 ERR_INVALID_ARG_TYPE）。
+- **测试先行过程**：先写 19 用例见红灯（模块不存在）→ 实现后 8/19 → 修 3 处（city 正则 `\b?` / 测试助手接受 duplicate / zod 剥离）→ 19/19 全绿；回归 gateway+hub 既有 31 用例全绿。
+- 验证：`node --test tests/job-extract-*.test.mjs` 19/19；gateway/hub 回归 31/31；`npm run verify:quick` 在 secrets 扫描阶段仍被执行环境沙箱拦截（`CODEBUDDY_BROKER_DENY` 读取未跟踪文件审批超时，非仓库基线失败），本次以定向测试替代并在下个全量门禁运行时复核。
+
+## 2026-09-02｜build(scripts): 网关 CLI 挂 npm script（gateway / gateway:start / gateway:list-chats）
+
+- **改动**：`package.json` scripts 新增三条：`gateway`（免凭证子命令入口）、`gateway:start`（`node --env-file=.env … start`）、`gateway:list-chats`（`node --env-file=.env … list-chats`）。响应后端模块结构文档 §4 指出的「CLI 存在但没挂 npm script，每次手敲全路径」。
+- 验证：`npm run gateway -- list-chats` 实跑通过，缺凭证时按设计优雅提示 LARK_* 键名与 quickstart 指引，不崩溃。
+
 ## 2026-09-02｜docs(roadmap): 群消息→job_facts 提炼层研发路径 + OpenClaw 接口包（开源调研综合）
 
 - **改动**：用户指令「按照这个架构，给出你觉得接下来的研发路径，后端的结构我打包给对方模块化的信息，然后全面的阅读分类，然后信息需要结构，你可以参考开源的 github 的算法和组件，你阅读先广泛的学习」。同一任务两份产出：新建 `docs/2026-09-02-job-facts-extraction-roadmap.md`（约 150 行）与 `docs/2026-09-02-openclaw-interface-pack.md`（约 120 行）；README 任务路由 +2 行、文档书目录 +2 条。

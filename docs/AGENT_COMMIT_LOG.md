@@ -2,6 +2,12 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-03｜feat(agent): 落实 App 维度顾问与群授权
+
+- 任务：完成 T007-T008；服务端只用签名载荷中的 Feishu account+sender 查 ACTIVE 绑定，不接受模型参数里的租户或顾问；工具与 purpose 使用固定映射。
+- 群权限：群调用必须同时命中同租户 App 群 scope、发送人白名单、用途白名单和可选项目范围；未知群、跨 App、撤销身份、停用顾问、伪造私聊目标及损坏 scope JSON 全部失败关闭。
+- 验证：授权专项与签名联合测试 10/10、完整后端测试 410/410、`npm run verify:quick` 16/16 通过；群聊 `require_mention` 仍由 OpenClaw 渠道策略执行，锁定版工具上下文没有可独立签名的 mention 字段。
+
 ## 2026-09-03｜feat(agent): 增加短时主体签名与防重放
 
 - 任务：完成 T005-T006；先固定 canonical JSON、参数哈希、HMAC、时效、篡改与一次性消费的失败测试，再实现 `brainx_principal.v1` 签发、验证和 SQLite 原子 nonce 消费。

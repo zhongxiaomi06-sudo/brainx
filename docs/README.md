@@ -16,7 +16,8 @@
 | 任务类型 | 必读文档 |
 |---|---|
 | 产品范围、功能规划或验收标准 | [BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md) |
-| 飞书机器人、AI 猎头副驾驶、Codex 插件或对话式工作流 | [BrainX 飞书 AI 猎头副驾驶产品需求文档](prd-2026-09-01-feishu-ai-consultant-copilot.md)、[BrainX Codex Agent 职责与权限规范](codex-agent-responsibilities-and-permissions.md)、[安全操作手册](SECURITY.md) |
+| OpenClaw、飞书机器人、AI 猎头工作流、人才权限或简历解析 | [BrainX × OpenClaw AI 猎头工作流产品需求文档](prd-2026-09-02-openclaw-ai-recruiting-workflow.md)、[安全操作手册](SECURITY.md) |
+| 历史 Codex 插件、旧版飞书副驾驶方案 | [历史：BrainX 飞书 AI 猎头副驾驶产品需求文档](prd-2026-09-01-feishu-ai-consultant-copilot.md)、[历史：BrainX Codex Agent 职责与权限规范](codex-agent-responsibilities-and-permissions.md) |
 | 最终产品形态、跨前后端施工顺序或总体验收 | [BrainX 最终交付蓝图与施工总清单](brainx-final-delivery-blueprint.md) |
 | 任何代码、测试或配置改动 | [上传前完整验证](standards/PRE_PUSH_VERIFICATION.md)、[质量门禁操作手册](standards/QUALITY_GATE_OPERATIONS.md) |
 | 前端组件、视觉状态或交互样例 | [内部 Storybook 组件库](storybook-component-library.md)、[上传前完整验证](standards/PRE_PUSH_VERIFICATION.md) |
@@ -55,8 +56,9 @@
 
 ### 设计与数据
 
-- [BrainX 飞书 AI 猎头副驾驶产品需求文档](prd-2026-09-01-feishu-ai-consultant-copilot.md)：以飞书为默认入口、BrainX 为业务底座、Codex 兼容插件为能力封装的个人顾问副驾驶范围、流程、架构、安全边界和分阶段验收。
-- [BrainX Codex Agent 职责与权限规范](codex-agent-responsibilities-and-permissions.md)：Codex 与 DataClaw、飞书执行机器人及 BrainX 领域服务的详细分工，逐对象权限矩阵、P0-P5 风险、工具契约、审批、沙箱、隐私和安全验收的权威规范。
+- [BrainX × OpenClaw AI 猎头工作流产品需求文档](prd-2026-09-02-openclaw-ai-recruiting-workflow.md)：当前阶段权威开发基线；基于代码审计和官方能力，定义 OpenClaw 主 Agent、飞书最小权限、BrainX 窄网关、人才授权、简历事实、匹配、施工阶段和发布门禁。
+- [历史：BrainX 飞书 AI 猎头副驾驶产品需求文档](prd-2026-09-01-feishu-ai-consultant-copilot.md)：主 Agent 调整前的 Codex 方案和用户研究，仅作历史参考。
+- [历史：BrainX Codex Agent 职责与权限规范](codex-agent-responsibilities-and-permissions.md)：旧 Codex 方案的权限、审批和沙箱研究；不得据此向 OpenClaw 开放工具。
 - [BrainX 最终交付蓝图与施工总清单](brainx-final-delivery-blueprint.md)：基于当前代码审计定义最终产品形态、黄金路径、跨前后端施工顺序和端到端验收。
 - [前端审核台账](frontend-reviews/README.md)：前端审核、正式接入、发布与真实数据验证状态的唯一权威入口。
 - [前端交互架构](frontend-interaction-architecture.md)：BrainX 页面分层、状态诚实性和核心用户动作链。

@@ -2,15 +2,15 @@
 
 > 上级目录：[BrainX 文档书](README.md)
 >
-> 文档状态：下一阶段设计基线；尚未实现的能力不得被解释为当前生产权限
+> 文档状态：历史 Codex 设计参考；OpenClaw 当前权限以 [BrainX × OpenClaw AI 猎头工作流 PRD](prd-2026-09-02-openclaw-ai-recruiting-workflow.md) 为准
 >
 > 适用范围：BrainX Agent Gateway、Codex 兼容插件、飞书适配器、DataClaw 集成、reloop/OpenMai 集成及所有被 Agent 调用的业务工具
 >
-> 权威边界：本文是 Codex 职责、工具授权、业务审批和禁止事项的唯一详细规范；产品范围以 [飞书 AI 猎头副驾驶 PRD](prd-2026-09-01-feishu-ai-consultant-copilot.md) 为准，生产密钥和基础设施操作以 [安全操作手册](SECURITY.md) 为准
+> 权威边界：本文保留 Codex 方案的职责、审批和沙箱研究；不得据此向 OpenClaw 开放工具。当前产品和权限以 [OpenClaw PRD](prd-2026-09-02-openclaw-ai-recruiting-workflow.md) 为准，生产密钥和基础设施操作以 [安全操作手册](SECURITY.md) 为准
 
 ## 1. 文档目的
 
-本文回答四个工程上必须可验证的问题：
+本文记录主 Agent 仍为 Codex 时的权限设计，回答四个工程上必须可验证的问题：
 
 1. Codex 在猎头顾问日常工作中具体承担什么功能；
 2. Codex 为完成这些功能可以读取、生成、修改和发送什么；

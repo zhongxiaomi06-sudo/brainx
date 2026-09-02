@@ -24,6 +24,13 @@ import { feedback as recommendationFeedback, undoFeedback as recommendationUndoF
 const db = openDb();
 
 // —— 工具实现（与 server.js 路由同一套领域函数，输出原样 JSON）——
+
+// 黑名单：外露前必须先补守门的工具（工具外露白名单 §4 硬前置 1a/1c）。
+// brainx_sync_now —— 默认 source='fixture' + dry_run=false 会把决策库刷成测试数据；
+// brainx_talent  —— 无 cid 隔离（补完 brainx_talent_mine 改造后才可移出）。
+// 定义保留在 TOOLS 里（tests/mcp-write-guard.test.mjs 静态扫描依赖），但 list/call 双拦。
+const BLOCKED_TOOLS = new Set(['brainx_sync_now', 'brainx_talent']);
+
 const TOOLS = {
   brainx_consultants: {
     description: '顾问花名册（consultant_id/显示名；open_id 不出 MCP）',
@@ -176,7 +183,9 @@ const TOOLS = {
     inputSchema: { type: 'object', required: ['consultant_id', 'project_id', 'stage'], properties: {
       consultant_id: { type: 'string' }, project_id: { type: 'string' }, stage: { type: 'string' },
       value: { type: 'object' }, decision_id: { type: 'string' }, idempotency_key: { type: 'string' } } },
-    run: ({ consultant_id: cid, ...b }) => recordOutcome(db, cid, b),
+    run: ({ consultant_id: cid, project_id: pid, ...b }) =>
+      jobVisibleTo(db, cid, pid) ? recordOutcome(db, cid, { project_id: pid, ...b })
+                                 : { error: 'NOT_FOUND', project_id: pid },
   },
   brainx_sync_now: {
     description: '触发一次同步（source: fixture|feishu；dry_run=true 只校验不落库）',
@@ -240,9 +249,14 @@ function handle(msg) {
       case 'ping':
         return respond(id, { result: {} });
       case 'tools/list':
-        return respond(id, { result: { tools: Object.entries(TOOLS).map(([name, t]) => ({
-          name, description: t.description, inputSchema: t.inputSchema })) } });
+        return respond(id, { result: { tools: Object.entries(TOOLS)
+          .filter(([name]) => !BLOCKED_TOOLS.has(name))
+          .map(([name, t]) => ({ name, description: t.description, inputSchema: t.inputSchema })) } });
       case 'tools/call': {
+        if (BLOCKED_TOOLS.has(params?.name)) {
+          return respond(id, { error: { code: -32602,
+            message: `tool blocked by policy: ${params?.name}（外露白名单硬前置未完成，见 docs/2026-09-02-tool-exposure-whitelist.md）` } });
+        }
         const t = TOOLS[params?.name];
         if (!t) return respond(id, { error: { code: -32601, message: `unknown tool: ${params?.name}` } });
         try {

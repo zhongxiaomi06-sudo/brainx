@@ -93,10 +93,10 @@
 
 | # | 待补什么 | 位置 | 工期 | 阻塞 |
 |---|---|---|---|---|
-| **1** | **挂 MCP 前三个硬前置** | `mcp/server.mjs` | 0.5 天 | **必须先做完才能挂 MCP** |
-| 1a | `brainx_sync_now` 进黑名单 | 同上 | 0.2 天 | 默认 `source='fixture'`+`dry_run=false` 会刷库 |
-| 1b | `brainx_record_outcome` 补 `jobVisibleTo` | `src/replay.js:35` | 0.3 天 | 现在可给任意职位录结果 |
-| 1c | `brainx_talent` 进黑名单 | `mcp/server.mjs` | — | 无 cid 隔离 |
+| **1** | **挂 MCP 前三个硬前置** | `mcp/server.mjs` | ~~0.5 天~~ **✅ 9/2 晚完成** | `BLOCKED_TOOLS` 黑名单 + 守门测试 `tests/mcp-write-guard.test.mjs` 已落地 |
+| 1a | `brainx_sync_now` 进黑名单 | 同上 | ✅ | `tools/list` 过滤 + `tools/call` 显式报错，默认参数不再可触达 |
+| 1b | `brainx_record_outcome` 补 `jobVisibleTo` | ~~`src/replay.js:35`~~ `mcp/server.mjs` run 块 | ✅ | 与其余 5 个跨职位工具同款守门，无关职位 `NOT_FOUND` |
+| 1c | `brainx_talent` 进黑名单 | `mcp/server.mjs` | ✅ | 随 `BLOCKED_TOOLS` 机制一并拦（该工具本就不在 MCP 里，防未来加回） |
 | **2** | **OpenMai 工具暴露到 MCP** | `mcp/server.mjs` | 0.5 天 | 接单自动找人的前置 |
 | **3** | **`brainx_talent_mine` cid 隔离改造** | `src/talent.js` | 1.5 天 | 改造完才能外露 |
 | **4** | **演示机 IP 加 RDS 白名单** | 运维 | 0.5 天 | `npm run talent:health` 留证 |

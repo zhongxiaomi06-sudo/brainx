@@ -105,11 +105,11 @@ registry.js（15）                    mcp/server.mjs（15）
 - `brainx_talent` 是**泄漏**——候选人隐私进了群。
 - `brainx_sync_now` 是**破坏**——`source='fixture'` 默认参数会把真实决策库覆盖成测试数据，且默认 `dry_run=false` 直接落库，没有二次确认。**隐私泄漏能补救，数据被刷没得救。**
 
-**必须做的三件事（P0，在 MCP server 挂进 OpenClaw 之前）：**
+**必须做的三件事（P0，在 MCP server 挂进 OpenClaw 之前）—— ✅ 9/2 晚已完成第 1、2 件：**
 
-1. `brainx_sync_now` 加入启动黑名单；即使保留，也应把默认值改为 `dry_run=true` 且禁止 `source='fixture'` 走非 dry_run。
-2. `brainx_record_outcome` 补 `jobVisibleTo` 守门（与 `engage` / `record_progress` 对齐——**当前守门策略不一致**）。
-3. `brainx_recommend_run` 加调用频率限制。
+1. ✅ `brainx_sync_now` 加入启动黑名单（`mcp/server.mjs` `BLOCKED_TOOLS` 集合，`tools/list` 过滤 + `tools/call` 显式报错；`brainx_talent` 一并列入）。默认参数仍是 `source='fixture'`+`dry_run=false`，但已不可触达；未来解封前须先把默认值改为 `dry_run=true` 且禁止 `source='fixture'` 走非 dry_run。
+2. ✅ `brainx_record_outcome` 补 `jobVisibleTo` 守门（与 `engage` / `record_progress` 对齐——run 块接线，`src/visibility.js` fail-closed 实现本就共用）。守门测试 `tests/mcp-write-guard.test.mjs` B3/B4/B5 用例覆盖。
+3. ⬜ `brainx_recommend_run` 加调用频率限制（未做）。
 
 > **守门策略不一致是根因。** `engage` / `record_progress` / `terminal_result` 三个都规规矩矩调了 `jobVisibleTo`，`record_outcome` 却漏了。这不是设计取舍，是遗漏。
 

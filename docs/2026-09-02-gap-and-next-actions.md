@@ -36,15 +36,17 @@
 |---|---|---|---|
 | **A1** | **配飞书 4 个凭证** | `.env` 里 `LARK_*` 零命中 | **0 天，纯手动** |
 
-### B 档｜安全硬前置（挂 MCP 前必做，另一个线程未动）
+### B 档｜安全硬前置（挂 MCP 前必做）—— ✅ 2026-09-02 晚已全部完成
 
-核实结果（逐项 grep，非估算）：
+核实结果（逐项 grep，非估算）→ **随后同晚已修复（commit 见 [Agent Commit 记录](AGENT_COMMIT_LOG.md)）**：
 
-| # | 缺口 | 核实证据 | 风险 |
-|---|---|---|---|
-| **B1** | `brainx_sync_now` 仍在暴露且默认参数危险 | `mcp/server.mjs:181` 仍在 15 个工具里；`run: ({...source = 'fixture', dry_run = false})`。**全文件 grep `BLOCKED`/`blacklist`/`disabled`/`DENY_LIST` 零命中——没有任何黑名单机制** | 群里一句话把决策库刷成 fixture 测试数据，**数据破坏，不可恢复** |
-| **B2** | `brainx_record_outcome` 补 `jobVisibleTo` | `mcp/server.mjs:174` `run: ({consultant_id: cid, ...b}) => recordOutcome(db, cid, b)`——**MCP 层无守门**，直接透传 `src/replay.js:35`，那里只校验职位全局存在 | 可给**任意**职位录结果 |
-| **B3** | 建立 MCP 工具黑名单机制 | 同上 grep 零命中，**机制层面不存在** | 以后从 registry 那套加工具进来还会漏 |
+| # | 缺口 | 核实证据（修复前） | 修复落点 | 状态 |
+|---|---|---|---|---|
+| **B1** | `brainx_sync_now` 仍在暴露且默认参数危险 | `mcp/server.mjs:181` 仍在 15 个工具里；`run: ({...source = 'fixture', dry_run = false})`。**全文件 grep `BLOCKED`/`blacklist`/`disabled`/`DENY_LIST` 零命中——没有任何黑名单机制** | `BLOCKED_TOOLS` 集合（含 `brainx_sync_now` + `brainx_talent`），`tools/list` 过滤 + `tools/call` 显式 `tool blocked by policy` 错误，绝不执行 | ✅ |
+| **B2** | `brainx_record_outcome` 补 `jobVisibleTo` | `mcp/server.mjs:174` `run: ({consultant_id: cid, ...b}) => recordOutcome(db, cid, b)`——**MCP 层无守门**，直接透传 `src/replay.js:35`，那里只校验职位全局存在 | `run` 块补 `jobVisibleTo(db, cid, pid)`，无关职位返回 `NOT_FOUND`（与其余 5 个跨职位工具对齐；`src/visibility.js` 的 fail-closed 实现本来就 import 了，只是这个工具没接线） | ✅ |
+| **B3** | 建立 MCP 工具黑名单机制 | 同上 grep 零命中，**机制层面不存在** | `BLOCKED_TOOLS` 即机制本体：未来从 registry 加新工具，进黑名单一行即可拦；`tests/mcp-write-guard.test.mjs` B5 用静态扫描断言四个跨职位写工具（engage/record_progress/terminal_result/record_outcome）的 run 块都必须含 `jobVisibleTo`，防再漏 | ✅ |
+
+> **守门测试**：`tests/mcp-write-guard.test.mjs` 5 用例——B1 黑名单不外露 / B2 命中黑名单显式报错不执行 / B3 无关职位 NOT_FOUND / B4 有关系职位放行（守门不误伤）/ B5 静态扫描防再漏。**注意**：本机 FS 代理环境下 `mcp/server.mjs` 冷启动实测 ~10s，测试 timeout 用 30s；既有 `tests/mcp.test.mjs` 的 8s timeout 在本环境同样超时（环境问题非逻辑回归）。
 
 > **顺带纠正一个易错点**：`mcp/server.mjs` 的 15 个工具是**对象 key 格式**（`brainx_consultants: {`），不是 `name: 'brainx_xxx'`。用后者 grep 会零命中、误判成"已修复"。**核实守门状态请用 `grep -n "^  brainx_[a-z_]*: {" mcp/server.mjs`。**
 

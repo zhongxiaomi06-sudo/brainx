@@ -2,6 +2,14 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-02｜fix(mcp): B 档安全硬前置三件（黑名单机制 + sync_now 屏蔽 + record_outcome 守门）
+
+- **背景**：按[缺口总表](2026-09-02-gap-and-next-actions.md) B 档实施（另一线程核实「三个硬前置一个没做」，本线程独立复核属实后修复）。
+- **改动**：`mcp/server.mjs` 三处——①新增 `BLOCKED_TOOLS = new Set(['brainx_sync_now', 'brainx_talent'])` 黑名单机制：`tools/list` 过滤黑名单工具 + `tools/call` 命中即返回 `tool blocked by policy` JSON-RPC 错误（code -32602），**绝不执行**（sync_now 默认 `source='fixture'`+`dry_run=false` 会把决策库刷成测试数据）；工具定义保留在 TOOLS 里（解封只需移出 Set）。②`brainx_record_outcome` run 块补 `jobVisibleTo(db, cid, pid)` 守门，无关职位返回 `NOT_FOUND`——与其余 5 个跨职位工具对齐；`src/visibility.js` 的 fail-closed 实现 server.mjs 本来就 import 了，只是这个工具漏接线（守门策略不一致的根因即此遗漏）。③新增 `tests/mcp-write-guard.test.mjs` 5 用例（测试先行，先 5/5 红灯后全绿）：B1 黑名单不外露 / B2 命中黑名单显式报错不执行 / B3 无关职位 NOT_FOUND / B4 有关系职位放行不误伤 / B5 静态扫描断言四个跨职位写工具（engage/record_progress/terminal_result/record_outcome）run 块必须含 `jobVisibleTo`（防再漏守门）。
+- **文档回写**：缺口总表 B 档标 ✅ 并记录修复落点；后端模块结构 §3 待补 1/1a/1b/1c 标完成；工具外露白名单 §3 三件 P0 标 1、2 完成（第 3 件 recommend_run 限流未做）。
+- **排障记录（环境坑，防复踩）**：守门测试首跑 B1 超时——排查发现本机 FS 代理环境下 `mcp/server.mjs` 冷启动实测 ~10s（node_modules 大模块 + 31 迁移 + seed 全走代理 IPC），8s timeout 必超；**既有 `tests/mcp.test.mjs` 3/3 在本环境同样超时挂掉，属环境问题非逻辑回归**（其 8s timeout 未动，属他人文件且与本次任务无直接关系）；新测试 timeout 提至 30s 并在代码注释说明。另：macOS BSD grep 的 `\|` 交替不可靠，核实 MCP 工具守门状态必须用 `grep -nE`（`\|` 模式会零命中误判「已修复」）。
+- 验证：`node --test tests/mcp-write-guard.test.mjs` 5/5；回归 `tests/job-extract-*.test.mjs + gateway-process + hub-consumer` 32/32；`node --check mcp/server.mjs` 通过；`npm run verify:quick` 仍被执行环境沙箱在 secrets 扫描阶段拦截（同前次记录，非仓库问题）。
+
 ## 2026-09-02｜feat(job-extract): E1 群消息提炼规则层 MVP（挂账本消费者）
 
 - **改动**：按 [job_facts 提炼层研发路径](2026-09-02-job-facts-extraction-roadmap.md) §6 E1 实施。新增 `migrations/0030_lark_messages.sql`（消息正文落库，补齐规格 002 留待后续决定的缺口——evidence_refs 引用目标此前不存在）、`migrations/0031_job_facts_drafts.sql`（草稿 staging：字段对齐 job_facts + 逐字段 evidence 列 + status=pending/confirmed/rejected）；新增 `src/job-extract/`（classify.js 规则层纯函数 / schema.js zod 输出契约 / index.js `consumeJobExtract` 消费者主入口）；新增 `src/gateway/lark-messages.js`（`persistLarkMessage` INSERT OR IGNORE 幂等落正文，`processLarkEvent` 通过事件时调用，DENY 不落）；新增 `tests/job-extract-rules.test.mjs`（12 用例）+ `tests/job-extract-consumer.test.mjs`（7 用例）；roadmap 文档补 E1 实施记录；specs/002 data-model 修订 `lark_messages` 决定条目。

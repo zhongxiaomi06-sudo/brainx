@@ -2,6 +2,12 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-03｜docs(talent): 记录 OpenClaw 飞书推荐真实验收
+
+- 状态：数据责任人明确同意脱敏候选 shortlist 进入当前 OpenAI 模型；OpenClaw `gpt-5.5` 真实执行一次 Agent turn，仅调用 `brainx_candidate_shortlist` 1 次、工具失败 0 次，生成 Mia 的沐仞科技 HR 岗 Top 3 推荐。
+- 投递：复核输出不含手机号、邮箱、完整姓名或简历原文后，由飞书企业机器人发送到 Mia 私聊；飞书返回消息 ID `om_x100b66b20466a0a0c218868c5e0df24`。权威数据契约文档同步从“尚未授权/未发送”更新为“单顾问 PoC 闭环验收通过”，仍明确多人生产网关与撤权传播未完成。
+- 验证：OpenClaw run 状态 `ok`、OpenAI 调用成功且未回退；飞书发送接口返回正式消息 ID；`git diff --check` 和 `npm run verify:quick` 16/16 通过。
+
 ## 2026-09-03｜feat(talent): 打通 reloop 到 OpenClaw 候选推荐闭环
 
 - 改动：新增 reloop 结构化档案转换器与幂等导入器，复用 `reloop_app` 已有候选事实和推荐批次，不安装整套 Resume-Matcher、不读取旧空 `talent/resume` 作为业务源、不改变原排序；事实写入前经过 strict `candidate_fact_v1` 和敏感文本检查，联系方式不进入影子 `talent`、事实 JSON、shortlist 或固定文案。新增 `candidate_source_links` 稳定映射和 `job_access_grants` 职位授权账本，shortlist 同时要求有效职位授权、人才 `resume_facts` 授权、相同 tenant/consultant/purpose、`READY` fact 与 `SUCCEEDED` run；修复该 RDS 不支持参数化 `LIMIT` 及北京时间 `DATETIME` 与 `UTC_TIMESTAMP` 错配导致的误拒绝。

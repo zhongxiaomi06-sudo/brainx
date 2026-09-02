@@ -165,7 +165,7 @@ BRAINX_MCP_TENANT_ID=<内部租户ID>
 - 10/10 候选人通过 `candidate_fact_v1`，已写入 10 个最小影子人才、10 份事实、144 条 hash 证据、候选授权、职位授权和版本化 match run；
 - 当前最新 run 使用 `reloop-existing-recommendation-v1.1`。它只转换既有推荐和补充保守解释，不改变候选排序；
 - OpenClaw `brainx` profile 已绑定 `consultant=mia`、`tenant=ttc-york-team`，MCP probe 确认只外露 7 个精确只读工具，其中包含 shortlist；
-- 固定模板 Top 3 已真实读取成功。实际调用外部模型生成文案因候选数据出境授权未单独确认而停止，未向模型或飞书发送。
+- 数据责任人已明确授权脱敏 shortlist 进入当前 OpenAI 模型。OpenClaw 使用 `gpt-5.5` 完成一次真实 Agent turn，执行记录显示只调用 1 次 `brainx_candidate_shortlist`、失败 0 次；生成结果经敏感字段复核后由飞书企业机器人发送到 Mia 私聊，飞书返回消息 ID `om_x100b66b20466a0a0c218868c5e0df24`。
 - 10 份事实重新通过生产 Zod 契约，排除 hash/ref 后的可展示文本手机号/邮箱命中均为 0；数据库整段正则会误扫 SHA-256 连续数字，不作为隐私验收方式。
 
 已完成：
@@ -178,6 +178,7 @@ BRAINX_MCP_TENANT_ID=<内部租户ID>
 - reloop 结构化档案到事实契约的确定性转换；
 - 现有推荐批次的幂等导入、版本化 run 和固定文案预览；
 - 真实 RDS migration、真实 Top 10 导入、OpenClaw 双层白名单与 MCP probe；
+- OpenClaw 真实读取脱敏 Top 3、生成推荐文案并由飞书机器人投递 Mia 私聊；
 - 契约、迁移、查询、MCP 暴露条件回归测试。
 
 尚未完成：
@@ -187,20 +188,18 @@ BRAINX_MCP_TENANT_ID=<内部租户ID>
 - 尚未对非结构化 PDF/DOCX 生成新事实；当前首批直接复用 reloop 已有结构化档案；
 - 尚未用 BrainX 新算法重排，当前保留 reloop 既有 Top 10 顺序；
 - 尚未实现候选人详情、fit 和 gap 工具；
-- 尚未获得“允许脱敏候选 shortlist 进入外部 OpenAI 模型”的单独明确授权，因此未执行 Agent 生成与飞书真实发送；
 - 尚未实现多人生产 Agent Gateway、撤权后的缓存/索引删除传播。
 
-因此当前已经完成“真实数据 → 严格事实 → 双重授权 → OpenClaw 可调用工具 → 固定文案预览”；还差外部模型数据处理授权和一次飞书私聊投递，不能表述为多人生产已完成。
+因此当前已经完成单顾问 PoC 的“真实数据 → 严格事实 → 双重授权 → OpenClaw 读取 → Agent 生成 → 飞书机器人私聊投递”闭环；它证明了技术链路可行，但不能表述为多人生产已完成。
 
 ## 9. 下一步
 
-1. 由数据责任人明确确认：脱敏 shortlist 是否允许发送给当前 OpenAI 模型处理；同意后运行一次 OpenClaw Agent 私聊 smoke test；
-2. 先发送固定模板 Top 3 到 Mia 私聊，核对真实接收人和展示口径，再讨论定时推送；
-3. 把 `reloop_app` 的用户—顾问授权同步从本次人工绑定改为可撤销的正式同步作业；
-4. 为 383 份结构化档案做增量游标，而不是每天全量复制；
-5. 用顾问反馈标注比较 reloop 既有排序与 BrainX 影子算法，达标后才切换排序；
-6. PDF/DOCX 无结构化来源时再引入 Docling/MarkItDown，扫描件明确标 `OCR_REQUIRED`；
-7. 实现生产 Agent Gateway、可信 requester 身份映射和撤权传播后，才向其他顾问推广。
+1. 由 Mia 核对本次飞书私聊的展示口径，再决定每日发送时间、Top N 和是否使用互动卡片；
+2. 把 `reloop_app` 的用户—顾问授权同步从本次人工绑定改为可撤销的正式同步作业；
+3. 为 383 份结构化档案做增量游标，而不是每天全量复制；
+4. 用顾问反馈标注比较 reloop 既有排序与 BrainX 影子算法，达标后才切换排序；
+5. PDF/DOCX 无结构化来源时再引入 Docling/MarkItDown，扫描件明确标 `OCR_REQUIRED`；
+6. 实现生产 Agent Gateway、可信 requester 身份映射和撤权传播后，才向其他顾问推广。
 
 ### 9.1 当前 PoC 命令
 

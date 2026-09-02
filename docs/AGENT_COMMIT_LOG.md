@@ -26,6 +26,18 @@
 - **产出 2（接口包，`2026-09-02-openclaw-interface-pack.md`）**：交给 OpenClaw 侧的**单一打包文档**——对方拿这一份即可完成对接，不重复后端内部实现（内部/守门/部署均以链接引用避免复制冲突）。§1 三接缝一屏图（工具调用 / consultant_id 身份映射 / Skill 素材）+ 三条红线对方侧同样适用；§2 stdio MCP 接入配置模板（`openclaw.json` 挂 `brainx-domain`）+ 15 工具快照表（明确 🚫 黑名单 `brainx_sync_now`/`brainx_talent` 与 ⚠️ 待补守门的 `brainx_record_outcome`，并注明**运行时 `tools/list` 为准**）+ 三条调用纪律；§3 身份映射规则（后端唯一身份键 `consultant_id`、映射权威在对方、**群消息通道与身份映射互不相干**——chat_contexts 只存 chat_id）；§4 Skill 交付与合规基线；§5 后端六层一屏（仅作对方理解工具行为的上下文）；§6 交付包清单 6 项。
 - 验证：调研基于 6 轮 GitHub 检索结果交叉比对；架构决策逐条对照 Step 0/1 既有代码（`consumeOnce`/`event_dlq`/`entity_links` 均已在仓库）；目标字段与 `migrations/0001_init.sql` 实读对齐；接口包三接缝与红线逐条对照 `2026-09-02-backend-module-structure.md` §5-§6 原始裁定，工具状态与白名单文档一致；两份文档均 ≤500 行（176/132）；README 已同步。`npm run verify:quick` 本次运行至 secrets 扫描阶段被执行环境沙箱拦截（`CODEBUDDY_BROKER_DENY`，读取未跟踪文件审批超时，非仓库基线失败；前 5 项检查全部通过）；本提交为纯文档改动，不触碰代码与配置。
 
+## 2026-09-02｜docs(gap): 缺口与下一步总表（核实另一线程产出后的优先级裁定）
+
+- **改动**：用户贴来另一线程（`a3b676f` 调研+两份文档 / `2497670` gateway script / `dc4f88a` E1 规则层）的汇报并问「这个还缺什么，然后还需要写什么」。**逐项核实仓库现状**（非复述汇报）后新建 `docs/2026-09-02-gap-and-next-actions.md`（107 行），同步更新[后端模块结构](2026-09-02-backend-module-structure.md) §3 待补第 5 项状态、README 任务路由与目录。
+- **核实结论 1（全局卡点）**：`.env` 存在（1927 字节）但 **`LARK_APP_ID`/`LARK_APP_SECRET`/`LARK_ENCRYPT_KEY`/`LARK_VERIFICATION_TOKEN` 四项命中数为 0**。链路：凭证没配 → 网关 `credentials_missing` → 收不到群消息 → **E1 提炼层无输入（写了跑不了）** → 9/3 demo 无法演示 → gold set 攒不到 → E2 动不了。**这是全部待办里唯一"零成本、纯手动、卡住全局"的动作**，昨晚已列为「今晚三件事」第 1 条，至今未做。
+- **核实结论 2（B 档安全硬前置一个没动，均 grep 实证）**：①`brainx_sync_now` 仍在 15 个工具里（`mcp/server.mjs:181`），`run: ({... source = 'fixture', dry_run = false})`，**全文件 grep `BLOCKED`/`blacklist`/`disabled`/`DENY_LIST` 零命中——黑名单机制根本不存在**；②`brainx_record_outcome`（`mcp/server.mjs:174`）`run: ({consultant_id: cid, ...b}) => recordOutcome(db, cid, b)`，**MCP 层无守门直接透传** `src/replay.js:35`（那里只校验职位全局存在）；③机制层缺失导致以后从 registry 那套加工具还会漏。
+- **顺带纠正易错点**：`mcp/server.mjs` 的 15 个工具是**对象 key 格式**（`brainx_consultants: {`），不是 `name: 'brainx_xxx'`。用后者 grep 会零命中、**误判成"已修复"**。核实守门状态正确命令：`grep -n "^  brainx_[a-z_]*: {" mcp/server.mjs`。
+- **核实结论 3（C 档日历助手三件套未动）**：`src/push.js:33` `buildDailyCard` 仍推「今天建议先看 3 个职位」（**推新东西不是催旧账，方向反了**）；`src/engagement.js:120` 仍硬编码 `'推进交付或记录结果'`；`src/scheduler.js:17` 仍只有 `SLOTS = [7, 19]`。
+- **核实结论 4（D 档关键）**：`src/job-extract/index.js` 只 `INSERT INTO job_facts_drafts`（第 19 行），**不写 `job_facts`**。E3 确认闭环未做，所以 **E1 对 MVP 主循环尚无实际贡献**——`job_facts` 是推荐/接单/进展的唯一输入源，草稿进不去等于没提炼。
+- **优先级判断（本文核心）**：另一线程产出质量没问题（发现并补齐了 `lark_messages` 表缺失这个真实缺口，规格 002 原写"留待后续规格决定"；19 新测试 + 31 回归全绿）。**问题在排序**——用同一把尺子量：E1 现在跑不了且只能测纯函数、需 A1+E3 后才有业务价值；B 档立竿见影消除不可逆风险；C 档 2 天出效果。**正确顺序：A1（0 成本解锁全局）→ B（消除风险）→ C（2 天见效）→ D2 E3 确认闭环 → D1 E2 LLM → E 档其余。现在的顺序是反的。**
+- **§5 还需写什么**：代码侧 A1/B/C/D；文档侧除本文外还缺——**E1 端到端验证方案**（凭证配好后怎么验无文档，容易配完却不知验没验对）、**后端模块结构 §3 待补清单同步**（另一线程三个 commit 都没更新它，导致文档间状态不一致）、**E3 `brainx_confirm_facts` 接口契约**（接口包未纳入，OpenClaw 侧对接会缺一块）。
+- 验证：全部基于 grep 与源码实读（`.env` 键值、`mcp/server.mjs` 15 个工具 key 与 174/181 行实现、`src/job-extract/index.js:19`、`src/push.js:33`、`src/engagement.js:120`、`src/scheduler.js:17`）；新文档 107 行 ≤500；他人改动未触碰。
+
 ## 2026-09-02｜docs(architecture): 后端侧模块结构与下一步安排（职责边界裁定）
 
 - **改动**：用户明确边界「现在是对于群里的信息的读取，这个是 openclaw 的事情，还是我后端多的，**openclaw 的接口这一块我不负责，我就负责后端的其他点**；现在按照这个架构还有模块，给结构还有下一步的安排」。据此新建 `docs/2026-09-02-backend-module-structure.md`（155 行），只写后端侧。README 任务路由新增 2 行（后端模块结构 / 群消息读取归谁）、文档书目录登记 1 条。

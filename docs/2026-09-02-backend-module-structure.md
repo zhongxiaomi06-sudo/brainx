@@ -100,7 +100,7 @@
 | **2** | **OpenMai 工具暴露到 MCP** | `mcp/server.mjs` | 0.5 天 | 接单自动找人的前置 |
 | **3** | **`brainx_talent_mine` cid 隔离改造** | `src/talent.js` | 1.5 天 | 改造完才能外露 |
 | **4** | **演示机 IP 加 RDS 白名单** | 运维 | 0.5 天 | `npm run talent:health` 留证 |
-| **5** | **群消息提炼成业务字段** | **待新建**（`src/job-extract.js` 或挂 L3） | 2 天 | **① 飞书后台配完才有的验** |
+| **5** | **群消息提炼成业务字段** | `src/job-extract/` | 2 天 | **9/2 晚部分完成**：E1 规则层已落地（`dc4f88a`，含 `0030_lark_messages` 补正文落库 + `0031_job_facts_drafts` staging 表 + 规则层纯函数）。**但 E2 LLM 层与 E3 确认闭环未做，草稿进不了 `job_facts`** —— 见 [缺口总表 §3 D 档](2026-09-02-gap-and-next-actions.md) |
 | **6** | **待办提醒卡** | `src/push.js` | 1 天 | 现在推的是"建议看 3 个职位"，方向反了 |
 | **7** | **`next_action` 改 `suggestedAction`** | `src/engagement.js:120` | 0.5 天 | 现在是硬编码占位符 |
 | **8** | **到期前弹窗 + 逾期加急** | `src/scheduler.js` | 0.5 天 | 现在只有早晚两班 |

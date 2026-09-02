@@ -19,8 +19,8 @@
 - [x] T006 实现短时主体声明签发与验证到 src/agent-gateway/assertion.js
 - [x] T007 [P] 先写 App 维度身份、白名单群、sender、purpose 和项目范围负向测试到 tests/agent-authorization.test.mjs
 - [x] T008 实现 fail-closed 身份与群授权到 src/agent-gateway/authorization.js
-- [ ] T009 [P] 先写统一成功/错误 envelope、脱敏审计和限流测试到 tests/agent-runtime-guards.test.mjs
-- [ ] T010 实现统一 envelope、审计与固定窗口限流到 src/agent-gateway/envelopes.js、src/agent-gateway/audit.js、src/agent-gateway/rate-limit.js
+- [x] T009 [P] 先写统一成功/错误 envelope、脱敏审计和限流测试到 tests/agent-runtime-guards.test.mjs
+- [x] T010 实现统一 envelope、审计与固定窗口限流到 src/agent-gateway/envelopes.js、src/agent-gateway/audit.js、src/agent-gateway/rate-limit.js
 
 **Checkpoint**: assertion、身份、群范围、审计和限流可脱离 OpenClaw 独立验收。
 

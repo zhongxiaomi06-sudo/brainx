@@ -67,8 +67,8 @@
 
 - [x] T022 [P] [US4] 先写插件 manifest/运行时上下文缺失拒绝/固定 URL/签名请求/工具集合测试到 tests/openclaw-plugin.test.mjs
 - [x] T023 [US4] 实现并打包 BrainX 原生 OpenClaw 插件到 plugins/brainx-openclaw/
-- [ ] T024 [P] [US4] 先写生产 OpenClaw 配置的插件 allowlist、工具 deny、沙箱和会话隔离策略测试到 tests/openclaw-production-config.test.mjs
-- [ ] T025 [US4] 新增无密钥生产配置模板、安装脚本和 systemd 单元到 deploy/openclaw/、deploy/systemd/
+- [x] T024 [P] [US4] 先写生产 OpenClaw 配置的插件 allowlist、工具 deny、沙箱和会话隔离策略测试到 tests/openclaw-production-config.test.mjs
+- [x] T025 [US4] 新增无密钥生产配置模板、安装脚本和 systemd 单元到 deploy/openclaw/、deploy/systemd/
 - [ ] T026 [P] [US4] 先写候选卡和工作流卡只允许 HTTPS 基址、对象深链和页面再鉴权的测试到 tests/agent-deep-links.test.mjs
 - [ ] T027 [US4] 将卡片深链改为受控 HTTPS 对象 URL 并删除生产 localhost 回退到 src/candidate-shortlist-card.js 与相关渲染层
 - [ ] T028 [US4] 更新部署、安全、权限、运维、回滚和文档总目录到 docs/DEPLOYMENT.md、docs/SECURITY.md、docs/README.md、docs/2026-09-03-openclaw-production-runbook.md

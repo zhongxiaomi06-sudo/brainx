@@ -1,0 +1,24 @@
+[Unit]
+Description=BrainX least-privilege Agent Gateway
+After=network-online.target brainx.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=brainx
+Group=brainx
+WorkingDirectory=/opt/brainx
+EnvironmentFile=/etc/brainx/agent.env
+Environment=BRAINX_AGENT_GATEWAY_HOST=127.0.0.1
+Environment=BRAINX_AGENT_GATEWAY_PORT=3102
+ExecStart=/usr/bin/node /opt/brainx/bin/brainx-agent-gateway.mjs
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/brainx/data
+
+[Install]
+WantedBy=multi-user.target

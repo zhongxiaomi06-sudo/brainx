@@ -2,6 +2,12 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-03｜feat(deploy): 固化 OpenClaw 最小权限服务
+
+- 任务：完成 T024-T025；新增无明文密钥的 OpenClaw 生产配置、Agent Gateway/集成 worker/OpenClaw 三个 systemd 单元和可重复安装脚本。
+- 权限：只加载 Feishu 与 BrainX 插件，只暴露十个只读工具，明确拒绝通用执行/文件/浏览器/旧写工具；私聊按 App+渠道+发送人隔离，群聊白名单且必须 @，所有 Agent 会话按 session 沙箱隔离且无 workspace 访问。
+- 验证：配置/服务契约测试 4/4、安装脚本语法与锁定版本预检通过、`npm run verify:quick` 16/16；复盘修正密钥文件为 `0640 root:brainx` 且服务强制要求文件存在，插件临时包使用独占目录避免误装旧包。
+
 ## 2026-09-03｜feat(openclaw): 实现十工具原生插件
 
 - 任务：完成 T022-T023；按锁定版 OpenClaw `2026.7.1-2` 的官方工具工厂接口实现原生插件，manifest 与 BrainX 唯一工具目录严格保持十项一致。

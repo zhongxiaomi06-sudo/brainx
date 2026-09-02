@@ -176,7 +176,9 @@ BRAINX_MCP_TENANT_ID=<内部租户ID>
 - OpenClaw `brainx` profile 已绑定 `consultant=mia`、`tenant=ttc-york-team`，MCP probe 确认只外露 7 个精确只读工具，其中包含 shortlist；
 - `brainx-talent` Skill 已通过 OpenClaw 官方本地安装入口进入 main Agent 工作区，状态为 Ready 且对模型可见；回答规范改为“岗位投入判断—候选结论—真实证据—最大风险—首问问题”，禁止字段搬运和长串待确认项；
 - 数据责任人已明确授权脱敏 shortlist 进入当前 OpenAI 模型。OpenClaw 使用 `gpt-5.5` 完成一次真实 Agent turn，执行记录显示只调用 1 次 `brainx_candidate_shortlist`、失败 0 次；生成结果经敏感字段复核后由飞书企业机器人发送到 Mia 私聊，飞书返回消息 ID `om_x100b66b20466a0a0c218868c5e0df24`。
-- 用户反馈首版内容没有猎头决策价值。新版工具已在真实 RDS 返回职位画像和 Top 3 脱敏成果经历，v1.2 Top 10 已写入新不可变 run `rrun_5aa9caf49ab03ce299b504c4992b159557b401ebe2a94dff`；由于新增出域范围包含公司、岗位、教育和成果数字，安全层要求重新取得该扩展字段范围的明确授权，因此新版 Agent 调用与飞书发送尚未执行。
+- 用户反馈首版内容没有猎头决策价值。新版工具已在真实 RDS 返回职位画像和 Top 3 脱敏成果经历，v1.2 Top 10 已写入新不可变 run `rrun_5aa9caf49ab03ce299b504c4992b159557b401ebe2a94dff`；数据责任人随后明确授权脱敏公司、岗位、教育和成果数字进入当前 OpenAI 模型并发送给 Mia 私聊。
+- 第二版 OpenClaw run `ce8d43af-8fe2-4126-a24e-24dbf73a263f` 使用 `openai/gpt-5.5` 成功生成猎头判断。审计记录显示人才数据只由 `brainx_candidate_shortlist` 返回；另一次 `bash` 调用仅以只读方式打开 `brainx-talent/SKILL.md`，没有读取数据库、其他文件或网络。输出中的公司、岗位和成果数字均能在 shortlist 字段中定位，手机号、邮箱、完整姓名和简历原文复核为 0。
+- 首次用旧 BrainX 飞书应用的 Mia `open_id` 发送时，飞书以 `open_id cross app` 拒绝，未产生消息；改用当前 OpenClaw 飞书应用中已配对且标记为 owner 的应用内 `open_id` 后发送成功，消息 ID 为 `om_x100b66b2b17f98a4c226a29b1de8d0a`。卡片按钮指向本机 `http://127.0.0.1:3100/`，发送前 HTTP 200 已验证；公网 `http://47.110.93.137:3100/` 当时不可达，因此本次按钮只适用于同一台电脑，不代表公网部署完成。
 - 10 份事实重新通过生产 Zod 契约，排除 hash/ref 后的可展示文本手机号/邮箱命中均为 0；数据库整段正则会误扫 SHA-256 连续数字，不作为隐私验收方式。
 
 已完成：
@@ -206,8 +208,8 @@ BRAINX_MCP_TENANT_ID=<内部租户ID>
 
 ## 9. 下一步
 
-1. 由 Mia 核对本次飞书私聊的展示口径，再决定每日发送时间、Top N 和是否使用互动卡片；
-2. 数据责任人明确同意或拒绝“脱敏公司、岗位、教育和成果数字”进入当前 OpenAI 模型；同意后执行新版 Agent turn、敏感字段复核和 Mia 私聊投递；
+1. 由 Mia 核对第二版飞书互动卡片的展示口径，再决定每日发送时间和 Top N；
+2. 部署可由其他顾问访问的 HTTPS BrainX 正式入口，并把卡片按钮从本机地址切到稳定对象深链；
 3. 把 `reloop_app` 的用户—顾问授权同步从本次人工绑定改为可撤销的正式同步作业；
 4. 为 383 份结构化档案做增量游标，而不是每天全量复制；
 5. 用顾问反馈标注比较 reloop 既有排序与 BrainX 影子算法，达标后才切换排序；

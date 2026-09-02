@@ -48,8 +48,8 @@
 
 **Independent Test**: 用一份授权脱敏职位—候选人夹具完成五步连续工作流，所有结论有证据或未知标记且无业务写入。
 
-- [ ] T016 [P] [US2] 先写 me context、daily brief、job assessment、job gap 和 personal review 的契约/可见性测试到 tests/agent-job-tools.test.mjs
-- [ ] T017 [US2] 复用现有领域函数实现职位域工具到 src/agent-gateway/tools-jobs.js
+- [x] T016 [P] [US2] 先写 me context、daily brief、job assessment、job gap 和 personal review 的契约/可见性测试到 tests/agent-job-tools.test.mjs
+- [x] T017 [US2] 复用现有领域函数实现职位域工具到 src/agent-gateway/tools-jobs.js
 - [ ] T018 [P] [US2] 先写 shortlist、candidate facts、fit、candidate gap 和 interview prep 的授权/脱敏/版本测试到 tests/agent-talent-tools.test.mjs
 - [ ] T019 [US2] 复用 candidate_fact_v1 与版本化 match run 实现人才域工具到 src/agent-gateway/tools-talent.js
 - [ ] T020 [US2] 将 10 个工具接入注册表并添加黄金工作流只读回放到 tests/agent-golden-workflow.test.mjs

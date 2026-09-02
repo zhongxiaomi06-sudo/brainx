@@ -74,6 +74,7 @@ export function authorizePrincipal(db, payload, options = {}) {
   const projectRef = options.projectRef ?? null;
   if (projectRef !== null && !validText(projectRef)) fail();
   const binding = resolveBinding(db, payload, options.feishuAppKeyHash);
+  if (options.requireP2p && payload.chat_type !== 'p2p') fail();
   if (payload.chat_type === 'p2p') {
     if (payload.chat_id !== payload.requester_sender_id) fail();
   } else {

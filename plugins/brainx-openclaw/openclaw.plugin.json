@@ -1,0 +1,24 @@
+{
+  "id": "brainx-openclaw",
+  "name": "BrainX Recruiting Tools",
+  "description": "Ten least-privilege recruiting decision tools backed by the local BrainX Agent Gateway.",
+  "contracts": {
+    "tools": [
+      "brainx_me_context",
+      "brainx_daily_brief",
+      "brainx_job_assessment",
+      "brainx_candidate_shortlist",
+      "brainx_candidate_facts",
+      "brainx_candidate_fit",
+      "brainx_gap_questions",
+      "brainx_interview_prep",
+      "brainx_personal_review",
+      "brainx_run_status"
+    ]
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}

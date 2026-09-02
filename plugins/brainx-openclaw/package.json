@@ -1,0 +1,20 @@
+{
+  "name": "@brainx/openclaw-plugin",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Least-privilege OpenClaw tools for the BrainX recruiting workflow",
+  "license": "UNLICENSED",
+  "files": [
+    "index.js",
+    "runtime.js",
+    "openclaw.plugin.json",
+    "README.md"
+  ],
+  "peerDependencies": {
+    "openclaw": "2026.7.1-2"
+  },
+  "openclaw": {
+    "extensions": ["./index.js"]
+  }
+}

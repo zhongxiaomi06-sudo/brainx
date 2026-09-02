@@ -263,8 +263,14 @@ OpenClaw 侧应在 `~/.openclaw/openclaw.json` 加：
 |---|---|---|
 | **OpenMai 工具暴露**：`brainx_openmai_result` / `brainx_openmai_run` 注册到 MCP server | 飞书群不能触发自动找人 | 0.5 天 |
 | **人才库工具暴露**：`brainx_talent_mine`（**先改造为"我的候选人"cid 隔离**，§5.1 坑 1 未解决前禁止挂）+ `brainx_talent_health` | 飞书群不能查候选人（白名单已划：禁止直接挂 `brainx_talent`） | 1.5 天（含 talent 改造） |
-| **人才库契约对齐**：要么改代码为只读、要么放宽契约（与 reuse PRD §6 二选一） | 不对齐就接 MCP = 引入新隐私出口 | 0.5 天 |
+| **人才库契约对齐**：~~要么改代码为只读、要么放宽契约（与 reuse PRD §6 二选一）~~ → **9/2 会议已拍板：并行推进**（见下方说明） | 不对齐就接 MCP = 引入新隐私出口 | 0.5 天 |
 | **环境/部署验证**：演示机 IP 加白名单 + `talent:health` 留证 | 不在白名单 = 静默降级到内存库（假数据） | 0.5 天 |
+
+> **人才库契约已拍板（9/2「研发对一下」会议，[飞书权限清单 §6](2026-09-02-feishu-permission-scopes.md)）**：不是二选一，是**并行推进** ——
+> 1. **临时方案先落地**：组织团队成员把各自人才库共享给 TTC / York AI 助手，每人操作一次，约半小时，开发量极低。代价是用户需登录 reloop 才能被抓取数据，**必须额外开发数据隔离模块**。
+> 2. **整库权限同步申请**：拿到团队人才库整库共享账号后，数据隔离逻辑可直接省掉（约两个模块开发量），已开发的隔离模块再下线。
+>
+> 对本表的直接影响：**P0-2 的 cid 隔离改造不能省**（整库权限尚未通过，仍按"是否已拿到"两态设计，工具返回需带 `backend` 字段显式标注）。
 
 ### 7.2 P1 · 应做（决赛质量提升）
 
@@ -311,9 +317,10 @@ OpenClaw 侧应在 `~/.openclaw/openclaw.json` 加：
 按 P0 → P1 顺序，今天晚上 + 明天白天能做的：
 
 **今晚（9/2 21:00 前）**
-1. 拍板人才库契约（只读 / 可写），与 reuse PRD §6 对齐
+1. ~~拍板人才库契约（只读 / 可写），与 reuse PRD §6 对齐~~ → **已完成**（见 §7.1 下方说明：临时方案 + 整库申请并行推进）
 2. 跑一次端到端：用 `npx @modelcontextprotocol/inspector` 或 Claude Code 实调 5 个工具（consultants / workbench / opportunity / engage / feedback），确认契约无误
 3. 确认演示机信息回我：macOS 还是 Linux、出口 IP 是否在 RDS 白名单（决定 P0-4 怎么排）
+4. **发起人才库共享**：把"团队成员各自共享人才库给 TTC / York AI 助手"的操作步骤发到群里（这是临时方案的落地动作，约半小时）
 
 **明天（9/3）**
 1. P0-1：把 OpenMai 两个工具加进 MCP server（直接 import + 注册，半小时）
@@ -327,6 +334,7 @@ OpenClaw 侧应在 `~/.openclaw/openclaw.json` 加：
 
 ## 相关文档
 
+- [飞书权限清单（9/2 研发对齐会定论版）](2026-09-02-feishu-permission-scopes.md) — 飞书后台要勾选的 scope 与事件、三条待审批敏感权限、人才库并行方案
 - [OpenClaw 壳子 + 自写 Skill 架构](2026-09-02-openclaw-shell-architecture.md) — 上游架构与责任边界
 - [全景架构与技术施工蓝图](architecture-2026-09-01-full-blueprint.md) — BrainX 整体
 - [复用与自建边界及权限需求 PRD](prd-2026-09-01-reuse-selfbuild-boundary.md) — 人才库"只读账号"原始定义

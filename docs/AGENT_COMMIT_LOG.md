@@ -2,6 +2,11 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-02｜docs(spec): Step 1 规格补 plan/data-model/quickstart/tasks 四件套
+
+- 改动：完成 specs/002-step1-lark-gateway/ 的 speckit Phase 0-2 产物——plan.md（Technical Context、Constitution Check 五条全过、src/gateway/ 四模块 + migrations 0029 + 三个测试文件落点、纯逻辑层与传输层物理分离使可测部分无凭证依赖）；data-model.md（chat_contexts DDL + 信封映射契约表：通过 lark.message_received / DENY lark.ignored 两类，DENY idem_key 独立避免被通过事件吃掉）；quickstart.md（回放门禁 + 手工幂等单行 + 飞书凭证 8 步清单交付）；tasks.md（11 任务按 US1-US5 分组、测试先行、依赖与并行关系）。
+- 验证：`git diff --check` 通过；迁移 0029 与 0028 尾序核对一致；文件路径与 src/ tests/ 平铺惯例核对一致；仅暂存 specs/ 与本日志。
+
 ## 2026-09-02｜docs(spec): 建立 Step 1 飞书事件网关规格
 
 - 改动：Step 0 全绿后启动 Step 1，新建 `specs/002-step1-lark-gateway/spec.md`——5 个用户故事（P1 已登记群消息落标准信封、P1 未登记群默认 DENY、P1 @机器人过滤、P1 重复投递幂等、P2 凭证缺失优雅降级）+ 边界（无 message_id/无 chat_scope/evidence_refs 不存 PII）+ 9 条功能需求（chat_contexts 表、processLarkEvent 纯函数、复用 idx_wel_idem 入站幂等不新建去重表、信封映射、chat_contexts 注册工具、SDK WS 骨架、3s ACK、仅新增 @larksuiteoapi/node-sdk、fixtures 先行）+ 7 条可测成功标准。两处裁决记录于 Assumptions：①传输层采 SDK WS（蓝图 §5 伪代码为逻辑说明，§9 决议为准）；②入站幂等复用 Step 0 idx_wel_idem，不新建 lark_event_dedupe 表（Step 0 已提供更强保证）。

@@ -2,6 +2,11 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-02｜feat(gateway): Step 1 迁移 0029 + 飞书 SDK 采购
+
+- 改动：新增 `migrations/0029_chat_contexts.sql`（chat_contexts 群登记表：chat_id PK、enabled、bot_mode 默认 MENTION_ONLY、default_deny_reason、registered_at/updated_at、notes）；按蓝图 §6.2 采购清单 `npm install @larksuiteoapi/node-sdk`（运行时 deps 达 mysql2+zod+@larksuiteoapi/node-sdk=3，≤4 达标）。对应 tasks.md T001-T002。
+- 验证：`:memory:` 库经 src/db.js migrate() 自动应用后 chat_contexts 表存在、schema_migrations 记账正常；SDK 安装无漏洞。
+
 ## 2026-09-02｜docs(spec): Step 1 规格补 plan/data-model/quickstart/tasks 四件套
 
 - 改动：完成 specs/002-step1-lark-gateway/ 的 speckit Phase 0-2 产物——plan.md（Technical Context、Constitution Check 五条全过、src/gateway/ 四模块 + migrations 0029 + 三个测试文件落点、纯逻辑层与传输层物理分离使可测部分无凭证依赖）；data-model.md（chat_contexts DDL + 信封映射契约表：通过 lark.message_received / DENY lark.ignored 两类，DENY idem_key 独立避免被通过事件吃掉）；quickstart.md（回放门禁 + 手工幂等单行 + 飞书凭证 8 步清单交付）；tasks.md（11 任务按 US1-US5 分组、测试先行、依赖与并行关系）。

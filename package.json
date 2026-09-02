@@ -36,6 +36,7 @@
     "talent:e2e": "node scripts/e2e-talent-flow.mjs",
     "talent:health": "node scripts/talent-health.mjs",
     "candidate:sync:reloop": "node scripts/sync-reloop-shortlist.mjs",
+    "candidate:sync:incremental": "node scripts/sync-reloop-incremental.mjs",
     "candidate:preview": "node scripts/preview-candidate-shortlist.mjs",
     "data:pull": "node scripts/pull-cloud-data.mjs",
     "data:audit": "node scripts/pull-cloud-data.mjs --audit-only",

@@ -153,7 +153,7 @@ test('parseSkillFile 取 name/description/正文', () => {
   assert.equal(parseSkillFile('---\ndescription: 缺名\n---\nx'), null);
 });
 
-test('仓库 skills/ 发现 6 个 brainx 技能,加载与逃逸防护', () => {
+test('仓库 skills/ 同时发现历史本地技能与七个生产技能,加载与逃逸防护', () => {
   const index = discoverSkills({ includeGlobal: false });
   const names = [...index.keys()];
   for (const n of ['brainx-workbench', 'brainx-engagement', 'brainx-data-explorer', 'brainx-talent', 'brainx-ops', 'brainx-report']) {
@@ -168,9 +168,11 @@ test('仓库 skills/ 发现 6 个 brainx 技能,加载与逃逸防护', () => {
 
 test('OpenClaw 安装集只引用当前精确白名单工具', () => {
   const index = discoverSkills({ includeGlobal: false });
-  const installable = ['brainx-workbench', 'brainx-engagement', 'brainx-report', 'brainx-ops', 'brainx-talent'];
-  const allowed = new Set(['brainx_workbench', 'brainx_recommendations', 'brainx_opportunity',
-    'brainx_progress_suggestion', 'brainx_replay', 'brainx_push_preview', 'brainx_candidate_shortlist']);
+  const installable = ['brainx-today', 'brainx-job', 'brainx-talent', 'brainx-match',
+    'brainx-engagement-draft', 'brainx-interview-prep', 'brainx-review'];
+  const allowed = new Set(['brainx_me_context', 'brainx_daily_brief', 'brainx_job_assessment',
+    'brainx_candidate_shortlist', 'brainx_candidate_facts', 'brainx_candidate_fit',
+    'brainx_gap_questions', 'brainx_interview_prep', 'brainx_personal_review', 'brainx_run_status']);
   for (const name of installable) {
     const body = loadSkill(index, name).body;
     const referenced = body.match(/brainx_[a-z_]+/g) || [];

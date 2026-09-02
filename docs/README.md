@@ -31,6 +31,7 @@
 | **给 OpenClaw 侧打包对接信息、MCP 接入配置、consultant_id 映射规则或 Skill 交付** | **[BrainX → OpenClaw 接口包](2026-09-02-openclaw-interface-pack.md)**（三接缝一屏 + 15 工具快照 + 交付包清单）、[下游交付文档](2026-09-02-brainx-mcp-deliverable.md) |
 | **群消息读取归谁（OpenClaw 还是后端）** | **[后端侧模块结构 §1 边界裁定](2026-09-02-backend-module-structure.md)**（**关键纠正：通道层 `src/gateway/ws-client.js` 已在后端仓库建成，不依赖 OpenClaw**）、[飞书权限清单 §6.1](2026-09-02-feishu-permission-scopes.md) |
 | **现在还缺什么、下一步做什么** | **[缺口与下一步总表](2026-09-02-gap-and-next-actions.md)**（五档缺口 + 优先级裁定 + 顺序建议）。**当前全局卡点：飞书 4 个凭证未配**（`.env` 里 `LARK_*` 零命中），卡住 E1 验证与 9/3 demo |
+| **后端架构全貌、现状核实结论或"什么算做完"** | **[BrainX 后端架构 PRD（代码核实版）](prd-2026-09-02-backend-architecture.md)**（六层现状逐项核实 + 差距盘点含 3 个清单外新发现 + 工期关键路径 + 7 条验收标准）、[后端侧模块结构](2026-09-02-backend-module-structure.md) |
 | **飞书后台要勾选哪些权限/scope、事件订阅、敏感权限审批** | **[飞书权限清单（9/2 研发对齐会定论版）](2026-09-02-feishu-permission-scopes.md)**、`src/oauth.js` 用户身份 scope 实证注释 |
 | **这个架构承担哪些业务工作、每段业务走哪个工具** | **[业务工作全景](2026-09-02-business-work-breakdown.md)**（全链路六段 + MVP 每日循环 + 权限对照）、**[AI leader 工作流 + 日历助手](2026-09-02-ai-leader-workflow.md)**（一面前后两种形态）、[Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) |
 | **一面之前怎么串联 AI leader 工作流 / 一面之后的待办提醒** | **[AI leader 工作流 + 日历助手](2026-09-02-ai-leader-workflow.md)**、`src/scheduler.js` `src/engagement.js` `src/push.js` |

@@ -2,6 +2,16 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-02｜docs(prd): 后端架构 PRD（代码核实版）+ 全面差距盘点
+
+- **背景**：用户问「距后端全部完成还缺哪些架构」。对仓库做**独立代码核实**（非复述文档），产出架构 PRD 并开新 PR 交付。
+- **新增文档**：`docs/prd-2026-09-02-backend-architecture.md`（约 230 行）——§1 范围与职责边界（后端 vs OpenClaw 三段划分）/ §2 六层架构总览与逐层状态/ §3 本 PR 已交付成果（含「提炼层 = L1 账本消费者」关键裁决）/ §4 差距盘点/ §5 工期与关键路径/ §6 七条验收标准/ §7 五条红线/ §8 相关文档。
+- **核实发现 3 个原待补清单未覆盖的结构性缺口**（PRD §4.1）：**N1** L1 事件账本无消费者调度器（`src/hub/consumer.js` 只有 `consumeOnce` 幂等原语；`src/worker.js:25` `startWorkerTasks` 只跑 bridge+scheduler；`lark-gateway.js` 不触发消费者 → `consumeJobExtract` 全仓库只有测试在调，**配了凭证消息进来也不会自动提炼**）；**N2** MCP 无 pending drafts 读工具（grep `drafts` 零命中，E3 确认闭环只有写侧、顾问拿不到 draft_id，是半成品）；**N3** `event_dlq` 无消费/告警/重放入口（只有 `upcaster.js:20` 写入，失败事件即黑洞）。
+- **据实修正**：此前汇报「E1→E3 全链闭环打通」应限定为**代码层面**——生产侧因 N1 未接线而不会自动触发，已在 PRD 与本文档写明。
+- **关键事实**：`git diff --stat origin/main HEAD` = 128 files / +16892 / -777——Step 0 账本、Step 1 网关、job-extract 在 `main` 上**均不存在**，全部成果只在本分支，故本 PR 承载整体合并。
+- **文档回写**：`docs/README.md` 任务阅读路由新增「后端架构全貌/验收标准」一行指向本 PRD。
+- 验证：本轮为纯文档改动，未触碰代码；门禁红灯 2 项（超长行 html、health-brief 行尾空格）均为**他人未跟踪文件**，非本 PR 引入。
+
 ## 2026-09-02｜feat(job-extract): E3 确认闭环（drafts→job_facts 转正）+ recommend_run 限流
 
 - **背景**：按[缺口总表](2026-09-02-gap-and-next-actions.md) D2 实施（用户裁定顺序 D2 在 D1 之前——先让草稿能进 job_facts，E1 才不是「写了但没用」的代码）；顺带完成 B 档遗留小项 recommend_run 限流（白名单文档 P0 第 3 件）。E2 LLM 层按裁定等 gold set，本轮不动。

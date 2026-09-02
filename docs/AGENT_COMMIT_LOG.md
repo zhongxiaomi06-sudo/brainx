@@ -2,6 +2,12 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-03｜docs(plan): 设计 OpenClaw 生产权限与部署底座
+
+- 调研：对照 OpenClaw 官方插件、安全和飞书文档，并核对本机锁定版 `2026.7.1-2` 类型与真实脱敏会话元数据；确认该版本工具上下文使用 `requesterSenderId` 和 `deliveryContext`，不存在可直接假定的 `nativeChannelId`。
+- 方案：确定原生插件 → 回环 Agent Gateway → BrainX 领域函数的生产链路，定义双认证短时主体声明、App 身份/群范围、审计、人才增量与撤权、持久任务，以及 ECS systemd + nginx 的零客户端安装部署。
+- 产物：新增技术计划、研究结论、双库数据模型、Gateway v1 契约和端到端 quickstart；所有文件低于 500 行，`git diff --check` 与 `npm run verify:quick` 16/16 通过。
+
 ## 2026-09-03｜docs(spec): 冻结 OpenClaw 多顾问生产化验收范围
 
 - 规格：把 Mia 单人本机 PoC 到可推广正式版拆成四条可独立验收的用户主线，明确“任意电脑可用”是白名单顾问通过飞书或 HTTPS 零客户端安装使用，不扩大成匿名公网 SaaS。

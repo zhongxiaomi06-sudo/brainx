@@ -1,8 +1,9 @@
-# BrainX 后端架构 PRD（2026-09-02 代码核实版）
+# BrainX 后端架构核实与验收基线（2026-09-02）
 
 > 上级入口：[BrainX 文档书](README.md) · [缺口与下一步总表](2026-09-02-gap-and-next-actions.md)
 >
-> 定位：**回答"后端现在是什么样、还缺什么、什么算做完"的单一权威文档。**
+> 定位：**回答"后端现在是什么样、还缺什么、什么算做完"的代码核实文档。**
+> 本文不是项目产品 PRD；产品目标与范围只以[唯一产品 PRD](prd-2026-09-02-brainx-workflow.md)为准。
 > 本文所有"现状"结论均来自 2026-09-02 晚对仓库代码的逐项核实（非文档复述、非汇报转述），
 > 并标注了核实方法与代码位置，便于复核。
 
@@ -14,16 +15,10 @@ BrainX 是猎头 AI 助手，Reloop 黑客松 2026-09-14 截止，2026-09-03 有
 后端在 2026-08 至 09-02 期间完成了 Step 0（事件账本）与 Step 1（飞书网关）两大块建设，
 并在 09-02 完成了 MCP 安全加固与群消息提炼层（E1 规则层 + E3 确认闭环）。
 
-截至本文写作时，**这些成果全部只存在于 `docs/hunter-distillation-material-first` 分支上，
-尚未合入 `main`**——核实方式：
-
-```text
-git diff --stat origin/main HEAD
-→ 128 files changed, 16892 insertions(+), 777 deletions(-)
-```
-
-其中 `src/hub/`（事件账本）、`src/gateway/`（飞书网关）、`src/job-extract/`（提炼层）
-在 `main` 上均不存在。**本 PR 即承载这批成果的合并请求。**
+截至本轮复核，这批成果由 PR #45 的
+`docs/backend-architecture-prd-20260902` 分支承载，尚未合入 `main`。其中 `src/hub/`（事件账本）、
+`src/gateway/`（飞书网关）、`src/job-extract/`（提炼层）均应以该 PR 的代码和 CI 结果复核，
+不得继续引用早期分支名或旧 diff 数量作为当前状态。
 
 ### 1.2 职责边界（用户 9/2 明确裁定）
 
@@ -50,12 +45,12 @@ git diff --stat origin/main HEAD
 │  case-machine · event_dlq                                   │
 └────────────────────────┬─────────────────────────────────────┘
                          ▼
-┌─ L2 领域数据 · src/db.js + migrations/(31) ─────────────────┐
+┌─ L2 领域数据 · src/db.js + migrations/(33) ─────────────────┐
 │  job_facts · commitments · job_outcomes · lark_messages      │
 │  job_facts_drafts · processed_events · entity_links          │
 └────────────────────────┬─────────────────────────────────────┘
                          ▼
-┌─ L3 业务领域 · src/*.js(48 模块) ───────────────────────────┐
+┌─ L3 业务领域 · src/*.js(28 个根模块) ───────────────────────┐
 │  commitment · engagement · replay · recommend · radar        │
 │  openmai-task · talent-supply · scorer · sync · guard        │
 └────────────────────────┬─────────────────────────────────────┘
@@ -65,16 +60,16 @@ git diff --stat origin/main HEAD
 └────────────────────────┬─────────────────────────────────────┘
                          ▼
 ┌─ L5 MCP 交付 · mcp/server.mjs ──────────────────────────────┐
-│  16 工具 · JSON-RPC 2.0 · 零依赖 stdio · 守门与脱敏在这层    │
+│  16 个定义 / 14 个可见工具 · JSON-RPC 2.0 · stdio            │
 └──────────────────────────────────────────────────────────────┘
 ```
 
 | 层 | 位置 | 状态 | 说明 |
 |---|---|---|---|
-| L0 飞书网关 | `src/gateway/`（4 文件） | ✅ 建成，**等凭证** | `ws-client.js` 是 118 行完整实现，非骨架；不依赖 OpenClaw |
+| L0 飞书网关 | `src/gateway/`（5 文件） | ✅ 建成，**等凭证** | `ws-client.js` 是完整实现，非骨架；不依赖 OpenClaw |
 | L1 事件账本 | `src/hub/`（6 文件） | ⚠️ **只写不读** | 幂等、升档、实体对齐、Case 状态机齐备；**但无消费者调度器（见 §4.1 N1）** |
-| L2 领域数据 | `src/db.js` + 31 迁移 | ✅ 建成 | 决策库 SQLite，业务真值唯一权威 |
-| L3 业务领域 | `src/*.js`（48 模块） | ✅ 建成 | 接单/承诺/进展/回放/推荐/找人/人才供给/雷达/评分 |
+| L2 领域数据 | `src/db.js` + 33 个迁移文件 | ✅ 建成 | 决策库 SQLite，业务真值唯一权威 |
+| L3 业务领域 | `src/*.js`（28 个根模块） | ✅ 建成 | 接单/承诺/进展/回放/推荐/找人/人才供给/雷达/评分 |
 | L4 调度推送 | `scheduler.js` 等 | ⚠️ 建成，粒度粗 | 只有 `SLOTS=[7,19]`，无到期/逾期触发（见 §4.2 C3） |
 | L5 MCP 交付 | `mcp/server.mjs` | ⚠️ 建成，缺读工具 | 安全守门已补齐；**无 pending drafts 读工具（见 §4.1 N2）** |
 
@@ -196,7 +191,7 @@ git diff --stat origin/main HEAD
 | [缺口与下一步总表](2026-09-02-gap-and-next-actions.md) | 优先级与卡点，回答"现在该做什么" |
 | [后端模块结构](2026-09-02-backend-module-structure.md) | 六层职责边界与待补 10 项 |
 | [job_facts 提炼层研发路径](2026-09-02-job-facts-extraction-roadmap.md) | 开源调研综合 + E0-E4 排期 |
-| [OpenClaw 接口包](2026-09-02-openclaw-interface-pack.md) | 三接缝 + 16 工具快照，给对方对接用 |
+| [OpenClaw 接口包](2026-09-02-openclaw-interface-pack.md) | 三接缝与接口接入说明；工具清单须以 `tools/list` 实测为准 |
 | [工具外露白名单](2026-09-02-tool-exposure-whitelist.md) | 哪些工具能外露、补守门的判定依据 |
 | [飞书权限清单](2026-09-02-feishu-permission-scopes.md) | A1 配凭证时勾哪些 scope |
 | `specs/002-step1-lark-gateway/quickstart.md` | 飞书后台 8 步配置清单 |

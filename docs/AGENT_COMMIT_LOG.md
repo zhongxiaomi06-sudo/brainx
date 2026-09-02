@@ -2,6 +2,15 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-02｜docs(prd): 以当天最新需求确立猎头业务工作流产品目标
+
+- **裁决纠正**：不再把 2026-08-24 职位决策工作台 PRD提升为当前产品真理；该文档降为历史产品基线。当前唯一项目级产品 PRD改为 `docs/prd-2026-09-02-brainx-workflow.md`，以用户 9 月 2 日最新要求为依据。
+- **当前产品目标**：飞书群聊是主要工作入口，BrainX / Workflow Hub 是业务真值；一面之前由 AI Leader 主动串联“职位录入→接单→找人→推荐→约面/一面”，一面之后由日历助手提醒未完成工作、下一步与截止时间。
+- **文档分层**：群聊工作流技术 PRD负责交互、安全和权限架构；工作台 PRD保留职位域历史；后端 9 月 2 日文档更名为代码核实与验收基线；文档书首页新增 P0 产品、P1 架构、P2 功能规格、P3 施工、P4 证据五层结构。
+- **任务框架**：固定 `产品 PRD → specs/<NNN-feature>/spec.md → plan.md → tasks.md → implement → converge → 完整验证 → commit/PR`，跨功能缺口总表不再替代单功能任务。
+- **事实校正**：后端基线更新为 PR #45 当前承载分支、5 个网关文件、33 个迁移文件、28 个根业务模块、16 个 MCP 定义/14 个可见工具，并声明工具清单以 `tools/list` 实测为准。
+- **验证**：`npm run verify:quick` 16/16 通过；相关文件 `git diff --check` 通过。
+
 ## 2026-09-02｜chore(cleanup): 清除 reference 化石、PRD 改名 brainx、修复 2 个红灯文件
 
 - **背景**：上一轮化石清理（`be348ed`）后剩余三项，由用户逐项裁定：①`frontend/btex-frontend/reference/braintex-showcase-original/`（7 文件）清除；②`docs/prd-2026-09-01-braintex-group-workflow.md` 只改文件名、不改标题与内容；③2 个他人遗留的未跟踪红灯文件修好并纳入跟踪。

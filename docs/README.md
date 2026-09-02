@@ -4,6 +4,22 @@
 
 这里是仓库文档的统一入口。任何 Agent 读完根目录 `AGENTS.md` 后，都必须先到这里判断本次任务需要阅读哪些文档，不得在不了解相关约束时直接修改代码。
 
+## 唯一 PRD、文档目标与任务框架
+
+项目唯一产品 PRD 是 [BrainX 猎头业务工作流产品 PRD（2026-09-02 当前目标）](prd-2026-09-02-brainx-workflow.md)。它以用户当天最新要求为裁决依据：群聊是主要工作入口，一面之前由 AI Leader 主动串联，一面之后由日历助手提醒；8 月职位决策工作台 PRD只保留为历史产品基线。
+
+| 层级 | 目标 | 权威载体 | 完成判定 |
+|---|---|---|---|
+| P0 产品 | 明确为什么做、为谁做、做什么与不做什么 | 唯一产品 PRD | 产品 DoD 可验证且范围无冲突 |
+| P1 架构 | 说明系统如何分层、模块如何协作、信任边界在哪里 | 全景蓝图、Workflow Hub、后端核实基线 | 契约与真实调用链一致 |
+| P2 功能 | 把一个可交付变化写成可验收规格 | `specs/<feature>/spec.md` | 需求与验收场景明确 |
+| P3 施工 | 明确实现方案、依赖顺序和可勾选任务 | 同目录 `plan.md`、`tasks.md` | 任务完成并有对应测试 |
+| P4 证据 | 记录代码、测试、发布和真实数据状态 | CI/质量门禁、前端审核台账、Commit 记录 | 证据来自当前 commit 和目标环境 |
+
+任务只能按 `产品 PRD → feature spec → plan → tasks → implement → converge → 完整验证 → commit/PR` 流转。
+`2026-09-02-gap-and-next-actions.md` 只负责跨功能优先级与阻塞，不替代任何 feature 的 `tasks.md`；
+没有激活 feature 时表示当前没有进入实现阶段的新增功能，不应为了让工具通过而创建空规格。
+
 ## 所有任务的固定阅读顺序
 
 1. [多 Agent 协作准则](../AGENTS.md)
@@ -15,7 +31,7 @@
 
 | 任务类型 | 必读文档 |
 |---|---|
-| 产品范围、功能规划或验收标准 | [BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md) |
+| 产品范围、功能规划或产品验收标准 | [唯一产品 PRD](prd-2026-09-02-brainx-workflow.md)；[8 月工作台 PRD](prd-2026-08-24-brainx-v2.md)仅作历史基线 |
 | 最终产品形态、跨前后端施工顺序或总体验收 | [BrainX 最终交付蓝图与施工总清单](brainx-final-delivery-blueprint.md) |
 | BrainX×reloop 工作流总线、身份、Case 或跨系统桥接 | [Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) |
 | 全景架构、技术施工安排、分步代码逻辑或组件选型 | [全景架构与技术施工蓝图](architecture-2026-09-01-full-blueprint.md)、[Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) |
@@ -31,7 +47,7 @@
 | **给 OpenClaw 侧打包对接信息、MCP 接入配置、consultant_id 映射规则或 Skill 交付** | **[BrainX → OpenClaw 接口包](2026-09-02-openclaw-interface-pack.md)**（三接缝一屏 + 15 工具快照 + 交付包清单）、[下游交付文档](2026-09-02-brainx-mcp-deliverable.md) |
 | **群消息读取归谁（OpenClaw 还是后端）** | **[后端侧模块结构 §1 边界裁定](2026-09-02-backend-module-structure.md)**（**关键纠正：通道层 `src/gateway/ws-client.js` 已在后端仓库建成，不依赖 OpenClaw**）、[飞书权限清单 §6.1](2026-09-02-feishu-permission-scopes.md) |
 | **现在还缺什么、下一步做什么** | **[缺口与下一步总表](2026-09-02-gap-and-next-actions.md)**（五档缺口 + 优先级裁定 + 顺序建议）。**当前全局卡点：飞书 4 个凭证未配**（`.env` 里 `LARK_*` 零命中），卡住 E1 验证与 9/3 demo |
-| **后端架构全貌、现状核实结论或"什么算做完"** | **[BrainX 后端架构 PRD（代码核实版）](prd-2026-09-02-backend-architecture.md)**（六层现状逐项核实 + 差距盘点含 3 个清单外新发现 + 工期关键路径 + 7 条验收标准）、[后端侧模块结构](2026-09-02-backend-module-structure.md) |
+| **后端架构全貌、现状核实结论或"什么算做完"** | **[后端架构核实与验收基线](prd-2026-09-02-backend-architecture.md)**（六层现状、差距、关键路径与验收证据，不是产品 PRD）、[后端侧模块结构](2026-09-02-backend-module-structure.md) |
 | **飞书后台要勾选哪些权限/scope、事件订阅、敏感权限审批** | **[飞书权限清单（9/2 研发对齐会定论版）](2026-09-02-feishu-permission-scopes.md)**、`src/oauth.js` 用户身份 scope 实证注释 |
 | **这个架构承担哪些业务工作、每段业务走哪个工具** | **[业务工作全景](2026-09-02-business-work-breakdown.md)**（全链路六段 + MVP 每日循环 + 权限对照）、**[AI leader 工作流 + 日历助手](2026-09-02-ai-leader-workflow.md)**（一面前后两种形态）、[Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) |
 | **一面之前怎么串联 AI leader 工作流 / 一面之后的待办提醒** | **[AI leader 工作流 + 日历助手](2026-09-02-ai-leader-workflow.md)**、`src/scheduler.js` `src/engagement.js` `src/push.js` |

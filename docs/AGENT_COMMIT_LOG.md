@@ -2,6 +2,11 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-02｜docs(architecture): 飞书权限清单（9/2 研发对齐会定论版）
+
+- 改动：用户给妙记 `obcnsf91z37eqqv8d87f591q`（2026-09-02 16:27「研发对一下」，38 分 53 秒，York 姚堃 / Mia 钟笑咪），要求通过飞书阅读并回答"需要的权限是什么"。用 lark-cli `--as user` 读到 AI 总结 / 12 个章节 / 3 条待办 / 关键词后，新建 `docs/2026-09-02-feishu-permission-scopes.md` 把会议定的 MVP 能力映射成飞书后台可勾选的精确 scope 与事件。**核心判断：会议里 York 那句"直接把机器人拉进所有群，减少接口权限开发"的假设不成立** —— 机器人入群只能收到 @它 的消息（`im:message.group_at_msg:readonly`），而会议定的「读群内全量历史与实时消息 / 群信息提炼为标准化字段 / 目标检查」必须开高敏感的 `im:message.group_msg`（应用身份）或 `im:message.group_msg:get_as_user`（用户身份）。文档内容：①一句话结论（MVP 需两套身份权限，不是一套）；②纠正"拉机器人进群不够"并列出三档权限实际能读到什么；③会议定论→权限映射表（8 项能力，标注身份与敏感度）；④精确 scope 清单——应用身份 7 项可批量导入的 JSON（逐项注明缺了会怎样，如缺 `contact:user.base:readonly` 报 `99991672` 无法识别说话人、缺 `im:message.group_at_msg:readonly` 群里 @机器人 完全没反应）+ 用户身份 9 项（沿用 `src/oauth.js:27-38` 已实证白名单清单，**明确不要改**）；⑤事件订阅 4 项（必须选长连接不要 Webhook，且必须先本地配好凭证重启网关再去后台配，反了提示"未建立长连接"）；⑥三条待审批敏感权限 + 人才库两条路并行方案（**这条回答了下游交付文档 §7.1 P0-3「人才库契约对齐」——会议拍板是先走"成员各自共享"临时方案 + 同步申请整库，不是二选一**）；⑦与现有代码关系表；⑧红线 5 条（改完权限必须建版本发布否则不生效、不要申请全量包——2026-08-10 实证被管理员驳回）；⑨待确认 5 项。同步：docs/README.md 任务路由新增"飞书后台要勾选哪些权限/scope"行、文档书目录登记。
+- 验证：纯文档 + README/日志改动，无代码与配置影响；妙记通过 lark-cli user 身份实读成功（`minutes minutes get` + `minutes +detail --summary --todo --chapter --keyword`），`note_id` 为空（无关联智能纪要，未追 note）；scope 名称经两源交叉验证——飞书 OpenClaw 接入公开教程（im:message / im:message.p2p_msg:readonly / im:message.group_at_msg:readonly / im:message:send_as_bot / im:chat / contact:user.base:readonly / im:resource / im:message.group_msg / im:message:readonly）与仓库 `src/oauth.js` 实证清单（im:message:readonly / im:message.group_msg:get_as_user / im:chat:read / im:chat.members:read）；无估算 scope 名。
+
 ## 2026-09-02｜docs(architecture): 下游交付文档 §10 编号修正与补项
 
 - 改动：`docs/2026-09-02-brainx-mcp-deliverable.md` §10「今晚（9/2）」清单原本编号从 1 直接跳到 3（漏 2），修正为 1/2/3 连续，并把原第 3 项「端到端实调 5 个工具」补上工具全名（consultants / workbench / opportunity / engage / feedback）。同时补一条今晚可并行推进的确认项：向用户索取演示机信息（macOS 还是 Linux、出口 IP 是否在 RDS 白名单），该项决定 P0-4 的排期方式。

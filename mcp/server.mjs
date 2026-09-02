@@ -27,6 +27,7 @@ import { candidateShortlist } from '../src/candidate-shortlist.js';
 const db = openDb();
 const BOUND_CONSULTANT_ID = String(process.env.BRAINX_MCP_CONSULTANT_ID || '').trim();
 const BOUND_TENANT_ID = String(process.env.BRAINX_MCP_TENANT_ID || '').trim();
+const RELOOP_JOB_REF = /^reloop-position:\d+$/;
 
 if (BOUND_CONSULTANT_ID && !loadConsultants(db)
   .some((consultant) => consultant.consultant_id === BOUND_CONSULTANT_ID)) {
@@ -98,7 +99,7 @@ const TOOLS = {
       purpose: { type: 'string', enum: ['candidate_review', 'interview_prep', 'daily_brief'] },
     } },
     run: ({ consultant_id: consultantId, job_id: jobId, limit, page_token: pageToken, purpose }) =>
-      jobVisibleTo(db, consultantId, jobId)
+      (RELOOP_JOB_REF.test(jobId) || jobVisibleTo(db, consultantId, jobId))
         ? candidateShortlist({ tenantId: BOUND_TENANT_ID, consultantId, jobId, limit, pageToken, purpose })
         : { error: 'NOT_FOUND_OR_FORBIDDEN' },
   },

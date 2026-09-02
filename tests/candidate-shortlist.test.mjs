@@ -37,6 +37,7 @@ test('shortlist：只返回脱敏、已授权、已完成的预计算结果', as
   assert.equal(JSON.stringify(out).includes('13800000000'), false);
   assert.match(calls[0].sql, /mr\.status = 'SUCCEEDED'/);
   assert.match(calls[0].sql, /talent_access_grants/);
+  assert.match(calls[0].sql, /job_access_grants/);
   assert.match(calls[0].sql, /tag\.scope = 'resume_facts'/);
   assert.ok(calls[0].params.includes('mia'));
   assert.ok(calls[0].params.includes('tenant_a'));

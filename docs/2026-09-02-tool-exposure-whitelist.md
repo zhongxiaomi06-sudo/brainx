@@ -167,7 +167,7 @@ registry.js（15）                    mcp/server.mjs（15）
 
 `brainx_candidate_shortlist` 不是通用人才浏览工具。当前实现只有同时配置服务端
 `BRAINX_MCP_CONSULTANT_ID` 和 `BRAINX_MCP_TENANT_ID` 时才出现在 `tools/list`，并继续执行
-`jobVisibleTo`、RDS `resume_facts` grant、purpose、有效期、`SUCCEEDED` run 和 `READY` fact 校验。
+本地职位的 `jobVisibleTo` 或外部职位的 RDS `job_access_grants`、RDS `resume_facts` grant、purpose、有效期、`SUCCEEDED` run 和 `READY` fact 校验。
 详细契约见[候选人事实与 shortlist 数据契约](2026-09-03-candidate-data-contracts.md)。多人生产身份网关完成前，本表保持 ⚠️，不得按通用 MCP 工具推广。
 
 ## 相关文档

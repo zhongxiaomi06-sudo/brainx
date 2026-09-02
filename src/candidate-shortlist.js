@@ -28,13 +28,26 @@ const AUTHORIZED = `EXISTS (
     AND tag.status = 'ACTIVE'
     AND tag.scope = 'resume_facts'
     AND tag.purpose = ?
-    AND tag.granted_at <= UTC_TIMESTAMP(3)
-    AND (tag.expires_at IS NULL OR tag.expires_at > UTC_TIMESTAMP(3))
-    AND (tag.revoked_at IS NULL OR tag.revoked_at > UTC_TIMESTAMP(3))
+    AND tag.granted_at <= CURRENT_TIMESTAMP(3)
+    AND (tag.expires_at IS NULL OR tag.expires_at > CURRENT_TIMESTAMP(3))
+    AND (tag.revoked_at IS NULL OR tag.revoked_at > CURRENT_TIMESTAMP(3))
     AND (
       (tag.grantee_type = 'consultant' AND tag.grantee_ref = ?)
       OR (tag.grantee_type = 'project' AND tag.grantee_ref = ?)
     )
+)`;
+
+const AUTHORIZED_JOB = `EXISTS (
+  SELECT 1 FROM job_access_grants jag
+  WHERE jag.tenant_id = mr.tenant_id
+    AND jag.external_job_ref = jcv.external_job_ref
+    AND jag.status = 'ACTIVE'
+    AND jag.purpose = ?
+    AND jag.granted_at <= CURRENT_TIMESTAMP(3)
+    AND (jag.expires_at IS NULL OR jag.expires_at > CURRENT_TIMESTAMP(3))
+    AND (jag.revoked_at IS NULL OR jag.revoked_at > CURRENT_TIMESTAMP(3))
+    AND jag.grantee_type = 'consultant'
+    AND jag.grantee_ref = ?
 )`;
 
 const LATEST_RUN = `mr.match_run_id = (
@@ -121,24 +134,28 @@ WHERE mr.tenant_id = ?
   AND mr.completed_at IS NOT NULL
   AND cfv.quality_status = 'READY'
   AND cjm.\`rank\` > ?
+  AND ${AUTHORIZED_JOB}
   AND ${AUTHORIZED}`;
   if (input.cursor) {
     return {
       sql: `${SELECT}${common}
   AND mr.match_run_id = ?
 ORDER BY cjm.\`rank\` ASC
-LIMIT ?`,
+LIMIT ${input.limit}`,
       params: [input.tenantId, input.jobId, input.cursor.after_rank,
-        input.purpose, input.consultantId, input.jobId, input.cursor.match_run_id, input.limit],
+        input.purpose, input.consultantId,
+        input.purpose, input.consultantId, input.jobId, input.cursor.match_run_id],
     };
   }
   return {
     sql: `${SELECT}${common}
   AND ${LATEST_RUN}
 ORDER BY cjm.\`rank\` ASC
-LIMIT ?`,
-    params: [input.tenantId, input.jobId, 0, input.purpose, input.consultantId, input.jobId,
-      input.tenantId, input.jobId, input.limit],
+LIMIT ${input.limit}`,
+    params: [input.tenantId, input.jobId, 0,
+      input.purpose, input.consultantId,
+      input.purpose, input.consultantId, input.jobId,
+      input.tenantId, input.jobId],
   };
 }
 

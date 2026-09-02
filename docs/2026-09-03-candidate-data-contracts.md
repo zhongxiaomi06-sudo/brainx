@@ -12,7 +12,7 @@
 
 1. `candidate_fact_v1`：候选人的版本化结构事实；
 2. `candidate_match_bundle_v1`：某次已完成匹配运行的脱敏 shortlist 投影；
-3. 人才 RDS 独立迁移历史及八张增量表；
+3. 人才 RDS 独立迁移历史及十张增量表；
 4. `brainx_candidate_shortlist` 单顾问 PoC 工具。
 
 OpenClaw 只读取 BrainX 已经处理完成并授权的数据，不直接读取原始简历、不执行 SQL、不临时扫描整个人才库。
@@ -23,8 +23,11 @@ OpenClaw 只读取 BrainX 已经处理完成并授权的数据，不直接读取
 |---|---|
 | 两个 JSON 契约及隐私校验 | `src/talent-contracts.js` |
 | shortlist 授权查询与字段投影 | `src/candidate-shortlist.js` |
+| reloop 结构化事实转换 | `src/reloop-shortlist-pipeline.js` |
+| reloop 推荐批次导入 | `src/reloop-shortlist-sync.js`、`scripts/sync-reloop-shortlist.mjs` |
+| 固定飞书安全文案 | `src/candidate-shortlist-message.js`、`scripts/preview-candidate-shortlist.mjs` |
 | 人才 RDS 迁移执行器 | `src/talent-migrations.js` |
-| 首个增量迁移 | `talent-migrations/0001_candidate_data_v1.mjs` |
+| 增量迁移 | `talent-migrations/0001_candidate_data_v1.mjs`、`0002_job_access_grants.mjs` |
 | OpenClaw 本地 PoC 工具 | `mcp/server.mjs` |
 
 文档用于解释设计，字段真值以 Zod 契约和迁移代码为准。修改字段时必须同时更新契约测试、迁移兼容性说明和本文。
@@ -112,6 +115,7 @@ OpenClaw 只读取 BrainX 已经处理完成并授权的数据，不直接读取
 |---|---|
 | `talent_schema_migrations` | 记录文件名、内容 checksum 和执行时间 |
 | `talent_access_grants` | 人才、授予者、被授权对象、scope、purpose、有效期和撤销状态 |
+| `candidate_source_links` | reloop 等外部候选人与内部最小影子人才的稳定映射 |
 | `candidate_documents` | 文档 hash、解析器版本和处理质量，不存原文 |
 | `candidate_fact_versions` | `candidate_fact_v1` 不可变 JSON 版本 |
 | `candidate_fact_evidence` | 字段到来源位置的证据锚点 |
@@ -119,6 +123,7 @@ OpenClaw 只读取 BrainX 已经处理完成并授权的数据，不直接读取
 | `match_runs` | 匹配运行及 `PENDING→RUNNING→SUCCEEDED|FAILED|CANCELLED` 状态 |
 | `candidate_job_matches` | 每次 run 的候选人排名、双分数和解释 payload |
 | `source_sync_cursors` | 外部人才源增量同步水位 |
+| `job_access_grants` | 外部职位、顾问、purpose、有效期和撤销状态 |
 
 迁移遵循 additive-first，不修改历史 migration、不删除旧表/旧列、不覆盖 `resume.parsed_content` 和 `match_record`。MySQL DDL 会隐式提交，因此每条 DDL 都必须可幂等重放；全部执行成功后才登记 migration checksum。已经登记的迁移文件禁止改写，应新增下一个文件。
 
@@ -127,10 +132,10 @@ OpenClaw 只读取 BrainX 已经处理完成并授权的数据，不直接读取
 `brainx_candidate_shortlist` 的读取顺序是：
 
 1. MCP 启动时同时存在 `BRAINX_MCP_CONSULTANT_ID` 与 `BRAINX_MCP_TENANT_ID`，否则工具不出现在清单；
-2. 使用现有 SQLite `jobVisibleTo` 判断该顾问能否看此职位；
-3. RDS 查询锁定相同租户和外部职位引用；
+2. BrainX 本地职位先使用 SQLite `jobVisibleTo`；`reloop-position:<id>` 只允许精确格式进入 RDS 授权查询；
+3. RDS 查询锁定相同租户和外部职位引用，并要求有效 `job_access_grants`；
 4. 只选择 `SUCCEEDED` 且有完成时间的 match run；
-5. 每名候选人都必须有未撤销、未过期、purpose 相同的 `resume_facts` grant；
+5. 每名候选人都必须有未撤销、未过期、purpose 相同的 `resume_facts` grant；职位和人才两道授权缺一不可；
 6. 事实版本必须是 `READY`；
 7. 服务端只选择契约所需列，姓名只返回首字符加星号；
 8. 输出前再做 schema 和敏感文本校验。
@@ -152,34 +157,62 @@ BRAINX_MCP_TENANT_ID=<内部租户ID>
 
 ## 8. 当前完成与未完成
 
+### 8.1 2026-09-03 真实环境核验
+
+- 当前配置的 RDS `reloop` 旧七表为空，但同实例 `reloop_app.talent_profiles` 是真实结构化人才源；`COUNT(*)` 精确值为 4,156（不能使用 `information_schema.TABLE_ROWS` 的 2,264 估算值作业务口径）；
+- `York团队AI助手` 数据账号的 `ttc_bound_name` 明确为 `Mia 钟笑咪`，该账号下 383 份人才、6 个职位、20 条现有推荐；
+- 首个 PoC 选取仍启用的 `reloop-position:31`（“沐仞科技 HR岗”），只读取最新 pending 推荐批次；
+- 10/10 候选人通过 `candidate_fact_v1`，已写入 10 个最小影子人才、10 份事实、144 条 hash 证据、候选授权、职位授权和版本化 match run；
+- 当前最新 run 使用 `reloop-existing-recommendation-v1.1`。它只转换既有推荐和补充保守解释，不改变候选排序；
+- OpenClaw `brainx` profile 已绑定 `consultant=mia`、`tenant=ttc-york-team`，MCP probe 确认只外露 7 个精确只读工具，其中包含 shortlist；
+- 固定模板 Top 3 已真实读取成功。实际调用外部模型生成文案因候选数据出境授权未单独确认而停止，未向模型或飞书发送。
+- 10 份事实重新通过生产 Zod 契约，排除 hash/ref 后的可展示文本手机号/邮箱命中均为 0；数据库整段正则会误扫 SHA-256 连续数字，不作为隐私验收方式。
+
 已完成：
 
 - 两个 strict 数据契约；
 - 联系方式内容检测与未知字段拒绝；
-- 人才 RDS 迁移执行器和八张增量表；
+- 人才 RDS 迁移执行器和十张增量表；
 - 只读授权 SQL、版本固定分页、错误收口；
 - 单顾问/单租户 MCP shortlist 工具；
+- reloop 结构化档案到事实契约的确定性转换；
+- 现有推荐批次的幂等导入、版本化 run 和固定文案预览；
+- 真实 RDS migration、真实 Top 10 导入、OpenClaw 双层白名单与 MCP probe；
 - 契约、迁移、查询、MCP 暴露条件回归测试。
 
 尚未完成：
 
-- 尚未执行真实 RDS migration；
-- 尚未把旧 `resume` / `match_record` 回填为 legacy 版本；
+- 尚未把全部 383 份档案或其他顾问数据增量同步；
 - 尚未安装 Docling/MarkItDown 或启动解析 worker；
-- 尚未生成真实 `candidate_fact_v1` 和 match run；
+- 尚未对非结构化 PDF/DOCX 生成新事实；当前首批直接复用 reloop 已有结构化档案；
+- 尚未用 BrainX 新算法重排，当前保留 reloop 既有 Top 10 顺序；
 - 尚未实现候选人详情、fit 和 gap 工具；
+- 尚未获得“允许脱敏候选 shortlist 进入外部 OpenAI 模型”的单独明确授权，因此未执行 Agent 生成与飞书真实发送；
 - 尚未实现多人生产 Agent Gateway、撤权后的缓存/索引删除传播。
 
-因此当前完成的是“安全的数据与读取骨架”，不是“真实候选人已经能在飞书展示”。
+因此当前已经完成“真实数据 → 严格事实 → 双重授权 → OpenClaw 可调用工具 → 固定文案预览”；还差外部模型数据处理授权和一次飞书私聊投递，不能表述为多人生产已完成。
 
 ## 9. 下一步
 
-1. 在测试库执行 migration 并核对表、索引、外键及账号权限；
-2. 选取一小批已获授权且脱敏的 PDF/DOCX，隔离运行 Docling 影子解析；
-3. 只把通过 `candidate_fact_v1` 的结果写入新版本表；扫描件明确标 `OCR_REQUIRED`；
-4. 用现有 `supply-match-v1` 与结构化特征并行生成影子 run，正式排序保持不变；
-5. 建有效 `resume_facts` grant 后，用绑定 Mia 的 MCP 做真实只读烟雾测试；
-6. 人工检查 Top 3 的证据、未知项和脱敏结果，再把精确工具名加入 OpenClaw allowlist。
+1. 由数据责任人明确确认：脱敏 shortlist 是否允许发送给当前 OpenAI 模型处理；同意后运行一次 OpenClaw Agent 私聊 smoke test；
+2. 先发送固定模板 Top 3 到 Mia 私聊，核对真实接收人和展示口径，再讨论定时推送；
+3. 把 `reloop_app` 的用户—顾问授权同步从本次人工绑定改为可撤销的正式同步作业；
+4. 为 383 份结构化档案做增量游标，而不是每天全量复制；
+5. 用顾问反馈标注比较 reloop 既有排序与 BrainX 影子算法，达标后才切换排序；
+6. PDF/DOCX 无结构化来源时再引入 Docling/MarkItDown，扫描件明确标 `OCR_REQUIRED`；
+7. 实现生产 Agent Gateway、可信 requester 身份映射和撤权传播后，才向其他顾问推广。
+
+### 9.1 当前 PoC 命令
+
+以下命令默认只读；导入命令只有显式 `--apply` 才写影子表：
+
+```text
+npm run candidate:sync:reloop -- --tenant <tenant> --consultant <cid> \
+  --source-owner <reloop_user_id> --bound-name <ttc_bound_name> --position <id>
+
+npm run candidate:preview -- --tenant <tenant> --consultant <cid> \
+  --job reloop-position:<id> --job-name <职位名> --limit 3
+```
 
 ## 10. 验证
 

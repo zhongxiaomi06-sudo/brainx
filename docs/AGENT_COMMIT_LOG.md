@@ -2,6 +2,13 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-03｜feat(talent): 打通 reloop 到 OpenClaw 候选推荐闭环
+
+- 改动：新增 reloop 结构化档案转换器与幂等导入器，复用 `reloop_app` 已有候选事实和推荐批次，不安装整套 Resume-Matcher、不读取旧空 `talent/resume` 作为业务源、不改变原排序；事实写入前经过 strict `candidate_fact_v1` 和敏感文本检查，联系方式不进入影子 `talent`、事实 JSON、shortlist 或固定文案。新增 `candidate_source_links` 稳定映射和 `job_access_grants` 职位授权账本，shortlist 同时要求有效职位授权、人才 `resume_facts` 授权、相同 tenant/consultant/purpose、`READY` fact 与 `SUCCEEDED` run；修复该 RDS 不支持参数化 `LIMIT` 及北京时间 `DATETIME` 与 `UTC_TIMESTAMP` 错配导致的误拒绝。
+- 真实数据：确认同实例 `reloop_app.talent_profiles` 精确 4,156 条；`York团队AI助手` 数据账号的 `ttc_bound_name` 为 `Mia 钟笑咪`，该账号下 383 份人才、6 个职位、20 条既有推荐。对启用的 `reloop-position:31` 最新批次执行只读预检 10/10 通过，随后写入 10 个无联系方式影子人才、10 份事实、144 条 hash 证据、双重授权和版本化 Top 10；最新 run 为 `reloop-existing-recommendation-v1.1`，保留源排序并把占位地点视为未知。
+- OpenClaw：本机 `brainx` profile 增加服务端租户绑定和精确 shortlist allowlist；MCP probe 显示 `brainx-domain` 正常且实际仅 7 个精确工具，Shell、文件、网页、自动化和消息工具仍在 deny。新增固定飞书安全文案预览和更新后的 `brainx-talent` Skill。外部模型调用因尚未单独获得“脱敏候选 shortlist 可发送给当前 OpenAI 模型”的明确授权而被安全层拒绝；未绕过，也未真实发送飞书消息。
+- 验证：新增转换、默认 dry-run、账号绑定失败关闭、职位/人才双授权和固定文案测试；候选链路与 MCP 专项 27/27 通过；真实只读入口返回 Top 3，固定文案生成成功；10/10 事实重新通过生产契约，排除 hash/ref 后手机号/邮箱文本命中 0，影子 `talent.phone/email` 非空数 0；沙箱外完整后端测试 392/392 通过（沙箱内 HTTP/SSE 用例因监听端口被拒绝，获准在正常本机权限下复跑）；`npm run verify:quick` 16/16 通过。
+
 ## 2026-09-03｜feat(talent): 建立候选事实与授权 shortlist 数据脊柱
 
 - 改动：新增 strict `candidate_fact_v1` 与 `candidate_match_bundle_v1` 契约，要求已支持事实具备证据引用，拒绝未知字段、手机号、邮箱、完整简历和飞书路由字段；新增人才 RDS 文件名+checksum 增量迁移执行器，以及授权账本、文档/事实/证据版本、职位条件、match run、候选匹配和同步游标八张 additive 表；新增只读取 `SUCCEEDED` run、`READY` fact 和有效 `resume_facts` grant 的 shortlist 服务，候选姓名脱敏，分页固定同一 match run，RDS 不可用时明确 `SOURCE_UNAVAILABLE` 且不退内存假数据。

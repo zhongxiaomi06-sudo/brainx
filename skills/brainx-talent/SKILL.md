@@ -1,30 +1,29 @@
 ---
 name: brainx-talent
-description: 查人才库:候选人列表/详情/简历/标签/职位供给快照/找人结果。当用户问"有没有合适的候选人""某职位的人才供给""简历/匹配情况""OpenMai 找人结果"时使用。
+description: 查询本人已获授权职位的脱敏候选 shortlist；用户问合适候选人、岗位匹配、人才推荐或待确认项时使用。
 ---
 
-# BrainX 人才库查询(产品内工具版)
+# BrainX 候选人 shortlist
 
-人才库 = 阿里云 RDS MySQL `brainx_talent`(7 表:talent/tag/talent_tag/resume/position/match_record/user);MySQL 不可用时自动内存回退——先查健康再下结论。
+## 唯一允许的读取路径
 
-## 工具速查
+调用 `brainx_candidate_shortlist`，只传业务参数：
 
-| 需求 | 调用 |
-|---|---|
-| 后端健康 | `brainx_talent({health:true})` → backend(mysql/memory)与连通性 |
-| 候选人列表 | `brainx_talent({limit})`,加 `query` 按姓名/摘要过滤 |
-| 单人详情+简历 | `brainx_talent({talent_id})` |
-| 职位供给快照 | `brainx_talent_supply({project_id})` → 可匹配人数/供给难度/Top 匹配及命中词 |
-| OpenMai 找人结果 | `brainx_openmai_result({project_id})` → running/done/failed + 结果 markdown |
+- `job_id`：当前职位引用；
+- `limit`：1—20，默认 5；
+- `purpose`：默认 `candidate_review`；
+- `page_token`：仅翻页时原样传回。
 
-## 口径
+顾问和租户由服务端绑定，不能从聊天正文推断或覆盖。工具返回空时，只说“没有可展示的已授权候选人”，不得判断人才是否存在。
 
-- 供给快照是**只读旁路**(既有 match_record 的读取,不重算),刻意不参与推荐评分;回答时别把它当评分依据
-- `SUPPLY_DISABLED` = 功能未开启(BRAINX_TALENT_SUPPLY),如实告知,不要假装有数据
-- `empty:true` = 该职位还没跑过供给计算;OpenMai 找人由接单动作自动触发,或工作台职位详情页手动重跑(机器人不代触发)
-- 简历 parsed_content 可能很长,引用关键段即可
+## 回复口径
 
-## 写意图指引(机器人不执行)
+- 姓名只使用工具返回的掩码；
+- 分开写“候选人实力”和“本职位匹配”，不得合成录用概率；
+- 推荐理由只引用 `summary`，关键缺口写 `gaps`、`risks`、`unknowns`；
+- `UNKNOWN` 表示待核实，不得改写为不满足；
+- 明确算法版本。`reloop-existing-recommendation-v1*` 是现有 reloop 推荐的结构化转换，不是 BrainX 新算法重排；
+- 不索取、不输出、不猜测手机号、邮箱、完整姓名、简历原文或飞书路由 ID；
+- 不调用 SQL、Shell、文件、网页或通用人才浏览工具补数据。
 
-- 导入候选人/简历 → 管理员走 `POST /api/v1/talent/sync` 或 `node bin/brainx-openmai.mjs` / talent CLI
-- 触发/重跑 OpenMai → 工作台职位详情页「重新找人」按钮
+需要联系方式或简历详情时，告知用户应在权威人才系统内按权限查看；当前 Agent 工具不提供这些字段。

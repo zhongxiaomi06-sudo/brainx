@@ -2,6 +2,11 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-02｜docs(architecture): 工具外露白名单（15 个 read-only 工具实测）
+
+- 改动：依据用户授权"继续推进 §5.1 流水线前置"逐个读 `src/agent/registry.js` 与 `src/agent/tools/*.js` 的 schema + 隔离实现，**实测产出工具外露白名单**，新增 `docs/2026-09-02-openclaw-shell-architecture.md` §5.2：①**第一档 ✅ 直接外露 9 个**：`brainx_consultants`（花名册无业务数据）、`brainx_workbench`（恒 cid）、`brainx_recommendations`（blocked 自身守门）、`brainx_profile`（仅本人）、`brainx_radar`（可见池不含候选人）、`brainx_clients`（客户聚合不含候选人）、`brainx_progress_suggestion`（jobVisibleTo）、`brainx_push_preview`（仅本人）、`brainx_replay`（跨人=NOT_FOUND）；②**第二档 ⚠️ 需脚本级脱敏 3 个**：`brainx_opportunity`（job_facts 表可能有客户 BD 联系人）、`brainx_openmai_result`（结果候选人池）、`brainx_talent_supply`（Top 匹配）；③**第三档 ❌ 禁止外露 3 个**：**`brainx_talent`（最危险，无 cid 隔离，查 MySQL 全库等于任何群成员能查所有候选人手机号邮箱）**、`query_sql`（SQL 注入面扩到群）、`brainx_load_skill`（元工具对外无价值）；④改造落地顺序：`talent_supply` 脱敏今天可搞、`openmai_result` 脱敏明天、`opportunity` 看 `job_facts` migrations 1 小时内定、`talent` 改造为"我的候选人"cid 隔离视角列入决赛后（涉及接口签名 + MySQL 查询改造）；⑤与 §5.1 流水线对接——白名单是 AI 生成 Skill 的输入，TOOL_ROWS 需加 `exposeable` 标记让 AI 跳过第三档；现有 `skills/brainx-talent/SKILL.md` 因含 `brainx_talent({...})` 工具调用记号，**生成前必须从 MCP server 启动黑名单中移除 `brainx_talent`**，否则 MCP 一挂上它就暴露——这是历史上"已合规"判断的盲点。`§12` 待确认第一项划线标记为"已实测"指向 §5.2。
+- 验证：15 个工具逐文件读 `name` / `description` / `parameters` / 隔离实现（`loadConsultants` / `jobVisibleTo` / `cid` 解构位置 / `latestSync(complete)` 守门），无估算；其中 6 个工具发现需要 `grep` 上下文（progress-suggestion/talent-supply/push-preview/opportunity/replay/load-skill），已用 `sed -n 1,40p` 批量读全头部；文档 439 行 ≤500 行限制，章节 §1-§12 连续。
+
 ## 2026-09-02｜docs(design): 导出 OpenClaw 壳子架构图 SVG + PNG
 
 - 改动：用户要"这张架构给我一张图片"。新增 `docs/design/openclaw-shell-architecture.svg`（白底矢量，680×666）与同目录 `openclaw-shell-architecture.png`（1360×1332，由 SVG 经 Chrome headless --force-device-scale-factor=2 渲染生成，白底适合直接分享与插入 PPT）；PNG 为生成物，不应独立维护。`docs/README.md` 设计与数据段登记一行指向 SVG 并注明 PNG 同目录提供。

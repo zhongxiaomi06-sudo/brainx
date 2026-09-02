@@ -195,6 +195,58 @@ SKILL.md 草稿
 
 **核心判断：人工改的是口径，不是语法。** 语法错了肉眼可见、跑一下就崩；口径错了要等演示现场才暴露——所以上面三处人工校正不能省，其余交给生成。
 
+### 5.2 工具外露白名单（实测）
+
+（本节依据：逐个读 `src/agent/registry.js` 与 `src/agent/tools/*.js` 的 schema + 隔离实现。挂进 OpenClaw 之前必须先定白名单——`§5.1` 流水线只能遍历白名单内的工具。）
+
+按外露难度分三档：
+
+#### 第一档 ✅：直接外露（9 个）
+
+| 工具 | 隔离性 | 判定理由 |
+|---|---|---|
+| `brainx_consultants` | 全局（仅 consultant_id + display_name） | 花名册，不含业务数据 |
+| `brainx_workbench` | 恒为会话 cid | 工作台首屏仅本人 |
+| `brainx_recommendations` | 恒为 cid；同步不完整时返回 blocked | 自身有守门 |
+| `brainx_profile` | 仅本人 | 顾问自己的画像 |
+| `brainx_radar` | 当前顾问可见 | 雷达不含候选人 |
+| `brainx_clients` | 当前顾问可见 | 客户公司聚合不含候选人 |
+| `brainx_progress_suggestion` | jobVisibleTo 守门 | 仅本人可见职位 |
+| `brainx_push_preview` | 仅本人 | 推送卡预览 |
+| `brainx_replay` | 跨人 = NOT_FOUND | 决策回放 |
+
+#### 第二档 ⚠️：需脚本级脱敏后外露（3 个）
+
+| 工具 | 问题 | 改造方向 |
+|---|---|---|
+| `brainx_opportunity` | `job_facts` 表里若含客户 BD 联系人字段，会跨出"顾问可见"边界 | **先看 `job_facts` 的 migrations 字段**确认无客户敏感字段；否则在 `scripts/` 输出脚本内投影 |
+| `brainx_openmai_result` | 结果是候选人池 markdown，可能含候选人摘要/联系方式 | 输出脚本只回 `run_id` + `status` + 候选人 ID 列表；候选人详情走 `evidence_ref` |
+| `brainx_talent_supply` | Top 匹配含候选人 | 只回可匹配人数/难度/命中词，不回候选人 ID 以外的字段 |
+
+#### 第三档 ❌：禁止外露（3 个）
+
+| 工具 | 硬指标 |
+|---|---|
+| **`brainx_talent`** | **没有 cid 隔离**——它从 MySQL 全局查任何人，挂进群里等于任何群成员都能查所有候选人的手机号/邮箱/简历。**最危险的工具** |
+| **`query_sql`** | 让 agent 直查 SQLite 决策库，SQL 注入面从 Web 直接扩到群里 |
+| `brainx_load_skill` | 元工具（加载技能手册），对外没价值；只会让用户拿到内部 agent 协议 |
+
+#### 改造项落地顺序（9/14 前）
+
+1. **`talent_supply` 输出脚本脱敏**（看 `src/talent-supply.js` 找到字段出口）——今天可搞
+2. **`openmai_result` 输出脚本脱敏**——明天可搞
+3. **`opportunity` 看 `job_facts` 字段**——看 migrations 0024 之类的 job_facts 表定义，1 小时内可决；有问题再改脚本
+4. **`talent` 改造为"我承接过的候选人"视角**（受 cid 隔离）→ 改名 `brainx_talent_mine`——**涉及接口签名变更和 MySQL 查询改造，9/14 前不一定能完成，列入决赛后清单**
+
+#### 与 §5.1 流水线对接
+
+白名单是流水线的输入。生成 Skill 时 AI 只遍历：
+- 第一档全部（9 个）
+- 第二档中脱敏脚本完成后的项
+- 第三档始终排除——`registry.js` 的 `TOOL_ROWS` 里可以加 `exposeable: false` 标记，AI 跳过
+
+`brainx_talent` 因为历史 SKILL.md（`skills/brainx-talent/SKILL.md`）已经存在且描述里含 `brainx_talent({...})` 工具调用记号，**生成前要从 schema 里移除它的可见性，或在 MCP server 启动时直接挂黑名单**。否则 MCP server 一挂上它就暴露。
+
 ## 6. 官方数据接口怎么挂进来
 
 你手上有官方数据接口，这是相对 DataClaw 的优势。挂进 OpenClaw 有两条路：
@@ -367,7 +419,7 @@ Skill 与 MCP 让调用入口变多，隐私出口随之变多。硬规矩：
 
 | 缺什么 | 影响 |
 |---|---|
-| **15 个只读工具里哪些允许暴露成 Skill / MCP** | 决定 §5.1 生成范围。**`query_sql` 必须先排除**——它让 agent 直查 SQL，挂进 OpenClaw 等于把决策库开给群里的自然语言输入；`load_skill` 同理不该外露 |
+| ~~**15 个只读工具里哪些允许暴露成 Skill / MCP**~~ | **已实测**——见 §5.2 白名单：✅ 9 个直接外露 + ⚠️ 3 个需脚本脱敏 + ❌ 3 个禁止（含 `brainx_talent` 因无 cid 隔离是硬伤） |
 | 官方数据接口的文档（端点、鉴权、返回字段、错误码、QPS） | §6 选 A 还是 B 的前提，Skill 也写不对 |
 | 官方接口覆盖哪些业务域（职位？候选人？约面？成单？） | 决定哪些 Skill 能拿到真数据、哪些只能走 BrainX 本地库，也决定我们和 DataClaw 的数据面谁更全 |
 | 该接口的凭证形式与存放方式 | 决定 gating 与 env 注入方式 |

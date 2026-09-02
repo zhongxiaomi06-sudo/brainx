@@ -2,6 +2,18 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-02｜docs(roadmap): 群消息→job_facts 提炼层研发路径 + OpenClaw 接口包（开源调研综合）
+
+- **改动**：用户指令「按照这个架构，给出你觉得接下来的研发路径，后端的结构我打包给对方模块化的信息，然后全面的阅读分类，然后信息需要结构，你可以参考开源的 github 的算法和组件，你阅读先广泛的学习」。同一任务两份产出：新建 `docs/2026-09-02-job-facts-extraction-roadmap.md`（约 150 行）与 `docs/2026-09-02-openclaw-interface-pack.md`（约 120 行）；README 任务路由 +2 行、文档书目录 +2 条。
+- **调研范围（5 大方向 12 个项目）**：①结构化抽取框架——google/langextract（38k★，**原文锚定**：每字段对齐回原文字符区间，对不上即过滤，挡幻觉）、instructor-js（zod schema 约束 + 校验失败重问）、CorrDyn/job-posting-structure（规则层与 LLM 层并存的论文级架构）；②聊天→结构化事实——ReNodeX/ai-delegator（Telegram 群→线索，**先分类后抽取**砍 LLM 调用）、AmirrG1/ai-automation-agent、megaDeathChav/asapp-project（字段级评测脚本结构）；③招聘 agent——punkisnotdead3/open_recruiter（**抽取与确认分离**、Slack 群收简历同构场景、PII 过滤）、interviewstreet/hiring-agent（规则/LLM **双后端可切换**，82% top-10 基准）、farahdimshawy/RecruitmentAgent；④中文兜底——PaddleNLP UIE/PP-UIE（MVP 不采用，栈不匹配，记为降级选项）；⑤实体对齐——dedupe/splink（MVP 用规范化键 + 既有 entity_links，后期才评估）。
+- **核心选型判断：借思想不引依赖，零新增运行时依赖**。全部项目为 Python 栈或引入即超 deps≤4 约束；instructor-js 核心机制约 40 行可自建（zod 已在 deps，DeepSeek 自带 json_object）。
+- **关键架构决策：提炼层是 L1 事件账本的一个消费者**，不是新服务——`consumeOnce(db, eventId, 'job-extract', fn)` 直接复用 Step 0 幂等消费器（同 message_id 不重复抽，LLM 调用也是钱），LLM 失败走既有 `event_dlq` 可重放，实体对齐复用既有 `entity_links` 五列解析。
+- **双层管线**：①规则层（群名 `Offer-{团队}-{候选人}-{岗位}` 解析 + 状态关键词 + 正则，零成本永远在）→ ②LLM 层（`AI_JOB_EXTRACT_ENABLED` 默认关，kill-switch 对齐用户成本控制偏好）。抽取落 staging（`active_state='UNKNOWN'`），经人工/MCP `brainx_confirm_facts` 才转正——杜绝「群聊一句气话把项目标停」。
+- **抽取 schema 回答「信息需要结构」**：与 0001_init 的 job_facts 字段一一对应，每字段带 `evidence`（langextract 原文锚定思想，与账本 evidence_refs 证据链同构）+ 置信度三级（rules=high / LLM 有证据=medium / 无证据=low 不展示）。
+- **时间线 E0-E4 共 2.5 天**（E0 随 9/3 demo 攒 gold set 0.5d → E1 规则层 1d → E2 LLM 层 1d → E3 确认闭环 0.5d → E4 归一 post-deadline），与模块结构文档「2 天」估算同量级；P0 硬前置优先级不变，提炼层排其后。含不做清单（不引 UIE、不做向量匹配、LLM 不直写权威表）。
+- **产出 2（接口包，`2026-09-02-openclaw-interface-pack.md`）**：交给 OpenClaw 侧的**单一打包文档**——对方拿这一份即可完成对接，不重复后端内部实现（内部/守门/部署均以链接引用避免复制冲突）。§1 三接缝一屏图（工具调用 / consultant_id 身份映射 / Skill 素材）+ 三条红线对方侧同样适用；§2 stdio MCP 接入配置模板（`openclaw.json` 挂 `brainx-domain`）+ 15 工具快照表（明确 🚫 黑名单 `brainx_sync_now`/`brainx_talent` 与 ⚠️ 待补守门的 `brainx_record_outcome`，并注明**运行时 `tools/list` 为准**）+ 三条调用纪律；§3 身份映射规则（后端唯一身份键 `consultant_id`、映射权威在对方、**群消息通道与身份映射互不相干**——chat_contexts 只存 chat_id）；§4 Skill 交付与合规基线；§5 后端六层一屏（仅作对方理解工具行为的上下文）；§6 交付包清单 6 项。
+- 验证：调研基于 6 轮 GitHub 检索结果交叉比对；架构决策逐条对照 Step 0/1 既有代码（`consumeOnce`/`event_dlq`/`entity_links` 均已在仓库）；目标字段与 `migrations/0001_init.sql` 实读对齐；接口包三接缝与红线逐条对照 `2026-09-02-backend-module-structure.md` §5-§6 原始裁定，工具状态与白名单文档一致；两份文档均 ≤500 行（176/132）；README 已同步。`npm run verify:quick` 本次运行至 secrets 扫描阶段被执行环境沙箱拦截（`CODEBUDDY_BROKER_DENY`，读取未跟踪文件审批超时，非仓库基线失败；前 5 项检查全部通过）；本提交为纯文档改动，不触碰代码与配置。
+
 ## 2026-09-02｜docs(architecture): 后端侧模块结构与下一步安排（职责边界裁定）
 
 - **改动**：用户明确边界「现在是对于群里的信息的读取，这个是 openclaw 的事情，还是我后端多的，**openclaw 的接口这一块我不负责，我就负责后端的其他点**；现在按照这个架构还有模块，给结构还有下一步的安排」。据此新建 `docs/2026-09-02-backend-module-structure.md`（155 行），只写后端侧。README 任务路由新增 2 行（后端模块结构 / 群消息读取归谁）、文档书目录登记 1 条。

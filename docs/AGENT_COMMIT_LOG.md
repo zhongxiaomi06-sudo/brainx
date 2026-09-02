@@ -2,6 +2,11 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-02｜fix(mcp): 为单顾问 OpenClaw 锁定服务端身份
+
+- 改动：`mcp/server.mjs` 新增 `BRAINX_MCP_CONSULTANT_ID` 单顾问绑定模式；启动时校验顾问存在，`tools/list` 隐藏 `consultant_id` 参数，`tools/call` 由服务端注入绑定身份并拒绝模型覆盖。保留未设置变量时的受信本地开发兼容行为。接口包同步给出只读 6 工具过滤模板，并明确该方案仅用于单顾问本机 PoC，多人生产仍须使用 OpenClaw 原生插件 + BrainX Agent Gateway。
+- 验证：MCP 与写守门专项 12/12 通过；`npm run verify:quick` 16/16 通过；格式、换行、秘密扫描、500 行限制和前端静态回归均通过。
+
 ## 2026-09-02｜fix(test): 统一 MCP 测试文件换行
 
 - 改动：将合并兼容修正涉及的 `tests/mcp.test.mjs` 重新统一为原文件的 CRLF 换行，消除局部 LF 导致的文本卫生门禁失败；不改变测试逻辑。

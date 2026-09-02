@@ -41,7 +41,21 @@
       "brainx-domain": {
         "command": "node",
         "args": ["/path/to/brainx/mcp/server.mjs"],
-        "transport": "stdio"
+        "transport": "stdio",
+        "env": {
+          "BRAINX_ENV_FILE": "/path/to/brainx/.env",
+          "BRAINX_MCP_CONSULTANT_ID": "由管理员确认的顾问 ID"
+        },
+        "toolFilter": {
+          "include": [
+            "brainx_workbench",
+            "brainx_recommendations",
+            "brainx_opportunity",
+            "brainx_progress_suggestion",
+            "brainx_replay",
+            "brainx_push_preview"
+          ]
+        }
       }
     }
   }
@@ -49,6 +63,9 @@
 ```
 
 - 协议：JSON-RPC 2.0 over stdio，零 npm 依赖，`node mcp/server.mjs` 直接起。
+- `BRAINX_MCP_CONSULTANT_ID` 是单顾问本机 PoC 的身份硬绑定：设置后，工具 schema 不再向模型暴露 `consultant_id`，服务端自动注入；模型显式传入其他顾问 ID 会返回 `-32602`。缺少或无效绑定时不得把该 MCP 挂进飞书 Agent。
+- 上述 `toolFilter.include` 是首轮只读集合；不得把混合读写的 `brainx_profile` 或任何写工具提前加入。
+- 该 stdio 方案只用于当前单顾问本机 PoC。多人/生产飞书链路仍以 [OpenClaw 工作流 PRD §8](prd-2026-09-02-openclaw-ai-recruiting-workflow.md#8-brainx-agent-gateway-权限设计) 的原生插件 + Agent Gateway 为准，不能用“一实例一个环境变量”代替正式身份映射。
 - 方法：`initialize` / `tools/list` / `tools/call`。对方接入后先调 `tools/list` 拿实时清单——**清单以运行时返回为准**，本文表格是快照。
 - 部署与打包细节（Docker、环境凭据、版本）：见[下游交付文档](2026-09-02-brainx-mcp-deliverable.md)，本文不重复。
 

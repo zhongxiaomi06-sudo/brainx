@@ -10,10 +10,11 @@ import { fileURLToPath } from 'node:url';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 /** 起 MCP 子进程，发 NDJSON 帧，按 id 收集响应。 */
-function mcpClient() {
+function mcpClient({ boundConsultantId = '' } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'brainx-mcp-'));
   const child = spawn('node', [join(ROOT, 'mcp', 'server.mjs')], {
-    env: { ...process.env, BRAINX_DB: join(dir, 't.db') },
+    env: { ...process.env, BRAINX_DB: join(dir, 't.db'),
+      ...(boundConsultantId ? { BRAINX_MCP_CONSULTANT_ID: boundConsultantId } : {}) },
     stdio: ['pipe', 'pipe', 'pipe'],
   });
   const pending = new Map();
@@ -109,6 +110,29 @@ test('MCP：brainx_replay 信任收紧——consultant_id 缺失/未知均拒绝
     // 花名册内身份：进入归属校验（空库返回 NOT_FOUND 而非越权数据）
     const goodCid = await c.call('tools/call', { name: 'brainx_replay', arguments: { decision_id: 'D-ANY', consultant_id: 'felix' } });
     assert.equal(JSON.parse(goodCid.result.content[0].text).error, 'NOT_FOUND');
+  } finally {
+    c.close();
+  }
+});
+
+test('MCP：服务端绑定顾问后隐藏身份参数、自动注入并拒绝越权覆盖', async () => {
+  const c = mcpClient({ boundConsultantId: 'felix' });
+  try {
+    await c.call('initialize', {});
+    const list = await c.call('tools/list');
+    const workbench = list.result.tools.find((tool) => tool.name === 'brainx_workbench');
+    assert.ok(workbench);
+    assert.equal(workbench.inputSchema.properties.consultant_id, undefined);
+    assert.ok(!workbench.inputSchema.required.includes('consultant_id'));
+
+    const own = await c.call('tools/call', { name: 'brainx_workbench', arguments: {} });
+    assert.equal(JSON.parse(own.result.content[0].text).consultant_id, 'felix');
+
+    const override = await c.call('tools/call', {
+      name: 'brainx_workbench', arguments: { consultant_id: 'mia' },
+    });
+    assert.equal(override.error.code, -32602);
+    assert.match(override.error.message, /cannot be overridden/);
   } finally {
     c.close();
   }

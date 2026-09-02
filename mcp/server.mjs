@@ -3,8 +3,9 @@
  * Codex CLI / Claude Code / OpenCode 三端注册同一命令：
  *   node ./mcp/server.mjs
  *
- * 直连 src/*.js（不绕 HTTP，web 服务不用在线）。actor=consultant_id 参数归属，
- * 与 braintex-mcp 同一信任模型：本机 agent 代表某顾问行动，事件账本记 actor。
+ * 直连 src/*.js（不绕 HTTP，web 服务不用在线）。默认保留本地开发工具的
+ * consultant_id 参数；面向单顾问 Agent 时必须设置 BRAINX_MCP_CONSULTANT_ID，
+ * 服务端会注入并锁死身份，模型不能通过参数切换顾问。
  */
 import '../src/env.js';
 import { createInterface } from 'node:readline';
@@ -23,6 +24,12 @@ import { updateProfile } from '../src/roster.js';
 import { feedback as recommendationFeedback, undoFeedback as recommendationUndoFeedback } from '../src/recommendation-batch.js';
 
 const db = openDb();
+const BOUND_CONSULTANT_ID = String(process.env.BRAINX_MCP_CONSULTANT_ID || '').trim();
+
+if (BOUND_CONSULTANT_ID && !loadConsultants(db)
+  .some((consultant) => consultant.consultant_id === BOUND_CONSULTANT_ID)) {
+  throw new Error('BRAINX_MCP_CONSULTANT_ID 未对应有效顾问，MCP 拒绝启动');
+}
 
 // —— 工具实现（与 server.js 路由同一套领域函数，输出原样 JSON）——
 
@@ -259,6 +266,28 @@ const respond = (id, resultOrError) => {
 };
 const ok = (value) => ({ content: [{ type: 'text', text: JSON.stringify(value, null, 1) }] });
 
+function toolUsesConsultantId(tool) {
+  return Object.hasOwn(tool?.inputSchema?.properties || {}, 'consultant_id');
+}
+
+function publishedInputSchema(tool) {
+  if (!BOUND_CONSULTANT_ID || !toolUsesConsultantId(tool)) return tool.inputSchema;
+  const { consultant_id: _hidden, ...properties } = tool.inputSchema.properties;
+  return {
+    ...tool.inputSchema,
+    required: (tool.inputSchema.required || []).filter((name) => name !== 'consultant_id'),
+    properties,
+  };
+}
+
+function argumentsWithBoundIdentity(tool, value) {
+  const args = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  if (!BOUND_CONSULTANT_ID || !toolUsesConsultantId(tool)) return args;
+  const claimed = typeof args.consultant_id === 'string' ? args.consultant_id.trim() : '';
+  if (claimed && claimed !== BOUND_CONSULTANT_ID) return null;
+  return { ...args, consultant_id: BOUND_CONSULTANT_ID };
+}
+
 function handle(msg) {
   const { id, method, params } = msg;
   if (id === undefined || id === null) return; // notification（initialized 等）不回复
@@ -275,7 +304,8 @@ function handle(msg) {
       case 'tools/list':
         return respond(id, { result: { tools: Object.entries(TOOLS)
           .filter(([name]) => !BLOCKED_TOOLS.has(name))
-          .map(([name, t]) => ({ name, description: t.description, inputSchema: t.inputSchema })) } });
+          .map(([name, t]) => ({ name, description: t.description,
+            inputSchema: publishedInputSchema(t) })) } });
       case 'tools/call': {
         if (BLOCKED_TOOLS.has(params?.name)) {
           return respond(id, { error: { code: -32602,
@@ -283,8 +313,13 @@ function handle(msg) {
         }
         const t = TOOLS[params?.name];
         if (!t) return respond(id, { error: { code: -32601, message: `unknown tool: ${params?.name}` } });
+        const args = argumentsWithBoundIdentity(t, params.arguments);
+        if (args === null) {
+          return respond(id, { error: { code: -32602,
+            message: 'consultant identity is bound by server policy and cannot be overridden' } });
+        }
         try {
-          return respond(id, { result: ok(t.run(params.arguments || {})) });
+          return respond(id, { result: ok(t.run(args)) });
         } catch (e) {
           return respond(id, { result: { content: [{ type: 'text',
             text: `ERROR: ${String(e.message || e).slice(0, 500)}` }], isError: true } });
@@ -306,4 +341,4 @@ createInterface({ input: process.stdin, terminal: false })
     try { msg = JSON.parse(s); } catch { return; }
     handle(msg);
   });
-process.stderr.write('brainx-mcp ready (stdio)\n');
+process.stderr.write(`brainx-mcp ready (stdio, identity=${BOUND_CONSULTANT_ID ? 'bound' : 'caller-declared'})\n`);

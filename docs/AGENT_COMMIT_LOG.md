@@ -2,6 +2,11 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-02｜docs(spec): 建立 Step 1 飞书事件网关规格
+
+- 改动：Step 0 全绿后启动 Step 1，新建 `specs/002-step1-lark-gateway/spec.md`——5 个用户故事（P1 已登记群消息落标准信封、P1 未登记群默认 DENY、P1 @机器人过滤、P1 重复投递幂等、P2 凭证缺失优雅降级）+ 边界（无 message_id/无 chat_scope/evidence_refs 不存 PII）+ 9 条功能需求（chat_contexts 表、processLarkEvent 纯函数、复用 idx_wel_idem 入站幂等不新建去重表、信封映射、chat_contexts 注册工具、SDK WS 骨架、3s ACK、仅新增 @larksuiteoapi/node-sdk、fixtures 先行）+ 7 条可测成功标准。两处裁决记录于 Assumptions：①传输层采 SDK WS（蓝图 §5 伪代码为逻辑说明，§9 决议为准）；②入站幂等复用 Step 0 idx_wel_idem，不新建 lark_event_dedupe 表（Step 0 已提供更强保证）。
+- 验证：`git diff --check` 通过；spec 内链接核对正常；仅暂存 specs/ 与本日志。
+
 ## 2026-09-02｜feat(hub): T015 upcaster 逐级转换 + Step 0 门禁收口
 
 - 改动：新增 `tests/hub-upcaster.test.mjs`（5 用例：当前版本直通、upcastTo 逐级转换 1→2→3、转换链缺口落 DLQ upcast_failed、转换抛错落 DLQ、比当前更新的未知版本落 DLQ schema_invalid）与 `src/hub/upcaster.js`（注册表驱动的逐级 upcast + event_dlq 落表，upcastTo 承载机制、upcastEvent 以 CURRENT_SCHEMA_VERSION 为目标）；quickstart.md 运行命令/手工验证片段修正并逐项打勾（另经 :memory: 单行验证 SC-002 rows=1）；tasks.md T001-T016 全部勾选。

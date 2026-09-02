@@ -10,11 +10,12 @@ import { fileURLToPath } from 'node:url';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 /** 起 MCP 子进程，发 NDJSON 帧，按 id 收集响应。 */
-function mcpClient({ boundConsultantId = '' } = {}) {
+function mcpClient({ boundConsultantId = '', tenantId = '' } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'brainx-mcp-'));
   const child = spawn('node', [join(ROOT, 'mcp', 'server.mjs')], {
     env: { ...process.env, BRAINX_DB: join(dir, 't.db'),
-      ...(boundConsultantId ? { BRAINX_MCP_CONSULTANT_ID: boundConsultantId } : {}) },
+      ...(boundConsultantId ? { BRAINX_MCP_CONSULTANT_ID: boundConsultantId } : {}),
+      ...(tenantId ? { BRAINX_MCP_TENANT_ID: tenantId } : {}) },
     stdio: ['pipe', 'pipe', 'pipe'],
   });
   const pending = new Map();
@@ -135,5 +136,36 @@ test('MCP：服务端绑定顾问后隐藏身份参数、自动注入并拒绝�
     assert.match(override.error.message, /cannot be overridden/);
   } finally {
     c.close();
+  }
+});
+
+test('MCP：候选 shortlist 仅在顾问与租户双绑定时外露，且职位不可见时不碰人才库', async () => {
+  const hidden = mcpClient({ boundConsultantId: 'mia' });
+  try {
+    await hidden.call('initialize', {});
+    const list = await hidden.call('tools/list');
+    assert.equal(list.result.tools.some((tool) => tool.name === 'brainx_candidate_shortlist'), false);
+  } finally {
+    hidden.close();
+  }
+
+  const exposed = mcpClient({ boundConsultantId: 'mia', tenantId: 'tenant_a' });
+  try {
+    await exposed.call('initialize', {});
+    const list = await exposed.call('tools/list');
+    const tool = list.result.tools.find((entry) => entry.name === 'brainx_candidate_shortlist');
+    assert.ok(tool);
+    assert.equal(tool.inputSchema.properties.consultant_id, undefined);
+    assert.equal(tool.inputSchema.properties.tenant_id, undefined);
+    assert.deepEqual(tool.inputSchema.required, ['job_id']);
+
+    const result = await exposed.call('tools/call', {
+      name: 'brainx_candidate_shortlist', arguments: { job_id: 'job_01' },
+    });
+    assert.equal(result.result.isError, undefined);
+    assert.equal(JSON.parse(result.result.content[0].text).error, 'NOT_FOUND_OR_FORBIDDEN');
+    assert.doesNotMatch(result.result.content[0].text, /BRAINX_MYSQL_PASSWORD|SELECT|ttc-rds/);
+  } finally {
+    exposed.close();
   }
 });

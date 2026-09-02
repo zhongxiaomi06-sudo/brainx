@@ -2,6 +2,13 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-03｜feat(talent): 建立候选事实与授权 shortlist 数据脊柱
+
+- 改动：新增 strict `candidate_fact_v1` 与 `candidate_match_bundle_v1` 契约，要求已支持事实具备证据引用，拒绝未知字段、手机号、邮箱、完整简历和飞书路由字段；新增人才 RDS 文件名+checksum 增量迁移执行器，以及授权账本、文档/事实/证据版本、职位条件、match run、候选匹配和同步游标八张 additive 表；新增只读取 `SUCCEEDED` run、`READY` fact 和有效 `resume_facts` grant 的 shortlist 服务，候选姓名脱敏，分页固定同一 match run，RDS 不可用时明确 `SOURCE_UNAVAILABLE` 且不退内存假数据。
+- MCP 与权限：新增 `brainx_candidate_shortlist` 只读工具；只有服务端同时绑定顾问和租户时才外露，模型看不到或覆盖不了身份参数；调用前先走现有 `jobVisibleTo`，RDS 查询再按租户、职位、purpose、授权范围和有效期二次守门。当前仅为单顾问/单租户 PoC，多人生产仍需 OpenClaw 原生插件 + BrainX Agent Gateway，因此未加入当前 OpenClaw 六工具 allowlist，也未执行真实 RDS migration。
+- 文档：新增候选人数据契约施工说明，并同步文档书、MCP 交付、OpenClaw 接口包、工具白名单、环境变量示例和初始化脚本；明确本阶段没有安装 Resume-Matcher/Docling、没有改变正式排序，也没有声称真实候选人已经可在飞书展示。
+- 验证：新增契约、授权查询、迁移和 MCP 条件外露测试；相关专项 27/27 通过；沙箱外完整后端测试 386/386 通过（沙箱内监听回环端口会因 EPERM 失败，获准在正常本机权限下复跑）；`npm run verify:quick` 16/16 通过，Node 语法、秘密扫描、500 行、换行、前端 Lint/TypeScript/静态适配测试均通过。
+
 ## 2026-09-03｜feat(push): 支持 OpenClaw 触发个人飞书推荐卡
 
 - 改动：新增飞书机器人官方接口直发适配，使用现有环境凭据获取 tenant token 并发送互动卡片，不再要求安装 `lark-cli`；保留旧 profile 作为无直连凭据时的兼容回退。推荐卡 CLI 默认按顾问花名册解析本人 `open_id`，新增日期 + 时段幂等键，供 OpenClaw command cron 在 07:00/19:00 精确触发。接口包补充“当天最短闭环”说明，明确该路径只发个人私聊、不代表完整对话网关已经建成。

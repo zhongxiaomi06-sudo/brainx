@@ -44,7 +44,8 @@
         "transport": "stdio",
         "env": {
           "BRAINX_ENV_FILE": "/path/to/brainx/.env",
-          "BRAINX_MCP_CONSULTANT_ID": "由管理员确认的顾问 ID"
+          "BRAINX_MCP_CONSULTANT_ID": "由管理员确认的顾问 ID",
+          "BRAINX_MCP_TENANT_ID": "由管理员确认的租户 ID"
         },
         "toolFilter": {
           "include": [
@@ -62,8 +63,9 @@
 }
 ```
 
-- 协议：JSON-RPC 2.0 over stdio，零 npm 依赖，`node mcp/server.mjs` 直接起。
+- 协议：JSON-RPC 2.0 over stdio，协议层手写，运行依赖以仓库 lockfile 为准；`node mcp/server.mjs` 直接起。
 - `BRAINX_MCP_CONSULTANT_ID` 是单顾问本机 PoC 的身份硬绑定：设置后，工具 schema 不再向模型暴露 `consultant_id`，服务端自动注入；模型显式传入其他顾问 ID 会返回 `-32602`。缺少或无效绑定时不得把该 MCP 挂进飞书 Agent。
+- `brainx_candidate_shortlist` 还要求同时设置 `BRAINX_MCP_TENANT_ID`；缺任一绑定时该工具不出现在 `tools/list`。详细授权与脱敏契约见[候选人事实与 shortlist 数据契约](2026-09-03-candidate-data-contracts.md)。
 - 上述 `toolFilter.include` 是首轮只读集合；不得把混合读写的 `brainx_profile` 或任何写工具提前加入。
 - 该 stdio 方案只用于当前单顾问本机 PoC。多人/生产飞书链路仍以 [OpenClaw 工作流 PRD §8](prd-2026-09-02-openclaw-ai-recruiting-workflow.md#8-brainx-agent-gateway-权限设计) 的原生插件 + Agent Gateway 为准，不能用“一实例一个环境变量”代替正式身份映射。
 - 方法：`initialize` / `tools/list` / `tools/call`。对方接入后先调 `tools/list` 拿实时清单——**清单以运行时返回为准**，本文表格是快照。
@@ -87,7 +89,7 @@ OpenClaw cron
 - 这是单顾问、私聊、只推卡的临时闭环，不代表 OpenClaw 飞书对话渠道、Skill 或生产身份网关已经接通。
 - 创建任务前必须先手动运行一次真实发送并确认接收人、机器人权限和卡片内容正确。
 
-### 2.2 工具清单（15 个快照，2026-09-02）
+### 2.2 工具清单快照（以运行时 `tools/list` 为准）
 
 | 工具 | 读/写 | 用途一句话 | 外露状态 |
 |---|---|---|---|
@@ -98,6 +100,7 @@ OpenClaw cron
 | `brainx_engage` | 写 | 对职位表态（接单/跟进），ACCEPT 分支可触发自动找人 | ✅ 可用 |
 | `brainx_record_outcome` | 写 | 录入职位结果 | ✅ 可用（`jobVisibleTo` 守门已补，硬前置 1b 完成） |
 | `brainx_confirm_facts` | 写 | 确认/驳回职位信息草稿（E3 确认闭环；confirm 支持草稿转正到 job_facts，reject 终态；带 project_id 时校验职位可见性） | ✅ 可用 |
+| `brainx_candidate_shortlist` | 读 | 读取已完成、已授权且脱敏的候选列表 | ⚠️ 仅单顾问+单租户 PoC；真实 RDS 数据与生产网关未完成 |
 | `brainx_replay` | 读 | 决策轨迹回放 | ✅ 可用 |
 | `brainx_recommend` | 读 | 推荐队列 | ✅ 可用 |
 | 其余 7 个 | 混合 | 见白名单文档逐个审 | ⚠️ 见白名单 |
@@ -141,7 +144,7 @@ OpenClaw cron
 
 ```text
 L0 飞书网关（等凭证） → L1 事件账本（幂等/状态机） → L2 决策库 SQLite（31 迁移）
-→ L3 业务领域（48 模块） → L4 调度推送（只私聊，在跑） → L5 MCP 交付（15 工具 ← 接缝1）
+→ L3 业务领域（模块持续演进） → L4 调度推送（只私聊，在跑） → L5 MCP 交付（运行时清单 ← 接缝1）
                                                     skills/（8 个 md ← 接缝3）
 ```
 

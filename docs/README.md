@@ -17,6 +17,7 @@
 |---|---|
 | 产品范围、功能规划或验收标准 | [BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md) |
 | OpenClaw、飞书机器人、AI 猎头工作流、人才权限或简历解析 | [BrainX × OpenClaw AI 猎头工作流产品需求文档](prd-2026-09-02-openclaw-ai-recruiting-workflow.md)、[安全操作手册](SECURITY.md) |
+| 候选人事实版本、人才 RDS 迁移、shortlist 数据契约或授权查询 | [候选人事实与 shortlist 数据契约](2026-09-03-candidate-data-contracts.md)、[BrainX × OpenClaw AI 猎头工作流产品需求文档](prd-2026-09-02-openclaw-ai-recruiting-workflow.md) |
 | 历史 Codex 插件、旧版飞书副驾驶方案 | [历史：BrainX 飞书 AI 猎头副驾驶产品需求文档](prd-2026-09-01-feishu-ai-consultant-copilot.md)、[历史：BrainX Codex Agent 职责与权限规范](codex-agent-responsibilities-and-permissions.md) |
 | 最终产品形态、跨前后端施工顺序或总体验收 | [BrainX 最终交付蓝图与施工总清单](brainx-final-delivery-blueprint.md) |
 | BrainX×reloop 工作流总线、身份、Case 或跨系统桥接 | [Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) |
@@ -77,6 +78,7 @@
 
 ### 设计与数据
 
+- [候选人事实与 shortlist 数据契约](2026-09-03-candidate-data-contracts.md)：`candidate_fact_v1`、`candidate_match_bundle_v1`、人才 RDS 增量迁移、授权查询、分页、MCP PoC 暴露条件及当前未完成项的唯一施工说明。
 - [BrainX × OpenClaw AI 猎头工作流产品需求文档](prd-2026-09-02-openclaw-ai-recruiting-workflow.md)：当前阶段权威开发基线；基于代码审计和官方能力，定义 OpenClaw 主 Agent、飞书最小权限、BrainX 窄网关、人才授权、简历事实、匹配、施工阶段和发布门禁。
 - [历史：BrainX 飞书 AI 猎头副驾驶产品需求文档](prd-2026-09-01-feishu-ai-consultant-copilot.md)：主 Agent 调整前的 Codex 方案和用户研究，仅作历史参考。
 - [历史：BrainX Codex Agent 职责与权限规范](codex-agent-responsibilities-and-permissions.md)：旧 Codex 方案的权限、审批和沙箱研究；不得据此向 OpenClaw 开放工具。

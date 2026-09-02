@@ -11,6 +11,7 @@ import { readdirSync, readFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { seedRoster } from './roster.js';
+import { applyTalentMigrations } from './talent-migrations.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 export const DB_PATH = process.env.BRAINX_DB || join(ROOT, 'data', 'brainx.db');
@@ -177,6 +178,7 @@ export async function initTalentSchema() {
     for (const ddl of TALENT_DDL) {
       await conn.execute(ddl);
     }
+    await applyTalentMigrations(conn);
     return TALENT_DDL.length;
   });
 }

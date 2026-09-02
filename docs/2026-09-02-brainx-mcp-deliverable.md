@@ -58,12 +58,12 @@
 
 ## 3. 已交付：MCP server 工具现状
 
-**位置**：`mcp/server.mjs`（272 行，**零依赖**手写 NDJSON + JSON-RPC 2.0）。
+**位置**：`mcp/server.mjs`（手写 NDJSON + JSON-RPC 2.0 协议层，领域模块依赖以仓库 lockfile 为准）。
 **启动**：`node ./mcp/server.mjs`（stdio 模式，父进程管生命周期）。
 **协议**：`PROTOCOL_VERSION = "2024-11-05"`，**NDJSON**（每行一个 JSON-RPC 2.0 消息）。
 **共享可见性**：`src/visibility.js` 是单一权威（server.js 与 mcp 共用，fail-closed），防止两处过滤逻辑分叉。
 
-### 3.1 工具清单（15 个，按读写分）
+### 3.1 工具基础快照（15 个，2026-09-02；后续增量见下）
 
 | # | 工具名 | 类型 | 入参 | 输出要点 | 守门 |
 |---|---|---|---|---|---|
@@ -86,6 +86,16 @@
 **actor 守门**：所有工具的 `consultant_id` 都必须通过 roster 校验（`loadConsultants`）。缺失或未知 = `UNKNOWN_CONSULTANT`。**不放行"声明身份兜底"路径**（2026-08-20 信任对齐收紧）。
 
 **幂等**：所有写工具必填 `idempotency_key`。重复键返回 `already`。MCP server 不做键持久化（在领域函数里），重启后失效属预期。
+
+#### 3.1.1 2026-09-03 增量
+
+- `brainx_confirm_facts`：确认或驳回职位事实草稿；写操作，继续执行职位可见性守门。
+- `brainx_candidate_shortlist`：读取预计算且已授权的脱敏候选列表；只有同时绑定
+  `BRAINX_MCP_CONSULTANT_ID` 与 `BRAINX_MCP_TENANT_ID` 才出现在运行时清单。
+- 候选人工具仍是单顾问/单租户 PoC，生产外露状态为 ⚠️；完整门禁见
+  [候选人事实与 shortlist 数据契约](2026-09-03-candidate-data-contracts.md)。
+
+工具数量和输入 schema 应以实际 `tools/list` 为准，不应由本基础快照推断当前运行时清单。
 
 ### 3.2 错误响应规范
 
@@ -174,6 +184,8 @@ MCP server 是无状态进程，**生命周期由父进程管**。父进程：
 | `BRAINX_MYSQL_DATABASE` | 人才库启用时 | — | RDS 库名 |
 | `BRAINX_MYSQL_HOST` | 否 | `ttc-rds-public-0707.mysql.rds.aliyuncs.com` | RDS 主机 |
 | `BRAINX_TALENT_SUPPLY` | 否 | `0` | `1` 启用人才供给工具 |
+| `BRAINX_MCP_CONSULTANT_ID` | 单顾问 PoC | — | 服务端锁死顾问身份，不允许模型覆盖 |
+| `BRAINX_MCP_TENANT_ID` | 候选 shortlist PoC | — | 与顾问绑定同时存在时才外露候选 shortlist |
 | `BRAINX_TTC_API_BASE` | 否 | `https://api.ttcadvisory.com` | TTC CRM |
 | `BRAINX_OPENMAI_API_BASE` | 否 | `https://gateway.ttcadvisory.com` | OpenMai |
 | `BRAINX_TTC_*` | OpenMai 触发时 | — | TTC JWT 持久化（`ttcsdk/auth.js` 维护） |

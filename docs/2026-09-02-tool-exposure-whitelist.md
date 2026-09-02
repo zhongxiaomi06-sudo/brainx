@@ -129,6 +129,7 @@ registry.js（15）                    mcp/server.mjs（15）
 | `brainx_engage` | **仅 MCP** | 写 | ✅ | 接单核心动作，`jobVisibleTo` 守门正确 |
 | `brainx_record_progress` | **仅 MCP** | 写 | ✅ | 守门正确 |
 | `brainx_terminal_result` | **仅 MCP** | 写 | ✅ | 守门正确 |
+| `brainx_candidate_shortlist` | **仅 MCP** | 读 | ⚠️ | 已有双重职位/人才授权与脱敏；仅在单顾问+单租户绑定 PoC 外露，生产需 Agent Gateway |
 | `brainx_opportunity` | 两套都有 | 读 | ⚠️ | 先查 `job_facts` migrations 有无客户 BD 联系人字段 |
 | `brainx_recommend_run` | **仅 MCP** | 写 | ✅ | 已加 60s 限流（B6 测试覆盖） |
 | `brainx_feedback` | **仅 MCP** | 写 | ⚠️ | 核 `recommendationFeedback` 是否校验职位归属 |
@@ -161,6 +162,13 @@ registry.js（15）                    mcp/server.mjs（15）
 3. 输出里有没有候选人手机号 / 邮箱 / 简历原文？
 4. 写操作有没有幂等键？
 5. 加进本文 §4 表格了吗？
+
+### 5.1 候选人 shortlist 的额外门禁（9/3）
+
+`brainx_candidate_shortlist` 不是通用人才浏览工具。当前实现只有同时配置服务端
+`BRAINX_MCP_CONSULTANT_ID` 和 `BRAINX_MCP_TENANT_ID` 时才出现在 `tools/list`，并继续执行
+`jobVisibleTo`、RDS `resume_facts` grant、purpose、有效期、`SUCCEEDED` run 和 `READY` fact 校验。
+详细契约见[候选人事实与 shortlist 数据契约](2026-09-03-candidate-data-contracts.md)。多人生产身份网关完成前，本表保持 ⚠️，不得按通用 MCP 工具推广。
 
 ## 相关文档
 

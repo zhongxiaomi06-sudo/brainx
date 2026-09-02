@@ -5,6 +5,7 @@ import { authorizePrincipal } from './authorization.js';
 import { beginAgentRun, authorizeAgentRun, beginToolCall, finishAgentRun, finishToolCall } from './audit.js';
 import { successEnvelope, errorEnvelope } from './envelopes.js';
 import { consumeRateLimit } from './rate-limit.js';
+import { assertSafeAgentProjection } from './projection.js';
 
 const BODY_LIMIT = 64 * 1024;
 const TOOL_PATH = /^\/internal\/v1\/agent\/tools\/([a-z0-9_]+)$/;
@@ -123,6 +124,7 @@ export function createAgentGatewayServer(config) {
         policyVersion: 'agent-auth.v1',
       });
       const result = await config.registry.execute(toolName, body.arguments, { principal, requestId, runId });
+      assertSafeAgentProjection(result, principal);
       finishToolCall(config.db, toolCallId, {
         status: 'SUCCEEDED', dataVersions: result.source_versions,
         evidenceRefs: result.evidence_refs,

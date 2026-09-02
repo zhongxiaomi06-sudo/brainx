@@ -36,7 +36,7 @@
 - [x] T012 [US1] 实现唯一生产工具注册表与回环 HTTP Gateway 到 src/agent-gateway/tool-registry.js、src/agent-gateway/server.js、bin/brainx-agent-gateway.mjs
 - [x] T013 [P] [US1] 先写绑定/撤销顾问和登记/撤销群 scope 的管理员命令测试到 tests/agent-admin.test.mjs
 - [x] T014 [US1] 实现显式管理员身份与群范围命令到 src/agent-gateway/admin.js、bin/brainx-agent-admin.mjs
-- [ ] T015 [US1] 添加跨顾问、跨群、跨项目、身份参数注入和群/私聊字段隔离回放到 tests/agent-isolation.test.mjs
+- [x] T015 [US1] 添加跨顾问、跨群、跨项目、身份参数注入和群/私聊字段隔离回放到 tests/agent-isolation.test.mjs
 
 **Checkpoint**: BrainX Gateway 本身满足身份不可伪造和 0 越权；尚不依赖真实飞书。
 

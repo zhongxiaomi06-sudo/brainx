@@ -13,8 +13,8 @@
 │                                        │        │                                        │
 │  飞书插件（前台对话通道，独立 WS）      │        │  L0 网关 ws-client.js（群消息通道）     │
 │  open_id ↔ consultant_id 映射  ────────┼──接缝2─▶  只认 consultant_id，不碰 open_id      │
-│  openclaw.json 挂 brainx-domain ───────┼──接缝1─▶  mcp/server.mjs（15 工具，stdio）    │
-│  放置/启用 skills/ 8 个 md  ◀──────────┼──接缝3──  skills/（7 个已合规，纯文本）          │
+│  openclaw.json 挂 brainx-domain ───────┼──接缝1─▶  MCP 运行时只外露 7 个工具          │
+│  放置/启用 5 个安全 Skill ◀────────────┼──接缝3──  skills/（仓库共 6 个）               │
 └────────────────────────────────────────┘        └────────────────────────────────────────┘
 ```
 
@@ -22,7 +22,7 @@
 |---|---|---|
 | **1 工具调用** | `mcp/server.mjs`（stdio，JSON-RPC 2.0，零依赖） | `openclaw.json` 的 `mcp.servers` 挂 `brainx-domain` |
 | **2 身份映射** | 一切接口只认 `consultant_id` 字符串 | 维护 `open_id ↔ consultant_id` 映射；后端永不接收/存储 open_id |
-| **3 Skill 素材** | `skills/` 8 个 md（7 个已合规） | 放置到 OpenClaw Skill 目录并启用 |
+| **3 Skill 素材** | `skills/` 共 6 个；当前 OpenClaw 安装 5 个安全 Skill | 放置到 OpenClaw Skill 目录并启用；不安装 SQL 探索 Skill |
 
 **三条红线（对方侧同样适用）**：
 
@@ -54,7 +54,8 @@
             "brainx_opportunity",
             "brainx_progress_suggestion",
             "brainx_replay",
-            "brainx_push_preview"
+            "brainx_push_preview",
+            "brainx_candidate_shortlist"
           ]
         }
       }
@@ -93,27 +94,22 @@ OpenClaw cron
 
 | 工具 | 读/写 | 用途一句话 | 外露状态 |
 |---|---|---|---|
-| `brainx_summary` | 读 | 顾问级项目概览 | ✅ 可用 |
-| `brainx_jobs` | 读 | 职位列表与筛选 | ✅ 可用 |
-| `brainx_job_detail` | 读 | 单职位详情 | ✅ 可用 |
-| `brainx_commitments` | 读 | 承诺/待办清单 | ✅ 可用 |
-| `brainx_engage` | 写 | 对职位表态（接单/跟进），ACCEPT 分支可触发自动找人 | ✅ 可用 |
-| `brainx_record_outcome` | 写 | 录入职位结果 | ✅ 可用（`jobVisibleTo` 守门已补，硬前置 1b 完成） |
-| `brainx_confirm_facts` | 写 | 确认/驳回职位信息草稿（E3 确认闭环；confirm 支持草稿转正到 job_facts，reject 终态；带 project_id 时校验职位可见性） | ✅ 可用 |
-| `brainx_candidate_shortlist` | 读 | 读取已完成、已授权且脱敏的候选列表 | ⚠️ 仅单顾问+单租户 PoC；真实 RDS 数据与生产网关未完成 |
-| `brainx_replay` | 读 | 决策轨迹回放 | ✅ 可用 |
-| `brainx_recommend` | 读 | 推荐队列 | ✅ 可用 |
-| 其余 7 个 | 混合 | 见白名单文档逐个审 | ⚠️ 见白名单 |
-| `brainx_sync_now` | 写 | 同步任务 | 🚫 **黑名单**（默认参数刷库，硬前置 1a） |
-| `brainx_talent` | 写 | 人才库直查 | 🚫 **黑名单**（无 cid 隔离，硬前置 1c） |
+| `brainx_workbench` | 读 | 本人同步状态、承接摘要、待行动项和今日 Top 3 | ✅ 当前 OpenClaw 外露 |
+| `brainx_recommendations` | 读 | 本人最近一轮冻结推荐 | ✅ 当前 OpenClaw 外露 |
+| `brainx_opportunity` | 读 | 本人可见职位的事实、事件、结果和推荐证据 | ✅ 当前 OpenClaw 外露 |
+| `brainx_progress_suggestion` | 读 | 生成下一行动草案，不写库 | ✅ 当前 OpenClaw 外露 |
+| `brainx_replay` | 读 | 本人决策轨迹回放 | ✅ 当前 OpenClaw 外露 |
+| `brainx_push_preview` | 读 | 预览个人推荐卡，不发送 | ✅ 当前 OpenClaw 外露 |
+| `brainx_candidate_shortlist` | 读 | 已授权职位的脱敏候选列表 | ⚠️ 当前单顾问 + 单租户 PoC 外露 |
+| 其他 MCP 工具 | 混合 | 见白名单文档逐个审 | 🚫 当前 OpenClaw `toolFilter` 不外露 |
 
 > **对方接入时的纪律**：黑名单工具不要挂进自动路径；写工具必须由 Skill 显式发起且带 `consultant_id`；任何工具返回 `forbidden`/`guard` 类错误属正常守门，不要重试绕过。
 
 ### 2.3 调用纪律（防止再次出 sync_now 类事故）
 
-1. **所有写调用必带 `consultant_id`**——后端按此隔离数据视图，缺失即拒绝。
-2. **不缓存写结果**——决策库是唯一真值，读后立即用、不长期持有。
-3. **错误处理**：JSON-RPC error 对象里的 `code` + `message` 是契约的一部分；`message` 面向日志，不直接展示给终端用户（可能含守门细节）。
+1. 当前 OpenClaw 只外露 7 个精确只读工具，任何写工具都不得由 Skill 猜测或绕过 `toolFilter` 调用。
+2. 顾问和租户由服务端绑定，模型不传、不猜测、不覆盖身份参数。
+3. 错误响应面向日志，不原样展示给终端用户；对象不存在和无权访问对外统一按不可展示处理。
 
 ## 3. 接缝 2：consultant_id 身份映射
 
@@ -133,10 +129,11 @@ OpenClaw cron
 
 ## 4. 接缝 3：Skill 素材
 
-- 我方产出：`skills/` 目录 8 个 SKILL.md，其中 7 个已通过合规实测（内容见仓库，对方按需复制）。
-- 对方职责：放置到 OpenClaw Skill 加载路径、启用、维护本地版本。
-- 合规基线（我方已验证，对方改动后需自行复审）：不硬编码任何个人 open_id、不含敏感字段明文示例、不引导绕过 MCP 守门。
-- Skill 与工具的对应关系示例：Skill 编排「推荐队列浏览」时调 `brainx_recommend`；「录入结果」时调 `brainx_record_outcome`（守门已补完，可直接编排）；「群消息提炼确认」时调 `brainx_confirm_facts`（草稿列表经后端日历/推送触达顾问，顾问确认后落 job_facts）。
+- 仓库当前共 6 个 BrainX Skill：`brainx-workbench`、`brainx-engagement`、`brainx-report`、`brainx-ops`、`brainx-talent`、`brainx-data-explorer`。
+- 当前 `brainx` OpenClaw profile 已安装前 5 个，均为 Ready、model-visible、user-invocable；它们只引用本节列出的 7 个精确白名单工具。
+- `brainx-data-explorer` **不安装**：它依赖 `query_sql`，会把自然语言输入扩大成数据库查询面，与当前最小权限设计冲突。
+- `brainx-workbench` 负责今日优先级、推荐榜、职位详情和回放；`brainx-talent` 负责候选 shortlist；`brainx-report` 只基于可见工具写报告；`brainx-engagement` 对写意图只查证并指引用户去页面操作；`brainx-ops` 只做业务层诊断，不执行 Shell 或查日志。
+- 安装完成不等于相关数据已获外部模型处理授权。候选脱敏履历已有明确授权；工作台职位、客户、承接和进展数据在获得明确授权前，只能完成本地 Skill 校验，不能执行真实 OpenAI 烟雾测试。
 
 ## 5. 后端结构一屏（给对方的上下文，非契约）
 
@@ -145,7 +142,7 @@ OpenClaw cron
 ```text
 L0 飞书网关（等凭证） → L1 事件账本（幂等/状态机） → L2 决策库 SQLite（31 迁移）
 → L3 业务领域（模块持续演进） → L4 调度推送（只私聊，在跑） → L5 MCP 交付（运行时清单 ← 接缝1）
-                                                    skills/（8 个 md ← 接缝3）
+                                                    skills/（6 个 md，安全安装集 5 个）
 ```
 
 - MCP 工具读写的是 L2 决策库，经 L3 业务模块，**守门与脱敏都做在 L5**——所以对方看到的报错都发生在最外层，规则见白名单文档。
@@ -157,10 +154,10 @@ L0 飞书网关（等凭证） → L1 事件账本（幂等/状态机） → L2 
 |---|---|---|---|
 | 1 | MCP server（运行时） | `mcp/server.mjs` + [部署文档](2026-09-02-brainx-mcp-deliverable.md) | ✅ 可交付 |
 | 2 | 本接口包（契约） | 本文 | ✅ 可交付 |
-| 3 | Skill 素材 | `skills/`（8 个 md） | ✅ 可交付（对方复审合规） |
+| 3 | Skill 素材 | `skills/`（6 个 md；OpenClaw 安全安装集 5 个） | ✅ 已安装并完成本地白名单校验 |
 | 4 | 工具外露白名单（纪律） | [白名单文档](2026-09-02-tool-exposure-whitelist.md) | ✅ 可交付 |
 | 5 | open_id ↔ consultant_id 映射表 | OpenClaw 侧自建 | ⬜ 对方职责 |
-| 6 | 前台对话 Skill 编写 | OpenClaw 侧自建 | ⬜ 对方职责 |
+| 6 | 前台对话 Skill 安装 | 当前 `brainx` OpenClaw profile | ✅ 5 个 Ready；真实工作台烟测待数据出域授权 |
 
 ## 相关文档
 

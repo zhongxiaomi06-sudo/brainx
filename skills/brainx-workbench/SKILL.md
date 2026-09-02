@@ -1,30 +1,31 @@
 ---
 name: brainx-workbench
-description: 查工作台/今日推荐/职位详情/雷达/客户聚合。当用户问"今天该做什么""我的推荐""某职位详情/状态""机会雷达""某客户公司情况"时使用。
+description: 查询本人工作台、今日推荐、完整推荐榜、职位详情和决策回放；用户问今天做什么、某职位值不值得做或推荐依据时使用。
 ---
 
-# BrainX 工作台与推荐查询(产品内工具版)
+# BrainX 工作台与推荐查询（OpenClaw 只读版）
 
-查询一律以当前登录顾问(consultant_id)归属,工具已锁定本人,无需也不可读他人。
+查询一律以服务端绑定的当前顾问为准。不要传、猜测或覆盖 `consultant_id`，也不要代查他人。
 
 ## 查询动线
 
-1. **工作台首屏** → `brainx_workbench` → 同步状态 / 承接摘要(watched/accepted/need_action)/ 今日 Top3 / run_id
-2. **完整推荐榜** → `brainx_recommendations({limit})`(冻结行;`blocked:true` = 本次同步不完整,如实告知,并建议用户稍后在工作台手动同步)
-3. **单职位全量** → `brainx_opportunity({project_id})` → 事实/关系/承接状态/合法操作/事件/结果/最近一次推荐评分与理由
-4. **雷达(机会池)** → `brainx_radar` → 可见职位池 + 字段覆盖率
-5. **客户聚合** → `brainx_clients` → 按公司聚合(在库职位数/活跃数/最近动态)
-6. **人名对照** → `brainx_consultants`(仅名单,不能查别人数据)
+1. **今天先做什么** → `brainx_workbench`：同步状态、承接摘要、待行动项、今日 Top 3 和 `run_id`。
+2. **查看更多推荐** → `brainx_recommendations({limit})`：读取最近一轮冻结推荐；`blocked:true` 表示同步不完整，不能把旧结果包装成今日结论。
+3. **为什么推荐这个职位** → `brainx_opportunity({project_id})`：读取事实、关系、承接状态、合法操作、事件、结果和最近推荐证据。
+4. **复核当时为什么这样推荐** → `brainx_replay({decision_id})`：回放冻结推荐，不按今天的数据重算。
+5. **看看今天会推什么** → `brainx_push_preview()`：只预览，不发送。
+
+当前没有开放雷达、客户聚合、人名对照或任意 SQL 工具。用户问这些能力时，明确说“当前机器人还不能直接查询”，不要编造结果，也不要尝试 Shell 或数据库直查。
 
 ## 关键事实
 
-- `project_id = 'P-FIX-' + md5(company|role)[:8]`,同公司同岗跨源合并
-- 推荐是**冻结行**:回放用 `brainx_replay({decision_id})`,只读不重算
-- 评分六维确定性(reasons/risks/breakdown 在 opportunity 的 latest_recommendation 里)
-- 无关系职位对顾问不可见:NOT_FOUND 是正常行为,不是错误
+- 推荐是冻结行；“排序靠前”不等于客户一定会面试或录用。
+- 分开表达职位经营价值、候选人实力和本职位匹配，不能合成成功率。
+- `reasons`、`risks` 和 `breakdown` 是解释依据；缺失字段必须写“待核实”。
+- 无关系职位对当前顾问不可见；`NOT_FOUND` 不得用其他工具绕过。
 
 ## 排错口径
 
-- `blocked:true` → 同步不完整;建议用户在工作台触发一次同步,或由管理员排查
-- 推荐为空 → 可能从未跑过推荐轮,或全部职位已被承接隐藏
-- 用户追问"帮我刷新/同步" → 写操作,给指引:工作台右上角同步按钮,或管理员 CLI `node bin/brainx-sync.mjs --consultant <id>`
+- `blocked:true`：同步不完整，建议用户稍后在工作台手动同步或联系管理员。
+- 推荐为空：只能说“当前没有可展示的正式推荐”，不要推断数据库没有职位。
+- 用户要求刷新、接单或发送：属于写动作，本 Skill 不执行，转用 `brainx-engagement` 的查证、建议和页面指引流程。

@@ -166,6 +166,18 @@ test('仓库 skills/ 发现 6 个 brainx 技能,加载与逃逸防护', () => {
   assert.equal(loadSkill(index, 'no-such-skill'), null);
 });
 
+test('OpenClaw 安装集只引用当前精确白名单工具', () => {
+  const index = discoverSkills({ includeGlobal: false });
+  const installable = ['brainx-workbench', 'brainx-engagement', 'brainx-report', 'brainx-ops', 'brainx-talent'];
+  const allowed = new Set(['brainx_workbench', 'brainx_recommendations', 'brainx_opportunity',
+    'brainx_progress_suggestion', 'brainx_replay', 'brainx_push_preview', 'brainx_candidate_shortlist']);
+  for (const name of installable) {
+    const body = loadSkill(index, name).body;
+    const referenced = body.match(/brainx_[a-z_]+/g) || [];
+    for (const tool of referenced) assert.ok(allowed.has(tool), `${name} 引用了未开放工具 ${tool}`);
+  }
+});
+
 test('全局技能加扫只收 brainx-* 前缀', () => {
   const index = discoverSkills({ includeGlobal: true });
   const globalOnes = [...index.values()].filter((s) => s.root === GLOBAL_SKILLS_DIR);

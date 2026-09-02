@@ -2,6 +2,13 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-03｜fix(skills): 让 OpenClaw 安全加载 BrainX 技能集
+
+- 定位：飞书侧复核第二版候选卡位于当前 OpenClaw 机器人一对一会话，消息存在、未删除、类型为互动卡片；会话 ID `oc_d0b8bb983ff2fe2943592978311c0624`，不是群聊或旧 BrainX 机器人。
+- 改动：把 `brainx-workbench`、`brainx-report`、`brainx-ops` 收紧到当前 7 个精确只读工具，删除对未开放雷达、客户聚合、任意 SQL、人才健康和 OpenMai 工具的旧引用；新增回归测试，保证 OpenClaw 安装集只引用白名单工具。连同原有 `brainx-engagement` 和 `brainx-talent`，共 5 个 Skill 已安装到当前 `brainx` profile，全部 Ready、model-visible、user-invocable。
+- 权限：`brainx-data-explorer` 因依赖 `query_sql` 未安装。真实工作台 Skill 烟雾测试被安全层拒绝，因为现有明确授权只覆盖候选脱敏履历，不包含职位、客户、承接和进展数据；未绕过，等待数据责任人另行授权后再测。
+- 验证：Skill 白名单专项 16/16、`npm run verify:quick` 16/16 通过；OpenClaw 对 5 个已安装 Skill 的状态检查全部通过。
+
 ## 2026-09-03｜docs(talent): 记录第二版候选卡真实投递
 
 - 授权与生成：数据责任人明确同意脱敏公司、岗位、教育和成果数字发送给当前 OpenAI 模型并投递 Mia 私聊；OpenClaw run `ce8d43af-8fe2-4126-a24e-24dbf73a263f` 使用 `openai/gpt-5.5` 生成“岗位投入判断—Top 3 证据—风险—首问—动作”正文。审计确认人才数据只来自 `brainx_candidate_shortlist`，额外 `bash` 调用只读 Skill 规则，没有补查数据。

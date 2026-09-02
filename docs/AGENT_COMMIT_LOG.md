@@ -2,6 +2,13 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-03｜fix(skills): 修正工作台回答的数据时效口径
+
+- 授权：数据责任人明确同意 Mia 本人可见的职位、客户、承接和进展字段进入当前 OpenAI 模型；候选联系方式、原始聊天、密钥和数据库连接信息仍不在授权范围。
+- 实测：OpenClaw run `ff689790-c7fd-4fdf-a1b3-583ccd2cc079` 成功加载 `brainx-workbench`，调用 `brainx_workbench` 和 3 次 `brainx_opportunity`，工具失败 0、写操作 0；另外 2 次 `bash` 只读取和搜索该 Skill 目录，没有补查业务数据。
+- 修正：首轮回答把 9 月 1 日快照称为“今天”，因此 Skill 新增 24 小时时效规则：超过阈值必须标注“最近一次可用快照”和具体时间，并优先建议同步；新增回归测试防止口径回退。
+- 验证：工作台时效与 Skill 白名单专项通过，更新后的 Skill 重新安装到 OpenClaw 并保持 Ready/model-visible；`npm run verify:quick` 通过。
+
 ## 2026-09-03｜fix(skills): 让 OpenClaw 安全加载 BrainX 技能集
 
 - 定位：飞书侧复核第二版候选卡位于当前 OpenClaw 机器人一对一会话，消息存在、未删除、类型为互动卡片；会话 ID `oc_d0b8bb983ff2fe2943592978311c0624`，不是群聊或旧 BrainX 机器人。

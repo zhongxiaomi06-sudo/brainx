@@ -133,7 +133,8 @@ OpenClaw cron
 - 当前 `brainx` OpenClaw profile 已安装前 5 个，均为 Ready、model-visible、user-invocable；它们只引用本节列出的 7 个精确白名单工具。
 - `brainx-data-explorer` **不安装**：它依赖 `query_sql`，会把自然语言输入扩大成数据库查询面，与当前最小权限设计冲突。
 - `brainx-workbench` 负责今日优先级、推荐榜、职位详情和回放；`brainx-talent` 负责候选 shortlist；`brainx-report` 只基于可见工具写报告；`brainx-engagement` 对写意图只查证并指引用户去页面操作；`brainx-ops` 只做业务层诊断，不执行 Shell 或查日志。
-- 安装完成不等于相关数据已获外部模型处理授权。候选脱敏履历已有明确授权；工作台职位、客户、承接和进展数据在获得明确授权前，只能完成本地 Skill 校验，不能执行真实 OpenAI 烟雾测试。
+- 数据责任人已明确授权 Mia 本人可见的职位、客户、承接和进展字段进入当前 OpenAI 模型；仍不包含候选联系方式、原始聊天、密钥或数据库连接信息。真实 smoke run `ff689790-c7fd-4fdf-a1b3-583ccd2cc079` 已成功调用 `brainx_workbench` 和 `brainx_opportunity`，工具失败 0、写操作 0。
+- 首次真实回答暴露出时效口径问题：`sync.updated_at` 为 9 月 1 日，回答却使用“今天”。`brainx-workbench` 已补上 24 小时时效规则；超过阈值必须称为“最近一次可用快照”并优先建议同步。
 
 ## 5. 后端结构一屏（给对方的上下文，非契约）
 
@@ -157,7 +158,7 @@ L0 飞书网关（等凭证） → L1 事件账本（幂等/状态机） → L2 
 | 3 | Skill 素材 | `skills/`（6 个 md；OpenClaw 安全安装集 5 个） | ✅ 已安装并完成本地白名单校验 |
 | 4 | 工具外露白名单（纪律） | [白名单文档](2026-09-02-tool-exposure-whitelist.md) | ✅ 可交付 |
 | 5 | open_id ↔ consultant_id 映射表 | OpenClaw 侧自建 | ⬜ 对方职责 |
-| 6 | 前台对话 Skill 安装 | 当前 `brainx` OpenClaw profile | ✅ 5 个 Ready；真实工作台烟测待数据出域授权 |
+| 6 | 前台对话 Skill 安装 | 当前 `brainx` OpenClaw profile | ✅ 5 个 Ready；工作台真实烟测通过 |
 
 ## 相关文档
 

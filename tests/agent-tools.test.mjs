@@ -178,6 +178,13 @@ test('OpenClaw 安装集只引用当前精确白名单工具', () => {
   }
 });
 
+test('工作台 Skill 不把超过 24 小时的快照包装成今天事实', () => {
+  const skill = loadSkill(discoverSkills({ includeGlobal: false }), 'brainx-workbench');
+  assert.match(skill.body, /sync\.updated_at/);
+  assert.match(skill.body, /超过 24 小时/);
+  assert.match(skill.body, /不得直接说“今天”/);
+});
+
 test('全局技能加扫只收 brainx-* 前缀', () => {
   const index = discoverSkills({ includeGlobal: true });
   const globalOnes = [...index.values()].filter((s) => s.root === GLOBAL_SKILLS_DIR);

@@ -2,6 +2,11 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-02｜docs(architecture): 简报补人才库与 reloop 层
+
+- 改动：用户要求把人才库与 reloop 两层写入 `docs/2026-09-02-dataclaw-integration-brief.md`。新增 §6「人才库与 reloop 层（领域权威的另外两块）」：①6.1 人才库（阿里云 RDS MySQL `ttc-rds-public-0707`，IP 白名单，BrainX 入口 `src/talent.js`/`pingMysql()`/`bin/brainx-ttc-sync.mjs`），点出两个已核实坑——契约与代码不一致（reuse PRD §6 定"只读账号禁止写人才库"，但 `src/talent.js` 是可写层：候选人 UPSERT/标签写入/匹配覆盖写）与**静默降级演示风险**（未配置或连不通 MySQL 时自动退进程内内存库，语义一致且无报错，演示当天会显示内存假数据）；②6.2 reloop 权威范围（candidate_identity/resume_document/candidate_field_fact）、三方 ID 映射（TTC job_id ↔ BrainX project_id ↔ reloop position_id 进 entity_links）、桥 1（9/4，未过 Step 0 回放门禁不得称打通）、推人循环（9/8 里程碑）、代码现状已核实（`src/ scripts/ bin/ tests/` 中 reloop 与 position_id **零命中**，桥 1 只有规格未开工）、reloop 侧 3 个未修 P1（BUG-101/103/105，不修则推人循环现场露馅）；③6.3 与 DataClaw 的边界——人才库核对诊断只给脱敏投影，评分口径由 BrainX 统一供数（B 方案）避免它直连人才库形成第二个隐私出口，桥 1 与推人循环归属不因集成改变；④6.4 这一层可复用清单（entity-links + migrations 0025、talent.js、ttc-sync、resume.js/openmai-task.js）与明确不重造项。同步：§2 补"领域权威层三个物理库"对照表；§7 加 9/7 盯 reloop P1 与人才库权限拍板、9/11-9/13 联排前 `pingMysql()` 留证；§8 风险加 5 人才库静默降级、6 reloop P1 未修；§9 待确认从 6 项扩到 9 项（新增 reloop 与人才库是否同实例、人才库账号只读还是可写、演示机 IP 是否在 RDS 白名单、reloop P1 修复排期）。
+- 验证：纯文档改动，不触碰代码与他人未提交改动；所有事实均标注来源（workflow-hub §3/§4.2 所有权、reuse PRD §6 权限、week-plan reloop P1 修复窗口、src/talent.js 头部设计约束注释、grep 全仓 `reloop|position_id` 在 src/scripts/bin/tests 零命中）；文档 204 行 ≤500 行限制，章节编号连续（§1-§9 + 相关文档）。
+
 ## 2026-09-02｜docs(architecture): DataClaw 集成交流与架构重排简报
 
 - 改动：用户提供 DataClaw 事实（自研 AI 数据管理 Agent，已跑通"读群消息→核对后台数据→打分→建议"闭环，York 用它搭团队目标评分系统，约一面 17→25→36、推荐→约面转化 35%→80%，支持一切皆插件，9/2 下午谈集成），据此重排架构并产出 `docs/2026-09-02-dataclaw-integration-brief.md`：①一句话结论——BrainX 不再做通用 IM Agent，收缩为"职位决策与推人的领域权威 + 安全边界"，DataClaw 承担群脑层；②三层分工（群入口 / DataClaw 群脑 + BrainX 领域权威 / 共享 workflow_event_log 与 entity_links 契约层）与三条分工铁律；③今天下午交流会 10 项索取清单（每项含为什么问、可接受答案、谈不拢时的红线），按 1 插件协议→2 结构化原始消息→6 数据边界→8 排期责任人的谈判顺序；④三种集成拓扑（A BrainX 作 DataClaw 插件、B BrainX 作数据源、C 双向事件留到决赛后）与 A+B 并行的推荐；⑤可复现 vs 可接入二分表（账本/幂等/确定性评分/只读工具注册表自建保留；群入口/意图识别/经营诊断/目标评分/权限审计不重造）；⑥你重点做的事（今天谈集成 + 并行配飞书凭证保底 + York 对齐；9/3 全员使用；9/4 桥 1；9/7-9/8 推人循环优先于集成）；⑦四条风险红线（All-in 风险、候选人隐私、两套评分口径打架、留痕分裂）；⑧仍不完整的信息（需从 DataClaw 拿 10 项、需从用户拿 6 项）。`docs/README.md` 同步登记任务路由与文档书目录。

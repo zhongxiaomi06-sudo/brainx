@@ -41,6 +41,14 @@
 - 写动作一律回 BrainX 的领域函数（`membership.js`/`engagement.js`/`commitment.js`），DataClaw 不直写 BrainX 库表。
 - 留痕唯一权威是 BrainX 的 `workflow_event_log`——DataClaw 识别出的目标/反馈/评分，能进账本才算数。
 
+**"领域权威层"内部其实是三个物理库**，DataClaw 一个都不直连，全部经接口（详见 §6）：
+
+| 库 | 位置 | 归属权威 | BrainX 的用法 |
+|---|---|---|---|
+| 决策库 | 本地 SQLite `data/brainx.db` | BrainX | 唯一读写：事件账本、Case、成员、行动项 |
+| 人才库 | 阿里云 RDS MySQL（IP 白名单） | TTC / reloop 共有 | **只读**：候选人检索与脱敏摘要 |
+| reloop 候选人域 | reloop 侧 | reloop | 只经 API token 调用，不直连其库 |
+
 ## 3. 今天下午交流会：10 项索取清单
 
 按"谈不下来就影响什么"排序。每项的**红线**是谈不拢时的退路。
@@ -101,7 +109,50 @@ DataClaw 消费 BrainX 事件账本做复盘；BrainX 消费 DataClaw 评分事�
 | 团队目标评分与打分复盘闭环 | York 已在用，直接接，别重造一套评分 |
 | 权限 RBAC / 操作审计 | 它已有五层安全体系；我们只补"候选人隐私投影"这一层 |
 
-## 6. 你重点做的事
+## 6. 人才库与 reloop 层（领域权威的另外两块）
+
+DataClaw 只影响"群入口"这一层。人才库与 reloop 属于**领域权威层内部**，集成与否都不改变它们的所有权——这一节把它们的位置、现状和坑固定下来。
+
+### 6.1 人才库（阿里云 RDS MySQL）
+
+| 项 | 事实 |
+|---|---|
+| 位置 | 阿里云 RDS MySQL `ttc-rds-public-0707.mysql.rds.aliyuncs.com`，IP 白名单 + 账号密码（`.env` 的 `BRAINX_MYSQL_*`） |
+| BrainX 侧入口 | `src/talent.js`（读写层）、`src/db.js` 的 `pingMysql()`（连通自检）、`bin/brainx-ttc-sync.mjs`（同步）、`src/talent-supply.js` |
+| 归属权威 | 人选 canonical identity 属 reloop（[Workflow Hub §4.2](workflow-hub-architecture.md)）；BrainX 只存 `candidate_ref` 与脱敏摘要，**不存手机号、邮箱、完整简历** |
+
+**两个必须先解决的坑**：
+
+1. **契约与代码不一致**：[复用与自建边界 PRD §6](prd-2026-09-01-reuse-selfbuild-boundary.md) 定的是"MySQL 人才库**只读账号**，禁止写人才库"，但 `src/talent.js` 当前是**可写层**（候选人 UPSERT、标签写入、匹配记录覆盖写）。两者必须对齐——要么改代码为只读，要么正式放宽契约，不能悬着。
+2. **静默降级的演示风险（高）**：`src/talent.js` 在未配置或连不通 MySQL 时**自动降级到进程内内存库**，读写语义与真库一致。这意味着演示当天若白名单失效或网络不通，页面照常显示候选人数据，但那是内存里的假数据，且没有任何报错。**对策**：演示前必须跑 `pingMysql()` 确认真库连通并留证据，健康简报里显式记录"当前后端 = MySQL / memory"。
+
+### 6.2 reloop（候选人域权威）
+
+- **权威范围**：人选身份（`candidate_identity` / `resume_document` / `candidate_field_fact`）、简历、匹配、触达、submission。
+- **三方 ID 映射**：`TTC job_id ↔ BrainX project_id ↔ reloop position_id`，全部进 `entity_links`（Step 0 已建成，migrations 0025）。
+- **桥 1（9/4 联调）**：BrainX `ACCEPTED` → reloop 幂等建岗 → 回传 `position_id` 映射；**未过 Step 0 回放门禁不得称"桥 1 打通"**。
+- **推人循环（9/8 核心里程碑）**：reloop TopN → 飞书对话推人 → 回复回流双写 → 不成功自动起下一轮。
+- **代码现状（已核实）**：`src/`、`scripts/`、`bin/`、`tests/` 中 `reloop` 与 `position_id` **零命中**——桥 1 只有规格，实现尚未开工。
+- **reloop 侧 3 个未修 P1**（作战计划 9/7 修复窗口）：BUG-101 点"去联系"刷新即丢、BUG-103 跨天反馈静默丢、BUG-105 删除不级联。**不修，推人循环会在演示现场露馅。**
+
+### 6.3 与 DataClaw 的边界（这一层最关键的一条）
+
+- DataClaw 可以做人才库数据核对与经营诊断，但**绝不能成为候选人隐私的出口**：只给脱敏投影，手机号/邮箱/简历原文一律不得出现在任何群里。
+- 它的目标评分若要"推荐→约面"口径，数据来自 reloop / 人才库。**建议由 BrainX 统一供数**（B 方案），而不是让它直连人才库——否则会出现第二个隐私出口和第二套身份映射。
+- 桥 1 与推人循环是 BrainX ↔ reloop 的领域链路，**不因 DataClaw 集成而改变归属**。
+
+### 6.4 这一层已有的可复用能力（不要重造）
+
+| 已有 | 用途 |
+|---|---|
+| `src/hub/entity-links.js` + migrations 0025 | 跨系统身份链接与拆分，三方 ID 映射直接用 |
+| `src/talent.js` / `src/talent-supply.js` | 人才库读写与供给，含内存降级（要修的是权限，不是重写） |
+| `bin/brainx-ttc-sync.mjs` | TTC 同步管道，已跑通 |
+| `src/resume.js` / `src/openmai-task.js` | 简历解析与找人，桥 2/3 直接复用 |
+
+**明确不重造**：人选 canonical identity（reloop 拥有）、简历解析、人才库同步管道、人才库的候选人存储。
+
+## 7. 你重点做的事
 
 **今天 9/2（下午前）**
 1. 带这份清单去谈 DataClaw，优先拿到 #1 插件协议、#2 结构化原始消息、#6 数据边界、#8 排期责任人。
@@ -112,16 +163,22 @@ DataClaw 消费 BrainX 事件账本做复盘；BrainX 消费 DataClaw 评分事�
 
 **9/4**：桥 1 联调（BrainX ACCEPT → reloop 建岗），需要 reloop 侧 Dykes/Frankie 在场。
 
+**9/7**：盯 reloop 侧 BUG-101/103/105 修复（推人循环的前置，不是可选项）。同时拍板人才库账号权限（只读 vs 可写，见 §6.1）。
+
 **9/7-9/8**：推人循环——优先级高于任何集成工作。DataClaw 集成谈成是加分项，谈不成不影响这条主线。
 
-## 7. 风险与红线
+**9/11-9/13 联排前**：跑 `pingMysql()` 确认人才库走的是真库而非内存降级，并留证据；确认 reloop P1 已回归（65 测试全绿）。
+
+## 8. 风险与红线
 
 1. **All-in 风险**：9/14 前把群入口全押在 DataClaw 上，一旦它排期落空，演示没有群留痕。**对策**：飞书自建链路今天必须配好凭证，作为保底。
 2. **隐私红线**：候选人联系方式、简历原文不得通过 DataClaw 出现在任何外部群。插件只返回投影字段，敏感字段走 `evidence_ref`。
 3. **口径打架**：两套评分（BrainX 六维 vs York 目标评分）同时出现在演示里会被问穿。**对策**：9/4 前明确"六维评分用于职位优先级，目标评分用于顾问执行"，并在演示脚本里说清。
 4. **留痕分裂**：DataClaw 的群留痕与 BrainX 事件账本若各记一份，9/9 复盘会出现两个数字。**对策**：清单 #2 拿到原始消息后统一入账本；拿不到就在演示里明确"两个系统、两套口径"。
+5. **人才库静默降级**：连不通 RDS 时 `src/talent.js` 自动退到内存库，页面照常显示假数据且无报错。**对策**：演示前 `pingMysql()` 留证，健康简报显式记录当前后端。
+6. **reloop 侧 P1 未修**：BUG-101/103/105 不修，推人循环在演示现场露馅。**对策**：9/7 修复窗口必须落，9/10 回归 65 测试全绿才能进联排。
 
-## 8. 仍不完整、需要补齐的信息
+## 9. 仍不完整、需要补齐的信息
 
 **需要从 DataClaw 团队获取**：见 §3 十项。
 
@@ -131,8 +188,11 @@ DataClaw 消费 BrainX 事件账本做复盘；BrainX 消费 DataClaw 评分事�
 |---|---|
 | DataClaw 的 OpenAPI 文档或接口清单 | 无法设计 B 方案接口契约 |
 | York 团队目标评分的规则口径 | 无法判断评分是复用还是自建 |
-| reloop 侧 API 文档与联调联系人 | 桥 1（9/4）无法开工 |
-| MySQL 人才库只读账号 | 桥 1 跨库映射无法验证 |
+| reloop 侧 API 文档与联调联系人（Dykes / Frankie） | 桥 1（9/4）无法开工 |
+| reloop 与人才库是否同一个 MySQL 实例、哪个库 | 决定跨库映射是 `entity_links` 还是直连查询 |
+| 人才库账号到底给只读还是可写（契约与 `talent.js` 冲突，见 §6.1） | 决定要不要改代码，以及隐私边界怎么划 |
+| 演示/联调机器的公网 IP 是否已在 RDS 白名单 | 不在白名单 = 演示当天静默降级到内存库 |
+| reloop 侧 3 个 P1（BUG-101/103/105）的修复排期 | 决定推人循环能不能进 9/12 联排 |
 | 9/3 全员使用的 SOP 与人工补位提示语是否已有草稿 | 明早发布物，今晚要定稿 |
 | DataClaw 是私有化部署还是 SaaS、在内网还是公网 | 决定我们能不能回调它、要不要开白名单 |
 

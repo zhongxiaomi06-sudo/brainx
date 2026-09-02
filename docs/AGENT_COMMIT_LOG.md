@@ -2,6 +2,29 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-02｜docs(architecture): 架构细节改正 + 业务工作全景 + 白名单拆文
+
+用户要求「像一些细节要改正，然后这个架构明确一下所有的业务的工作」。逐条核实代码后改正 7 处错误，并新增 2 份文档。
+
+**改正的错误（全部经代码核实，无估算）：**
+
+1. **「15 个只读工具」是错的（全文 5 处）**——仓库有**两套不同的 15 个工具**：`src/agent/registry.js` 的 `TOOL_ROWS` 与 `mcp/server.mjs` 的 `TOOLS`，**交集只有 8 个**（consultants/workbench/recommendations/opportunity/progress_suggestion/replay/profile/push_preview），各自独有 7 个。MCP server 那套是 **7 读 + 8 写**，根本不是只读。§5.1 生成素材因此要指明用 MCP 那套，否则写进 Skill 会调用失败。
+2. **白名单盲区（最严重）**——§5.2 白名单只审了 registry 那套，**MCP server 独有的 7 个写操作从未审查**。逐个读 `run` 实现后补审：**`brainx_sync_now` 默认 `source='fixture'` 且 `dry_run=false`，群里一句话就能把决策库刷成 fixture 测试数据直接落库**；**`brainx_record_outcome`（`src/replay.js:35`）只校验职位全局存在、无 `jobVisibleTo`，可给任意职位录结果**；`brainx_recommend_run` 无守门可反复重置推荐；`brainx_feedback` 待核归属。守门正确的是 `engage`/`record_progress`/`terminal_result`。**判断：`sync_now` 比 `brainx_talent` 更危险——隐私泄漏能补救，数据被刷没得救。**
+3. **§6 路径 A 文件名错误**：`mcp/domain-server.mjs` → 实际是 **`mcp/server.mjs`**。
+4. **§6 env 键错误**：`BRAINX_DB` → `src/env.js` 的零依赖加载器只认 **`BRAINX_ENV_FILE`**，写错会导致环境变量全部加载失败并静默降级。与下游交付文档 §6.3 统一。
+5. **§4.4 权限清单不精确** → 指向新权限清单，并补**「拉机器人进群 ≠ 能读群消息」**的认知纠正。
+6. **§7 双轨判断前提错误**——原结论「验证透传后自建网关可能退居纯账本」假设 OpenClaw 插件能看到群里所有消息，实际它只收 @它 的消息。改为**两条都不能砍**：OpenClaw 管前台对话（@触发），自建网关管全量消息通道 + 账本；高敏感权限能否批下来是独立变量，不能赌。
+7. **§8.1 坑 1 / §10 日程 / §12 待确认** 按 9/2 会议结论更新（人才库已拍板并行推进、日程反映会议后实际状态）。
+
+**新增文档：**
+
+- `docs/2026-09-02-business-work-breakdown.md`（122 行）：**用户要的「所有业务工作」**。猎头全链路六段逐段标注现状/承担者/工具/权限，指出 **offer 谈判段是数据盲区**（驾驶舱只能监控一二面，三面与 offer 全在私聊小群）；MVP 每日七步循环；支撑类工作（群信息提炼、目标检查、数据验算——明确是交叉验算而非接口监控）；权限档位 × 业务对照；**关键结论：MVP 主循环只依赖低敏感权限，不必等审批就能跑通**。
+- `docs/2026-09-02-tool-exposure-whitelist.md`（170 行）：白名单三节从架构文档拆出独立成文（原文已超 500 行上限，且白名单需持续增补）。新增**合并后最终白名单表**（21 个工具 × 当前在哪 / 读写 / 判定 / 外露前必做）与**防漏机制**（建议加 `tests/mcp-write-guard.test.mjs` 断言所有写工具含守门 + 新增工具 checklist 5 条）。
+
+同步：docs/README.md 任务路由新增 3 行、文档书目录登记 2 条；架构文档相关文档区补链接。
+
+- 验证：工具清单用 `grep -nE "^  brainx_[a-z_]+:" mcp/server.mjs` 与 `sed -n '/TOOL_ROWS/,/^\];/p' src/agent/registry.js` 实测提取后逐项比对交集；守门情况逐个读 `mcp/server.mjs` 的 `run` 实现与 `src/replay.js:35` 的 `recordOutcome` 源码确认（该函数只 `SELECT 1 FROM job_facts WHERE project_id=?`，确无归属校验）；架构文档 ASCII 图修改后逐行核对无重复行无断框；四份文档行数 450/170/122/177 均 ≤500。
+
 ## 2026-09-02｜docs(architecture): 回填人才库契约拍板结论到下游交付文档
 
 - 改动：9/2 会议已拍板人才库契约，回填 `docs/2026-09-02-brainx-mcp-deliverable.md` 三处，避免与新出的[飞书权限清单](2026-09-02-feishu-permission-scopes.md)打架：①§7.1 P0-3「人才库契约对齐」由"只读 vs 可写二选一"划线改为**并行推进**，并在表下补一段说明——临时方案（成员各自共享给 TTC/York AI 助手，半小时、开发量极低，代价是必须额外写数据隔离模块）+ 整库权限同步申请（拿到后省约两个模块开发量，隔离模块再下线）；明确 **P0-2 的 cid 隔离改造不能省**，因为整库权限尚未通过，工具返回需带 `backend` 字段标注两态。②§10 今晚清单第 1 条标记为已完成，并把原来的 3 条补成 4 条——新增"发起人才库共享：把成员各自共享的操作步骤发到群里"这一落地动作。③相关文档加入飞书权限清单链接。

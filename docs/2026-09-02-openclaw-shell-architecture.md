@@ -10,7 +10,9 @@
 
 **DataClaw 不是我们的上游，是同构参照物。壳子是开源的 OpenClaw，数据是官方接口，Skill 是 AI 生成 + 人工改——三样都不构成技术壁垒。**
 
-**去掉技术变量后，差距只剩两处：谁的领域知识更准（决定 Skill 写得对不对、口径对不对），谁的效果数据更早（他们有 35%→80%）。前者我们占优——已建成的领域权威层、15 个只读工具、7 个已合规 Skill 都是现成弹药；后者我们追不上也不必追，那是"跑得早"的红利，不是能力差。**
+**去掉技术变量后，差距只剩两处：谁的领域知识更准（决定 Skill 写得对不对、口径对不对），谁的效果数据更早（他们有 35%→80%）。前者我们占优——已建成的领域权威层、两套工具集（registry 15 个 + MCP server 15 个）、7 个已合规 Skill 都是现成弹药；后者我们追不上也不必追，那是"跑得早"的红利，不是能力差。**
+
+> **术语纠正（9/2 晚核实）**：本文早期版本反复出现的「**15 个只读工具**」是错误表述。仓库里有**两套不同的 15 个工具**，交集只有 8 个，且 MCP server 那套含 8 个写操作、根本不是只读。详见 §5.3。
 
 ## 2. 为什么翻转：五个新事实
 
@@ -27,7 +29,7 @@
 
 | 差异点 | 谁占优 | 说明 |
 |---|---|---|
-| 领域口径（职位/候选人/Case 的业务真值） | **我们** | 领域权威层、15 个只读工具、7 个已合规 Skill 都是现成的 |
+| 领域口径（职位/候选人/Case 的业务真值） | **我们** | 领域权威层、两套工具集、7 个已合规 Skill 都是现成的（见 §5.3 工具集纠正） |
 | 数据接口的丰富度与稳定性 | 持平或视接口而定 | 都是官方接口，看谁的覆盖更全 |
 | 效果数据（35%→80%） | **他们** | 跑得早的红利，不是能力差；我们用 baseline-1.1 六维口径打另一侧 |
 | IM / 多轮 / 意图识别 | 持平 | 同为 OpenClaw 壳子 |
@@ -45,13 +47,13 @@
        ▼ Skill 层（WHAT：该怎么做）        ▼ MCP 层（HOW：真去调）
 ┌─ ~/.openclaw/workspace/skills/ ─┐   ┌─ openclaw.json: mcp.servers ──┐
 │ brainx-workbench      已合规    │   │ brainx-domain  本地 stdio     │
-│ brainx-talent         已合规    │   │  → 15 个只读工具              │
-│ brainx-engagement     已合规    │   │ vendor-official 远程 http     │
-│ brainx-report         已合规    │   │  → 你手上的官方数据接口       │
-│ brainx-ops            已合规    │   │ reloop-api    远程 http       │
-│ brainx-data-explorer  已合规    │   │  → 候选人域（只经 token）     │
-│ brainx-hunter-playbook 已合规   │   └──────────────┬────────────────┘
-└─────────────────────────────────┘                  │
+│ brainx-talent         已合规    │   │  → mcp/server.mjs 15 工具     │
+│ brainx-engagement     已合规    │   │    （7 读 + 8 写，见 §5.3）   │
+│ brainx-report         已合规    │   │ vendor-official 远程 http     │
+│ brainx-ops            已合规    │   │  → 你手上的官方数据接口       │
+│ brainx-data-explorer  已合规    │   │ reloop-api    远程 http       │
+│ brainx-hunter-playbook 已合规   │   │  → 候选人域（只经 token）     │
+└─────────────────────────────────┘   └──────────────┬────────────────┘
                                                      ▼
                         ┌─ BrainX 领域权威层（不因换壳子而改变）──┐
                         │ workflow_event_log + idx_wel_idem 账本  │
@@ -113,10 +115,14 @@ openclaw logs --follow      # 实时日志排障
 
 1. 开放平台 → **创建企业自建应用**（国际版 Lark 用 `open.larksuite.com/app`）
 2. 添加应用能力 → **机器人**
-3. 权限管理 → **批量导入**权限 JSON（至少含消息收发、`im:resource`、通讯录基本信息）
+3. 权限管理 → **批量导入**权限 JSON（精确清单见下方）
 4. 事件与回调 → 订阅方式 → **使用长连接接收事件**（WS 模式，**不需要公网 IP**）
 5. 添加事件：**接收消息、消息已读、机器人进群、机器人被移出群**
 6. **创建版本 → 确认发布** ← 漏了这步，前面权限全不生效
+
+> **第 3 步的精确 scope 与事件清单见 [飞书权限清单（9/2 研发对齐会定论版）](2026-09-02-feishu-permission-scopes.md)**，不要照本节粗粒度描述勾。
+>
+> **一个必须先纠正的认知**：**把机器人拉进群 ≠ 能读群消息。** 机器人只会收到 @它 / 私聊它的消息（`im:message.group_at_msg:readonly` + `im:message.p2p_msg:readonly`）；要读**群内全量历史与实时消息**必须开高敏感的 `im:message.group_msg`（应用身份）或 `im:message.group_msg:get_as_user`（用户身份）。这会里定的「群信息提炼 / 目标检查」两条能力全依赖后者。详见权限清单 §2。
 
 > **省事点**：OpenClaw 走 WS 长连接，**只要 App ID + App Secret 两个凭证**；BrainX Step 1 自建网关额外要 Encrypt Key + Verification Token。两套系统用的是同一对凭证——你配一次，两边都能用（见 §7 双轨）。
 
@@ -167,9 +173,11 @@ openclaw gateway restart
 
 既然对方的做法是"AI 生成 + 人工改"，这就是这层的正确姿势。**批量生成 + 人工校准口径**，而不是逐个手写。
 
-我们的生成素材比他们好——`src/agent/registry.js` 的 15 个只读工具**已带完整 schema**（`name` / `description` / `parameters`），其中 description 是中文且写清了口径（例如"同步不完整时返回 blocked""只能查本人"）。这些 description 就是 Skill 正文的最佳来源，比从零让 AI 猜强得多。
+我们的生成素材比他们好——工具集里的每个工具**已带完整 schema**（`name` / `description` / `parameters`），其中 description 是中文且写清了口径（例如"同步不完整时返回 blocked""只能查本人"）。这些 description 就是 Skill 正文的最佳来源，比从零让 AI 猜强得多。
 
-**但不是 15 个都能外露。** 生成前先划掉两个：`query_sql`（让 agent 直查 SQL，挂进 OpenClaw 等于把决策库开给群里的自然语言输入，SQL 注入面直接从 Web 扩到群里）与 `load_skill`（元工具，不该对外）。**先定白名单再生成**，别生成完再挑。
+> **生成素材要用 MCP server 那套**（`mcp/server.mjs`），不是 registry 那套。Skill 经 MCP 调用，registry 独有的 7 个（radar / clients / talent / talentSupply / openmai / query_sql / load_skill）在 MCP server 里不存在，写进 Skill 会调用失败。见 §5.3。
+
+**但不是都能外露。** 生成前先划掉两个：`query_sql`（让 agent 直查 SQL，挂进 OpenClaw 等于把决策库开给群里的自然语言输入，SQL 注入面直接从 Web 扩到群里）与 `load_skill`（元工具，不该对外）。**先定白名单再生成**，别生成完再挑。
 
 ```text
 工具 schema（15 个，已有）
@@ -195,58 +203,21 @@ SKILL.md 草稿
 
 **核心判断：人工改的是口径，不是语法。** 语法错了肉眼可见、跑一下就崩；口径错了要等演示现场才暴露——所以上面三处人工校正不能省，其余交给生成。
 
-### 5.2 工具外露白名单（实测）
+### 5.2 工具外露白名单
 
-（本节依据：逐个读 `src/agent/registry.js` 与 `src/agent/tools/*.js` 的 schema + 隔离实现。挂进 OpenClaw 之前必须先定白名单——`§5.1` 流水线只能遍历白名单内的工具。）
+**完整白名单已独立成文**：[工具外露白名单（全量）](2026-09-02-tool-exposure-whitelist.md)。
 
-按外露难度分三档：
+挂进 OpenClaw 之前必须先定白名单——§5.1 的 Skill 生成流水线只能遍历白名单内的工具。核心结论摘要：
 
-#### 第一档 ✅：直接外露（9 个）
-
-| 工具 | 隔离性 | 判定理由 |
+| 档位 | 数量 | 工具 |
 |---|---|---|
-| `brainx_consultants` | 全局（仅 consultant_id + display_name） | 花名册，不含业务数据 |
-| `brainx_workbench` | 恒为会话 cid | 工作台首屏仅本人 |
-| `brainx_recommendations` | 恒为 cid；同步不完整时返回 blocked | 自身有守门 |
-| `brainx_profile` | 仅本人 | 顾问自己的画像 |
-| `brainx_radar` | 当前顾问可见 | 雷达不含候选人 |
-| `brainx_clients` | 当前顾问可见 | 客户公司聚合不含候选人 |
-| `brainx_progress_suggestion` | jobVisibleTo 守门 | 仅本人可见职位 |
-| `brainx_push_preview` | 仅本人 | 推送卡预览 |
-| `brainx_replay` | 跨人 = NOT_FOUND | 决策回放 |
+| ✅ 直接外露 | **7 个**（MCP 侧） | `consultants` `workbench` `recommendations` `profile` `progress_suggestion` `push_preview` `replay` |
+| ⚠️ 改造后外露 | **5 个** | `opportunity`（先确认 `job_facts` 字段）、`openmai_result` `talent_supply`（脱敏脚本）、`recommend_run`（限流）、`feedback`（待核归属） |
+| ❌ 禁止外露 | **5 个** | **`brainx_sync_now`（会把决策库刷成 fixture 测试数据）**、`brainx_talent`（无 cid 隔离）、`brainx_record_outcome`（漏守门）、`query_sql` `load_skill` |
 
-#### 第二档 ⚠️：需脚本级脱敏后外露（3 个）
+> `talent` / `talent_supply` / `radar` / `clients` / `openmai` / `query_sql` / `load_skill` 属 registry 独有，**当前不在 MCP server 里**，外露前需先决定要不要加进 MCP server。
 
-| 工具 | 问题 | 改造方向 |
-|---|---|---|
-| `brainx_opportunity` | `job_facts` 表里若含客户 BD 联系人字段，会跨出"顾问可见"边界 | **先看 `job_facts` 的 migrations 字段**确认无客户敏感字段；否则在 `scripts/` 输出脚本内投影 |
-| `brainx_openmai_result` | 结果是候选人池 markdown，可能含候选人摘要/联系方式 | 输出脚本只回 `run_id` + `status` + 候选人 ID 列表；候选人详情走 `evidence_ref` |
-| `brainx_talent_supply` | Top 匹配含候选人 | 只回可匹配人数/难度/命中词，不回候选人 ID 以外的字段 |
-
-#### 第三档 ❌：禁止外露（3 个）
-
-| 工具 | 硬指标 |
-|---|---|
-| **`brainx_talent`** | **没有 cid 隔离**——它从 MySQL 全局查任何人，挂进群里等于任何群成员都能查所有候选人的手机号/邮箱/简历。**最危险的工具** |
-| **`query_sql`** | 让 agent 直查 SQLite 决策库，SQL 注入面从 Web 直接扩到群里 |
-| `brainx_load_skill` | 元工具（加载技能手册），对外没价值；只会让用户拿到内部 agent 协议 |
-
-#### 改造项落地顺序（9/14 前）
-
-1. **`talent_supply` 输出脚本脱敏**（看 `src/talent-supply.js` 找到字段出口）——今天可搞
-2. **`openmai_result` 输出脚本脱敏**——明天可搞
-3. **`opportunity` 看 `job_facts` 字段**——看 migrations 0024 之类的 job_facts 表定义，1 小时内可决；有问题再改脚本
-4. **`talent` 改造为"我承接过的候选人"视角**（受 cid 隔离）→ 改名 `brainx_talent_mine`——**涉及接口签名变更和 MySQL 查询改造，9/14 前不一定能完成，列入决赛后清单**
-
-#### 与 §5.1 流水线对接
-
-白名单是流水线的输入。生成 Skill 时 AI 只遍历：
-- 第一档全部（9 个）
-- 第二档中脱敏脚本完成后的项
-- 第三档始终排除——`registry.js` 的 `TOOL_ROWS` 里可以加 `exposeable: false` 标记，AI 跳过
-
-`brainx_talent` 因为历史 SKILL.md（`skills/brainx-talent/SKILL.md`）已经存在且描述里含 `brainx_talent({...})` 工具调用记号，**生成前要从 schema 里移除它的可见性，或在 MCP server 启动时直接挂黑名单**。否则 MCP server 一挂上它就暴露。
-
+**两个关键纠正见白名单文档**：①仓库有**两套**工具集（registry 15 个 + MCP server 15 个，交集仅 8 个），此前被混为一谈；②MCP server 独有的 **7 个写操作此前从未审查**，其中 `sync_now` 比 `talent` 更危险——**隐私泄漏能补救，数据被刷没得救**。
 ## 6. 官方数据接口怎么挂进来
 
 你手上有官方数据接口，这是相对 DataClaw 的优势。挂进 OpenClaw 有两条路：
@@ -262,11 +233,13 @@ SKILL.md 草稿
   },
   "brainx-domain": {
     "command": "node",
-    "args": ["/abs/path/brainx/mcp/domain-server.mjs"],
-    "env": { "BRAINX_DB": "${BRAINX_DB}" }
+    "args": ["/abs/path/brainx/mcp/server.mjs"],
+    "env": { "BRAINX_ENV_FILE": "/abs/path/brainx/.env" }
   }
 } } }
 ```
+
+> **两处错误已修正（9/2 晚）**：①路径曾写作 `mcp/domain-server.mjs`，实际文件是 **`mcp/server.mjs`**；②env 键曾写作 `BRAINX_DB`，但 `src/env.js` 的零依赖加载器只认 **`BRAINX_ENV_FILE`**（指向 `.env` 文件路径），写 `BRAINX_DB` 会导致环境变量全部加载失败、静默降级。与[下游交付文档 §6.3](2026-09-02-brainx-mcp-deliverable.md) 保持一致。
 
 收益：工具自动被 agent 发现、参数有 schema、权限可收敛到单个 server。代价：要写 server 代码 + 调 transport。
 
@@ -288,20 +261,35 @@ OpenClaw 官方插件和 BrainX Step 1 自建网关（`src/gateway/ws-client.js`
 
 | | OpenClaw 飞书插件 | BrainX 自建 ws-client |
 |---|---|---|
-| 定位 | **前台**：对话、意图、多轮、发消息 | **账本**：原始事件入 `workflow_event_log` |
+| 定位 | **前台**：对话、意图、多轮、发消息 | **账本 + 全量消息通道** |
 | 现成度 | `channels add` 五分钟 | 已建成，凭证到手即可跑 |
+| 能收到哪些消息 | **只有 @机器人 / 私聊它的**（默认权限下） | 取决于订阅的事件，可覆盖群内全部消息 |
 | 能否拿到原始 `message_id`/`chat_id`/`open_id` | **待验证**（见下） | 确定能拿到，`envelope-mapper` 已在做 |
 | 成本 | 低 | 中（要自己维护） |
 
-**判断：双轨并行。** OpenClaw 当对话前台，自建网关继续当账本。
+**判断（9/2 晚修正）：双轨并行，且两条都不能砍。**
 
-理由是账本是"唯一留痕权威"，把留痕寄托在第三方插件的内部行为上不可接受——插件升级一次换套内部表示，我们的幂等键就断了。
+原判断是「验证透传后，自建网关可能退居纯账本、不做对话」。**这个结论建立在错误前提上**——它假设 OpenClaw 插件能看到群里所有消息。实际上（见 [权限清单 §2](2026-09-02-feishu-permission-scopes.md)）：
 
-**9/3 第一件事就是验证一件事**：OpenClaw 飞书插件能否把原始消息字段（`message_id` / `chat_id` / `open_id` / 原文 / 时间戳）透传给 Skill。
-- 能 → 自建网关退居纯账本，不做对话，维护量大降
-- 不能 → 双轨继续，自建网关同时承担账本与关键指令的接收
+- 默认权限下，OpenClaw 插件**只能收到 @机器人 的消息**，群里人与人之间的对话它一条都收不到。
+- 要让它读全量群消息，必须开高敏感的 `im:message.group_msg` —— **而这条能不能批下来还不确定**。
 
-这是今天唯一需要先验证再决定工作量分配的事，别在验证前砍掉任何一条。
+所以两条链路守的东西不一样，**不存在互相替代关系**：
+
+| 场景 | 谁负责 |
+|---|---|
+| 用户主动 @机器人 问问题、确认岗位、接受候选人 | **OpenClaw 插件**（前台对话） |
+| 读群内全量消息做提炼、目标检查、接单自动建目标 | **自建 ws-client**（除非高敏感权限批下来） |
+| 原始事件入 `workflow_event_log` | **自建 ws-client**（账本，唯一留痕权威） |
+
+保留自建网关的第二条理由不变：账本是审计底线，把留痕寄托在第三方插件的内部行为上不可接受——插件升级一次换套内部表示，我们的幂等键就断了。
+
+**9/3 第一件事仍然是验证透传**：OpenClaw 飞书插件能否把原始消息字段（`message_id` / `chat_id` / `open_id` / 原文 / 时间戳）透传给 Skill。
+
+- 能 → 透传的这部分可入账本，两套口径能对齐
+- 不能 → 账本仍以自建网关为准，演示中明确"两套口径"
+
+**但无论验证结果如何，自建网关都不砍** —— 因为高敏感权限批不批得下来是独立变量，不能赌。
 
 ## 8. 人才库与 reloop 层（换壳子不改归属）
 
@@ -317,7 +305,11 @@ DataClaw 与 OpenClaw 都只影响"群入口"。这两块属领域权威层内�
 
 **两个必须先解决的坑**：
 
-1. **契约与代码不一致**：[复用与自建边界 PRD §6](prd-2026-09-01-reuse-selfbuild-boundary.md) 定"MySQL 人才库**只读账号**，禁止写人才库"，但 `src/talent.js` 当前是**可写层**（候选人 UPSERT、标签写入、匹配记录覆盖写）。必须二选一对齐，不能悬着。**换壳子后这条更紧**：Skill/MCP 给了更多调用入口，可写层的爆炸半径变大。
+1. ~~**契约与代码不一致**：[复用与自建边界 PRD §6](prd-2026-09-01-reuse-selfbuild-boundary.md) 定"MySQL 人才库**只读账号**，禁止写人才库"，但 `src/talent.js` 当前是**可写层**。必须二选一对齐，不能悬着。~~
+   → **9/2「研发对一下」会议已拍板：不是二选一，是并行推进**（详见 [飞书权限清单 §6](2026-09-02-feishu-permission-scopes.md)）：
+   - **临时方案先落地**：团队成员各自把人才库共享给 TTC / York AI 助手（每人一次，约半小时，开发量极低）。代价是**必须额外开发数据隔离模块**。
+   - **整库权限同步申请**：拿到后可省约两个模块开发量，已开发的隔离模块再下线。
+   - **对本层的影响**：整库权限未落地前，`brainx_talent` 的 **cid 隔离改造不能省**（[下游交付文档 P0-2](2026-09-02-brainx-mcp-deliverable.md)）。换壳子后 Skill/MCP 调用入口变多，可写层爆炸半径更大，这条更紧。
 2. **静默降级（高）**：`src/talent.js` 在未配置或连不通 MySQL 时**自动降级到进程内内存库**，读写语义与真库一致。演示当天白名单失效 → 页面照常显示候选人，但那是内存假数据，**且无任何报错**。对策：演示前跑 `pingMysql()` 留证，健康简报显式记录"当前后端 = MySQL / memory"。
 
 ### 8.2 reloop（候选人域权威）
@@ -345,11 +337,13 @@ Skill 与 MCP 让调用入口变多，隐私出口随之变多。硬规矩：
 | `src/talent.js` / `src/talent-supply.js` | 人才库读写与供给（要修的是权限，不是重写） |
 | `bin/brainx-ttc-sync.mjs` | TTC 同步管道，已跑通 |
 | `src/resume.js` / `src/openmai-task.js` | 简历解析与找人，桥 2/3 直接复用 |
-| `src/agent/registry.js` 的 15 个只读工具 | MCP 层的现成工具清单，schema 已定 |
+| `mcp/server.mjs` 的 15 个工具（7 读 + 8 写） | MCP 层的现成工具清单，schema 已定（注意与 registry 那套不是同一集合，见 §5.3 / [白名单文档](2026-09-02-tool-exposure-whitelist.md)） |
 
 **明确不重造**：人选 canonical identity（reloop 拥有）、简历解析、人才库同步管道、事件账本与幂等。
 
-## 9. 今天下午交流会：索取清单（目标已从"求集成"改为"抄作业"）
+## 9. 交流会索取清单（目标已从"求集成"改为"抄作业"）
+
+> **9/2 下午的「研发对一下」（York × Mia，38 分 53 秒）已经开过了**，会议结论见 [飞书权限清单](2026-09-02-feishu-permission-scopes.md) 与 [业务工作全景](2026-09-02-business-work-breakdown.md)。本节保留为**与 DataClaw 团队交流时**的索取清单，届时按下面这些问。
 
 壳子一样、Skill 格式一样，他们踩过的坑就是我们明天要踩的坑。以下问题按"能省多少天"排序。
 
@@ -373,31 +367,45 @@ Skill 与 MCP 让调用入口变多，隐私出口随之变多。硬规矩：
 
 **仍要守住的底线**（与旧文档一致）：不提供候选人隐私明文、不让他们直连我们的库、不留痕的事不做。
 
-## 10. 你重点做的事
+## 10. 你重点做的事（9/2 晚更新，反映下午会议结论）
 
-**今天 9/2（下午前）**
-1. 按 §9 清单去谈。**立场是抄作业，不是求集成。**
-2. **并行**：把飞书 4 个凭证配好（§4.4 六步）。这是不依赖任何外部方的保底链路。
-3. 定一个判断：**演示机是 macOS 还是 Linux**，决定 `os` gating 与 OpenClaw 部署方式。
+**已完成（9/2）**
 
-**今晚 9/2**：两件事，都独立于交流会结果，必须完成。
+1. ✅ 下午「研发对一下」会议 —— 结论见 [飞书权限清单](2026-09-02-feishu-permission-scopes.md)：人才库并行方案、每日推 10 个岗位、第一版不做拉群/Sheet。
+2. ✅ 人才库契约拍板 —— 不是「只读 vs 可写」二选一，是**临时方案 + 整库申请并行推进**（§8.1）。
 
-1. 本地跑通 OpenClaw + 飞书插件 + 迁移 7 个 Skill（§5 三条命令），确认能收发消息。
-2. **按 §5.1 批量生成剩余 Skill**：拿 15 个只读工具的 schema 当输入批量生成，人工只改口径 / 脱敏 / 写意图三处，再过那四个坑的检查。交流会若问到对方"最常改哪里"，直接并进检查项；问不到就用 §5.1 那张表自查。
+**今晚 9/2（21:00 前）**
 
-> 注意顺序：**先跑通 1 再生成 2**。没跑通就批量生成，等于批量生产无法验证的东西。
+1. **飞书后台配权限 + 事件**：按 [权限清单 §4.1 的 JSON](2026-09-02-feishu-permission-scopes.md) 批量导入，**改完必须建版本发布**。这是不依赖任何外部方的保底链路。
+2. 本地跑通 OpenClaw + 飞书插件 + 迁移 7 个 Skill（§5 三条命令），确认能收发消息。
+3. 确认**演示机是 macOS 还是 Linux**、出口 IP 是否在 RDS 白名单 —— 决定 `os` gating 与 OpenClaw 部署方式。
+4. **发起人才库共享**：把"团队成员各自共享人才库"的操作步骤发到群里（半小时，并行方案的落地动作）。
+
+> 注意顺序：**先跑通 2 再生成 Skill**。没跑通就批量生成，等于批量生产无法验证的东西。
+
+**⚠️ 挂 MCP server 之前的硬性前置（§5.4 新发现）**
+
+1. `brainx_sync_now` 加入启动黑名单（默认 `source='fixture'` + `dry_run=false`，会把决策库刷成测试数据）
+2. `brainx_record_outcome` 补 `jobVisibleTo` 守门
+3. `brainx_talent` 加入黑名单（无 cid 隔离）
+
+**明天 9/3 上午**：验证 §7 那件事——原始消息字段能否透传给 Skill。**但无论结果如何，自建网关都不砍。**
+
+**9/3 全员使用日**：全天跟修黄金路径（推荐→加入→跟进→记录）。SOP 与人工补位提示语今晚定稿。
+
+**9/4**：桥 1 联调（BrainX ACCEPT → reloop 建岗），需 reloop 侧 Dykes/Frankie 在场。
+
+**9/7**：盯 reloop 侧 BUG-101/103/105 修复。
+
+**9/7-9/8**：推人循环。**优先级高于任何 OpenClaw 工作。** 壳子谈成是加分项，谈不成不影响这条主线——我们现在已经不依赖 DataClaw 了。
+
+**9/11-9/13 联排前**：跑 `pingMysql()` 确认走真库而非内存降级并留证；确认 reloop P1 已回归（65 测试全绿）。
 
 **明天 9/3 上午**：验证 §7 那件事——原始消息字段能否透传给 Skill。这决定自建网关的存废与工作量分配。
 
 **9/3 全员使用日**：全天跟修黄金路径（推荐→加入→跟进→记录）。SOP 与人工补位提示语今晚定稿。
 
 **9/4**：桥 1 联调（BrainX ACCEPT → reloop 建岗），需 reloop 侧 Dykes/Frankie 在场。
-
-**9/7**：盯 reloop 侧 BUG-101/103/105 修复；拍板人才库账号权限（只读 vs 可写，见 §8.1）。
-
-**9/7-9/8**：推人循环。**优先级高于任何 OpenClaw 工作。** 壳子谈成是加分项，谈不成不影响这条主线——我们现在已经不依赖 DataClaw 了。
-
-**9/11-9/13 联排前**：跑 `pingMysql()` 确认走真库而非内存降级并留证；确认 reloop P1 已回归（65 测试全绿）。
 
 ## 11. 风险与红线
 
@@ -410,6 +418,8 @@ Skill 与 MCP 让调用入口变多，隐私出口随之变多。硬规矩：
 7. **口径打架**：六维评分 vs York 目标评分同时出现会被问穿。**对策**：9/4 前明确"六维用于职位优先级，目标评分用于顾问执行"。
 8. **人才库静默降级**：连不通 RDS 自动退内存库，页面显示假数据无报错。**对策**：演示前 `pingMysql()` 留证。（与第 3 条叠加最危险：AI 生成的 Skill 把假数据说得更自信。）
 9. **reloop 侧 P1 未修**：BUG-101/103/105 不修，推人循环演示现场露馅。**对策**：9/7 修完，9/10 回归 65 测试全绿。
+10. **数据破坏比隐私泄漏更致命（新增，最高）**：`brainx_sync_now` 默认 `source='fixture'` + `dry_run=false`，挂进群里等于让任何群成员一句话把决策库刷成测试数据——**隐私泄漏能补救，数据被刷没得救**。同类问题还有 `brainx_record_outcome` 漏了 `jobVisibleTo` 守门。**对策**：见 §5.4，挂 MCP server 前必须处理完三项；**写操作的外露审查标准要比读操作更严**。
+11. **守门策略不一致（新增，高）**：同样是写职位数据，`engage` / `record_progress` / `terminal_result` 都调了 `jobVisibleTo`，`record_outcome` 却漏了。**这不是设计取舍，是遗漏**——说明"新增工具时没有守门 checklist"。**对策**：在 `mcp/server.mjs` 加一条测试，遍历所有写工具断言其 `run` 内含 `jobVisibleTo` 或等效守门，防止后续再漏。
 
 ## 12. 仍不完整、需要补齐的信息
 
@@ -419,13 +429,13 @@ Skill 与 MCP 让调用入口变多，隐私出口随之变多。硬规矩：
 
 | 缺什么 | 影响 |
 |---|---|
-| ~~**15 个只读工具里哪些允许暴露成 Skill / MCP**~~ | **已实测**——见 §5.2 白名单：✅ 9 个直接外露 + ⚠️ 3 个需脚本脱敏 + ❌ 3 个禁止（含 `brainx_talent` 因无 cid 隔离是硬伤） |
+| ~~**15 个只读工具里哪些允许暴露成 Skill / MCP**~~ | **已实测**——见 §5.2（registry 那套：✅ 9 个直接外露 + ⚠️ 3 个需脚本脱敏 + ❌ 3 个禁止）与 **§5.4（MCP server 独有的 7 个写操作补审：`sync_now` / `record_outcome` 禁止外露，`engage` / `record_progress` / `terminal_result` 守门正确可外露）** |
 | 官方数据接口的文档（端点、鉴权、返回字段、错误码、QPS） | §6 选 A 还是 B 的前提，Skill 也写不对 |
 | 官方接口覆盖哪些业务域（职位？候选人？约面？成单？） | 决定哪些 Skill 能拿到真数据、哪些只能走 BrainX 本地库，也决定我们和 DataClaw 的数据面谁更全 |
 | 该接口的凭证形式与存放方式 | 决定 gating 与 env 注入方式 |
 | 演示/联调机器是 macOS 还是 Linux、是否常开 | 决定 OpenClaw 部署形态与 `os` gating |
 | 演示机公网 IP 是否已在 RDS 白名单 | 不在 = 演示当天静默降级到内存库 |
-| 人才库账号给只读还是可写（契约与 `talent.js` 冲突，§8.1） | 决定要不要改代码、隐私边界怎么划 |
+| ~~人才库账号给只读还是可写（契约与 `talent.js` 冲突，§8.1）~~ | **已拍板**——9/2 会议定为并行推进：成员各自共享（临时）+ 整库权限申请（同步）。cid 隔离改造不能省 |
 | reloop 侧 API 文档与联调联系人（Dykes / Frankie） | 桥 1（9/4）无法开工 |
 | reloop 与人才库是否同一 MySQL 实例、哪个库 | 决定跨库映射走 `entity_links` 还是直连 |
 | reloop 侧 3 个 P1 的修复排期 | 决定推人循环能否进 9/12 联排 |
@@ -433,6 +443,7 @@ Skill 与 MCP 让调用入口变多，隐私出口随之变多。硬规矩：
 
 ## 相关文档
 
+- **[业务工作全景（全链路业务流 × 工具 × 权限）](2026-09-02-business-work-breakdown.md)** · [飞书权限清单](2026-09-02-feishu-permission-scopes.md) · [下游交付文档](2026-09-02-brainx-mcp-deliverable.md)
 - [全景架构与技术施工蓝图](architecture-2026-09-01-full-blueprint.md) · [复用与自建边界及权限需求 PRD](prd-2026-09-01-reuse-selfbuild-boundary.md)
 - [Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) · [BrainTex 群聊工作流技术 PRD](prd-2026-09-01-braintex-group-workflow.md)
 - [DataClaw 集成交流会历史底稿](2026-09-02-dataclaw-integration-brief.md)（架构结论已被本文取代，索取清单部分仍可参考）

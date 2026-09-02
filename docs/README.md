@@ -17,6 +17,7 @@
 |---|---|
 | 产品范围、功能规划或验收标准 | [BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md) |
 | OpenClaw、飞书机器人、AI 猎头工作流、人才权限或简历解析 | [BrainX × OpenClaw AI 猎头工作流产品需求文档](prd-2026-09-02-openclaw-ai-recruiting-workflow.md)、[安全操作手册](SECURITY.md) |
+| OpenClaw 多顾问安装、上线、运维、故障或回滚 | [OpenClaw 多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md)、[部署编排](DEPLOYMENT.md) |
 | 候选人事实版本、人才 RDS 迁移、shortlist 数据契约或授权查询 | [候选人事实与 shortlist 数据契约](2026-09-03-candidate-data-contracts.md)、[BrainX × OpenClaw AI 猎头工作流产品需求文档](prd-2026-09-02-openclaw-ai-recruiting-workflow.md) |
 | 历史 Codex 插件、旧版飞书副驾驶方案 | [历史：BrainX 飞书 AI 猎头副驾驶产品需求文档](prd-2026-09-01-feishu-ai-consultant-copilot.md)、[历史：BrainX Codex Agent 职责与权限规范](codex-agent-responsibilities-and-permissions.md) |
 | 最终产品形态、跨前后端施工顺序或总体验收 | [BrainX 最终交付蓝图与施工总清单](brainx-final-delivery-blueprint.md) |
@@ -73,6 +74,7 @@
 
 - [安全操作手册](SECURITY.md)：密钥、RDS、授权与数据隔离操作。
 - [部署编排](DEPLOYMENT.md)：生产 systemd、本地开发、隔离 Docker 测试和 CI。
+- [OpenClaw 多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md)：服务端安装、权限绑定、灰度验收、日常运维与可恢复回滚。
 - [云端恢复清单](cloud-recovery-checklist.md)：现网唯一入口、标准恢复步骤与历史事件。
 - [带宽告警说明](guard-bandwidth-alert.md)：带宽监控与告警规则。
 

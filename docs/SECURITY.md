@@ -2,6 +2,8 @@
 
 生产安全操作的三件事：**密钥备份**、**RDS 收紧**、**按人隔离激活**。按 checklist 执行，每项都有验证命令。
 
+OpenClaw Agent 的 App 身份、群 scope、短时签名、十工具边界、撤权和停机顺序见[多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md)。聊天中的姓名、consultant_id 或链接参数都不是可信身份来源。
+
 ## 一、data/.secret 单点密钥：备份与恢复
 
 ### 密钥用途（为什么它这么重要）

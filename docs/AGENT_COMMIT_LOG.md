@@ -2,6 +2,12 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-03｜docs(deploy): 固化 OpenClaw 生产运行手册
+
+- 任务：完成 T028；统一记录 ECS 首装、服务顺序、三人灰度、十工具检查、任务恢复、授权撤销、故障降级和可恢复回滚。
+- 边界：顾问端零安装；公网只有 HTTPS，OpenClaw 控制面、Agent Gateway、SQLite 与 RDS 均不暴露；没有真实部署证据时只能标记代码就绪。
+- 验证：文档链接、行数、格式与 `npm run verify:quick` 通过；复盘将旧工作台部署与新增三个 Agent 服务明确分开，避免把单机 PoC 当成多人上线。
+
 ## 2026-09-03｜feat(pipeline): 完成可恢复任务、文档解析与影子评测
 
 - 任务：完成 T033-T038；新增 SQLite 持久任务租约、费用/重试上限、取消和投递 outbox，并提供不会误领取未配置任务的常驻 worker；新增固定版本 MarkItDown PDF/DOCX 抽取边界，以及 Recall@20/NDCG@10 可复跑影子评测。

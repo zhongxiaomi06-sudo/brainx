@@ -71,7 +71,7 @@
 - [x] T025 [US4] 新增无密钥生产配置模板、安装脚本和 systemd 单元到 deploy/openclaw/、deploy/systemd/
 - [x] T026 [P] [US4] 先写候选卡和工作流卡只允许 HTTPS 基址、对象深链和页面再鉴权的测试到 tests/agent-deep-links.test.mjs
 - [x] T027 [US4] 将卡片深链改为受控 HTTPS 对象 URL 并删除生产 localhost 回退到 src/candidate-shortlist-card.js 与相关渲染层
-- [ ] T028 [US4] 更新部署、安全、权限、运维、回滚和文档总目录到 docs/DEPLOYMENT.md、docs/SECURITY.md、docs/README.md、docs/2026-09-03-openclaw-production-runbook.md
+- [x] T028 [US4] 更新部署、安全、权限、运维、回滚和文档总目录到 docs/DEPLOYMENT.md、docs/SECURITY.md、docs/README.md、docs/2026-09-03-openclaw-production-runbook.md
 
 **Checkpoint**: 发布包和配置可以在服务器复现，客户端只需要飞书或浏览器。
 

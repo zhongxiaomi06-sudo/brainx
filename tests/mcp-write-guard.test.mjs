@@ -71,7 +71,7 @@ function withClient(fn) {
     const dbPath = join(dir, 't.db');
     seedDb(dbPath);
     const c = mcpClient(dbPath);
-    try { await fn(c); } finally { c.close(); rmSync(dir, { recursive: true, force: true }); }
+    try { await fn(c, dbPath); } finally { c.close(); rmSync(dir, { recursive: true, force: true }); }
   };
 }
 
@@ -122,3 +122,56 @@ test('B5: 静态扫描——四个跨职位写工具的 run 块都必须调 jobV
     );
   }
 });
+
+test('E3-MCP: tools/list 含 brainx_confirm_facts，黑名单仍被过滤', withClient(async (c) => {
+  const r = await c.call('tools/list', {});
+  const names = r.result.tools.map((t) => t.name);
+  assert.ok(names.includes('brainx_confirm_facts'), 'E3 确认闭环工具应外露');
+  assert.ok(!names.includes('brainx_sync_now'), '黑名单不受新工具影响');
+}));
+
+test('E3-MCP: 经 MCP 确认草稿 → job_facts 落库（draft→权威表全链）', withClient(async (c, dbPath) => {
+  // 用预置库 seed 一条 pending 草稿（走 E1 全链路：网关→账本→消费者）
+  const db = openDb(dbPath);
+  const { registerChatContext } = await import('../src/gateway/chat-contexts.js');
+  const { processLarkEvent } = await import('../src/gateway/lark-gateway.js');
+  const { consumeJobExtract } = await import('../src/job-extract/index.js');
+  registerChatContext(db, { chat_id: 'oc_mcp', bot_mode: 'ALL' });
+  processLarkEvent(db, {
+    message_id: 'om_mcp_e3', chat_id: 'oc_mcp', open_id: 'ou_u',
+    mentions: [], message_type: 'text',
+    create_time: '2026-09-02T12:00:00+08:00', body: { text: '煌炎科技急招产品经理，HC 1' },
+  });
+  const ev = db.prepare('SELECT event_id FROM workflow_event_log WHERE idem_key=?').get('lark:message:om_mcp_e3');
+  consumeJobExtract(db, ev.event_id);
+  const draft = db.prepare('SELECT * FROM job_facts_drafts WHERE message_id=?').get('om_mcp_e3');
+  db.close();
+
+  const r = await c.call('tools/call', {
+    name: 'brainx_confirm_facts',
+    arguments: { consultant_id: 'felix', draft_id: draft.draft_id },
+  });
+  const out = JSON.parse(r.result.content[0].text);
+  assert.equal(out.ok, true, JSON.stringify(out));
+
+  const verify = openDb(dbPath);
+  const job = verify.prepare('SELECT * FROM job_facts WHERE project_id=?').get(out.project_id);
+  assert.ok(job, 'job_facts 应有权威行');
+  assert.equal(job.company, '煌炎科技');
+  assert.equal(verify.prepare('SELECT status FROM job_facts_drafts WHERE draft_id=?').get(draft.draft_id).status, 'confirmed');
+  verify.close();
+}));
+
+test('B6: brainx_recommend_run 60s 内第二次调用 → rate_limited', withClient(async (c) => {
+  const first = await c.call('tools/call', {
+    name: 'brainx_recommend_run', arguments: { consultant_id: 'felix' },
+  });
+  const firstOut = JSON.parse(first.result.content[0].text);
+  assert.ok(!firstOut.error || firstOut.error !== 'rate_limited', `首次调用不应被限流: ${JSON.stringify(firstOut)}`);
+  const second = await c.call('tools/call', {
+    name: 'brainx_recommend_run', arguments: { consultant_id: 'felix' },
+  });
+  const secondOut = JSON.parse(second.result.content[0].text);
+  assert.equal(secondOut.error, 'rate_limited', '60s 内第二次必须被限流');
+  assert.ok(secondOut.retry_after_ms > 0);
+}));

@@ -2,6 +2,14 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-02｜feat(job-extract): E3 确认闭环（drafts→job_facts 转正）+ recommend_run 限流
+
+- **背景**：按[缺口总表](2026-09-02-gap-and-next-actions.md) D2 实施（用户裁定顺序 D2 在 D1 之前——先让草稿能进 job_facts，E1 才不是「写了但没用」的代码）；顺带完成 B 档遗留小项 recommend_run 限流（白名单文档 P0 第 3 件）。E2 LLM 层按裁定等 gold set，本轮不动。
+- **改动**：①新增 `src/job-extract/confirm.js`——`confirmDraft(db, {draft_id, consultant_id, project_id})`：无 pid 走新建路径（须草稿有 company+role，否则 400 `insufficient_fields`），事务内 INSERT job_facts + INSERT job_memberships（'MY_JOB'，确认人立即可见）+ 专用 sync_runs 血缘行（source='lark_extract'）；有 pid 走更新路径（先 `jobVisibleTo` 前置校验，fail-closed 不区分「不存在」与「不可见」均 404；草稿须至少一个可更新字段），UPDATE 用 `COALESCE(?, city)` 不覆盖既有值、active_state='UNKNOWN' 不落地；确认幂等：重复确认返回 409 `already_confirmed`；`rejectDraft` 置 rejected 终态。②`mcp/server.mjs` 新增 `brainx_confirm_facts` 工具（confirm/reject 两动作，带 pid 时 jobVisibleTo 前置检查）+ `brainx_recommend_run` 60s 进程内限流（`RECOMMEND_RUN_AT` Map 按 consultant_id 记上次调用时间戳，超限返回 `{error:'rate_limited', retry_after_ms}` 不执行）。③新增 `tests/job-extract-confirm.test.mjs` 7 用例（新建+血缘+membership / 重复确认 409 / 更新不覆盖既有值 / 不可见职位 NOT_FOUND / 缺 company+role 400 / 未知草稿 404 / rejected 终态）；`tests/mcp-write-guard.test.mjs` 扩至 8 用例（新增 E3-MCP×2 全链 + B6 限流）。
+- **文档回写**：缺口总表 D2 标 ✅（「E1→E3 闭环打通」）；工具外露白名单 P0 三件全部 ✅（第 3 件限流含实施细节）；OpenClaw 接口包工具快照 15→16（补 `brainx_confirm_facts`，record_outcome ⚠️→✅——上一轮 501b9bd 的守门状态本文件此前未回写，本轮补上）。
+- **更新路径 insufficient_fields 校验修正**：首版校验过严——更新路径草稿只有 active_state 也被「缺 company/role」拒绝；拆分为：新建须 company+role，更新只须任一可更新字段（city/pipeline_stage/hc/非 UNKNOWN 状态）。
+- 验证：`node --test tests/mcp-write-guard.test.mjs` 8/8；`tests/job-extract-confirm.test.mjs` 7/7；全量回归 `job-extract-*(26) + gateway-process + hub-consumer` 50/50；`node --check mcp/server.mjs` 通过；`npm run verify:quick` 仍被执行环境沙箱拦截（同前次记录，非仓库问题，以定向测试替代）。
+
 ## 2026-09-02｜fix(mcp): B 档安全硬前置三件（黑名单机制 + sync_now 屏蔽 + record_outcome 守门）
 
 - **背景**：按[缺口总表](2026-09-02-gap-and-next-actions.md) B 档实施（另一线程核实「三个硬前置一个没做」，本线程独立复核属实后修复）。

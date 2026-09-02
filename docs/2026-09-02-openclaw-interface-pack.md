@@ -61,7 +61,8 @@
 | `brainx_job_detail` | 读 | 单职位详情 | ✅ 可用 |
 | `brainx_commitments` | 读 | 承诺/待办清单 | ✅ 可用 |
 | `brainx_engage` | 写 | 对职位表态（接单/跟进），ACCEPT 分支可触发自动找人 | ✅ 可用 |
-| `brainx_record_outcome` | 写 | 录入职位结果 | ⚠️ 等补 `jobVisibleTo` 守门（硬前置 1b） |
+| `brainx_record_outcome` | 写 | 录入职位结果 | ✅ 可用（`jobVisibleTo` 守门已补，硬前置 1b 完成） |
+| `brainx_confirm_facts` | 写 | 确认/驳回职位信息草稿（E3 确认闭环；confirm 支持草稿转正到 job_facts，reject 终态；带 project_id 时校验职位可见性） | ✅ 可用 |
 | `brainx_replay` | 读 | 决策轨迹回放 | ✅ 可用 |
 | `brainx_recommend` | 读 | 推荐队列 | ✅ 可用 |
 | 其余 7 个 | 混合 | 见白名单文档逐个审 | ⚠️ 见白名单 |
@@ -97,7 +98,7 @@
 - 我方产出：`skills/` 目录 8 个 SKILL.md，其中 7 个已通过合规实测（内容见仓库，对方按需复制）。
 - 对方职责：放置到 OpenClaw Skill 加载路径、启用、维护本地版本。
 - 合规基线（我方已验证，对方改动后需自行复审）：不硬编码任何个人 open_id、不含敏感字段明文示例、不引导绕过 MCP 守门。
-- Skill 与工具的对应关系示例：Skill 编排「推荐队列浏览」时调 `brainx_recommend`；「录入结果」时调 `brainx_record_outcome`（该工具守门补完前，Skill 侧应置灰此动作）。
+- Skill 与工具的对应关系示例：Skill 编排「推荐队列浏览」时调 `brainx_recommend`；「录入结果」时调 `brainx_record_outcome`（守门已补完，可直接编排）；「群消息提炼确认」时调 `brainx_confirm_facts`（草稿列表经后端日历/推送触达顾问，顾问确认后落 job_facts）。
 
 ## 5. 后端结构一屏（给对方的上下文，非契约）
 
@@ -110,7 +111,7 @@ L0 飞书网关（等凭证） → L1 事件账本（幂等/状态机） → L2 
 ```
 
 - MCP 工具读写的是 L2 决策库，经 L3 业务模块，**守门与脱敏都做在 L5**——所以对方看到的报错都发生在最外层，规则见白名单文档。
-- 后端正在补的两块与对方有关：①写工具守门（补完后 `brainx_record_outcome` 从 ⚠️ 转 ✅）；②`job_facts` 提炼层（纯后端内部，产出只进决策库，对方经 `brainx_jobs`/`brainx_job_detail` 读到，接口不变）。
+- 后端已补完的两块与对方有关：①写工具守门（`brainx_record_outcome` 已转 ✅，P0 三件全部完成）；②`job_facts` 提炼层 E1→E3 闭环已打通（纯后端内部，产出只进决策库，对方经 `brainx_jobs`/`brainx_job_detail` 读到，接口不变；确认动作经新工具 `brainx_confirm_facts` 走 MCP，Skill 可编排）。
 
 ## 6. 交付包清单（对方拿走什么）
 

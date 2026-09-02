@@ -105,7 +105,7 @@ registry.js（15）                    mcp/server.mjs（15）
 - `brainx_talent` 是**泄漏**——候选人隐私进了群。
 - `brainx_sync_now` 是**破坏**——`source='fixture'` 默认参数会把真实决策库覆盖成测试数据，且默认 `dry_run=false` 直接落库，没有二次确认。**隐私泄漏能补救，数据被刷没得救。**
 
-**必须做的三件事（P0，在 MCP server 挂进 OpenClaw 之前）—— ✅ 9/2 晚已完成第 1、2 件：**
+**必须做的三件事（P0，在 MCP server 挂进 OpenClaw 之前）—— ✅ 9/2 晚全部完成：**
 
 1. ✅ `brainx_sync_now` 加入启动黑名单（`mcp/server.mjs` `BLOCKED_TOOLS` 集合，`tools/list` 过滤 + `tools/call` 显式报错；`brainx_talent` 一并列入）。默认参数仍是 `source='fixture'`+`dry_run=false`，但已不可触达；未来解封前须先把默认值改为 `dry_run=true` 且禁止 `source='fixture'` 走非 dry_run。
 2. ✅ `brainx_record_outcome` 补 `jobVisibleTo` 守门（与 `engage` / `record_progress` 对齐——run 块接线，`src/visibility.js` fail-closed 实现本就共用）。守门测试 `tests/mcp-write-guard.test.mjs` B3/B4/B5 用例覆盖。
@@ -130,7 +130,7 @@ registry.js（15）                    mcp/server.mjs（15）
 | `brainx_record_progress` | **仅 MCP** | 写 | ✅ | 守门正确 |
 | `brainx_terminal_result` | **仅 MCP** | 写 | ✅ | 守门正确 |
 | `brainx_opportunity` | 两套都有 | 读 | ⚠️ | 先查 `job_facts` migrations 有无客户 BD 联系人字段 |
-| `brainx_recommend_run` | **仅 MCP** | 写 | ⚠️ | 加调用频率限制 |
+| `brainx_recommend_run` | **仅 MCP** | 写 | ✅ | 已加 60s 限流（B6 测试覆盖） |
 | `brainx_feedback` | **仅 MCP** | 写 | ⚠️ | 核 `recommendationFeedback` 是否校验职位归属 |
 | `brainx_talent_supply` | 仅 registry | 读 | ⚠️ | 脱敏脚本 + 决定是否加进 MCP server |
 | `brainx_openmai_result` | 仅 registry | 读 | ⚠️ | 脱敏脚本 + 加进 MCP server（架构 P0-1） |

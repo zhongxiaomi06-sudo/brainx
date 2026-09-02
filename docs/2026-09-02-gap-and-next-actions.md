@@ -60,14 +60,14 @@
 
 > **这三件做完，顾问明天早上就能收到「你有 3 项待办逾期」**——是全部待办里**唯一不依赖任何外部条件、2 天能见效**的部分。
 
-### D 档｜E1 提炼层的下半段（另一线程留下的）
+### D 档｜E1 提炼层的下半段
 
 | # | 缺口 | 现状 |
 |---|---|---|
-| **D1** | E2 LLM 层（DeepSeek + evidence + 失败进 DLQ） | `AI_JOB_EXTRACT_ENABLED` 开关位已留，实现未做 |
-| **D2** | **E3 确认闭环（drafts → job_facts 转正）** | **未做。核实 `src/job-extract/index.js` 只 `INSERT INTO job_facts_drafts`（第 19 行），不写 `job_facts`** |
+| **D1** | E2 LLM 层（DeepSeek + evidence + 失败进 DLQ） | `AI_JOB_EXTRACT_ENABLED` 开关位已留，实现未做。**等 gold set（A1 配凭证 → 9/3 demo 攒真实消息）** |
+| **D2** | **E3 确认闭环（drafts → job_facts 转正）** | **✅ 9/2 晚完成**：`src/job-extract/confirm.js`（confirmDraft/rejectDraft，血缘 sync_runs source='lark_extract'，新建职位同事务落 membership）+ MCP `brainx_confirm_facts` 工具（带 jobVisibleTo 守门 + reject 动作）；`tests/job-extract-confirm.test.mjs` 7 用例 + MCP 端到端用例全绿。**E1→E3 闭环打通：群消息 → 草稿 → 确认 → job_facts 权威表** |
 
-> **D2 是关键**：E1 现在只把提炼结果停在 staging 表，**对 MVP 主循环没有任何实际贡献**——`job_facts` 是推荐、接单、进展所有下游的唯一输入源，草稿进不去等于没提炼。E1 要到 E3 做完才形成闭环。
+> **D2 已闭合**：E1 的提炼结果现在可以经显式确认进 `job_facts`（推荐、接单、进展的输入源），E1 不再是"写了但没用"的代码。剩余 D1 只提精度（LLM 补规则层抽不到的字段），是锦上添花。
 
 ### E 档｜其余后端待补（未动）
 

@@ -127,3 +127,27 @@ test('SC-002: 同一 message_id 既 DENY 又在登记后重投通过，两类事
   assert.equal(events(db, 'lark.ignored').length, 1, 'DENY 留痕不被吃掉');
   assert.equal(events(db, 'lark.message_received').length, 1, '通过事件独立落账');
 });
+
+test('修复 BOT_OPEN_ID 占位符：注入真实 botOpenId 后 @机器人 正确判定', () => {
+  const db = newDb();
+  seedRegistered(db);
+  // 真实机器人 open_id 是 ou_xxxx，永远不等于占位 'ou_bot'
+  const realBot = 'ou_7f3c9a1e真实机器人';
+  const evt = {
+    message_id: 'om_real_bot',
+    chat_id: 'oc_registered',
+    open_id: 'ou_user_1',
+    mentions: [realBot], // @的是真实机器人
+    message_type: 'text',
+    create_time: '2026-09-02T11:00:00Z',
+    body: {},
+  };
+  // 不注入 botOpenId（用占位默认）→ 误判 not_mentioned（缺陷复现）
+  const buggy = processLarkEvent(db, evt);
+  assert.equal(buggy.action, 'denied');
+  assert.equal(buggy.reason, 'not_mentioned', '占位常量下真实 @机器人 被误判（缺陷复现）');
+  // 注入真实 botOpenId → 正确通过
+  const fixed = processLarkEvent(db, { ...evt, message_id: 'om_real_bot_2' }, realBot);
+  assert.equal(fixed.action, 'queued', '注入真实 botOpenId 后 @机器人 正确落账');
+  assert.equal(events(db, 'lark.message_received').length, 1);
+});

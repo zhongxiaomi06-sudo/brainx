@@ -53,7 +53,8 @@
     "braintex-local-recommend": "bin/brainx-recommend.mjs",
     "braintex-local-replay": "bin/brainx-replay.mjs",
     "braintex-local-push": "bin/brainx-push.mjs",
-    "braintex-local-web": "bin/brainx-web.mjs"
+    "braintex-local-web": "bin/brainx-web.mjs",
+    "braintex-lark-gateway": "bin/brainx-lark-gateway.mjs"
   },
   "devDependencies": {
     "playwright": "^1.62.1",

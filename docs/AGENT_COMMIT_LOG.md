@@ -2,6 +2,11 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-02｜fix(gateway): 修复 BOT_OPEN_ID 占位符缺陷 + bin 启动脚本
+
+- 改动：用户指出 `src/gateway/lark-gateway.js` 的 `BOT_OPEN_ID='ou_bot'` 占位符缺陷——真实飞书事件机器人 open_id 是 ou_xxxx 永不匹配，会导致所有 @机器人 消息误判 not_mentioned 落 lark.ignored。按 A 方案修：① `processLarkEvent(db, evt, botOpenId)` 第三参数化（默认 BOT_OPEN_ID 测试约定，真实运行注入）；② `src/gateway/ws-client.js` 新增 `getBotOpenId(credentials)` 用 fetch 调 tenant_access_token/internal + bot/v3/info 拿真实 open_id，live 模式启动时注入 onMessage 回调，失败显式返回 bot_info_failed 不静默回落占位值；③ 新增 `bin/brainx-lark-gateway.mjs` 启动脚本（start [--mock] / list-chats / register 子命令，import '../src/env.js' 加载 .env，SIGINT/SIGTERM 自动 stopGateway）；④ quickstart 真实联调清单重写：分工表（用户跑 1-5/6，助手跑 5.5/7/8）、.env 键名约定（新增 LARK_* 不改旧 BRAINX_FEISHU_*）、可跑命令、版本发布关键一步、已知修复记录；⑤ package.json bin 登记 braintex-lark-gateway。
+- 验证：gateway 测试 22/22 全绿（新增 4 用例：缺陷复现+注入修复、getBotOpenId 成功/失败 mock fetch、startGateway live 失败显式 bot_info_failed）；bin 脚本三条路径（无凭证 list-chats 提示、未知子命令、start --mock 降级）均不崩；`node --check bin/brainx-lark-gateway.mjs` 语法 OK。
+
 ## 2026-09-02｜feat(gateway): Step 1 门禁收口
 
 - 改动：quickstart 核对清单逐项打勾（SC-001~007 全达成，真实联调待凭证）、tasks T001-T011 全部勾选。

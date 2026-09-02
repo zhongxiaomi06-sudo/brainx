@@ -35,18 +35,41 @@ console.log("rows =", db.prepare("SELECT COUNT(*) c FROM workflow_event_log").ge
 '
 ```
 
-## 真实联调前置（飞书凭证清单，交付后接入）
+## 真实联调前置（飞书凭证清单，分工交付后接入）
 
-需用户配置（不在本轮可测范围）：
+> 8 步里助手只跑 3 步命令行（5.5 / 7 / 8），其余 5 步由用户在飞书后台/客户端完成。
+
+需用户配置（飞书后台/客户端）：
 
 1. 飞书开放平台创建企业自建应用，记录 **App ID** / **App Secret** / **Encrypt Key** / **Verification Token**。
 2. 机器人能力：开启"机器人"，`bot_mode=MENTION_ONLY`。
 3. 权限最小集（3 项）：`im.message.receive_v1`（收群消息）、`im:message:send_as_bot`（发消息）、`im:chat:readonly`（读群信息登记 chat_contexts）。
-4. 事件订阅：选 **WebSocket 长连接模式**（免公网回调；SDK WSClient 自动连接）。
-5. 机器人加入目标群，取 `chat_id`（oc_ 开头）。
-6. 凭证写入 `.env`：`LARK_APP_ID` / `LARK_APP_SECRET` / `LARK_ENCRYPT_KEY` / `LARK_VERIFICATION_TOKEN`。
-7. 用 `registerChatContext` 登记 chat_id（见 quickstart 手工片段）。
-8. `npm install`（SDK 已随本轮加入），`node -e 'import("./src/gateway/ws-client.js").then(m=>m.startGateway({db}))'` 启动；发 @机器人消息，查 `workflow_event_log` 应有 `lark.message_received`。
+   - **关键一步**：加完权限必须去「版本管理与发布」建版本并申请发布——**没发布权限不生效**；企业自建一般自动过，敏感权限要管理员批。
+4. 事件订阅：选 **WebSocket 长连接模式**（免公网回调；SDK WSClient 自动连接）+ 挂 `im.message.receive_v1`。
+5. 飞书客户端把机器人拉进目标群（群里加成员即可）。
+
+助手跑（命令行）：
+
+5.5. 取 `chat_id`（用 `im:chat:readonly` 列机器人所在群，不必满世界找）：
+    ```bash
+    node --env-file=.env bin/brainx-lark-gateway.mjs list-chats
+    ```
+6. 凭证写入 `.env`：**新增** `LARK_APP_ID` / `LARK_APP_SECRET` / `LARK_ENCRYPT_KEY` / `LARK_VERIFICATION_TOKEN` 四行。
+    - 旧键 `BRAINX_FEISHU_APP_ID` / `BRAINX_FEISHU_APP_SECRET` **不改不删**（其他模块在用），网关一律读 `LARK_*`。
+7. 登记群到 `chat_contexts`：
+    ```bash
+    node --env-file=.env bin/brainx-lark-gateway.mjs register <chat_id> [--bot-mode MENTION_ONLY] [--notes "备注"]
+    ```
+8. 启动网关 + 验证：
+    ```bash
+    # 真实连飞书（WS 长连接）
+    node --env-file=.env bin/brainx-lark-gateway.mjs start
+    # 预演模式（不真实连飞书，只校验凭证与可启动性 + bot/v3/info 拿真实 open_id）
+    node --env-file=.env bin/brainx-lark-gateway.mjs start --mock
+    ```
+    启动后发 @机器人消息，查 `workflow_event_log` 应有 `lark.message_received`。Ctrl+C 退出（SIGINT/SIGTERM 自动 stopGateway）。
+
+> 已知修复（2026-09-02）：`BOT_OPEN_ID='ou_bot'` 占位符缺陷——真实飞书事件机器人 open_id 是 `ou_xxxx` 永不匹配，导致所有 @机器人 误判 `not_mentioned`。已改为 live 模式启动时调 `GET /open-apis/bot/v3/info` 拿真实 open_id 注入 `processLarkEvent` 的 `botOpenId` 参数；获取失败显式返回 `bot_info_failed` 不静默回落占位值。`processLarkEvent(db, evt, botOpenId)` 第三参数化，mock/测试用约定值 `ou_bot`。
 
 ## 验收核对清单（实施交回时逐项打勾，2026-09-02 由 WorkBuddy 会话实施完成可测部分）
 

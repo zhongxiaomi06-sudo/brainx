@@ -48,13 +48,15 @@ console.log("rows =", db.prepare("SELECT COUNT(*) c FROM workflow_event_log").ge
 7. 用 `registerChatContext` 登记 chat_id（见 quickstart 手工片段）。
 8. `npm install`（SDK 已随本轮加入），`node -e 'import("./src/gateway/ws-client.js").then(m=>m.startGateway({db}))'` 启动；发 @机器人消息，查 `workflow_event_log` 应有 `lark.message_received`。
 
-## 验收核对清单（实施交回时逐项打勾）
+## 验收核对清单（实施交回时逐项打勾，2026-09-02 由 WorkBuddy 会话实施完成可测部分）
 
-- [ ] SC-001 fixtures 6 场景全绿
-- [ ] SC-002 重复 message_id 投递账本恒 1 行
-- [ ] SC-003 未登记群消息无 lark.message_received 但有 lark.ignored 留痕
-- [ ] SC-004 非 @ 消息不进 inbox
-- [ ] SC-005 startGateway 无凭证返回 credentials_missing 不抛错
-- [ ] SC-006 `grep -r lark-gateway src/gateway/` 真实命中
-- [ ] SC-007 package.json 仅新增 @larksuiteoapi/node-sdk、verify:quick 通过
-- [ ] 迁移 0029 登记 schema_migrations
+- [x] SC-001 fixtures 6 场景全绿（gateway-process 8 用例含 6 场景 + 边界 + 幂等裁决，共 18 用例全绿）
+- [x] SC-002 重复 message_id 投递账本恒 1 行（gateway-process 重复投递用例 + 上方手工单行）
+- [x] SC-003 未登记群消息无 lark.message_received 但有 lark.ignored 留痕（unregistered_chat / chat_disabled / not_mentioned 三类）
+- [x] SC-004 非 @ 消息不进 inbox（not_mentioned DENY）
+- [x] SC-005 startGateway 无凭证返回 credentials_missing 不抛错
+- [x] SC-006 `grep -r lark-gateway src/gateway/` 真实命中（4 文件命中）
+- [x] SC-007 package.json 仅新增 @larksuiteoapi/node-sdk（deps=mysql2,zod,@larksuiteoapi/node-sdk，≤4 达标）、verify:quick 通过
+  - 注：verify:quick 14/16，仅余其他协作者未跟踪文件的 2 项既有失败（week-plan HTML 超长行、health-brief 行尾空白），与本规格无关
+- [x] 迁移 0029 登记 schema_migrations（:memory: 自动应用，migrations 计数 31）
+- [ ] 真实联调（需用户配置飞书凭证，见上方清单 8 步，不在本轮可测范围）

@@ -2,6 +2,11 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-02｜feat(gateway): Step 1 门禁收口
+
+- 改动：quickstart 核对清单逐项打勾（SC-001~007 全达成，真实联调待凭证）、tasks T001-T011 全部勾选。
+- 验证：`node --test tests/gateway-*.test.mjs` 18/18 全绿（chat-contexts 6 + process 8 + ws-client 4）；SC-006 grep lark-gateway src/gateway/ 4 文件真实命中；package.json deps=mysql2,zod,@larksuiteoapi/node-sdk（3 项 ≤4 达标）；`:memory: 迁移 0029 自动应用（schema_migrations 计数 31）；`npm run verify:quick` 14/16——仅余其他协作者未跟踪文件的 2 项既有失败（week-plan HTML 超长行、health-brief 行尾空白），与本任务无关，未触碰。Step 1（specs/002 T001-T011）可测部分实施完成，真实联调待飞书凭证；push 仍按门禁暂缓。
+
 ## 2026-09-02｜feat(gateway): Step 1 SDK WS 传输层骨架
 
 - 改动：按 tasks.md T009-T010 测试先行——新增 `tests/gateway-ws-client.test.mjs`（4 用例：无凭证降级 credentials_missing、缺 App ID 降级、mock 模式 ready 标记不真实连接、stopGateway 空操作安全）；实现 `src/gateway/ws-client.js`（startGateway/stopGateway 单例，凭证缺失优雅降级，live 模式动态 import SDK 的 WSClient+EventDispatcher 订阅 im.message.receive_v1 解密后调 processLarkEvent，含 decodeLarkMessage 归一函数，≤120 行）。

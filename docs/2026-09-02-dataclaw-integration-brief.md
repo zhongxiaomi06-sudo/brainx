@@ -1,10 +1,14 @@
 # DataClaw 集成交流与架构重排简报（2026-09-02）
 
+> ⚠️ **本文的架构结论已被取代。** 新事实：DataClaw 同样以 OpenClaw 为壳子、Skill 自写、且不允许我们直接使用其产品，同时我们手上有官方数据接口。架构已重排为「自建 OpenClaw 壳子 + 自写 Skill」，权威说明见 [OpenClaw 壳子 + 自写 Skill 架构](2026-09-02-openclaw-shell-architecture.md)。
+>
+> 本文保留作为 **9/2 下午交流会的历史底稿**：§3 的十项索取清单（数据边界、隐私、排期、成本部分）与 §8 风险列表仍然有效，§6 人才库与 reloop 事实已并入新文档 §8。**不要再依据本文的 §2 架构图与 §4 拓扑做施工决策。**
+
 > 上级入口：[BrainX 文档书](README.md)
 >
-> 适用场景：9/2 下午与 DataClaw 产品/研发谈集成时的索取清单与边界谈判底稿；以及 DataClaw 纳入后的 BrainX 架构重排结论。
+> 原适用场景：9/2 下午与 DataClaw 产品/研发谈集成时的索取清单与边界谈判底稿；以及 DataClaw 纳入后的 BrainX 架构重排结论。
 >
-> 文档性质：**决策简报**。不取代[全景架构与技术施工蓝图](architecture-2026-09-01-full-blueprint.md)的施工逻辑，也不取代[复用与自建边界 PRD](prd-2026-09-01-reuse-selfbuild-boundary.md)的自建结论；本文只裁定"哪些能力交给 DataClaw、哪些留在 BrainX"。
+> 文档性质：**历史决策简报**。不取代[全景架构与技术施工蓝图](architecture-2026-09-01-full-blueprint.md)的施工逻辑，也不取代[复用与自建边界 PRD](prd-2026-09-01-reuse-selfbuild-boundary.md)的自建结论。
 
 ## 1. 一句话结论
 

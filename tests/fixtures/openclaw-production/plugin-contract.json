@@ -1,0 +1,51 @@
+{
+  "openclaw_version": "2026.7.1-2",
+  "plugin_api_min": "2026.7.1-2",
+  "trusted_context_fields": [
+    "requesterSenderId",
+    "agentAccountId",
+    "deliveryContext.channel",
+    "deliveryContext.to",
+    "deliveryContext.accountId",
+    "deliveryContext.threadId"
+  ],
+  "unsupported_context_fields": [
+    "nativeChannelId"
+  ],
+  "delivery_targets": {
+    "p2p_prefix": "user:",
+    "group_prefix": "chat:"
+  },
+  "allowed_tools": [
+    "brainx_me_context",
+    "brainx_daily_brief",
+    "brainx_job_assessment",
+    "brainx_candidate_shortlist",
+    "brainx_candidate_facts",
+    "brainx_candidate_fit",
+    "brainx_gap_questions",
+    "brainx_interview_prep",
+    "brainx_personal_review",
+    "brainx_run_status"
+  ],
+  "denied_tool_ids": [
+    "exec",
+    "process",
+    "read",
+    "write",
+    "edit",
+    "apply_patch",
+    "browser",
+    "web_search",
+    "web_fetch",
+    "query_sql",
+    "brainx_sync_now",
+    "brainx_talent",
+    "brainx_engage",
+    "brainx_record_progress",
+    "brainx_terminal_result",
+    "brainx_record_outcome",
+    "brainx_feedback",
+    "brainx_recommend_run"
+  ]
+}

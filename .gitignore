@@ -2,7 +2,9 @@ data/
 node_modules/
 nohup.out
 .DS_Store
-.env
+.env*
+!.env.example
+!deploy/**/*.env.example
 logs/
 # 登录态密文 + 抓取输出（含你账号可见的敏感数据，绝不入库）
 scripts/session/.state.enc
@@ -31,6 +33,13 @@ sync.err.log
 dist/
 build/
 .quality-gate/reports/
+*.tgz
+
+# 隔离简历解析环境与临时产物（原文/中间文本绝不入库）
+.venv/
+**/__pycache__/
+parser/work/
+parser/out/
 
 # 调试/一次性脚本与备份（不入库）
 *.bak

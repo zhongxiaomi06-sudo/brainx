@@ -7,7 +7,7 @@
 ## Phase 1: Setup
 
 - [x] T001 固定 OpenClaw 2026.7.1-2 插件契约夹具与禁止工具基线到 tests/fixtures/openclaw-production/
-- [ ] T002 校验插件发布包、Python parser 产物和本地密钥排除规则并按需更新 .gitignore 与 .npmignore
+- [x] T002 校验插件发布包、Python parser 产物和本地密钥排除规则并按需更新 .gitignore 与 .npmignore
 
 ---
 

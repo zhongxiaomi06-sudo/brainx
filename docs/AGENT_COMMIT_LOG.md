@@ -2,6 +2,12 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-03｜chore(security): 排除插件与解析器敏感产物
+
+- 任务：完成 T002，扩展 Git 排除规则覆盖所有本地 `.env` 变体、npm tarball、Python 虚拟环境、缓存、解析工作目录和输出；保留可提交的 `.env.example` 与部署环境模板。
+- 插件：为待建的 `brainx-openclaw` 包增加 npm 发布排除规则，防止环境文件、日志、测试、覆盖率和打包产物进入发布包。
+- 验证：Git ignore 实测敏感样例均被排除、`.env.example` 仍可跟踪；`git diff --check` 与 `npm run verify:quick` 通过。
+
 ## 2026-09-03｜test(openclaw): 固定生产插件契约基线
 
 - 任务：完成 T001，把本机锁定版 OpenClaw `2026.7.1-2` 的可信上下文字段、私聊/群目标前缀、10 个批准工具和 18 个禁止工具固化成无个人数据 JSON fixture。

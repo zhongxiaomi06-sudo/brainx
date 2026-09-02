@@ -50,8 +50,8 @@
 
 - [x] T016 [P] [US2] 先写 me context、daily brief、job assessment、job gap 和 personal review 的契约/可见性测试到 tests/agent-job-tools.test.mjs
 - [x] T017 [US2] 复用现有领域函数实现职位域工具到 src/agent-gateway/tools-jobs.js
-- [ ] T018 [P] [US2] 先写 shortlist、candidate facts、fit、candidate gap 和 interview prep 的授权/脱敏/版本测试到 tests/agent-talent-tools.test.mjs
-- [ ] T019 [US2] 复用 candidate_fact_v1 与版本化 match run 实现人才域工具到 src/agent-gateway/tools-talent.js
+- [x] T018 [P] [US2] 先写 shortlist、candidate facts、fit、candidate gap 和 interview prep 的授权/脱敏/版本测试到 tests/agent-talent-tools.test.mjs
+- [x] T019 [US2] 复用 candidate_fact_v1 与版本化 match run 实现人才域工具到 src/agent-gateway/tools-talent.js
 - [ ] T020 [US2] 将 10 个工具接入注册表并添加黄金工作流只读回放到 tests/agent-golden-workflow.test.mjs
 - [ ] T021 [US2] 将七个生产 Skill 对齐新工具名、事实/推断/建议/未知格式与一次一问规则到 skills/brainx-today/、skills/brainx-job/、skills/brainx-talent/、skills/brainx-match/、skills/brainx-engagement-draft/、skills/brainx-interview-prep/、skills/brainx-review/
 

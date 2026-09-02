@@ -5,6 +5,7 @@ import { hashFeishuAppKey } from '../src/agent-gateway/authorization.js';
 import { createToolRegistry } from '../src/agent-gateway/tool-registry.js';
 import { createAgentGatewayServer } from '../src/agent-gateway/server.js';
 import { createJobToolHandlers } from '../src/agent-gateway/tools-jobs.js';
+import { createTalentToolHandlers } from '../src/agent-gateway/tools-talent.js';
 
 function appHashesFromEnv() {
   const source = JSON.parse(process.env.BRAINX_AGENT_FEISHU_APP_KEYS_JSON || '{}');
@@ -12,9 +13,11 @@ function appHashesFromEnv() {
 }
 
 const db = openDb();
+const jobHandlers = createJobToolHandlers({ db });
+const talentHandlers = createTalentToolHandlers({ jobGapHandler: jobHandlers.brainx_gap_questions });
 const server = createAgentGatewayServer({
   db,
-  registry: createToolRegistry({ handlers: createJobToolHandlers({ db }) }),
+  registry: createToolRegistry({ handlers: { ...jobHandlers, ...talentHandlers } }),
   gatewayToken: process.env.BRAINX_AGENT_GATEWAY_TOKEN,
   assertionSecret: process.env.BRAINX_AGENT_ASSERTION_SECRET,
   auditKey: process.env.BRAINX_AGENT_AUDIT_KEY,

@@ -312,7 +312,8 @@ OpenClaw 侧应在 `~/.openclaw/openclaw.json` 加：
 
 **今晚（9/2 21:00 前）**
 1. 拍板人才库契约（只读 / 可写），与 reuse PRD §6 对齐
-3. 跑一次端到端：用 `npx @modelcontextprotocol/inspector` 或 Claude Code 实调 5 个工具（consultants/workbench/opportunity/engage/feedback），确认契约无误
+2. 跑一次端到端：用 `npx @modelcontextprotocol/inspector` 或 Claude Code 实调 5 个工具（consultants / workbench / opportunity / engage / feedback），确认契约无误
+3. 确认演示机信息回我：macOS 还是 Linux、出口 IP 是否在 RDS 白名单（决定 P0-4 怎么排）
 
 **明天（9/3）**
 1. P0-1：把 OpenMai 两个工具加进 MCP server（直接 import + 注册，半小时）

@@ -15,8 +15,8 @@
 
 - [x] T003 [P] 先写 App 身份、群范围、Agent 审计、nonce、限流和任务表迁移测试到 tests/agent-migrations.test.mjs
 - [x] T004 实现 additive SQLite 迁移到 migrations/0032_agent_gateway.sql 与 migrations/0033_integration_jobs.sql
-- [ ] T005 [P] 先写 canonical body hash、HMAC、时效、篡改和重放输入测试到 tests/agent-assertion.test.mjs
-- [ ] T006 实现短时主体声明签发与验证到 src/agent-gateway/assertion.js
+- [x] T005 [P] 先写 canonical body hash、HMAC、时效、篡改和重放输入测试到 tests/agent-assertion.test.mjs
+- [x] T006 实现短时主体声明签发与验证到 src/agent-gateway/assertion.js
 - [ ] T007 [P] 先写 App 维度身份、白名单群、sender、purpose 和项目范围负向测试到 tests/agent-authorization.test.mjs
 - [ ] T008 实现 fail-closed 身份与群授权到 src/agent-gateway/authorization.js
 - [ ] T009 [P] 先写统一成功/错误 envelope、脱敏审计和限流测试到 tests/agent-runtime-guards.test.mjs

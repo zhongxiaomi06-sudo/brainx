@@ -2,6 +2,12 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-03｜feat(agent): 增加短时主体签名与防重放
+
+- 任务：完成 T005-T006；先固定 canonical JSON、参数哈希、HMAC、时效、篡改与一次性消费的失败测试，再实现 `brainx_principal.v1` 签发、验证和 SQLite 原子 nonce 消费。
+- 安全：声明强绑定 request、工具和参数摘要，默认 60 秒、最长 120 秒；要求 32 字节以上共享密钥、UUID request、严格字段集与 canonical 编码，恒定时间比对签名，任何篡改、未来签发、过期或重放均失败关闭。
+- 验证：签名专项 5/5、与迁移联合专项 9/9、完整后端测试 400/400、`npm run verify:quick` 16/16 通过；未记录 prompt、简历、联系方式或密钥。
+
 ## 2026-09-03｜feat(agent): 建立生产身份审计与任务账本
 
 - 任务：完成 T003-T004；先以 4 个失败测试证明 App 身份、群范围、Agent 审计、nonce、限流、持久任务和 outbox 均不存在，再新增两份 additive SQLite migration。

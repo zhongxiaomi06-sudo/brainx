@@ -54,6 +54,10 @@ function matchBundle(overrides = {}) {
   return {
     schema_version: 'candidate_match_bundle_v1',
     job_ref: 'job_01',
+    job_context: { title: '增长负责人', summary: '负责海外业务增长',
+      experience_requirement: '5 年以上', education_requirement: '本科', location: '上海',
+      required_skills: ['Google Ads'], preferred_skills: [], responsibilities: ['搭建投放体系'],
+      unknowns: [] },
     match_run: {
       match_run_id: 'run_01', algorithm_version: 'shadow-v1',
       feature_schema_version: 'features-v1', completed_at: ISO,
@@ -61,6 +65,9 @@ function matchBundle(overrides = {}) {
     page: { limit: 5, next_page_token: null },
     items: [{
       candidate_ref: 'cand_01', display_name_masked: '张*', rank: 1,
+      profile: { current_city: '上海', recent_experiences: [{ company: '示例科技', title: '增长负责人',
+        start_date: '2022-01', end_date: null, is_current: true, summary: '负责海外增长' }],
+        education: [], skills: ['Google Ads'] },
       strength: { score: 83, summary: '经历完整且成果有证据', evidence_refs: ['ev_work'] },
       job_fit: { score: 78, summary: '行业和投放能力匹配', evidence_refs: ['ev_skill'] },
       hard_conditions: [{ criterion: '上海办公', result: 'PASS', evidence_refs: ['ev_location'] }],
@@ -102,6 +109,8 @@ test('candidate_match_bundle_v1：候选人实力与职位匹配分开', () => {
   const parsed = parseCandidateMatchBundle(matchBundle());
   assert.equal(parsed.items[0].strength.score, 83);
   assert.equal(parsed.items[0].job_fit.score, 78);
+  assert.equal(parsed.job_context.title, '增长负责人');
+  assert.equal(parsed.items[0].profile.recent_experiences[0].company, '示例科技');
 });
 
 test('candidate_match_bundle_v1：最多 20 人且分数范围为 0 到 100', () => {

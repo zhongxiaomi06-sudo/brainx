@@ -26,6 +26,7 @@ OpenClaw 只读取 BrainX 已经处理完成并授权的数据，不直接读取
 | reloop 结构化事实转换 | `src/reloop-shortlist-pipeline.js` |
 | reloop 推荐批次导入 | `src/reloop-shortlist-sync.js`、`scripts/sync-reloop-shortlist.mjs` |
 | 固定飞书安全文案 | `src/candidate-shortlist-message.js`、`scripts/preview-candidate-shortlist.mjs` |
+| Agent 分析飞书卡片外壳 | `src/candidate-shortlist-card.js` |
 | 人才 RDS 迁移执行器 | `src/talent-migrations.js` |
 | 增量迁移 | `talent-migrations/0001_candidate_data_v1.mjs`、`0002_job_access_grants.mjs` |
 | OpenClaw 本地 PoC 工具 | `mcp/server.mjs` |
@@ -97,6 +98,14 @@ OpenClaw 只读取 BrainX 已经处理完成并授权的数据，不直接读取
 - `data_freshness`；
 - 支撑判断的 `evidence_refs`。
 
+为了让 Agent 能作出猎头可用的判断，而不是只复述分数，读取投影还包含：
+
+- `job_context`：职位标题、职责摘要、经验/学历要求、必需与优先能力，以及源数据明确缺失的职位条件；
+- `profile`：候选人的脱敏地点、最近四段结构化经历、最多三段教育和显式技能；
+- 工作摘要最多返回 700 字，只来自已经通过 `candidate_fact_v1` 的字段，不返回事实中的完整姓名、联系方式、原文或证据片段。
+
+以上是 `candidate_match_bundle_v1` 的向后兼容读取增强；数据库中的旧 match payload 不改写。服务端在读取时从同一不可变 fact version 构造最小投影，再执行 strict schema 和敏感文本检查。
+
 不得把两类分数合并成“录用概率”，也不得返回手机号、邮箱、完整简历、飞书 `chat_id` 或其他路由身份。
 
 ### 4.2 分页
@@ -163,9 +172,11 @@ BRAINX_MCP_TENANT_ID=<内部租户ID>
 - `York团队AI助手` 数据账号的 `ttc_bound_name` 明确为 `Mia 钟笑咪`，该账号下 383 份人才、6 个职位、20 条现有推荐；
 - 首个 PoC 选取仍启用的 `reloop-position:31`（“沐仞科技 HR岗”），只读取最新 pending 推荐批次；
 - 10/10 候选人通过 `candidate_fact_v1`，已写入 10 个最小影子人才、10 份事实、144 条 hash 证据、候选授权、职位授权和版本化 match run；
-- 当前最新 run 使用 `reloop-existing-recommendation-v1.1`。它只转换既有推荐和补充保守解释，不改变候选排序；
+- 当前最新 run 使用 `reloop-existing-recommendation-v1.2`。它仍不改变候选排序，只允许职位能力在结构化技能或工作经历中出现明确词项/保守同义证据时标为 `PASS`，修复已有招聘交付却显示“招聘待确认”的误导；
 - OpenClaw `brainx` profile 已绑定 `consultant=mia`、`tenant=ttc-york-team`，MCP probe 确认只外露 7 个精确只读工具，其中包含 shortlist；
+- `brainx-talent` Skill 已通过 OpenClaw 官方本地安装入口进入 main Agent 工作区，状态为 Ready 且对模型可见；回答规范改为“岗位投入判断—候选结论—真实证据—最大风险—首问问题”，禁止字段搬运和长串待确认项；
 - 数据责任人已明确授权脱敏 shortlist 进入当前 OpenAI 模型。OpenClaw 使用 `gpt-5.5` 完成一次真实 Agent turn，执行记录显示只调用 1 次 `brainx_candidate_shortlist`、失败 0 次；生成结果经敏感字段复核后由飞书企业机器人发送到 Mia 私聊，飞书返回消息 ID `om_x100b66b20466a0a0c218868c5e0df24`。
+- 用户反馈首版内容没有猎头决策价值。新版工具已在真实 RDS 返回职位画像和 Top 3 脱敏成果经历，v1.2 Top 10 已写入新不可变 run `rrun_5aa9caf49ab03ce299b504c4992b159557b401ebe2a94dff`；由于新增出域范围包含公司、岗位、教育和成果数字，安全层要求重新取得该扩展字段范围的明确授权，因此新版 Agent 调用与飞书发送尚未执行。
 - 10 份事实重新通过生产 Zod 契约，排除 hash/ref 后的可展示文本手机号/邮箱命中均为 0；数据库整段正则会误扫 SHA-256 连续数字，不作为隐私验收方式。
 
 已完成：
@@ -178,6 +189,7 @@ BRAINX_MCP_TENANT_ID=<内部租户ID>
 - reloop 结构化档案到事实契约的确定性转换；
 - 现有推荐批次的幂等导入、版本化 run 和固定文案预览；
 - 真实 RDS migration、真实 Top 10 导入、OpenClaw 双层白名单与 MCP probe；
+- 脱敏职位画像/成果履历读取投影、猎头判断 Skill 和带 BrainX 查询按钮的固定卡片外壳；
 - OpenClaw 真实读取脱敏 Top 3、生成推荐文案并由飞书机器人投递 Mia 私聊；
 - 契约、迁移、查询、MCP 暴露条件回归测试。
 
@@ -195,11 +207,12 @@ BRAINX_MCP_TENANT_ID=<内部租户ID>
 ## 9. 下一步
 
 1. 由 Mia 核对本次飞书私聊的展示口径，再决定每日发送时间、Top N 和是否使用互动卡片；
-2. 把 `reloop_app` 的用户—顾问授权同步从本次人工绑定改为可撤销的正式同步作业；
-3. 为 383 份结构化档案做增量游标，而不是每天全量复制；
-4. 用顾问反馈标注比较 reloop 既有排序与 BrainX 影子算法，达标后才切换排序；
-5. PDF/DOCX 无结构化来源时再引入 Docling/MarkItDown，扫描件明确标 `OCR_REQUIRED`；
-6. 实现生产 Agent Gateway、可信 requester 身份映射和撤权传播后，才向其他顾问推广。
+2. 数据责任人明确同意或拒绝“脱敏公司、岗位、教育和成果数字”进入当前 OpenAI 模型；同意后执行新版 Agent turn、敏感字段复核和 Mia 私聊投递；
+3. 把 `reloop_app` 的用户—顾问授权同步从本次人工绑定改为可撤销的正式同步作业；
+4. 为 383 份结构化档案做增量游标，而不是每天全量复制；
+5. 用顾问反馈标注比较 reloop 既有排序与 BrainX 影子算法，达标后才切换排序；
+6. PDF/DOCX 无结构化来源时再引入 Docling/MarkItDown，扫描件明确标 `OCR_REQUIRED`；
+7. 实现生产 Agent Gateway、可信 requester 身份映射和撤权传播后，才向其他顾问推广。
 
 ### 9.1 当前 PoC 命令
 

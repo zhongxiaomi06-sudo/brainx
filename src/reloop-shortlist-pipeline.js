@@ -163,6 +163,28 @@ function refsFor(fact, prefixes) {
     .map((entry) => entry.evidence_ref).slice(0, 50);
 }
 
+const CRITERION_ALIASES = new Map([
+  ['招聘', ['招聘']],
+  ['员工关系', ['员工关系', '人才保留', '团队融合']],
+  ['劳动法', ['劳动法', '劳动法规', '用工合规']],
+  ['沟通协调', ['沟通', '对接', '协同']],
+  ['数据整理', ['数据分析', '数据汇总', '数据报表', '招聘漏斗']],
+  ['考勤管理', ['考勤']],
+  ['社保办理', ['社保']],
+  ['制度优化', ['制度', '流程优化', 'sop']],
+]);
+
+function criterionEvidence(criterion, fact) {
+  const normalized = criterion.toLowerCase();
+  const skillHit = fact.skills.some((entry) => entry.normalized_name.includes(normalized));
+  if (skillHit) return refsFor(fact, ['skills.']);
+  const corpus = fact.work_experiences.map((entry) => `${entry.title} ${entry.summary || ''}`)
+    .join(' ').toLowerCase();
+  const aliases = CRITERION_ALIASES.get(criterion) || [criterion];
+  return aliases.some((alias) => corpus.includes(alias.toLowerCase()))
+    ? refsFor(fact, ['work_experiences.']) : [];
+}
+
 export function buildReloopMatchPayload(profile, recommendation, criteria = {}, fact) {
   const breakdown = parseJson(recommendation.score_breakdown, {});
   const detail = breakdown?.match_detail || {};
@@ -179,15 +201,18 @@ export function buildReloopMatchPayload(profile, recommendation, criteria = {}, 
     [company, role].filter(Boolean).join(' / ')].filter(Boolean);
   const fitParts = [`来源系统匹配分 ${jobFit}`];
   if (skillHits.length) fitParts.push(`技能命中：${skillHits.slice(0, 5).join('、')}`);
-  const factSkillSet = new Set(fact.skills.map((entry) => entry.normalized_name));
+  const evidenceByCriterion = new Map(requiredSkills.map((criterion) => [criterion,
+    criterionEvidence(criterion, fact)]));
   const hitSet = new Set([...skillHits.map((entry) => entry.toLowerCase()),
-    ...requiredSkills.filter((entry) => factSkillSet.has(entry.toLowerCase())).map((entry) => entry.toLowerCase())]);
+    ...requiredSkills.filter((entry) => evidenceByCriterion.get(entry).length > 0)
+      .map((entry) => entry.toLowerCase())]);
   const gaps = requiredSkills.filter((entry) => !hitSet.has(entry.toLowerCase()))
     .slice(0, 10).map((entry) => `待确认技能：${entry}`);
   const hardConditions = requiredSkills.slice(0, 20).map((criterion) => {
     const hit = hitSet.has(criterion.toLowerCase());
+    const refs = evidenceByCriterion.get(criterion) || [];
     return { criterion: `必需技能：${criterion}`, result: hit ? 'PASS' : 'UNKNOWN',
-      evidence_refs: hit ? skillRefs : [] };
+      evidence_refs: hit ? refs.length ? refs : skillRefs : [] };
   });
   const jobLocation = meaningful(criteria.location, 100);
   if (jobLocation) hardConditions.push({ criterion: `工作地点：${jobLocation}`,

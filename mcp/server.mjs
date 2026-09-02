@@ -91,7 +91,7 @@ const TOOLS = {
     },
   },
   brainx_candidate_shortlist: {
-    description: '读取本人获授权职位的预计算候选人 shortlist；仅返回脱敏事实与证据引用，每页最多 20 人',
+    description: '读取本人获授权职位的预计算候选人 shortlist；返回脱敏职位画像、结构化履历、匹配解释与证据引用，每页最多 20 人',
     inputSchema: { type: 'object', required: ['consultant_id', 'job_id'], properties: {
       consultant_id: { type: 'string' }, job_id: { type: 'string' },
       limit: { type: 'number', minimum: 1, maximum: 20 },

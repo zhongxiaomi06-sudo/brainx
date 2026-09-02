@@ -7,7 +7,7 @@ import {
   normalizeReloopScore,
 } from './reloop-shortlist-pipeline.js';
 
-const ALGORITHM_VERSION = 'reloop-existing-recommendation-v1.1';
+const ALGORITHM_VERSION = 'reloop-existing-recommendation-v1.2';
 const id = (prefix, value) => `${prefix}_${digest(value).slice(0, 48)}`;
 const json = (value, fallback = {}) => {
   if (value === null || value === undefined || value === '') return fallback;

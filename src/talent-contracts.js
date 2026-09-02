@@ -125,6 +125,36 @@ const assessmentSchema = z.strictObject({
   evidence_refs: evidenceRefs,
 });
 
+const jobContextSchema = z.strictObject({
+  title: z.string().min(1).max(200),
+  summary: z.string().max(1000).nullable(),
+  experience_requirement: z.string().max(500).nullable(),
+  education_requirement: z.string().max(300).nullable(),
+  location: z.string().max(200).nullable(),
+  required_skills: z.array(z.string().min(1).max(200)).max(30),
+  preferred_skills: z.array(z.string().min(1).max(200)).max(30),
+  responsibilities: z.array(z.string().min(1).max(500)).max(10),
+  unknowns: z.array(z.string().min(1).max(200)).max(20),
+});
+
+const profileSnapshotSchema = z.strictObject({
+  current_city: z.string().max(100).nullable(),
+  recent_experiences: z.array(z.strictObject({
+    company: z.string().min(1).max(200),
+    title: z.string().min(1).max(200),
+    start_date: z.string().max(20).nullable(),
+    end_date: z.string().max(20).nullable(),
+    is_current: z.boolean(),
+    summary: z.string().max(700).nullable(),
+  })).max(4),
+  education: z.array(z.strictObject({
+    school: z.string().min(1).max(200),
+    degree: z.string().max(100).nullable(),
+    major: z.string().max(150).nullable(),
+  })).max(3),
+  skills: z.array(z.string().min(1).max(120)).max(30),
+});
+
 export const storedCandidateMatchPayloadSchema = z.strictObject({
   strength_summary: z.string().min(1).max(1000),
   strength_evidence_refs: evidenceRefs,
@@ -141,6 +171,7 @@ const matchItemSchema = z.strictObject({
   candidate_ref: ref,
   display_name_masked: z.string().min(2).max(100),
   rank: z.number().int().positive(),
+  profile: profileSnapshotSchema,
   strength: assessmentSchema,
   job_fit: assessmentSchema,
   hard_conditions: z.array(hardConditionSchema).max(50),
@@ -153,6 +184,7 @@ const matchItemSchema = z.strictObject({
 export const candidateMatchBundleSchema = z.strictObject({
   schema_version: z.literal(CANDIDATE_MATCH_BUNDLE_SCHEMA_VERSION),
   job_ref: ref,
+  job_context: jobContextSchema.nullable(),
   match_run: z.strictObject({
     match_run_id: ref,
     algorithm_version: z.string().min(1).max(120),
@@ -170,6 +202,9 @@ export const candidateMatchBundleSchema = z.strictObject({
 }).superRefine((value, ctx) => {
   if (value.match_run === null && value.items.length > 0) {
     ctx.addIssue({ code: 'custom', path: ['match_run'], message: 'match_run required when items are present' });
+  }
+  if (value.job_context === null && value.items.length > 0) {
+    ctx.addIssue({ code: 'custom', path: ['job_context'], message: 'job_context required when items are present' });
   }
 });
 

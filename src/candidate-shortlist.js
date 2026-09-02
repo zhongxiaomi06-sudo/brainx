@@ -2,6 +2,7 @@
 import { withMysql } from './db.js';
 import {
   CANDIDATE_MATCH_BUNDLE_SCHEMA_VERSION,
+  parseCandidateFact,
   parseCandidateMatchBundle,
   parseStoredCandidateMatchPayload,
 } from './talent-contracts.js';
@@ -13,7 +14,8 @@ const SELECT = `SELECT
   mr.match_run_id, mr.algorithm_version, mr.feature_schema_version, mr.completed_at,
   cfv.candidate_ref, t.name AS candidate_name, cjm.\`rank\` AS match_rank,
   cjm.strength_score, cjm.job_fit_score, cjm.hard_filter_result,
-  cjm.payload_json, cd.processed_at AS fact_processed_at
+  cjm.payload_json, cfv.facts_json, jcv.criteria_json,
+  cd.processed_at AS fact_processed_at
 FROM match_runs mr
 JOIN job_criteria_versions jcv ON jcv.job_version_id = mr.job_version_id
 JOIN candidate_job_matches cjm ON cjm.match_run_id = mr.match_run_id
@@ -89,6 +91,50 @@ function iso(value) {
 function parseJson(value) {
   if (value && typeof value === 'object' && !Buffer.isBuffer(value)) return value;
   try { return JSON.parse(String(value)); } catch { throw qualityError(); }
+}
+
+const displayText = (value, limit) => String(value ?? '').trim().slice(0, limit);
+const meaningful = (value, limit) => {
+  const normalized = displayText(value, limit);
+  return /^(未提供|未知|暂无|无|n\/?a|null|-)$/i.test(normalized) ? null : normalized || null;
+};
+const stringList = (value, limit, itemLimit) => (Array.isArray(value) ? value : [])
+  .map((item) => meaningful(item, itemLimit)).filter(Boolean).slice(0, limit);
+
+function jobContextFromRow(row) {
+  const criteria = parseJson(row.criteria_json);
+  const fields = [
+    ['location', '工作地点'], ['salary_range', '薪资范围'],
+    ['reporting_line', '汇报关系'], ['team_size', '团队规模'],
+  ];
+  return {
+    title: meaningful(criteria.title, 200) || '当前职位',
+    summary: meaningful(criteria.summary, 1_000),
+    experience_requirement: meaningful(criteria.experience, 500),
+    education_requirement: meaningful(criteria.education, 300),
+    location: meaningful(criteria.location, 200),
+    required_skills: stringList(criteria.required_skills, 30, 200),
+    preferred_skills: stringList(criteria.preferred_skills, 30, 200),
+    responsibilities: stringList(criteria.responsibilities, 10, 500),
+    unknowns: fields.filter(([key]) => !meaningful(criteria[key], 500)).map(([, label]) => `${label}未提供`),
+  };
+}
+
+function profileFromRow(row) {
+  const fact = parseCandidateFact(parseJson(row.facts_json));
+  return {
+    current_city: meaningful(fact.identity.current_city, 100),
+    recent_experiences: fact.work_experiences.slice(0, 4).map((entry) => ({
+      company: displayText(entry.company, 200), title: displayText(entry.title, 200),
+      start_date: entry.start_date ?? null, end_date: entry.end_date ?? null,
+      is_current: entry.is_current === true, summary: meaningful(entry.summary, 700),
+    })),
+    education: fact.education.slice(0, 3).map((entry) => ({
+      school: displayText(entry.school, 200), degree: meaningful(entry.degree, 100),
+      major: meaningful(entry.major, 150),
+    })),
+    skills: fact.skills.map((entry) => displayText(entry.name, 120)).filter(Boolean).slice(0, 30),
+  };
 }
 
 export function maskCandidateName(value) {
@@ -167,6 +213,7 @@ function itemFromRow(row) {
     candidate_ref: String(row.candidate_ref),
     display_name_masked: maskCandidateName(row.candidate_name),
     rank: Number(row.match_rank),
+    profile: profileFromRow(row),
     strength: { score: Number(row.strength_score), summary: payload.strength_summary,
       evidence_refs: payload.strength_evidence_refs },
     job_fit: { score: Number(row.job_fit_score), summary: payload.job_fit_summary,
@@ -213,6 +260,7 @@ export async function candidateShortlist(rawInput, dependencies = {}) {
   const bundle = {
     schema_version: CANDIDATE_MATCH_BUNDLE_SCHEMA_VERSION,
     job_ref: input.jobId,
+    job_context: first ? jobContextFromRow(first) : null,
     match_run: matchRun,
     page: { limit: input.limit, next_page_token: nextPageToken },
     items,

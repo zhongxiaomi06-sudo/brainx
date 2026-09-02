@@ -3,6 +3,28 @@ import assert from 'node:assert/strict';
 import { candidateShortlist, decodeShortlistPageToken } from '../src/candidate-shortlist.js';
 
 const ISO = '2026-09-03T08:00:00.000Z';
+const HASH = 'a'.repeat(64);
+
+function fact(rank) {
+  return {
+    schema_version: 'candidate_fact_v1', fact_version_id: `fact_${rank}`, candidate_ref: `cand_${rank}`,
+    document: { document_ref: `doc_${rank}`, source_format: 'legacy_text', content_hash: HASH,
+      parser_version: 'fixture-v1', processed_at: ISO },
+    identity: { display_name: '张三', current_city: '上海', evidence_refs: ['ev_name'] },
+    work_experiences: [{ company: '示例科技', title: '招聘专员', start_date: '2024-01',
+      end_date: null, is_current: true, summary: '完成 40 个技术岗位交付并复盘招聘漏斗',
+      achievements: [], evidence_refs: ['ev_work'] }],
+    education: [{ school: '示例大学', degree: '本科', major: '人力资源',
+      evidence_refs: ['ev_education'] }],
+    skills: [], constraints: [],
+    evidence: [
+      { evidence_ref: 'ev_name', field_path: 'identity.display_name', source_ref: `doc_${rank}`, excerpt_hash: HASH },
+      { evidence_ref: 'ev_work', field_path: 'work_experiences.0', source_ref: `doc_${rank}`, excerpt_hash: HASH },
+      { evidence_ref: 'ev_education', field_path: 'education.0', source_ref: `doc_${rank}`, excerpt_hash: HASH },
+    ],
+    quality: { status: 'READY', evidence_coverage: 1, unknown_fields: [], warnings: [] },
+  };
+}
 
 function row(rank = 1) {
   return {
@@ -11,6 +33,11 @@ function row(rank = 1) {
     candidate_ref: `cand_${rank}`, candidate_name: '张三', match_rank: rank,
     strength_score: 83, job_fit_score: 78, hard_filter_result: 'PASS',
     fact_processed_at: ISO,
+    criteria_json: JSON.stringify({ title: '科技公司 HR 专员', summary: '招聘与基础人事综合岗',
+      education: '本科及以上', experience: '1-3 年 HR 经验', location: '上海',
+      required_skills: ['招聘', '员工关系'], preferred_skills: ['科技行业经验'],
+      responsibilities: ['全流程招聘', '基础人事'] }),
+    facts_json: JSON.stringify(fact(rank)),
     payload_json: JSON.stringify({
       strength_summary: '经历完整且成果有证据', strength_evidence_refs: ['ev_work'],
       job_fit_summary: '行业和投放能力匹配', job_fit_evidence_refs: ['ev_skill'],
@@ -35,6 +62,10 @@ test('shortlist：只返回脱敏、已授权、已完成的预计算结果', as
   assert.equal(out.items[0].display_name_masked, '张*');
   assert.equal(JSON.stringify(out).includes('张三'), false);
   assert.equal(JSON.stringify(out).includes('13800000000'), false);
+  assert.equal(out.job_context.title, '科技公司 HR 专员');
+  assert.equal(out.items[0].profile.current_city, '上海');
+  assert.match(out.items[0].profile.recent_experiences[0].summary, /40 个技术岗位/);
+  assert.equal(out.items[0].profile.education[0].degree, '本科');
   assert.match(calls[0].sql, /mr\.status = 'SUCCEEDED'/);
   assert.match(calls[0].sql, /talent_access_grants/);
   assert.match(calls[0].sql, /job_access_grants/);

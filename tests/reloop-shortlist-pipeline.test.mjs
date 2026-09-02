@@ -22,7 +22,7 @@ const profile = {
   source_payload: {
     basic: { name: { cn_name: '张三' }, phone: ['13800000000'], location: ['上海'] },
     work: { items: [{ company_name: '示例科技', position: 'HRBP', start_time: '2020-01',
-      end_time: '至今', description: '负责招聘与组织发展' }] },
+      end_time: '至今', description: '负责招聘与组织发展，定期做招聘漏斗数据分析' }] },
     education: { items: [{ school_name: '示例大学', degree: '本科', major: '管理学',
       start_time: '2012', end_time: '2016' }] },
   },
@@ -45,12 +45,13 @@ test('reloop 格式化：匹配解释保持实力与岗位匹配分离', () => {
   const payload = buildReloopMatchPayload(profile, {
     score: 0.76,
     score_breakdown: { match_detail: { skill_hits: ['招聘'], skill_jd_count: 3 } },
-  }, { required_skills: ['招聘', '薪酬'], location: '未提供' }, fact);
+  }, { required_skills: ['招聘', '数据整理', '薪酬'], location: '未提供' }, fact);
   assert.match(payload.strength_summary, /8/);
   assert.match(payload.job_fit_summary, /76/);
   assert.ok(payload.job_fit_evidence_refs.length > 0);
   assert.ok(payload.gaps.some((gap) => gap.includes('薪酬')));
   assert.equal(payload.hard_conditions.find((item) => item.criterion === '必需技能：招聘').result, 'PASS');
+  assert.equal(payload.hard_conditions.find((item) => item.criterion === '必需技能：数据整理').result, 'PASS');
   assert.equal(payload.hard_conditions.some((item) => item.criterion.startsWith('工作地点')), false);
 });
 

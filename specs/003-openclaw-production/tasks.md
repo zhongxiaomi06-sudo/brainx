@@ -101,7 +101,7 @@
 ## Phase 7: Polish & Cross-Cutting Concerns
 
 - [ ] T039 执行 npm run verify:quick、完整专项测试、插件 npm pack 安装、openclaw plugins inspect/doctor/security audit 并修复全部失败
-- [ ] T040 在最新 commit 的干净工作区运行 npm run verify，确认 .quality-gate/reports/latest.md 为通过且 Push 条件满足
+- [x] T040 在最新 commit 的干净工作区运行 npm run verify，确认 .quality-gate/reports/latest.md 为通过且 Push 条件满足
 - [ ] T041 按 docs/2026-09-03-openclaw-production-runbook.md 部署 ECS、迁移真实库、绑定最多三名灰度顾问并完成私聊/群聊/HTTPS 深链真实验收
 - [ ] T042 复核 git diff、提交记录和生产证据后推送 codex/feishu-agent-prd-20260901 并创建 GitHub PR
 - [ ] T043 运行 speckit-converge 对照 spec/plan/tasks 回扫缺口；如追加任务则继续 implement，直到报告 Converged
@@ -127,3 +127,9 @@
 3. Phase 5 原生插件和服务器部署优先于 Phase 6 的解析/算法增强；结构化 reloop 数据足以支撑首批灰度。
 4. Phase 6 保持增量、可取消和 shadow，不为“智能”牺牲授权与可恢复性。
 5. 每完成一个实现任务：运行对应专项测试 → `npm run verify:quick` → 自我复盘 → 更新本清单与 `docs/AGENT_COMMIT_LOG.md` → 独立中文 commit。
+
+## Phase 8: Convergence
+
+- [ ] T044 为常驻 worker 装配同步、解析和影子评测的固定生产 handler，并验证不会领取未启用类型 per FR-016 / T034 (partial)
+- [ ] T045 将文档状态、来源 hash、结构化事实和证据持久化为可恢复闭环 per FR-013 / SC-006 (partial)
+- [ ] T046 在可复跑匹配报告中增加硬条件误放率和证据覆盖率 per FR-015 / SC-011 (partial)

@@ -2,6 +2,12 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-03｜docs(spec): 回扫生产化剩余缺口
+
+- 收敛：按 `speckit-converge` 核对 FR-001 至 FR-021、SC-001 至 SC-012、用户故事、计划和 constitution；追加 T044-T046 三项 HIGH partial，不重复已有部署与 PR 任务。
+- 缺口：生产 worker handler 装配、文档持久化闭环，以及评测报告的硬条件误放率/证据覆盖率仍未实现；因此不声称 Converged。
+- 验证：最新干净提交上的 `npm run verify` 24/24 通过（后端 465 项、Storybook 80 项、构建、浏览器与服务烟雾）。
+
 ## 2026-09-03｜test(cards): 修复 HTTPS 深链全量回归
 
 - 根因：生产卡片已改为 HTTPS fail-closed，但两个旧推送测试仍继承本机 `.env` 的 HTTP 地址，导致完整门禁 463/465。

@@ -85,8 +85,8 @@
 
 - [x] T029 [P] [US3] 先写 source cursor 只在完整成功后前移及 383 档案增量分页测试到 tests/talent-pipeline.test.mjs
 - [x] T030 [US3] 实现 reloop 结构化档案增量同步与幂等事实写入到 src/talent-pipeline/sync-cursor.js、src/talent-pipeline/facts.js、scripts/sync-reloop-incremental.mjs
-- [ ] T031 [P] [US3] 先写撤权后查询、待发通知、缓存和索引均失效的测试到 tests/talent-revocation.test.mjs
-- [ ] T032 [US3] 实现人才授权与撤权传播到 src/talent-pipeline/grants.js
+- [x] T031 [P] [US3] 先写撤权后查询、待发通知、缓存和索引均失效的测试到 tests/talent-revocation.test.mjs
+- [x] T032 [US3] 实现人才授权与撤权传播到 src/talent-pipeline/grants.js
 - [ ] T033 [P] [US3] 先写任务幂等、费用上限、租约过期、重启恢复、取消和 outbox 去重测试到 tests/integration-jobs.test.mjs
 - [ ] T034 [US3] 实现持久任务仓库、worker 和 outbox 到 src/integration-jobs/repository.js、src/integration-jobs/worker.js、src/integration-jobs/outbox.js、bin/brainx-integration-worker.mjs
 - [ ] T035 [P] [US3] 先写数字 PDF/DOCX、空文本 OCR_REQUIRED、schema 失败和提示注入文档测试到 tests/document-parser.test.mjs

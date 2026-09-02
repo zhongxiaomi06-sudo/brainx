@@ -1,5 +1,4 @@
 "use client";
-
 import { useEffect, useMemo, useRef, useState } from "react";import { OpenmaiMarkdown, MarkdownBody } from "./openmai-markdown";
 import {
   Activity, AlertTriangle, ArrowLeft, BarChart3, Bell, BriefcaseBusiness,
@@ -38,6 +37,7 @@ import { ProjectsView } from "./projects-view";
 import { getRecommendationPage } from "./brainx-recommendation-pages-api";
 import { useRecommendationPages } from "./use-recommendation-pages";
 import { canIgnoreProject, createProjectIgnore } from "./project-ignore-action";
+import useWorkbenchDeepLink from "./use-workbench-deep-link";
 export default function DecisionWorkbench({demo=false}:{demo?:boolean}={}){
  const [hydrated,setHydrated]=useState(false);
  const [page,setPage]=useState<Page>("today");
@@ -258,6 +258,9 @@ export default function DecisionWorkbench({demo=false}:{demo?:boolean}={}){
  const projectDecisionJobs=useMemo(()=>brainxProjects.map(projectToDecisionJob),[brainxProjects]);
  const allDecisionJobs=useMemo(()=>[...activeDecisionJobs,...projectDecisionJobs.filter(project=>!activeDecisionJobs.some(job=>job.id===project.id))],[activeDecisionJobs,projectDecisionJobs]);
  const selectedDecisionJob=panel?.kind==="job"?[...allDecisionJobs,...verificationJobs].find(job=>job.id===panel.jobId)||null:null;
+ useWorkbenchDeepLink({connected:brainxMode==="connected",jobs:allDecisionJobs,
+  onOpen:(job,kind)=>{setPage("today");openDecision(job,kind==="replay"?"replay":"facts")},
+  onCandidate:(candidateRef,jobRef)=>{setAssistantOpen(true);setAssistantInput(`请分析候选人 ${candidateRef} 与职位 ${jobRef} 的匹配、证据、风险和待确认项。`)}});
  const commitmentJobs=allDecisionJobs.filter(job=>["WATCHED","ACCEPTED"].includes(engagement[job.id]||"NEW"));
  const shellPage:WorkspaceShellPage=page==="accepted"?"projects":page==="clients"?"clients":page==="jobs"?"jobs":page==="today"?"today":"settings";
  const navigateShell=(next:WorkspaceShellPage)=>{if(next==="jobs")setJobCompanyFilter(null);if(next==="settings")setAssistantOpen(false);go(next==="projects"?"accepted":next==="settings"?"settings":next)};

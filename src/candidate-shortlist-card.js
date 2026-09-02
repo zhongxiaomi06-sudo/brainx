@@ -1,4 +1,5 @@
 /** Render reviewed Agent analysis inside a fixed, privacy-safe Feishu card. */
+import { buildBrainxDeepLink } from './brainx-deep-links.js';
 
 const PHONE = /(?<!\d)(?:\+?86[-\s]?)?1[3-9]\d{9}(?!\d)/;
 const EMAIL = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
@@ -10,26 +11,20 @@ function safeText(value, max, errorCode) {
   return text;
 }
 
-function safeWebUrl(value) {
-  try {
-    const url = new URL(String(value));
-    if (!['http:', 'https:'].includes(url.protocol)) throw new Error('invalid');
-    return url.href;
-  } catch {
-    throw new Error('WEB_URL_INVALID');
-  }
-}
-
 export function buildCandidateShortlistCard({
   jobName,
+  jobId,
+  candidateRef,
   analysisMarkdown,
-  webUrl,
+  publicBaseUrl,
   sourceLabel = '授权后的结构化事实 · Agent 分析',
 }) {
   const name = safeText(jobName, 120, 'JOB_NAME_INVALID');
   const content = safeText(analysisMarkdown, 8_000, 'ANALYSIS_INVALID');
   const source = safeText(sourceLabel, 200, 'SOURCE_LABEL_INVALID');
-  const target = safeWebUrl(webUrl);
+  const target = buildBrainxDeepLink({
+    baseUrl: publicBaseUrl, objectType: 'opportunity', objectRef: jobId, candidateRef,
+  });
   const multiUrl = { url: target, pc_url: target, android_url: target, ios_url: target };
   return {
     config: { wide_screen_mode: true },

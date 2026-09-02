@@ -172,13 +172,14 @@ test('推送卡片：结构合法 + 三段信号 + 深链；同 run 重复推 SK
   const run = latestRun(db, CID);
   const c = commitmentSummary(db, CID);
   const card = buildDailyCard({ consultant_name: 'Felix 黄鑫', run: run.run,
-    items: run.items, commitments: c, sync: { complete: 1 }, snapshot_id: run.run.snapshot_id });
+    items: run.items, commitments: c, sync: { complete: 1 }, snapshot_id: run.run.snapshot_id,
+    publicBaseUrl: 'https://base.yorkteam.cn' });
   // legacy v1 卡片（schema 2.0 已移除 action 标签，实测 ErrCode 200861）
   assert.ok(card.config?.wide_screen_mode && Array.isArray(card.elements));
   assert.ok(card.elements.some((e) => e.tag === 'action'));
   const text = JSON.stringify(card);
   assert.match(text, /Fit /);
-  assert.match(text, /127\.0\.0\.1:\d+\/\?open=opportunity:/);
+  assert.match(text, /https:\/\/base\.yorkteam\.cn\/\?open=opportunity%3A/);
   const r1 = await pushCard(db, { consultant_id: CID, kind: 'DAILY_TOP3', run_id: run.run.run_id,
                             card, target: 'oc_test', send: false });
   assert.equal(r1.status, 'PREVIEW');

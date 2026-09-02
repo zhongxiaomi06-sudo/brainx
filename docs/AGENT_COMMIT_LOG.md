@@ -2,6 +2,12 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-03｜feat(cards): 接通受控 HTTPS 对象深链
+
+- 任务：完成 T026-T027；职位、回放、同步和候选推荐卡统一生成正式 HTTPS 工作台链接，删除生产 localhost 回退；工作台能解析对象并打开对应详情，候选引用只预填 Agent 匹配问题。
+- 权限：URL 只携带 `project_id`/`decision_id`/脱敏 `candidate_ref`，不携带 tenant、consultant、open_id、token 或 scope；页面 API 仍验证 HttpOnly 飞书会话和对象可见性，未登录 401、跨顾问 404。
+- 验证：深链/候选卡/推送联合测试 34/34、`npm run verify:quick` 16/16；首次门禁发现正式工作台增长到 512 行，已抽出解析 hook 并收敛到 500 行，前端审核台账、记录、施工清单与 Storybook 说明同步更新。
+
 ## 2026-09-03｜feat(deploy): 固化 OpenClaw 最小权限服务
 
 - 任务：完成 T024-T025；新增无明文密钥的 OpenClaw 生产配置、Agent Gateway/集成 worker/OpenClaw 三个 systemd 单元和可重复安装脚本。

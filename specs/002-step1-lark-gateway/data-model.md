@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS chat_contexts (
 
 - **workflow_event_log**：网关写入 `lark.message_received`（通过）/`lark.ignored`（DENY）；idem_key=`lark:message:<message_id>`；evidence_refs=`[{table:'chat_contexts',id:chat_id},{table:'lark_messages',id:message_id}]`。
 - 不新建 `lark_event_dedupe`：入站幂等由 `idx_wel_idem` 兜底（FR-003）。
-- 不新建 `lark_messages` 表：本规格不持久化消息正文（evidence_refs 只存引用名，引用目标表存在与否不阻塞本层；消息正文落 SDK 侧或后续规格决定）。
+- ~~不新建 `lark_messages` 表~~（**2026-09-02 E1 实施时修订**）：本规格留待「后续规格决定」的消息正文落库，由提炼层 E1 落地——`migrations/0030_lark_messages.sql` 新建该表，`processLarkEvent` 通过事件时以 `persistLarkMessage`（INSERT OR IGNORE）落正文，账本 payload 仍不含正文 PII（FR-006 不变），evidence_refs 引用目标自此真实存在。权威契约见 `docs/2026-09-02-job-facts-extraction-roadmap.md` §4；DENY 事件仍不落正文。
 
 ## 信封映射契约（processLarkEvent 写入 workflow_event_log）
 

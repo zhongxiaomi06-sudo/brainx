@@ -8,6 +8,7 @@
 import { appendEvent } from '../hub/event-log.js';
 import { getChatContext } from './chat-contexts.js';
 import { mapAcceptedEnvelope, mapDeniedEnvelope } from './envelope-mapper.js';
+import { persistLarkMessage } from './lark-messages.js';
 
 export const BOT_OPEN_ID = 'ou_bot'; // 测试/默认约定值；真实运行由 ws-client 启动时调 bot/v3/info 拿机器人真实 open_id 注入
 
@@ -29,6 +30,7 @@ export function processLarkEvent(db, evt, botOpenId = BOT_OPEN_ID) {
     return deny(db, evt, 'not_mentioned');
   }
 
+  persistLarkMessage(db, evt); // 正文落 lark_messages（evidence_refs 引用目标；幂等）
   const r = appendEvent(db, mapAcceptedEnvelope(evt, ctx));
   if (!r.ok) return { ack: false, reason: r.reason }; // schema_invalid / payload_too_large
   return r.deduplicated ? { ack: true, action: 'duplicate' } : { ack: true, action: 'queued' };

@@ -139,6 +139,21 @@ L0 网关 processLarkEvent → appendEvent（账本，幂等）
 
 ## 6. 研发路径与时间线（对齐 9/3 demo → 9/14 deadline）
 
+### E1 实施记录（2026-09-02，已落地）
+
+E1 规则层 MVP 已按本文实施，实施中把规格 002 留待「后续规格决定」的**消息正文落库**一并补齐（提炼层必须有原文输入；evidence_refs 指向的 `lark_messages` 表自此真实存在）：
+
+| 交付物 | 位置 | 说明 |
+|---|---|---|
+| 消息正文表 | `migrations/0030_lark_messages.sql` + `src/gateway/lark-messages.js` | `processLarkEvent` 通过事件时 INSERT OR IGNORE 落正文；DENY 不落 |
+| 草稿 staging 表 | `migrations/0031_job_facts_drafts.sql` | 字段与 job_facts 对齐 + `*_evidence` 原文锚定列 + status=pending/confirmed/rejected |
+| 规则层纯函数 | `src/job-extract/classify.js` | `parseOfferGroupName` / `isJobRelevant` / `extractRules`（公司/岗位/城市/pipeline/HC/active_state，全部保守正则，无证据不编造） |
+| 输出契约 | `src/job-extract/schema.js` | `jobFactsDraftSchema`（zod），规则层与 E2 LLM 层共用 |
+| 消费者主入口 | `src/job-extract/index.js` | `consumeJobExtract` = `consumeOnce(db, eventId, 'job-extract', fn)`；skip 路径：not_message_event / message_text_missing / irrelevant |
+| 测试 | `tests/job-extract-rules.test.mjs`（12）+ `tests/job-extract-consumer.test.mjs`（7） | 19 用例含幂等重放、DENY 不抽、正文缺失不编造 |
+
+已知边界（E2/E3 处理）：LLM 层未接（`AI_JOB_EXTRACT_ENABLED` 只留开关位）；`project_id` 实体对齐恒空（E4）；确认闭环（MCP `brainx_confirm_facts`）未建。
+
 与[后端侧模块结构 §4](2026-09-02-backend-module-structure.md) 的排期合并视图（该表 P0/P1 不变，本表细化待补第 5 项）：
 
 | 阶段 | 内容 | 工期 | 前置 | 可复用开源机制 |

@@ -52,7 +52,7 @@
 - [x] T017 [US2] 复用现有领域函数实现职位域工具到 src/agent-gateway/tools-jobs.js
 - [x] T018 [P] [US2] 先写 shortlist、candidate facts、fit、candidate gap 和 interview prep 的授权/脱敏/版本测试到 tests/agent-talent-tools.test.mjs
 - [x] T019 [US2] 复用 candidate_fact_v1 与版本化 match run 实现人才域工具到 src/agent-gateway/tools-talent.js
-- [ ] T020 [US2] 将 10 个工具接入注册表并添加黄金工作流只读回放到 tests/agent-golden-workflow.test.mjs
+- [x] T020 [US2] 将 10 个工具接入注册表并添加黄金工作流只读回放到 tests/agent-golden-workflow.test.mjs
 - [ ] T021 [US2] 将七个生产 Skill 对齐新工具名、事实/推断/建议/未知格式与一次一问规则到 skills/brainx-today/、skills/brainx-job/、skills/brainx-talent/、skills/brainx-match/、skills/brainx-engagement-draft/、skills/brainx-interview-prep/、skills/brainx-review/
 
 **Checkpoint**: 不经 OpenClaw 模型也能证明每个工具的权限、schema、证据和失败语义。

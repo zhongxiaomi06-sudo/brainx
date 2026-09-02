@@ -101,3 +101,14 @@ export function createToolRegistry(options = {}) {
     },
   });
 }
+
+export function createProductionToolRegistry({ db, talentDependencies = {} }) {
+  const jobs = createJobToolHandlers({ db });
+  const talent = createTalentToolHandlers({
+    ...talentDependencies,
+    jobGapHandler: jobs.brainx_gap_questions,
+  });
+  return createToolRegistry({ handlers: { ...jobs, ...talent } });
+}
+import { createJobToolHandlers } from './tools-jobs.js';
+import { createTalentToolHandlers } from './tools-talent.js';

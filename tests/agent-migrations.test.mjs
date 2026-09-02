@@ -9,6 +9,7 @@ test('agent gateway migrations create every security and recovery table', () => 
   const expected = [
     'feishu_identity_bindings', 'agent_group_scopes', 'agent_runs', 'agent_tool_calls',
     'agent_nonces', 'agent_rate_limits', 'integration_jobs', 'integration_outbox',
+    'agent_admin_events',
   ];
   const actual = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map((row) => row.name);
   for (const table of expected) assert.ok(actual.includes(table), `${table} missing`);

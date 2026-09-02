@@ -2,6 +2,13 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-02｜test(ci): 修复迁移清单与 MCP 黑名单回归断言
+
+- **迁移测试**：`tests/framework.test.mjs` 的权威迁移清单补齐 `0023` 至 `0031`，旧库升级后的记账数量由 24 更新为真实的 33；保持逐文件名显式断言，防止迁移遗漏。
+- **MCP 测试**：`tests/mcp.test.mjs` 不再错误要求危险工具 `brainx_sync_now` 出现在 `tools/list`，改为显式断言其必须被黑名单隐藏；其余安全工具仍逐项验证存在。
+- **根因**：PR #45 远端 CI 的 3 个失败均是测试契约落后于同分支已提交的迁移与安全策略，并非业务实现失败。
+- **验证**：专项 `node --test tests/framework.test.mjs tests/mcp.test.mjs` 24/24 通过；沙箱外完整后端测试 368/368 通过；`npm run verify:quick` 16/16 通过。
+
 ## 2026-09-02｜docs(spec): 建立 003 群消息到职位事实运行闭环规格
 
 - **规格目标**：新增 `specs/003-group-message-job-facts-loop/spec.md`，把当前最前置的结构性断点定义为“登记群消息自动消费 → 带证据草稿 → 顾问可见并确认/拒绝 → `job_facts` 权威事实 → 失败可发现与安全重试”。

@@ -72,6 +72,7 @@
 - [复用与自建边界及权限需求 PRD](prd-2026-09-01-reuse-selfbuild-boundary.md)：每步"直接可用/借鉴/必须自建"三色清单、七件自建件、飞书权限最小集与明确不采用清单。
 - [AI Native 猎头工作流架构图](design/architecture-workflow.html)：面向业务与 York 的三泳道主循环、人工边界、缺口和数据沉淀视图，附 2026-09-01 施工现状对照。
 - [AI Native 猎头技术架构图](design/architecture-tech.html)：面向研发的五层架构与 BrainX、reloop 三套桥接施工视图，附 2026-09-01 施工现状对照与桥 1 门禁现状。
+- [OpenClaw 壳子分层架构图](design/openclaw-shell-architecture.svg)：[OpenClaw 壳子 + 自写 Skill 架构](2026-09-02-openclaw-shell-architecture.md) §3 的可视化版本——飞书渠道 → OpenClaw Gateway → Skill 层 / MCP 层 → BrainX 领域权威层，标注 7 个已合规 Skill 与 3 个 MCP server。同目录提供 PNG 版 `openclaw-shell-architecture.png`（1360×1332，白底），可直接用于交流会与演示材料。
 - [AI Native 猎头全链路轨迹图](design/ai-native-headhunter-workflow.html)：环节级轨迹、人工/自动分工与证据来源的蒸馏工作稿，阶段三回填进行中。
 - [双项目 14 天作战计划](design/week-plan-brainx-reloop.html)：BrainX × reloop 至 9/14 决赛的双泳道排期、底线条件与不做清单。
 - [BrainX 最终交付蓝图与施工总清单](brainx-final-delivery-blueprint.md)：基于当前代码审计定义最终产品形态、黄金路径、跨前后端施工顺序和端到端验收。

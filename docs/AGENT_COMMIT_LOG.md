@@ -2,6 +2,12 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-02｜docs(design): 导出 OpenClaw 壳子架构图 SVG + PNG
+
+- 改动：用户要"这张架构给我一张图片"。新增 `docs/design/openclaw-shell-architecture.svg`（白底矢量，680×666）与同目录 `openclaw-shell-architecture.png`（1360×1332，由 SVG 经 Chrome headless --force-device-scale-factor=2 渲染生成，白底适合直接分享与插入 PPT）；PNG 为生成物，不应独立维护。`docs/README.md` 设计与数据段登记一行指向 SVG 并注明 PNG 同目录提供。
+- 验证：Chrome headless 渲染输出 1360×1332 / 187KB；五层架构完整呈现，中文/英文/符号（·/↔）正常显示，箭头 marker 正常（SVG 中 marker `stroke` 由 `context-stroke` 改为固定 `#888780` 以兼容非 WebKit 渲染器）；无需他人改动（distilled/felix.md、docs/hunter-distillation.md、docs/design/architecture-workflow.html 全程未纳入）。
+- 注：图取自 `docs/2026-09-02-openclaw-shell-architecture.md` §3。修改架构图请改 SVG，重新渲染 PNG。
+
 ## 2026-09-02｜docs(architecture): 补 Skill 工业化生成与壁垒重判
 
 - 改动：用户补充第五条事实——**DataClaw 也用官方接口，且 Skill 是找 AI 写的、自己改**。据此更新 `docs/2026-09-02-openclaw-shell-architecture.md`：①§1 结论重判——壳子（开源 OpenClaw）、数据（同为官方接口）、Skill（同为 AI 生成）三条技术路径**全部同一水平线，技术壁垒为零**；差距只剩"谁的领域知识更准"（我们占优：领域权威层 + 15 个只读工具 + 7 个已合规 Skill）与"谁的效果数据更早"（他们占优：35%→80%，是跑得早的红利不是能力差，不必追）；②§2 改标题为"五个新事实"并新增差异点对照表（领域口径我优 / 数据接口持平 / 效果数据他优 / IM 多轮持平）；③新增 **§5.1「Skill 应当工业化生成，人工只改口径」**——既然对方也是 AI 生成 + 人工改，这层的正确姿势是批量生成 + 人工校准，而非逐个手写；我们的素材更优（15 个工具已带完整中文 schema，description 本身就是口径来源）；给出生成流水线（工具 schema → AI 批量生成 → 人工只改三处：口径校正 / 脱敏规则 / 写意图指引 → 合规校验）与**AI 生成 Skill 的四个典型坑**（触发词写错致不加载、工具名与真名不符、敏感字段直出、幻觉出不存在的参数）及各自检查方式；核心判断"人工改的是口径不是语法——语法错会崩肉眼可见，口径错要等演示现场才暴露"；**并明确生成前先划白名单：`query_sql`（agent 直查 SQL，挂进 OpenClaw 等于把决策库开给群里的自然语言输入，SQL 注入面从 Web 扩到群里）与 `load_skill`（元工具）必须先排除，先定白名单再生成**；④§9 交流会清单第 1 项从"看 Skill 目录结构"改为"**AI 生成的 Skill 你们自己改了哪些地方**"（结构是可抄的公开规范且我们已全部合规，真正值钱的是抄不到的经验），新增 1b"几个 Skill、怎么切粒度"，第 3 项改为"官方接口哪些字段好用哪些是坑"（双方都用官方接口，此项交流性价比最高）；谈判姿态改为同行切磋（"我们也在用 OpenClaw，Skill 也是 AI 生成 + 自己改"），并给出可亮的两张牌（7 个 SKILL.md 已过合规校验、手上有官方数据接口）用于换取对等信息；⑤§11 风险新增第 3 条"AI 生成 Skill 的口径错误（高）"并给出对策（三处人工校正不得省、每个 Skill 用真实问法试触发、人才库相关 Skill 必须额外试"连不通"场景），原 3-8 顺延为 4-9，第 8 条人才库静默降级补注"与第 3 条叠加最危险：AI 生成的 Skill 把假数据说得更自信"；⑥§10 今晚拆成两件事（先跑通 OpenClaw + 迁移 7 个 Skill，再批量生成剩余 Skill），强调顺序——没跑通就批量生成等于批量生产无法验证的东西；⑦§12 待确认新增三项（哪些工具允许外露 / 官方接口覆盖哪些业务域）。

@@ -2,6 +2,11 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-02｜feat(gateway): Step 1 chat_contexts 注册工具
+
+- 改动：按 tasks.md T003-T004 测试先行——新增 `tests/gateway-chat-contexts.test.mjs`（6 用例：注册写入查询、默认 bot_mode=MENTION_ONLY 且未登记返回 null、重复 chat_id upsert 不重置 enabled、启停、未登记 setChatEnabled 返回 not_found、listChatContexts 列举）；实现 `src/gateway/chat-contexts.js`（registerChatContext upsert/setChatEnabled/getChatContext/listChatContexts，≤60 行）。
+- 验证：测试先行确认初始失败；`node --test tests/gateway-chat-contexts.test.mjs` 6/6 通过。
+
 ## 2026-09-02｜feat(gateway): Step 1 迁移 0029 + 飞书 SDK 采购
 
 - 改动：新增 `migrations/0029_chat_contexts.sql`（chat_contexts 群登记表：chat_id PK、enabled、bot_mode 默认 MENTION_ONLY、default_deny_reason、registered_at/updated_at、notes）；按蓝图 §6.2 采购清单 `npm install @larksuiteoapi/node-sdk`（运行时 deps 达 mysql2+zod+@larksuiteoapi/node-sdk=3，≤4 达标）。对应 tasks.md T001-T002。

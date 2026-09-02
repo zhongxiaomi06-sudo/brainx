@@ -29,6 +29,8 @@
     "gateway": "node bin/brainx-lark-gateway.mjs",
     "agent:gateway": "node bin/brainx-agent-gateway.mjs",
     "agent:admin": "node bin/brainx-agent-admin.mjs",
+    "integration:worker": "node bin/brainx-integration-worker.mjs",
+    "match:evaluate": "node scripts/eval-candidate-matching.mjs",
     "gateway:start": "node --env-file=.env bin/brainx-lark-gateway.mjs start",
     "gateway:list-chats": "node --env-file=.env bin/brainx-lark-gateway.mjs list-chats",
     "fixture": "node scripts/build_fixture.mjs",
@@ -64,7 +66,8 @@
     "braintex-local-web": "bin/brainx-web.mjs",
     "braintex-lark-gateway": "bin/brainx-lark-gateway.mjs",
     "brainx-agent-gateway": "bin/brainx-agent-gateway.mjs",
-    "brainx-agent-admin": "bin/brainx-agent-admin.mjs"
+    "brainx-agent-admin": "bin/brainx-agent-admin.mjs",
+    "brainx-integration-worker": "bin/brainx-integration-worker.mjs"
   },
   "devDependencies": {
     "playwright": "^1.62.1",

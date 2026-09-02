@@ -87,12 +87,12 @@
 - [x] T030 [US3] 实现 reloop 结构化档案增量同步与幂等事实写入到 src/talent-pipeline/sync-cursor.js、src/talent-pipeline/facts.js、scripts/sync-reloop-incremental.mjs
 - [x] T031 [P] [US3] 先写撤权后查询、待发通知、缓存和索引均失效的测试到 tests/talent-revocation.test.mjs
 - [x] T032 [US3] 实现人才授权与撤权传播到 src/talent-pipeline/grants.js
-- [ ] T033 [P] [US3] 先写任务幂等、费用上限、租约过期、重启恢复、取消和 outbox 去重测试到 tests/integration-jobs.test.mjs
-- [ ] T034 [US3] 实现持久任务仓库、worker 和 outbox 到 src/integration-jobs/repository.js、src/integration-jobs/worker.js、src/integration-jobs/outbox.js、bin/brainx-integration-worker.mjs
-- [ ] T035 [P] [US3] 先写数字 PDF/DOCX、空文本 OCR_REQUIRED、schema 失败和提示注入文档测试到 tests/document-parser.test.mjs
-- [ ] T036 [US3] 实现隔离 MarkItDown 解析适配与文档状态到 parser/、src/talent-pipeline/document.js
-- [ ] T037 [P] [US3] 先写正式顺序冻结、shadow run 和 Recall@20/NDCG@10 报告测试到 tests/match-evaluation.test.mjs
-- [ ] T038 [US3] 实现固定评测集运行与可复跑报告到 src/talent-pipeline/evaluation.js、scripts/eval-candidate-matching.mjs
+- [x] T033 [P] [US3] 先写任务幂等、费用上限、租约过期、重启恢复、取消和 outbox 去重测试到 tests/integration-jobs.test.mjs
+- [x] T034 [US3] 实现持久任务仓库、worker 和 outbox 到 src/integration-jobs/repository.js、src/integration-jobs/worker.js、src/integration-jobs/outbox.js、bin/brainx-integration-worker.mjs
+- [x] T035 [P] [US3] 先写数字 PDF/DOCX、空文本 OCR_REQUIRED、schema 失败和提示注入文档测试到 tests/document-parser.test.mjs
+- [x] T036 [US3] 实现隔离 MarkItDown 解析适配与文档状态到 parser/、src/talent-pipeline/document.js
+- [x] T037 [P] [US3] 先写正式顺序冻结、shadow run 和 Recall@20/NDCG@10 报告测试到 tests/match-evaluation.test.mjs
+- [x] T038 [US3] 实现固定评测集运行与可复跑报告到 src/talent-pipeline/evaluation.js、scripts/eval-candidate-matching.mjs
 
 **Checkpoint**: 人才规模化不依赖全量重拷贝，撤权可验证；新算法仍不能未经签署切正式排序。
 

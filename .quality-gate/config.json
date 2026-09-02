@@ -33,8 +33,7 @@
     "frontend/btex-frontend/dist/",
     "frontend/btex-frontend/.next/",
     "frontend/btex-frontend/.wrangler/",
-    "frontend/btex-frontend/storybook-static/",
-    "frontend/btex-frontend/reference/"
+    "frontend/btex-frontend/storybook-static/"
   ],
   "excludedFiles": [],
   "excludedBasenames": [

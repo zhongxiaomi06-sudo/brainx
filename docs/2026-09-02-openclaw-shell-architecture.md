@@ -445,6 +445,6 @@ Skill 与 MCP 让调用入口变多，隐私出口随之变多。硬规矩：
 
 - **[业务工作全景（全链路业务流 × 工具 × 权限）](2026-09-02-business-work-breakdown.md)** · [飞书权限清单](2026-09-02-feishu-permission-scopes.md) · [下游交付文档](2026-09-02-brainx-mcp-deliverable.md)
 - [全景架构与技术施工蓝图](architecture-2026-09-01-full-blueprint.md) · [复用与自建边界及权限需求 PRD](prd-2026-09-01-reuse-selfbuild-boundary.md)
-- [Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) · [BrainTex 群聊工作流技术 PRD](prd-2026-09-01-braintex-group-workflow.md)
+- [Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) · [BrainTex 群聊工作流技术 PRD](prd-2026-09-01-brainx-group-workflow.md)
 - [DataClaw 集成交流会历史底稿](2026-09-02-dataclaw-integration-brief.md)（架构结论已被本文取代，索取清单部分仍可参考）
 - Step 1 飞书网关联调清单：[specs/002-step1-lark-gateway/quickstart.md](../specs/002-step1-lark-gateway/quickstart.md)

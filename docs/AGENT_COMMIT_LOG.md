@@ -2,6 +2,20 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-02｜chore(cleanup): 清除 reference 化石、PRD 改名 brainx、修复 2 个红灯文件
+
+- **背景**：上一轮化石清理（`be348ed`）后剩余三项，由用户逐项裁定：①`frontend/btex-frontend/reference/braintex-showcase-original/`（7 文件）清除；②`docs/prd-2026-09-01-braintex-group-workflow.md` 只改文件名、不改标题与内容；③2 个他人遗留的未跟踪红灯文件修好并纳入跟踪。
+- **清除 reference 化石 7 个**：`git rm -r frontend/btex-frontend/reference/braintex-showcase-original/`（6 张 png + 1 个 index.html，约 1.38M）。前置核验零代码引用（全仓库 grep `braintex-showcase-original|btex-frontend/reference` 无命中），备份至 `/tmp/brainx-fossil-backup-20260902/reference-original/`，**md5 逐文件校验 7/7 一致**后才删除。同步删除 `.quality-gate/config.json` 中 `excludedPrefixes` 的 `"frontend/btex-frontend/reference/"`——否则留下指向不存在路径的死配置。删除后 reference 目录整体消失，JSON 解析有效（8 项），LF 行尾未变。
+- **PRD 改名**：`docs/prd-2026-09-01-braintex-group-workflow.md` → `prd-2026-09-01-brainx-group-workflow.md`，`git mv` 后 git 记为 `R100`（内容 100% 相似），md5 比对 `06be6d47…` 一字未改，H1 标题 `# BrainTex 群聊工作流技术 PRD（v1.0）` 按裁定保留。
+- **引用同步 9 处**（5 个文件，仅改链接路径、不改显示文本）：`docs/README.md` 2、`docs/architecture-2026-09-01-full-blueprint.md` 3、`docs/prd-2026-09-01-reuse-selfbuild-boundary.md` 2、`docs/2026-09-02-openclaw-shell-architecture.md` 1、`docs/2026-09-02-dataclaw-integration-brief.md` 1。**例外**：`docs/AGENT_COMMIT_LOG.md:305` 是该 PRD 的创建记录，文件名以反引号代码文本（非 markdown 链接）出现，属历史事实陈述，保留不改——改它会让「该 commit 当时创建的文件名」失真，且它不构成死链。
+- **修复并纳入跟踪 2 个红灯文件**：
+  - `docs/design/week-plan-brainx-reloop.html`：第 95 行 529 字符超限（第 2 周表头 `<tr>`，含 8 个 `<th>`）。按文件既有风格（缩进 0、每单元格独占一行）拆为 10 行，最长 67 字符。**只在标签边界插入换行，未改动任何字符**：拆后 10 行拼接回 529 字符、零换行残留，`tr`/`th` 配对校验通过。
+  - `docs/health-brief-2026-09-01.md`：第 3/4/98/99 行行尾各有 2 个空格。**未直接删除**——Markdown 尾随双空格是硬换行语法，删除会让 blockquote 三行与列表三段各自挤成一团；改为等价的 `<br>`，渲染结果不变且行尾无空白。
+- **修正上一轮记录中的两处数字错误**：①引用处数不是 5 而是 9（漏算了 `2026-09-02-openclaw-shell-architecture.md`，且把「文件数 5」当成「引用数」）；②超长行只有 1 条不是 2 条——macOS 的 `awk` 按**字节**计数，第 53 行 633 字节实为 402 字符（含中文）本就合规，用 Python 按字符口径复核后确认门禁报告「1 条 / 529 字符」正确。**若不复核，会去改一行本就合规的代码。**
+- **验证结果**：死链扫描 146 个 md / 673 条相对链接 → **死链 0 条**；复用门禁自身检查函数对本次 9 个改动文件做静态预检 → 禁止跟踪文件、高置信度秘密扫描、超长行、个人电脑绝对路径、换行与行尾空白**全部通过（0 问题）**。可移植性已单独确认：`health-brief` 第 5 行含 `/Users/ashley/...`，但正则要求 `/Users/` 前是行首或空白/引号，而该处前为反引号，故命中 0 条，纳入跟踪不会新增红灯（此结论经实测正则验证，非推断）。
+- **未做**：`npm run verify:quick` 全量未重跑——前端 `node_modules` 仍缺 `eslint`/`marked`（上一轮被宿主文件系统代理拒绝安装所致），ESLint/TS/前端测试 3 项必然继续红，需在普通终端执行 `cd frontend/btex-frontend && npm install` 后才能验证。
+- **并发提示**：提交前检测到 `tests/framework.test.mjs`、`tests/mcp.test.mjs` 于 21:51:41 被另一会话修改（迁移清单 24→33、MCP 不再外露 `brainx_sync_now`）。与本次改动零文件重叠，且本次 commit 只提交暂存区、不夹带其工作区改动。
+
 ## 2026-09-02｜chore(cleanup): 清除化石归档并统一项目命名为 brainx
 
 - **背景**：仓库存在三个并存的项目身份（`brainx-local` / `site-creator-vinext-starter` / `braintex`·`brianx`），另有 217 个化石文件占 27% 被跟踪文件。用户裁定：统一为 `brainx`、清除化石、保留 git 历史、前端目录 `btex-frontend` 不改、历史文档叙述不改。

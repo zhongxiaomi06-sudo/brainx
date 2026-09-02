@@ -11,7 +11,7 @@
 | 规范 | 权威范围 | 关键结论 |
 |---|---|---|
 | [Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) | 身份、Case 状态机、事件账本、Saga | 双轴 Case；`case_id` 唯一连接单位；持久账本 vs 瞬态 relay；三座桥都是 Saga |
-| [群聊工作流技术 PRD](prd-2026-09-01-braintex-group-workflow.md) | 群聊交互层 | 五信任域；事件入口/卡片回调；外部安全视图；P0-P3；未登记群默认 DENY |
+| [群聊工作流技术 PRD](prd-2026-09-01-brainx-group-workflow.md) | 群聊交互层 | 五信任域；事件入口/卡片回调；外部安全视图；P0-P3；未登记群默认 DENY |
 | Codex Agent 职责与权限规范（微信稿，待入库） | Agent 工具与审批层 | P0-P5；工具注册契约；39 个窄工具；审批对象；Phase A-E |
 | [最终交付蓝图](brainx-final-delivery-blueprint.md) | 产品形态与施工顺序 | 四入口导航；四个业务概念不可互冒；后端裁决 |
 | [PRD v2.0](prd-2026-08-24-brainx-v2.md) | 产品边界 | 职位决策系统；评分确定性；TTC 是职位权威源 |
@@ -353,7 +353,7 @@ OpenMai 结果从 `openmai_results`(覆盖式 Markdown) 迁移为 `sourcing_run`
 
 ## 8. 与权威规范的关系
 
-本文是**导航层**：施工细节以 [Workflow Hub 架构](workflow-hub-architecture.md)为契约权威；交互与安全以[群聊工作流 PRD](prd-2026-09-01-braintex-group-workflow.md)为准；工具授权以 Codex Agent 职责规范（入库后）为准；产品验收以[最终交付蓝图](brainx-final-delivery-blueprint.md)为准。Codex 规范的 P0-P5 与群聊 PRD 的 P0-P3 映射：PRD-P0(查询)≈规范-P1、PRD-P1(内部写)≈P3、PRD-P2(对外)≈P4、PRD-P3(高风险)≈P4+审批/P5 禁区——**合并评审时统一编号**。
+本文是**导航层**：施工细节以 [Workflow Hub 架构](workflow-hub-architecture.md)为契约权威；交互与安全以[群聊工作流 PRD](prd-2026-09-01-brainx-group-workflow.md)为准；工具授权以 Codex Agent 职责规范（入库后）为准；产品验收以[最终交付蓝图](brainx-final-delivery-blueprint.md)为准。Codex 规范的 P0-P5 与群聊 PRD 的 P0-P3 映射：PRD-P0(查询)≈规范-P1、PRD-P1(内部写)≈P3、PRD-P2(对外)≈P4、PRD-P3(高风险)≈P4+审批/P5 禁区——**合并评审时统一编号**。
 
 ## 9. 每一步现状不足与云端可获组件映射（2026-09-01 代码审计）
 
@@ -436,6 +436,6 @@ OpenMai 结果从 `openmai_results`(覆盖式 Markdown) 迁移为 `sourcing_run`
 
 ## 相关文档
 
-- [Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) · [群聊工作流技术 PRD](prd-2026-09-01-braintex-group-workflow.md) · [最终交付蓝图](brainx-final-delivery-blueprint.md)
+- [Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) · [群聊工作流技术 PRD](prd-2026-09-01-brainx-group-workflow.md) · [最终交付蓝图](brainx-final-delivery-blueprint.md)
 - [BrainX v2.0 PRD](prd-2026-08-24-brainx-v2.md) · [安全操作手册](SECURITY.md) · [上传前完整验证](standards/PRE_PUSH_VERIFICATION.md)
 - [双项目 14 天作战计划](design/week-plan-brainx-reloop.html)

@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-04｜fix(deploy): 飞书 appSecret 改用环境变量引用绕过 SecretRef 解析 bug
+
+- 根因：OpenClaw 2026.7.1-2 外部化 feishu 插件无法解析 SecretRef（issue #76451），飞书私聊消息 dispatch 抛 `FeishuSecretRefUnavailableError: channels.feishu.appSecret: unresolved SecretRef`，表现为「机器人收到消息但不回复」。
+- 修复：`channels.feishu.accounts.mia.appSecret` 从 SecretRef 对象改为与 `appId` 一致的 `${BRAINX_FEISHU_APP_SECRET}` 环境变量引用（生产 `/var/lib/brainx/.openclaw/openclaw.json` 已同步 hot-reload 并重启 openclaw-brainx）。同步更新 `tests/openclaw-production-config.test.mjs` 断言。
+- 验证：`tests/openclaw-production-config.test.mjs` 8/8 通过；quick 门禁 16/16 通过；生产重启后 ws client ready、bot open_id 解析成功、无 SecretRef 错误。
+
 ## 2026-09-04｜feat(sourcing): SuperMai 凭证复用顾问本人 TTC JWT
 
 - 目标：接续 `ee33805` 的 SuperMai 集成——用户确认 SuperMai 云端 sourcing 的 Bearer token 即顾问本人登录的 TTC JWT（凭证鉴权"就是大家登录的"），无需另建独立凭证体系。

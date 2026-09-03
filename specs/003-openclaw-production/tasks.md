@@ -100,7 +100,7 @@
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T039 执行 npm run verify:quick、完整专项测试、插件 npm pack 安装、openclaw plugins inspect/doctor/security audit 并修复全部失败
+- [x] T039 执行 npm run verify:quick、完整专项测试、插件 npm pack 安装、openclaw plugins inspect/doctor/security audit 并修复全部失败
 - [x] T040 在最新 commit 的干净工作区运行 npm run verify，确认 .quality-gate/reports/latest.md 为通过且 Push 条件满足
 - [ ] T041 按 docs/2026-09-03-openclaw-production-runbook.md 部署 ECS、迁移真实库、绑定最多三名灰度顾问并完成私聊/群聊/HTTPS 深链真实验收
 - [ ] T042 复核 git diff、提交记录和生产证据后推送 codex/feishu-agent-prd-20260901 并创建 GitHub PR

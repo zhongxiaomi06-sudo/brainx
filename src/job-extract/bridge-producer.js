@@ -44,8 +44,16 @@ export async function produceOne(db, { message_id, chat_id, msg_type = 'text', t
     schema_version: 1,
   });
   if (!ev.ok) return { produced: false, reason: ev.reason };
-  const presetFields = await presetFromLlm(String(text || ''));
-  const consumed = consumeJobExtract(db, ev.event.event_id, { presetFields });
+  let presetFields = await presetFromLlm(String(text || ''));
+  let consumed;
+  try {
+    consumed = consumeJobExtract(db, ev.event.event_id, { presetFields });
+  } catch (e) {
+    // LLM 输出形状违反 draft schema 时，整条回退规则层（rules 保底纪律）
+    if (!presetFields || !String(e.message || '').includes('schema_invalid')) throw e;
+    presetFields = null;
+    consumed = consumeJobExtract(db, ev.event.event_id, { presetFields: null });
+  }
   return { produced: !ev.deduplicated, event_id: ev.event.event_id,
            draft: consumed?.result?.draft_id || null, action: consumed?.result?.action || null,
            layer: consumed?.result?.layer || (presetFields ? 'llm' : 'rules') };

@@ -2,6 +2,334 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-03｜test(ci): 放宽 MCP 冷启动测试时限
+
+- 根因：GitHub Actions 并行启动多组 MCP/SQLite 集成测试时，E3 确认全链耗时 30.35 秒，超过测试客户端固定 30 秒上限；同一提交本地完整门禁通过，属于共享 runner 冷启动抖动而非业务断言失败。
+- 修复：保留有限超时，将该集成客户端等待窗口调整为 60 秒；响应到达或超时后均清理定时器与 pending 项，避免测试资源残留。
+- 验证：`node --test tests/mcp-write-guard.test.mjs` 8/8 通过；提交后重新运行完整门禁并等待远端 CI 复验。
+
+## 2026-09-03｜docs(release): 记录 OpenClaw 生产化 PR
+
+- 发布：完整质量门禁在 `42f018c` 上 24/24 通过（后端 470、前端适配 40、Storybook 80、构建、浏览器链路和服务烟雾全绿），分支已推送并创建 GitHub PR #46。
+- 边界：PR 标题与正文明确“代码就绪，生产待部署”；T041 继续保持未完成，等待服务器维护同事提交真实 ECS/RDS/飞书/HTTPS 灰度证据。
+- 验证计划：本状态回填提交后再次运行完整门禁，确保最终远端 HEAD 与报告 commit 一致。
+
+## 2026-09-03｜docs(spec): 完成生产化二次收敛
+
+- 回扫：完成 T048-T049 后再次对照 21 条 FR、12 条 SC、4 个用户故事、8 项计划决策和 5 条 constitution 原则；未发现新的可施工代码缺口，结论为 Converged。
+- 边界：真实 ECS/RDS/飞书灰度属于已存在的 T041 外部验收项，不重复追加；维护同事回传证据前仍不得宣称多人生产已上线。
+- 下一步：在当前最新提交上运行完整质量门禁，随后推送分支并创建明确标注“生产待部署”的 PR。
+
+## 2026-09-03｜fix(feishu): 补齐三人两群生产白名单
+
+- 根因：旧生产模板只能配置一人一群，并错误地把用户 `open_id` 放入 Feishu 的群 ID 白名单；进一步用锁定版 `config get` 实测确认环境变量不会替换 JSON 对象键，原 `groups.${CHAT_ID}` 写法真实运行时无法命中。
+- 修复：完成 T049；DM allowlist 与群 sender allowlist 显式容纳三名顾问，`groupAllowFrom` 使用两个可展开的群 ID 值，统一强制 @；安装器补装并锁定经 npm 元数据核实兼容的官方 `@openclaw/feishu@2026.7.1`，支持幂等覆盖安装。
+- 验证：先让旧配置在新增测试中失败；修复后部署配置专项 7/7 通过，锁定版 OpenClaw `config validate` 返回 valid，运行时配置读取确认三人和两群均展开成实际 ID，未调用模型。
+
+## 2026-09-03｜fix(auth): 分离 Agent 与 worker 人才库权限
+
+- 收敛：`speckit-converge` 回扫 21 条功能需求、12 条成功标准、4 个用户故事和 5 条 constitution 原则，发现 Agent/worker 共用 DML 凭据，以及生产模板不足以容纳三人两群两项 HIGH 以上缺口，追加 T048-T049。
+- 修复：完成 T048；Gateway 环境仅使用 `brainx_agent_readonly`，worker 改用独立 `/etc/brainx/worker.env` 和最小 DML 账号，DDL 只允许临时迁移账号；安装器、systemd、安全手册、运行手册和 ECS 交接单同步更新。
+- 治理：constitution 升级到 1.0.1，把原笼统“人才库只读”澄清为 Agent 只读、确定性 worker 最小 DML、迁移临时 DDL 三段边界，以匹配已批准的增量同步需求。
+- 验证：先新增回归测试并确认旧配置 2 项失败；实现后部署配置专项 6/6、安装脚本语法和快速门禁 16/16 通过。
+
+## 2026-09-03｜fix(deploy): 修复生产安装错配并补齐 ECS 交接
+
+- 根因：发布复核发现安装器引用不存在的 `agent.env.example`，环境模板又使用运行时代码不读取的数据库与审计变量名；照旧说明执行会在安装或 Gateway 启动阶段失败。
+- 修复：安装器改用真实模板、固定 OpenClaw 生产 state/config 路径并补足预检；环境模板与 Gateway/Admin/worker 实际变量对齐，RDS 迁移账号与运行账号分离；插件检查统一使用真实插件 ID。
+- 交接：新增无密钥 ECS 部署交接单。按用户最新分工，生产操作由服务器维护同事执行；真实证据回传前只声明“代码就绪，生产待部署”，但允许先发起同状态 PR。
+- 本地验收：独立演示库 Agent Gateway 在 `127.0.0.1:3102` 返回 ready 并枚举 10 个批准工具；部署专项 5/5、安装脚本语法和快速门禁 16/16 通过，未调用模型。
+
+## 2026-09-03｜test(release): 完成插件发布前实装审计
+
+- 实装：OpenClaw `2026.7.1-2` 隔离安装 npm 包成功，runtime 精确枚举 10 个工具，`plugins doctor` 无问题，专项 94/94、快速门禁通过。
+- 审计：生产策略关闭浏览器并限制群 allowlist；模板源码的 0644 提示由安装脚本落盘 `0640 root:brainx` 消除。共享多人启发式警告按设计由全会话沙箱、无 workspace、十工具 allowlist 和 BrainX 二次授权缓解，控制面保持回环且不经 nginx。
+- 边界：真实 ECS 安装和飞书三人灰度仍归 T041，未用本机隔离结果冒充生产证据。
+
+## 2026-09-03｜fix(parser): 保留 READY 文档来源哈希
+
+- 根因：抽取结果包含原文件 hash，但 READY 投影遗漏该字段，导致生产持久化来源一致性检查必然失败。
+- 修复：READY 状态继续携带 `source_hash`，并新增回归断言；正文仍不进入持久结果。
+- 验证：文档专项与快速质量门禁通过。
+
+## 2026-09-03｜feat(worker): 装配固定生产任务处理器
+
+- 任务：完成 T044；worker 按服务端开关只领取增量人才同步、文档解析和影子评测三类固定 handler，评测报告写入受控目录且不可覆盖。
+- 权限：不存在任意命令/路径 handler；文档传入云模型另有默认关闭的明确同意开关，关闭时失败而不降级；未启用类型不会被领取。
+- 验证：任务队列与生产 handler 专项、快速质量门禁通过。
+
+## 2026-09-03｜feat(parser): 持久化文档事实与证据
+
+- 任务：完成 T045；解析器同时计算原文件 SHA-256，文档仓库在单个 RDS 事务中落文档状态、严格 `candidate_fact_v1` 和证据锚点。
+- 安全：文件引用、格式与 hash 必须和事实契约一致；OCR/待复核文档不产生事实版本；数据库不保存解析正文。
+- 验证：文档解析与持久化专项、快速质量门禁通过。
+
+## 2026-09-03｜feat(eval): 补齐匹配质量护栏指标
+
+- 任务：完成 T046；固定评测报告除 Recall@20、NDCG@10 外，新增 Top20 硬条件误放率与 Top10 平均证据覆盖率。
+- 口径：只对具备人工/规则标注的候选计算，缺少标注时返回 null 而非伪造零；仍只运行 SHADOW，不改变正式 shortlist。
+- 验证：评测专项与快速质量门禁通过。
+
+## 2026-09-03｜docs(spec): 回扫生产化剩余缺口
+
+- 收敛：按 `speckit-converge` 核对 FR-001 至 FR-021、SC-001 至 SC-012、用户故事、计划和 constitution；追加 T044-T046 三项 HIGH partial，不重复已有部署与 PR 任务。
+- 缺口：生产 worker handler 装配、文档持久化闭环，以及评测报告的硬条件误放率/证据覆盖率仍未实现；因此不声称 Converged。
+- 验证：最新干净提交上的 `npm run verify` 24/24 通过（后端 465 项、Storybook 80 项、构建、浏览器与服务烟雾）。
+
+## 2026-09-03｜test(cards): 修复 HTTPS 深链全量回归
+
+- 根因：生产卡片已改为 HTTPS fail-closed，但两个旧推送测试仍继承本机 `.env` 的 HTTP 地址，导致完整门禁 463/465。
+- 修复：测试显式注入 HTTPS 测试域名并在结束后恢复环境；生产代码继续拒绝 HTTP/localhost，不放宽安全边界。
+- 验证：自动推送与调度专项通过；随后重新运行完整门禁。
+
+## 2026-09-03｜docs(deploy): 固化 OpenClaw 生产运行手册
+
+- 任务：完成 T028；统一记录 ECS 首装、服务顺序、三人灰度、十工具检查、任务恢复、授权撤销、故障降级和可恢复回滚。
+- 边界：顾问端零安装；公网只有 HTTPS，OpenClaw 控制面、Agent Gateway、SQLite 与 RDS 均不暴露；没有真实部署证据时只能标记代码就绪。
+- 验证：文档链接、行数、格式与 `npm run verify:quick` 通过；复盘将旧工作台部署与新增三个 Agent 服务明确分开，避免把单机 PoC 当成多人上线。
+
+## 2026-09-03｜feat(pipeline): 完成可恢复任务、文档解析与影子评测
+
+- 任务：完成 T033-T038；新增 SQLite 持久任务租约、费用/重试上限、取消和投递 outbox，并提供不会误领取未配置任务的常驻 worker；新增固定版本 MarkItDown PDF/DOCX 抽取边界，以及 Recall@20/NDCG@10 可复跑影子评测。
+- 安全：任务载荷拒绝正文、简历、prompt 和文件字节；outbox 发送前重新鉴权；解析器只读受控 staging 根目录并把内容标为不可信数据，schema 失败不进入 READY；评测冻结正式排序。
+- 验证：任务、解析、评测专项 8/8，`npm run verify:quick` 16/16 通过；复盘将 Node SQLite 不兼容事务改为显式事务，并确保空 handler worker 不会领取后立即误失败任务。
+
+## 2026-09-03｜feat(talent): 落实人才授权撤销传播
+
+- 任务：完成 T031-T032；提供显式人才事实授权与按租户、人才、来源账号撤权，撤权后取消相关待发通知并清理候选缓存和检索索引。
+- 一致性：先提交 RDS 权威授权撤销，再传播派生状态；RDS 失败则不触碰缓存/索引，派生失效失败则显式返回 `REVOCATION_PROPAGATION_FAILED` 供任务重试，重复撤权保持幂等。
+- 验证：授权撤销、outbox 取消、缓存/索引失效、重复调用和 RDS 回滚测试 2/2，`npm run verify:quick` 16/16 通过。
+
+## 2026-09-03｜feat(talent): 增量盘活 reloop 结构化档案
+
+- 任务：完成 T029-T030；复用 `candidate_fact_v1`、证据表和人才授权账本，新增 reloop 人才档案的 `(updated_at,id)` 稳定游标分页、幂等事实写入与生产命令。
+- 恢复：每页最多 500 条并独立短事务写事实，只有所有页完整成功才推进源游标；中途失败可安全重放已写页，不会跳过未处理档案，也不把联系人字段写入事实表。
+- 验证：383 份档案四页、失败不前移、游标停滞/异常页拒绝测试 3/3，脚本与模块语法检查、`npm run verify:quick` 16/16 通过。
+
+## 2026-09-03｜feat(cards): 接通受控 HTTPS 对象深链
+
+- 任务：完成 T026-T027；职位、回放、同步和候选推荐卡统一生成正式 HTTPS 工作台链接，删除生产 localhost 回退；工作台能解析对象并打开对应详情，候选引用只预填 Agent 匹配问题。
+- 权限：URL 只携带 `project_id`/`decision_id`/脱敏 `candidate_ref`，不携带 tenant、consultant、open_id、token 或 scope；页面 API 仍验证 HttpOnly 飞书会话和对象可见性，未登录 401、跨顾问 404。
+- 验证：深链/候选卡/推送联合测试 34/34、`npm run verify:quick` 16/16；首次门禁发现正式工作台增长到 512 行，已抽出解析 hook 并收敛到 500 行，前端审核台账、记录、施工清单与 Storybook 说明同步更新。
+
+## 2026-09-03｜feat(deploy): 固化 OpenClaw 最小权限服务
+
+- 任务：完成 T024-T025；新增无明文密钥的 OpenClaw 生产配置、Agent Gateway/集成 worker/OpenClaw 三个 systemd 单元和可重复安装脚本。
+- 权限：只加载 Feishu 与 BrainX 插件，只暴露十个只读工具，明确拒绝通用执行/文件/浏览器/旧写工具；私聊按 App+渠道+发送人隔离，群聊白名单且必须 @，所有 Agent 会话按 session 沙箱隔离且无 workspace 访问。
+- 验证：配置/服务契约测试 4/4、安装脚本语法与锁定版本预检通过、`npm run verify:quick` 16/16；复盘修正密钥文件为 `0640 root:brainx` 且服务强制要求文件存在，插件临时包使用独占目录避免误装旧包。
+
+## 2026-09-03｜feat(openclaw): 实现十工具原生插件
+
+- 任务：完成 T022-T023；按锁定版 OpenClaw `2026.7.1-2` 的官方工具工厂接口实现原生插件，manifest 与 BrainX 唯一工具目录严格保持十项一致。
+- 安全：发送人、机器人账号、私聊/群聊目标只来自运行时可信上下文；私聊目标必须等于发送人；每次调用签发 60 秒 HMAC 主体声明；数据出口硬编码为 `127.0.0.1:3102`，密钥只从服务环境读取。
+- 验证：插件 manifest、上下文拒绝、私聊/群聊解析、固定 URL、跨模块签名和缺密钥失败关闭测试 5/5，`npm run verify:quick` 16/16 通过；插件不包含 Shell、SQL、文件、浏览器或业务写入工具。
+
+## 2026-09-03｜feat(skills): 重构七个顾问决策技能
+
+- 任务：完成 T021；按今日、职位、人才、匹配、行动草稿、面试准备和个人复盘拆成七个窄职责 Skill，只引用 Agent Gateway 十工具中的必要子集。
+- 行为：统一事实/推断/建议/未知口径与一次只问一个问题；禁止写操作、SQL、Shell、自行拼卡片 URL、身份覆盖和联系方式/原文输出；旧快照、空结果和不可见对象均采用不误导口径。
+- 验证：Skill 工具白名单与行为规则测试 2/2、`skill-creator` 官方 `quick_validate.py` 7/7、完整后端测试 439/439、`npm run verify:quick` 16/16 通过。官方校验器所需 PyYAML 仅安装到临时目录，未改变项目或全局依赖。
+
+## 2026-09-03｜test(agent): 打通十工具猎头黄金工作流
+
+- 任务：完成 T020；新增正式工具注册表唯一组装入口，Gateway 进程不再手工拼 handler；连续回放“我的上下文→今日简报→职位判断→shortlist→候选事实→fit→缺口→面试准备→个人复盘→任务状态”。
+- 边界：10 个目录工具逐一实际执行，人才依赖可测试注入而生产默认仍走 RDS 双授权；整条回放前后 `decision_events` 数量不变，证明 Agent 工具没有偷写业务表态或进展。
+- 验证：黄金链与职位/人才联合测试 11/11、完整后端测试 437/437、`npm run verify:quick` 16/16 通过。
+
+## 2026-09-03｜feat(agent): 接入授权人才决策工具
+
+- 任务：完成 T018-T019；将正式 Gateway 接到现有 `candidate_fact_v1`、双授权 shortlist 和不可变成功 match run，实现 shortlist、候选事实、人与岗匹配、候选缺口和面试准备五类只读输出。
+- 权限与脱敏：tenant/consultant/purpose 只从可信 principal 注入；候选姓名掩码，删除 contact_ref、内容 hash、联系方式、原文和薪资约束；实力分与职位匹配分保持分离，所有判断携带 fact/match 算法版本和证据引用。
+- 验证：人才工具 5/5、与候选契约/shortlist/隔离联合测试 21/21、完整后端测试 436/436、`npm run verify:quick` 16/16 通过；fit 与面试准备沿不可变游标最多读取 4 页/20 人，修复第二页候选误报不可见且保持成本有界。
+
+## 2026-09-03｜feat(agent): 接入只读职位决策工具
+
+- 任务：完成 T016-T017；复用现有花名册、正式推荐、职位事实、可见性、关系、承接和结果账本，实现我的上下文、今日简报、职位判断、职位缺口、个人复盘与本人运行状态六个 handler，并接入 Gateway 入口。
+- 口径：事实、推断、建议、未知和证据引用分开；跨顾问统一 `NOT_FOUND_OR_FORBIDDEN`；工具调用前后业务事件数不变；我的画像、个人复盘和运行状态只允许私聊。默认“今天”和复盘窗口按北京时间计算。
+- 验证：职位工具 5/5、与隔离/授权联合 14/14、完整后端测试 431/431、`npm run verify:quick` 16/16 通过；初测的两个失败来自同步 handler 被误用 `assert.rejects`，已改为正确的同步异常断言，未改业务逻辑。
+
+## 2026-09-03｜test(agent): 固化跨人跨群隔离与输出防线
+
+- 任务：完成 T015；用 Mia/Felix、两个群和两个项目交叉回放，证明相同工具按 App sender 解析本人、未知 sender 无默认回退、群 sender/项目不可串用、工具参数不能注入身份或 SQL。
+- 纵深防御：Gateway 在业务 handler 之后统一检查最终投影；私聊和群聊均拒手机号、邮箱、简历原文、凭据与飞书身份字段，群聊额外拒私人评价和候选薪资；异常整体失败，不把敏感字段静默删掉后继续生成误导答案。
+- 验证：隔离/管理员/授权联合测试 13/13、完整后端测试 426/426、`npm run verify:quick` 16/16 通过；输出检查有深度、节点数和单字符串上限，避免异常结果拖垮进程。
+
+## 2026-09-03｜feat(agent): 增加可撤销管理员授权命令
+
+- 任务：完成 T013-T014；新增显式管理员 allowlist 控制的顾问绑定/撤销、群 scope 登记/更新/撤销命令，App 标识只从服务端环境映射读取，不把 App Secret 放进命令行。
+- 安全与复盘：同 App+open_id 冲突拒绝，群 sender 必须已有同租户同 App 的 ACTIVE 绑定，purpose 只能来自生产工具目录；顾问和 sender 检查移入写事务，消除“检查后立刻被撤权”的并发窗口；所有权限变更进入 keyed 哈希审计。
+- 验证：管理员/迁移/旧库升级联合测试 29/29、完整后端测试 422/422、`npm run verify:quick` 16/16 通过；一次测试因同毫秒事件排序不确定误报，已改为按 action 定位而未放宽业务断言。
+
+## 2026-09-03｜feat(agent): 建立回环生产工具网关
+
+- 任务：完成 T011-T012；新增仅供服务器本机监听的 Agent Gateway、固定 10 工具注册表和进程入口，执行服务 Bearer、短时主体签名、nonce、数据库授权、限流、审计、工具校验及统一 envelope 全链。
+- 安全：请求体上限 64 KiB，只接受 POST JSON；工具参数 `additionalProperties:false` 并拒绝身份、SQL、URL、命令和文件注入；用途目录为单一来源，群候选详情等缺职位范围时拒绝，不提供默认顾问回退。
+- 验证：Gateway HTTP 4/4、与授权/运行护栏联合 13/13、完整后端测试 418/418、`npm run verify:quick` 16/16 通过；健康检查只返回服务、SQLite 和固定工具目录状态，不返回密钥或身份。
+
+## 2026-09-03｜feat(agent): 统一响应审计与限流护栏
+
+- 任务：完成 T009-T010；统一 `agent_tool_response.v1` 的事实、推断、建议、未知和数据范围，并将内部异常收敛为稳定 HTTP 错误，不返回异常正文、SQL 或堆栈。
+- 隐私与治理：运行审计仅保存 keyed 主体/会话哈希、canonical 参数哈希及参数键名；固定窗口按租户+顾问+工具的 keyed 哈希桶原子限流，数据库不保存 open_id 或 bucket 明文。
+- 验证：运行时护栏 4/4、全部 Agent 安全底座联合测试 18/18、完整后端测试 414/414、`npm run verify:quick` 16/16 通过；测试曾因 request_id 自含 `secret` 造成隐私断言误报，已修正夹具并确认产物无泄露。
+
+## 2026-09-03｜feat(agent): 落实 App 维度顾问与群授权
+
+- 任务：完成 T007-T008；服务端只用签名载荷中的 Feishu account+sender 查 ACTIVE 绑定，不接受模型参数里的租户或顾问；工具与 purpose 使用固定映射。
+- 群权限：群调用必须同时命中同租户 App 群 scope、发送人白名单、用途白名单和可选项目范围；未知群、跨 App、撤销身份、停用顾问、伪造私聊目标及损坏 scope JSON 全部失败关闭。
+- 验证：授权专项与签名联合测试 10/10、完整后端测试 410/410、`npm run verify:quick` 16/16 通过；群聊 `require_mention` 仍由 OpenClaw 渠道策略执行，锁定版工具上下文没有可独立签名的 mention 字段。
+
+## 2026-09-03｜feat(agent): 增加短时主体签名与防重放
+
+- 任务：完成 T005-T006；先固定 canonical JSON、参数哈希、HMAC、时效、篡改与一次性消费的失败测试，再实现 `brainx_principal.v1` 签发、验证和 SQLite 原子 nonce 消费。
+- 安全：声明强绑定 request、工具和参数摘要，默认 60 秒、最长 120 秒；要求 32 字节以上共享密钥、UUID request、严格字段集与 canonical 编码，恒定时间比对签名，任何篡改、未来签发、过期或重放均失败关闭。
+- 验证：签名专项 5/5、与迁移联合专项 9/9、完整后端测试 400/400、`npm run verify:quick` 16/16 通过；未记录 prompt、简历、联系方式或密钥。
+
+## 2026-09-03｜feat(agent): 建立生产身份审计与任务账本
+
+- 任务：完成 T003-T004；先以 4 个失败测试证明 App 身份、群范围、Agent 审计、nonce、限流、持久任务和 outbox 均不存在，再新增两份 additive SQLite migration。
+- 安全：ACTIVE 身份与群范围使用部分唯一索引阻止冲突；状态均有 CHECK；审计表不提供 prompt、简历、联系方式、secret 或 token 字段；任务通知按 job+payload 去重。
+- 验证：迁移专项 4/4 通过，完整后端测试与 `npm run verify:quick` 通过；迁移在内存新库和重复打开路径均由现有文件名账本管理。
+
+## 2026-09-03｜chore(security): 排除插件与解析器敏感产物
+
+- 任务：完成 T002，扩展 Git 排除规则覆盖所有本地 `.env` 变体、npm tarball、Python 虚拟环境、缓存、解析工作目录和输出；保留可提交的 `.env.example` 与部署环境模板。
+- 插件：为待建的 `brainx-openclaw` 包增加 npm 发布排除规则，防止环境文件、日志、测试、覆盖率和打包产物进入发布包。
+- 验证：Git ignore 实测敏感样例均被排除、`.env.example` 仍可跟踪；`git diff --check` 与 `npm run verify:quick` 通过。
+
+## 2026-09-03｜test(openclaw): 固定生产插件契约基线
+
+- 任务：完成 T001，把本机锁定版 OpenClaw `2026.7.1-2` 的可信上下文字段、私聊/群目标前缀、10 个批准工具和 18 个禁止工具固化成无个人数据 JSON fixture。
+- 复盘：显式把新版网页文档才出现、锁定版类型中不存在的 `nativeChannelId` 记为不支持，防止实现误用 undefined 后回退默认顾问。
+- 验证：JSON 可解析、工具集合无重复且批准/禁止集合无交集；`npm run verify:quick` 通过。
+
+## 2026-09-03｜docs(tasks): 拆分 OpenClaw 生产化施工与验收任务
+
+- 清单：将生产化范围拆为 43 个依赖有序任务，覆盖安全底座、多顾问只读 Gateway、猎头黄金工作流、原生插件与服务器部署、人才增量/撤权/解析/评测以及最终真实灰度和 PR。
+- 优先级：P1 身份权限、业务闭环和零客户端部署先于 P2 简历解析与新算法；每项实现都先写失败测试，再专项验收、快速门禁、自我复盘和原子提交。
+- 验证：任务 ID T001-T043 连续唯一、格式 43/43 合规，文件 129 行；`git diff --check` 与 `npm run verify:quick` 16/16 通过。
+
+## 2026-09-03｜docs(plan): 设计 OpenClaw 生产权限与部署底座
+
+- 调研：对照 OpenClaw 官方插件、安全和飞书文档，并核对本机锁定版 `2026.7.1-2` 类型与真实脱敏会话元数据；确认该版本工具上下文使用 `requesterSenderId` 和 `deliveryContext`，不存在可直接假定的 `nativeChannelId`。
+- 方案：确定原生插件 → 回环 Agent Gateway → BrainX 领域函数的生产链路，定义双认证短时主体声明、App 身份/群范围、审计、人才增量与撤权、持久任务，以及 ECS systemd + nginx 的零客户端安装部署。
+- 产物：新增技术计划、研究结论、双库数据模型、Gateway v1 契约和端到端 quickstart；所有文件低于 500 行，`git diff --check` 与 `npm run verify:quick` 16/16 通过。
+
+## 2026-09-03｜docs(spec): 冻结 OpenClaw 多顾问生产化验收范围
+
+- 规格：把 Mia 单人本机 PoC 到可推广正式版拆成四条可独立验收的用户主线，明确“任意电脑可用”是白名单顾问通过飞书或 HTTPS 零客户端安装使用，不扩大成匿名公网 SaaS。
+- 门禁：固化可信渠道身份、App 维度绑定、服务端字段裁剪、只读工具、人才增量与撤权、可解释匹配、持久任务、审计恢复和 HTTPS 深链等 21 条要求及 12 条量化结果；用户已授权实现、生产部署、推送和创建 PR。
+- 验证：规格质量清单 16/16 通过，无澄清标记；`npm run verify:quick` 16/16 通过。
+
+## 2026-09-03｜fix(skills): 修正工作台回答的数据时效口径
+
+- 授权：数据责任人明确同意 Mia 本人可见的职位、客户、承接和进展字段进入当前 OpenAI 模型；候选联系方式、原始聊天、密钥和数据库连接信息仍不在授权范围。
+- 实测：OpenClaw run `ff689790-c7fd-4fdf-a1b3-583ccd2cc079` 成功加载 `brainx-workbench`，调用 `brainx_workbench` 和 3 次 `brainx_opportunity`，工具失败 0、写操作 0；另外 2 次 `bash` 只读取和搜索该 Skill 目录，没有补查业务数据。
+- 修正：首轮回答把 9 月 1 日快照称为“今天”，因此 Skill 新增 24 小时时效规则：超过阈值必须标注“最近一次可用快照”和具体时间，并优先建议同步；新增回归测试防止口径回退。
+- 验证：工作台时效与 Skill 白名单专项通过，更新后的 Skill 重新安装到 OpenClaw 并保持 Ready/model-visible；`npm run verify:quick` 通过。
+
+## 2026-09-03｜fix(skills): 让 OpenClaw 安全加载 BrainX 技能集
+
+- 定位：飞书侧复核第二版候选卡位于当前 OpenClaw 机器人一对一会话，消息存在、未删除、类型为互动卡片；会话 ID `oc_d0b8bb983ff2fe2943592978311c0624`，不是群聊或旧 BrainX 机器人。
+- 改动：把 `brainx-workbench`、`brainx-report`、`brainx-ops` 收紧到当前 7 个精确只读工具，删除对未开放雷达、客户聚合、任意 SQL、人才健康和 OpenMai 工具的旧引用；新增回归测试，保证 OpenClaw 安装集只引用白名单工具。连同原有 `brainx-engagement` 和 `brainx-talent`，共 5 个 Skill 已安装到当前 `brainx` profile，全部 Ready、model-visible、user-invocable。
+- 权限：`brainx-data-explorer` 因依赖 `query_sql` 未安装。真实工作台 Skill 烟雾测试被安全层拒绝，因为现有明确授权只覆盖候选脱敏履历，不包含职位、客户、承接和进展数据；未绕过，等待数据责任人另行授权后再测。
+- 验证：Skill 白名单专项 16/16、`npm run verify:quick` 16/16 通过；OpenClaw 对 5 个已安装 Skill 的状态检查全部通过。
+
+## 2026-09-03｜docs(talent): 记录第二版候选卡真实投递
+
+- 授权与生成：数据责任人明确同意脱敏公司、岗位、教育和成果数字发送给当前 OpenAI 模型并投递 Mia 私聊；OpenClaw run `ce8d43af-8fe2-4126-a24e-24dbf73a263f` 使用 `openai/gpt-5.5` 生成“岗位投入判断—Top 3 证据—风险—首问—动作”正文。审计确认人才数据只来自 `brainx_candidate_shortlist`，额外 `bash` 调用只读 Skill 规则，没有补查数据。
+- 安全与投递：逐项对照 shortlist 后确认公司、岗位和成果数字有原始字段证据，手机号、邮箱、完整姓名和简历原文命中 0。旧应用 Mia `open_id` 被飞书以 `open_id cross app` 拒绝且未发出；切换到当前 OpenClaw 应用中已配对 owner 身份后成功发送互动卡片，消息 ID `om_x100b66b2b17f98a4c226a29b1de8d0a`。
+- 入口边界：公网 BrainX 地址当时不可达；本机工作台启动后 HTTP 200，卡片按钮暂指向 `http://127.0.0.1:3100/`，只适用于同一台电脑。文档明确该结果仍是单顾问 PoC，不冒充多人公网生产完成。
+- 验证：OpenClaw run 状态 `ok`、工具失败 0；飞书官方发送接口返回正式消息 ID；冲突标记、`git diff --check` 和快速质量门禁 16/16 通过。
+
+## 2026-09-03｜feat(talent): 让候选推荐提供猎头决策证据
+
+- 根因：用户真实验收确认首版飞书消息只是字段搬运，年限、来源分和九项待确认技能不能支持猎头判断。新版 shortlist 在双重授权和脱敏边界不变的前提下增加职位画像，以及候选人的地点、最近经历、成果摘要、教育和技能最小投影；`reloop-existing-recommendation-v1.2` 用结构化技能/经历中的明确词项和保守同义证据修复“已有招聘交付却标招聘待确认”，但不改变 reloop 原排序。
+- 交互：重写 `brainx-talent` Skill，要求先给岗位投入判断，再逐人给结论、两条真实证据、最大风险和首问问题；新增固定飞书卡片外壳，模型只生成正文，服务端固定提供“打开 BrainX 查询”按钮并拒绝联系方式和非 HTTP(S) 深链。Skill 已通过 OpenClaw 官方本地安装入口进入 main Agent 工作区并显示 Ready/model-visible；真实 v1.2 Top 10 已写入不可变 run `rrun_5aa9caf49ab03ce299b504c4992b159557b401ebe2a94dff`。
+- 权限：上一轮数据出域授权不包含新增的脱敏公司、岗位、教育和成果数字；OpenClaw 新版 Agent 调用被安全层拒绝，未绕过、未发送第二张卡。待数据责任人明确同意该扩展范围后再执行真实生成与投递。
+- 验证：测试先行确认旧实现缺少字段和卡片；候选契约、授权查询、解释、卡片及 MCP 专项 33/33 通过；真实 RDS 只读预览成功，Top 3 能显示成果经历且“招聘待确认”已消除；完整后端测试 394/394、`npm run verify:quick` 16/16 通过。
+
+## 2026-09-03｜docs(talent): 记录 OpenClaw 飞书推荐真实验收
+
+- 状态：数据责任人明确同意脱敏候选 shortlist 进入当前 OpenAI 模型；OpenClaw `gpt-5.5` 真实执行一次 Agent turn，仅调用 `brainx_candidate_shortlist` 1 次、工具失败 0 次，生成 Mia 的沐仞科技 HR 岗 Top 3 推荐。
+- 投递：复核输出不含手机号、邮箱、完整姓名或简历原文后，由飞书企业机器人发送到 Mia 私聊；飞书返回消息 ID `om_x100b66b20466a0a0c218868c5e0df24`。权威数据契约文档同步从“尚未授权/未发送”更新为“单顾问 PoC 闭环验收通过”，仍明确多人生产网关与撤权传播未完成。
+- 验证：OpenClaw run 状态 `ok`、OpenAI 调用成功且未回退；飞书发送接口返回正式消息 ID；`git diff --check` 和 `npm run verify:quick` 16/16 通过。
+
+## 2026-09-03｜feat(talent): 打通 reloop 到 OpenClaw 候选推荐闭环
+
+- 改动：新增 reloop 结构化档案转换器与幂等导入器，复用 `reloop_app` 已有候选事实和推荐批次，不安装整套 Resume-Matcher、不读取旧空 `talent/resume` 作为业务源、不改变原排序；事实写入前经过 strict `candidate_fact_v1` 和敏感文本检查，联系方式不进入影子 `talent`、事实 JSON、shortlist 或固定文案。新增 `candidate_source_links` 稳定映射和 `job_access_grants` 职位授权账本，shortlist 同时要求有效职位授权、人才 `resume_facts` 授权、相同 tenant/consultant/purpose、`READY` fact 与 `SUCCEEDED` run；修复该 RDS 不支持参数化 `LIMIT` 及北京时间 `DATETIME` 与 `UTC_TIMESTAMP` 错配导致的误拒绝。
+- 真实数据：确认同实例 `reloop_app.talent_profiles` 精确 4,156 条；`York团队AI助手` 数据账号的 `ttc_bound_name` 为 `Mia 钟笑咪`，该账号下 383 份人才、6 个职位、20 条既有推荐。对启用的 `reloop-position:31` 最新批次执行只读预检 10/10 通过，随后写入 10 个无联系方式影子人才、10 份事实、144 条 hash 证据、双重授权和版本化 Top 10；最新 run 为 `reloop-existing-recommendation-v1.1`，保留源排序并把占位地点视为未知。
+- OpenClaw：本机 `brainx` profile 增加服务端租户绑定和精确 shortlist allowlist；MCP probe 显示 `brainx-domain` 正常且实际仅 7 个精确工具，Shell、文件、网页、自动化和消息工具仍在 deny。新增固定飞书安全文案预览和更新后的 `brainx-talent` Skill。外部模型调用因尚未单独获得“脱敏候选 shortlist 可发送给当前 OpenAI 模型”的明确授权而被安全层拒绝；未绕过，也未真实发送飞书消息。
+- 验证：新增转换、默认 dry-run、账号绑定失败关闭、职位/人才双授权和固定文案测试；候选链路与 MCP 专项 27/27 通过；真实只读入口返回 Top 3，固定文案生成成功；10/10 事实重新通过生产契约，排除 hash/ref 后手机号/邮箱文本命中 0，影子 `talent.phone/email` 非空数 0；沙箱外完整后端测试 392/392 通过（沙箱内 HTTP/SSE 用例因监听端口被拒绝，获准在正常本机权限下复跑）；`npm run verify:quick` 16/16 通过。
+
+## 2026-09-03｜feat(talent): 建立候选事实与授权 shortlist 数据脊柱
+
+- 改动：新增 strict `candidate_fact_v1` 与 `candidate_match_bundle_v1` 契约，要求已支持事实具备证据引用，拒绝未知字段、手机号、邮箱、完整简历和飞书路由字段；新增人才 RDS 文件名+checksum 增量迁移执行器，以及授权账本、文档/事实/证据版本、职位条件、match run、候选匹配和同步游标八张 additive 表；新增只读取 `SUCCEEDED` run、`READY` fact 和有效 `resume_facts` grant 的 shortlist 服务，候选姓名脱敏，分页固定同一 match run，RDS 不可用时明确 `SOURCE_UNAVAILABLE` 且不退内存假数据。
+- MCP 与权限：新增 `brainx_candidate_shortlist` 只读工具；只有服务端同时绑定顾问和租户时才外露，模型看不到或覆盖不了身份参数；调用前先走现有 `jobVisibleTo`，RDS 查询再按租户、职位、purpose、授权范围和有效期二次守门。当前仅为单顾问/单租户 PoC，多人生产仍需 OpenClaw 原生插件 + BrainX Agent Gateway，因此未加入当前 OpenClaw 六工具 allowlist，也未执行真实 RDS migration。
+- 文档：新增候选人数据契约施工说明，并同步文档书、MCP 交付、OpenClaw 接口包、工具白名单、环境变量示例和初始化脚本；明确本阶段没有安装 Resume-Matcher/Docling、没有改变正式排序，也没有声称真实候选人已经可在飞书展示。
+- 验证：新增契约、授权查询、迁移和 MCP 条件外露测试；相关专项 27/27 通过；沙箱外完整后端测试 386/386 通过（沙箱内监听回环端口会因 EPERM 失败，获准在正常本机权限下复跑）；`npm run verify:quick` 16/16 通过，Node 语法、秘密扫描、500 行、换行、前端 Lint/TypeScript/静态适配测试均通过。
+
+## 2026-09-03｜feat(push): 支持 OpenClaw 触发个人飞书推荐卡
+
+- 改动：新增飞书机器人官方接口直发适配，使用现有环境凭据获取 tenant token 并发送互动卡片，不再要求安装 `lark-cli`；保留旧 profile 作为无直连凭据时的兼容回退。推荐卡 CLI 默认按顾问花名册解析本人 `open_id`，新增日期 + 时段幂等键，供 OpenClaw command cron 在 07:00/19:00 精确触发。接口包补充“当天最短闭环”说明，明确该路径只发个人私聊、不代表完整对话网关已经建成。
+- 验证：真实 Mia 推荐卡预览成功（Top3 + 3 项待处理）；新增直发契约和既有推卡专项 35/35 通过；快速质量门禁 16/16 通过；完整后端测试 371/371 通过。真实外发因接收人确认门禁尚未执行，待用户明确确认 Mia 私聊后立即发送并创建 OpenClaw 早晚任务。
+
+## 2026-09-02｜fix(mcp): 为单顾问 OpenClaw 锁定服务端身份
+
+- 改动：`mcp/server.mjs` 新增 `BRAINX_MCP_CONSULTANT_ID` 单顾问绑定模式；启动时校验顾问存在，`tools/list` 隐藏 `consultant_id` 参数，`tools/call` 由服务端注入绑定身份并拒绝模型覆盖。保留未设置变量时的受信本地开发兼容行为。接口包同步给出只读 6 工具过滤模板，并明确该方案仅用于单顾问本机 PoC，多人生产仍须使用 OpenClaw 原生插件 + BrainX Agent Gateway。
+- 验证：MCP 与写守门专项 12/12 通过；`npm run verify:quick` 16/16 通过；格式、换行、秘密扫描、500 行限制和前端静态回归均通过。
+
+## 2026-09-02｜fix(test): 统一 MCP 测试文件换行
+
+- 改动：将合并兼容修正涉及的 `tests/mcp.test.mjs` 重新统一为原文件的 CRLF 换行，消除局部 LF 导致的文本卫生门禁失败；不改变测试逻辑。
+- 验证：完整质量门禁首次运行 24 项中 23 项通过，唯一失败为该混合换行；前后端测试、生产构建、Storybook、浏览器链路与服务烟雾测试均已通过。修复提交后复跑质量门禁确认最终结论。
+
+## 2026-09-02｜merge(backend): 合入最新后端架构开发分支
+
+- 改动：将 `origin/docs/backend-architecture-prd-20260902@be348ed` 合入当前 `codex/feishu-agent-prd-20260901`；保留本地 OpenClaw 权威 PRD、历史 Codex 文档及远端后端架构、飞书网关、事件账本、职位提炼与 MCP 安全改动，解决 `docs/README.md` 和本记录的两处文本冲突并去除重复历史条目。同步修正旧测试对迁移仅到 `0022`、`brainx_sync_now` 仍对外开放的过期预期，使其与 `0023`—`0031` 迁移及高风险工具黑名单契约一致。
+- 验证：`npm ci --ignore-scripts` 成功且审计为 0 个漏洞；新增 gateway/hub/job-extract/MCP 安全专项 79/79 通过；兼容修正专项 32/32 通过；完整后端测试 368/368 通过；快速质量门禁在合并提交前除 `MERGE_HEAD` 预期项外 15/16 通过，提交后复跑完整质量门禁。
+
+## 2026-09-02｜docs(prd): 定义 OpenClaw AI 猎头工作流
+
+- 改动：基于最新 `origin/main@b00a870`、当前分支代码、OpenClaw 2026.7.1-2、官方飞书渠道/安全/插件文档和 Resume-Matcher 上游实现，新增当前阶段权威 PRD。完成现有 Web Agent、MCP、飞书 OAuth/推送、人才 RDS、简历解析、匹配算法和 OpenMai 链路审计；纠正“现有 15 个 MCP 工具均只读”等旧结论。明确飞书三道权限门、App 维度身份绑定、使用可信 requester context 的 OpenClaw 原生 BrainX 工具插件、服务端窄网关、人才授权账本、隔离简历解析 worker、版本化匹配与审计数据、七条黄金流程、阶段 0—5 施工及发布门禁。旧 Codex PRD 和权限文档改为历史参考，文档书同步指向新权威基线。
+- 验证：获取远端并确认主线基线未变化；本地 Markdown 链接检查、冲突标记检查和 `git diff --check` 通过；快速质量门禁 16/16 通过。此次仅修改文档，不推送或发布。
+
+## 2026-09-01｜docs(agent): 定义 Codex 职责与权限边界
+
+- 改动：新增 Codex Agent 职责与权限权威规范，区分当前能力与目标权限，明确 Codex/DataClaw/飞书专用机器人/BrainX 的角色边界；细化个人顾问 13 类功能、P0-P5 权限、逐对象和飞书权限矩阵、窄工具目录、服务端身份注入、业务审批、文件/Shell/网络沙箱、隐私、Agent 协作、每日简报与批量候选文件格式、运行审计、32 条安全验收及分阶段开放路径。同步在文档书和飞书副驾驶 PRD 建立权威链接并统一终局动作口径。
+- 验证：运行 Markdown 链接检查、冲突标记检查、`git diff --check` 和快速质量门禁；提交后在洁净工作区运行完整质量门禁并核对报告。
+
+## 2026-09-01｜docs(prd): 定义飞书 AI 猎头副驾驶下一阶段
+
+- 改动：基于最新 `origin/main@b00a870`、现有工作台/内嵌 Agent/MCP/飞书实现和用户提供的业务材料，新增下一阶段权威 PRD。明确飞书为顾问默认入口、BrainX 为业务事实与执行底座、Codex 兼容插件封装技能和工具；细化个人顾问黄金流程、AI 自主权与强确认、数据权威、Agent 运行和审批模型、安全隔离、指标、阶段路线、24 条验收场景及研发 Epic，并登记到文档书。同步清理主线提交记录中遗留的文本冲突标记，完整保留两侧历史记录。
+- 验证：运行 Markdown 链接检查、冲突标记检查、`git diff --check` 和快速质量门禁；提交后在洁净工作区运行完整质量门禁并核对报告。
+
+## 2026-08-30｜merge(main): 以本地版本完成远端同步
+
+- 改动：将最新 `origin/main` 记录为已合入演示功能分支；按用户明确要求，合并结果完整保留本地已经确认的代码、页面、交互与数据闭环，不引入远端同位置旧实现，避免工作台回退。原工作目录中的未提交路演文件未进入本次分支。
+- 验证：合并前后文件树仅增加本条记录；提交后执行快速质量门禁、推荐分页专项、前端构建与 Git 差异检查，再推送功能分支并创建 PR。
+
+## 2026-09-02｜chore(cleanup): 清除化石归档并统一项目命名为 brainx
+
+- **背景**：仓库存在三个并存的项目身份（`brainx-local` / `site-creator-vinext-starter` / `braintex`·`brianx`），另有 217 个化石文件占 27% 被跟踪文件。用户裁定：统一为 `brainx`、清除化石、保留 git 历史、前端目录 `btex-frontend` 不改、历史文档叙述不改。
+- **清除化石 217 个**（`git rm -r`，保留历史可追溯）：`_archive/` 210 个（braintex 88 / brainx-dev 63 / decision-workbench 47 / public 12）+ `docs/archive/` 7 个。被跟踪文件数 760 → 543。磁盘上另有 11 个未被 git 跟踪的残留（含 `.DS_Store`、`.pytest_cache`、`dist/*.tar.gz`、以及 **`_archive/brainx-dev/data/.secret`，64 字节、权限 600**），整体移出未删除。
+- **统一命名 6 处**：根 `package.json` + `package-lock.json`（2 处）`brainx-local` → `brainx`；`frontend/btex-frontend/` 的 `package.json` + `package-lock.json`（2 处）`site-creator-vinext-starter` → `@brainx/frontend`。目录名未动（该字符串散落在 40 个文件，含已执行的 `migrations/0009_switch_app.sql` 与 `src/server.js`，改名风险大于收益）。
+- **清理死链 7 行**：`.dockerignore` 3 行（含同样已不存在的 `frontend/decision-workbench`）、`.quality-gate/config.json` 3 行（`excludedPrefixes` 与 `textHygieneExcludedPrefixes` 里的化石前缀）、`README.md` 1 行（目录结构说明）。
+- **按裁定保留**：`docs/AGENT_COMMIT_LOG.md:693`、`docs/audits/2026-08-26-quality-gate-frontend-test-audit.md:9,15` 中的 `braintex`/`brianx` 叙述属于历史事实，未替换。
+- **清理前置**：`.git/index.lock` 为陈旧锁（20:45:14 创建、0 字节、`lsof` 无持有者、`pgrep` 无 git 进程、`.git/index` 停在 20:42:16 未再写入），移出至 `/tmp/index.lock.removed-20260902-2058`（另有备份 `/tmp/index.lock.backup-20260902-2053`）。清除后 `git add` 探针退出码 0，确认其为此前写操作被阻塞的原因。
+- **化石备份**：`/tmp/brainx-fossil-backup-20260902/`（4.0M，含 221 个磁盘文件与 11 个残留）。
+- **行尾保持**：根目录 `package.json`/`package-lock.json`/`.quality-gate/config.json`/`AGENT_COMMIT_LOG.md` 为 LF，`.dockerignore`/`README.md`/前端两个 lock 相关文件为 CRLF，改动后逐文件复核含 CR 行数不变，未产生行尾 diff。
+- **验证结果**：`npm run verify:quick` 16 项检查 11 通过 5 失败，**5 项失败均与本次改动无关**：①`docs/design/week-plan-brainx-reloop.html` 超长行 1 条（529 字符）与 ②`docs/health-brief-2026-09-01.md` 行尾空白 4 处——两者均为他人遗留的**未跟踪**文件；③④⑤前端 ESLint（退出码 127）/ TypeScript / 前端测试——根因为 `frontend/node_modules` 缺 `marked`，且尝试 `npm install` 补装时被宿主文件系统代理拒绝（`CODEBUDDY_BROKER_DENY: Brokered host mkdir`），该操作反而使 `eslint` 从 node_modules 丢失，**需用户在普通终端执行 `cd frontend/btex-frontend && npm install` 恢复**。与本次改动直接相关的检查全部通过：依赖清单与 lockfile 一致、Node.js 语法检查 192 文件、秘密扫描、禁止跟踪文件、个人绝对路径、500 行基线、Lint 豁免审计。
+
+## 2026-09-02｜docs(prd): 后端架构 PRD（代码核实版）+ 全面差距盘点
+
+- **背景**：用户问「距后端全部完成还缺哪些架构」。对仓库做**独立代码核实**（非复述文档），产出架构 PRD 并开新 PR 交付。
+- **新增文档**：`docs/prd-2026-09-02-backend-architecture.md`（约 230 行）——§1 范围与职责边界（后端 vs OpenClaw 三段划分）/ §2 六层架构总览与逐层状态/ §3 本 PR 已交付成果（含「提炼层 = L1 账本消费者」关键裁决）/ §4 差距盘点/ §5 工期与关键路径/ §6 七条验收标准/ §7 五条红线/ §8 相关文档。
+- **核实发现 3 个原待补清单未覆盖的结构性缺口**（PRD §4.1）：**N1** L1 事件账本无消费者调度器（`src/hub/consumer.js` 只有 `consumeOnce` 幂等原语；`src/worker.js:25` `startWorkerTasks` 只跑 bridge+scheduler；`lark-gateway.js` 不触发消费者 → `consumeJobExtract` 全仓库只有测试在调，**配了凭证消息进来也不会自动提炼**）；**N2** MCP 无 pending drafts 读工具（grep `drafts` 零命中，E3 确认闭环只有写侧、顾问拿不到 draft_id，是半成品）；**N3** `event_dlq` 无消费/告警/重放入口（只有 `upcaster.js:20` 写入，失败事件即黑洞）。
+- **据实修正**：此前汇报「E1→E3 全链闭环打通」应限定为**代码层面**——生产侧因 N1 未接线而不会自动触发，已在 PRD 与本文档写明。
+- **关键事实**：`git diff --stat origin/main HEAD` = 128 files / +16892 / -777——Step 0 账本、Step 1 网关、job-extract 在 `main` 上**均不存在**，全部成果只在本分支，故本 PR 承载整体合并。
+- **文档回写**：`docs/README.md` 任务阅读路由新增「后端架构全貌/验收标准」一行指向本 PRD。
+- 验证：本轮为纯文档改动，未触碰代码；门禁红灯 2 项（超长行 html、health-brief 行尾空格）均为**他人未跟踪文件**，非本 PR 引入。
+
 ## 2026-09-02｜feat(job-extract): E3 确认闭环（drafts→job_facts 转正）+ recommend_run 限流
 
 - **背景**：按[缺口总表](2026-09-02-gap-and-next-actions.md) D2 实施（用户裁定顺序 D2 在 D1 之前——先让草稿能进 job_facts，E1 才不是「写了但没用」的代码）；顺带完成 B 档遗留小项 recommend_run 限流（白名单文档 P0 第 3 件）。E2 LLM 层按裁定等 gold set，本轮不动。
@@ -362,12 +690,6 @@
 
 - 改动：对照合并前推荐卡恢复 AI 匹配分、证据覆盖和探索价值三项真实评分；删除“数据来源”及会筛空当前20条的阶段筛选，改为综合推荐、推进活跃、最近活跃、事实优先和探索发现五种完整冻结队列视图，每种视图服务端稳定分页且在真实数据上产生不同顺序。主导航“今日决策”收口为“精选盘”，原同名收藏区改为“已收藏”。同步补齐 `baseline-1.1` 六维评分与目标学习排序边界文档、Storybook、中央审核台账、单次复核和施工清单。用户指定的路演 HTML 已移到工作区外；本次未拉取、推送或发布远端。
 - 验证：快速门禁 16/16、推荐分页与 HTTP 契约 11/11、Storybook 19 文件 79 项交互测试、正式前端生产构建和 `git diff --check` 通过；本地真实队列200条，五种视图均展示20条且首屏顺序不同，卡片评分与精选盘命名在正式页面可见；目标环境尚未发布或验证，提交后在洁净工作区复跑完整门禁。
-
-## 2026-08-30｜merge(main): 以本地版本完成远端同步
-
-- 改动：将最新 `origin/main` 记录为已合入演示功能分支；按用户明确要求，合并结果完整保留本地已经确认的代码、页面、交互与数据闭环，不引入远端同位置旧实现，避免工作台回退。原工作目录中的未提交路演文件未进入本次分支。
-- 验证：合并前后文件树仅增加本条记录；提交后执行快速质量门禁、推荐分页专项、前端构建与 Git 差异检查，再推送功能分支并创建 PR。
-
 ## 2026-08-30｜fix(recommend): 切断分钟级推荐轨迹膨胀
 
 - 改动：审计确认本地 339,726 条决策事件中有 339,662 条是自动推荐机器事件，而不是浏览器缓存。自动推荐现采用两小时硬间隔，TTC 分页引起的输入变化不再绕过节流；推荐快照继续写入 `recommendations`，不再复制到人工决策轨迹；节流或阻断轮不再广播“推荐已更新”或触发重复推卡。推荐态与推荐轮次改由冻结快照推导，新增迁移只清理历史 `RECOMMENDED` 事件并保留人工事件，回放防御性排除旧机器事件。同步更新治理提案、PRD、前端审核台账、复核记录、施工清单、Storybook 说明和专项审计。本地执行迁移及离线压缩后，机器事件 339,662→0，人工事件保留64条，推荐快照保留4,200条，主库321 MiB→160 MiB、WAL→0，完整性检查为 `ok`；目标环境未发布或清理。

@@ -1,0 +1,91 @@
+{
+  "secrets": {
+    "providers": {
+      "default": { "source": "env" }
+    }
+  },
+  "gateway": {
+    "mode": "local",
+    "bind": "loopback",
+    "port": 18789,
+    "auth": {
+      "mode": "token",
+      "token": { "source": "env", "provider": "default", "id": "OPENCLAW_GATEWAY_TOKEN" }
+    }
+  },
+  "session": {
+    "dmScope": "per-account-channel-peer"
+  },
+  "agents": {
+    "defaults": {
+      "sandbox": {
+        "mode": "all",
+        "scope": "session",
+        "workspaceAccess": "none"
+      }
+    }
+  },
+  "plugins": {
+    "enabled": true,
+    "allow": ["feishu", "brainx-openclaw"],
+    "entries": {
+      "feishu": { "enabled": true },
+      "brainx-openclaw": {
+        "enabled": true,
+        "hooks": { "allowPromptInjection": false }
+      }
+    }
+  },
+  "tools": {
+    "allow": [
+      "brainx_me_context",
+      "brainx_daily_brief",
+      "brainx_job_assessment",
+      "brainx_candidate_shortlist",
+      "brainx_candidate_facts",
+      "brainx_candidate_fit",
+      "brainx_gap_questions",
+      "brainx_interview_prep",
+      "brainx_personal_review",
+      "brainx_run_status"
+    ],
+    "deny": [
+      "exec", "process", "read", "write", "edit", "apply_patch",
+      "browser", "web_search", "web_fetch", "query_sql", "brainx_sync_now",
+      "brainx_talent", "brainx_engage", "brainx_record_progress",
+      "brainx_terminal_result", "brainx_record_outcome", "brainx_feedback",
+      "brainx_recommend_run"
+    ]
+  },
+  "channels": {
+    "feishu": {
+      "enabled": true,
+      "connectionMode": "websocket",
+      "defaultAccount": "mia",
+      "dmPolicy": "allowlist",
+      "allowFrom": [
+        "${BRAINX_FEISHU_ALLOWED_OPEN_ID_1}",
+        "${BRAINX_FEISHU_ALLOWED_OPEN_ID_2}",
+        "${BRAINX_FEISHU_ALLOWED_OPEN_ID_3}"
+      ],
+      "groupPolicy": "allowlist",
+      "groupAllowFrom": [
+        "${BRAINX_FEISHU_ALLOWED_CHAT_ID_1}",
+        "${BRAINX_FEISHU_ALLOWED_CHAT_ID_2}"
+      ],
+      "groupSenderAllowFrom": [
+        "${BRAINX_FEISHU_ALLOWED_OPEN_ID_1}",
+        "${BRAINX_FEISHU_ALLOWED_OPEN_ID_2}",
+        "${BRAINX_FEISHU_ALLOWED_OPEN_ID_3}"
+      ],
+      "requireMention": true,
+      "accounts": {
+        "mia": {
+          "name": "Mia / BrainX",
+          "appId": "${BRAINX_FEISHU_APP_ID}",
+          "appSecret": { "source": "env", "provider": "default", "id": "BRAINX_FEISHU_APP_SECRET" }
+        }
+      }
+    }
+  }
+}

@@ -1,6 +1,6 @@
 # BrainX 部署编排
 
-> 上级：[文档书总目录](README.md) · 生产恢复：[云端恢复清单](cloud-recovery-checklist.md) · 安全配置：[安全操作手册](SECURITY.md)
+> 上级：[文档书总目录](README.md) · OpenClaw：[多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md) · 生产恢复：[云端恢复清单](cloud-recovery-checklist.md) · 安全配置：[安全操作手册](SECURITY.md)
 
 ## 应用拓扑
 
@@ -36,6 +36,8 @@ curl -fsS https://base.yorkteam.cn/api/v1/meta/guard
 ```
 
 禁止在这台生产机启动 BrainX Docker 容器或执行 `scripts/deploy-ecs-docker.sh`。详细排障、端口确认和历史事件见[云端恢复清单](cloud-recovery-checklist.md)。
+
+OpenClaw 多顾问版本在同机额外运行三个回环服务，安装、启动顺序、十工具核对和回滚以[多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md)为准。顾问电脑不安装 OpenClaw。
 
 ## 本地开发
 

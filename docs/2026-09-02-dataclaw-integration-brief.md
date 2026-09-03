@@ -203,6 +203,6 @@ DataClaw 只影响"群入口"这一层。人才库与 reloop 属于**领域权�
 ## 相关文档
 
 - [全景架构与技术施工蓝图](architecture-2026-09-01-full-blueprint.md) · [复用与自建边界及权限需求 PRD](prd-2026-09-01-reuse-selfbuild-boundary.md)
-- [Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) · [BrainTex 群聊工作流技术 PRD](prd-2026-09-01-brainx-group-workflow.md)
+- [Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) · [BrainTex 群聊工作流技术 PRD](prd-2026-09-01-braintex-group-workflow.md)
 - [双项目 14 天作战计划](design/week-plan-brainx-reloop.html) · [BrainX 最终交付蓝图](brainx-final-delivery-blueprint.md)
 - Step 1 飞书网关联调清单：[specs/002-step1-lark-gateway/quickstart.md](../specs/002-step1-lark-gateway/quickstart.md)

@@ -10,10 +10,12 @@ import { fileURLToPath } from 'node:url';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 /** 起 MCP 子进程，发 NDJSON 帧，按 id 收集响应。 */
-function mcpClient() {
+function mcpClient({ boundConsultantId = '', tenantId = '' } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'brainx-mcp-'));
   const child = spawn('node', [join(ROOT, 'mcp', 'server.mjs')], {
-    env: { ...process.env, BRAINX_DB: join(dir, 't.db') },
+    env: { ...process.env, BRAINX_DB: join(dir, 't.db'),
+      ...(boundConsultantId ? { BRAINX_MCP_CONSULTANT_ID: boundConsultantId } : {}),
+      ...(tenantId ? { BRAINX_MCP_TENANT_ID: tenantId } : {}) },
     stdio: ['pipe', 'pipe', 'pipe'],
   });
   const pending = new Map();
@@ -57,11 +59,7 @@ test('MCP：initialize → tools/list → tools/call 全链', async () => {
                      'brainx_record_outcome', 'brainx_push_preview']) {
       assert.ok(names.includes(t), `缺工具 ${t}`);
     }
-    // B 档安全硬前置（501b9bd）：黑名单工具不外露
-    for (const t of ['brainx_sync_now', 'brainx_talent']) {
-      assert.ok(!names.includes(t), `黑名单工具 ${t} 不应出现在 tools/list`);
-    }
-    assert.equal(names.includes('brainx_sync_now'), false, '危险同步工具不得通过 MCP 对外暴露');
+    assert.equal(names.includes('brainx_sync_now'), false, '高风险同步工具不得外露');
 
     // 花名册（openDb 自动播种）
     const cons = await c.call('tools/call', { name: 'brainx_consultants', arguments: {} });
@@ -115,5 +113,59 @@ test('MCP：brainx_replay 信任收紧——consultant_id 缺失/未知均拒绝
     assert.equal(JSON.parse(goodCid.result.content[0].text).error, 'NOT_FOUND');
   } finally {
     c.close();
+  }
+});
+
+test('MCP：服务端绑定顾问后隐藏身份参数、自动注入并拒绝越权覆盖', async () => {
+  const c = mcpClient({ boundConsultantId: 'felix' });
+  try {
+    await c.call('initialize', {});
+    const list = await c.call('tools/list');
+    const workbench = list.result.tools.find((tool) => tool.name === 'brainx_workbench');
+    assert.ok(workbench);
+    assert.equal(workbench.inputSchema.properties.consultant_id, undefined);
+    assert.ok(!workbench.inputSchema.required.includes('consultant_id'));
+
+    const own = await c.call('tools/call', { name: 'brainx_workbench', arguments: {} });
+    assert.equal(JSON.parse(own.result.content[0].text).consultant_id, 'felix');
+
+    const override = await c.call('tools/call', {
+      name: 'brainx_workbench', arguments: { consultant_id: 'mia' },
+    });
+    assert.equal(override.error.code, -32602);
+    assert.match(override.error.message, /cannot be overridden/);
+  } finally {
+    c.close();
+  }
+});
+
+test('MCP：候选 shortlist 仅在顾问与租户双绑定时外露，且职位不可见时不碰人才库', async () => {
+  const hidden = mcpClient({ boundConsultantId: 'mia' });
+  try {
+    await hidden.call('initialize', {});
+    const list = await hidden.call('tools/list');
+    assert.equal(list.result.tools.some((tool) => tool.name === 'brainx_candidate_shortlist'), false);
+  } finally {
+    hidden.close();
+  }
+
+  const exposed = mcpClient({ boundConsultantId: 'mia', tenantId: 'tenant_a' });
+  try {
+    await exposed.call('initialize', {});
+    const list = await exposed.call('tools/list');
+    const tool = list.result.tools.find((entry) => entry.name === 'brainx_candidate_shortlist');
+    assert.ok(tool);
+    assert.equal(tool.inputSchema.properties.consultant_id, undefined);
+    assert.equal(tool.inputSchema.properties.tenant_id, undefined);
+    assert.deepEqual(tool.inputSchema.required, ['job_id']);
+
+    const result = await exposed.call('tools/call', {
+      name: 'brainx_candidate_shortlist', arguments: { job_id: 'job_01' },
+    });
+    assert.equal(result.result.isError, undefined);
+    assert.equal(JSON.parse(result.result.content[0].text).error, 'NOT_FOUND_OR_FORBIDDEN');
+    assert.doesNotMatch(result.result.content[0].text, /BRAINX_MYSQL_PASSWORD|SELECT|ttc-rds/);
+  } finally {
+    exposed.close();
   }
 });

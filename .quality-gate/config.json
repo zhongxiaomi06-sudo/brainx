@@ -47,8 +47,6 @@
     ".quality-gate/reports/"
   ],
   "textHygieneExcludedPrefixes": [
-    "_archive/",
-    "docs/archive/",
     ".prd_pages/",
     ".quality-gate/reports/"
   ],

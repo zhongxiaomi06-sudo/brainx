@@ -2,7 +2,7 @@
 
 > 上级入口：[文档书总目录](README.md) · [多 Agent 协作准则](../AGENTS.md)
 
-本文回答四个问题：每一步哪些开源代码**直接可用**、哪些只**借鉴设计**、哪些**必须自建**、每步**需要什么权限**以及**哪些权限可以避开**。结论基于 2026-09-01 全网搜索 + 30 个仓库 GitHub API 逐仓核实（存在性/star/最后推送/归档/许可证），核实过程与勘误记录在[全景蓝图 §9.2](architecture-2026-09-01-full-blueprint.md)。施工顺序与代码逻辑以[全景蓝图](architecture-2026-09-01-full-blueprint.md)为准；交互与安全以[群聊工作流 PRD](prd-2026-09-01-brainx-group-workflow.md)为准。
+本文回答四个问题：每一步哪些开源代码**直接可用**、哪些只**借鉴设计**、哪些**必须自建**、每步**需要什么权限**以及**哪些权限可以避开**。结论基于 2026-09-01 全网搜索 + 30 个仓库 GitHub API 逐仓核实（存在性/star/最后推送/归档/许可证），核实过程与勘误记录在[全景蓝图 §9.2](architecture-2026-09-01-full-blueprint.md)。施工顺序与代码逻辑以[全景蓝图](architecture-2026-09-01-full-blueprint.md)为准；交互与安全以[群聊工作流 PRD](prd-2026-09-01-braintex-group-workflow.md)为准。
 
 ## 1. 三色总判断
 
@@ -137,5 +137,5 @@
 ## 相关文档
 
 - [全景架构与技术施工蓝图](architecture-2026-09-01-full-blueprint.md)（§5 代码逻辑 / §6 组件选型 / §9.2 核实修订）
-- [BrainTex 群聊工作流技术 PRD](prd-2026-09-01-brainx-group-workflow.md) · [Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md)
+- [BrainTex 群聊工作流技术 PRD](prd-2026-09-01-braintex-group-workflow.md) · [Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md)
 - [规范驱动研发流程](standards/SPEC_DRIVEN_WORKFLOW.md) · [上传前完整验证](standards/PRE_PUSH_VERIFICATION.md)

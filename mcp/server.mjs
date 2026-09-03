@@ -3,8 +3,9 @@
  * Codex CLI / Claude Code / OpenCode 三端注册同一命令：
  *   node ./mcp/server.mjs
  *
- * 直连 src/*.js（不绕 HTTP，web 服务不用在线）。actor=consultant_id 参数归属，
- * 与 braintex-mcp 同一信任模型：本机 agent 代表某顾问行动，事件账本记 actor。
+ * 直连 src/*.js（不绕 HTTP，web 服务不用在线）。默认保留本地开发工具的
+ * consultant_id 参数；面向单顾问 Agent 时必须设置 BRAINX_MCP_CONSULTANT_ID，
+ * 服务端会注入并锁死身份，模型不能通过参数切换顾问。
  */
 import '../src/env.js';
 import { createInterface } from 'node:readline';
@@ -21,8 +22,17 @@ import { jobVisibleTo } from '../src/visibility.js';
 import { relationOf } from '../src/relations.js';
 import { updateProfile } from '../src/roster.js';
 import { feedback as recommendationFeedback, undoFeedback as recommendationUndoFeedback } from '../src/recommendation-batch.js';
+import { candidateShortlist } from '../src/candidate-shortlist.js';
 
 const db = openDb();
+const BOUND_CONSULTANT_ID = String(process.env.BRAINX_MCP_CONSULTANT_ID || '').trim();
+const BOUND_TENANT_ID = String(process.env.BRAINX_MCP_TENANT_ID || '').trim();
+const RELOOP_JOB_REF = /^reloop-position:\d+$/;
+
+if (BOUND_CONSULTANT_ID && !loadConsultants(db)
+  .some((consultant) => consultant.consultant_id === BOUND_CONSULTANT_ID)) {
+  throw new Error('BRAINX_MCP_CONSULTANT_ID 未对应有效顾问，MCP 拒绝启动');
+}
 
 // —— 工具实现（与 server.js 路由同一套领域函数，输出原样 JSON）——
 
@@ -30,7 +40,11 @@ const db = openDb();
 // brainx_sync_now —— 默认 source='fixture' + dry_run=false 会把决策库刷成测试数据；
 // brainx_talent  —— 无 cid 隔离（补完 brainx_talent_mine 改造后才可移出）。
 // 定义保留在 TOOLS 里（tests/mcp-write-guard.test.mjs 静态扫描依赖），但 list/call 双拦。
-const BLOCKED_TOOLS = new Set(['brainx_sync_now', 'brainx_talent']);
+const BLOCKED_TOOLS = new Set([
+  'brainx_sync_now',
+  'brainx_talent',
+  ...(!BOUND_CONSULTANT_ID || !BOUND_TENANT_ID ? ['brainx_candidate_shortlist'] : []),
+]);
 
 // brainx_recommend_run 进程内限流状态（每顾问上次调用时间戳；白名单 §3 P0 第 3 件）
 const RECOMMEND_RUN_MIN_MS = 60_000;
@@ -75,6 +89,19 @@ const TOOLS = {
       return { blocked: false, run_id: run.run.run_id, policy_version: run.run.policy_version,
                generated_at: run.run.created_at, items: run.items.slice(0, Math.min(limit, 50)) };
     },
+  },
+  brainx_candidate_shortlist: {
+    description: '读取本人获授权职位的预计算候选人 shortlist；返回脱敏职位画像、结构化履历、匹配解释与证据引用，每页最多 20 人',
+    inputSchema: { type: 'object', required: ['consultant_id', 'job_id'], properties: {
+      consultant_id: { type: 'string' }, job_id: { type: 'string' },
+      limit: { type: 'number', minimum: 1, maximum: 20 },
+      page_token: { type: 'string' },
+      purpose: { type: 'string', enum: ['candidate_review', 'interview_prep', 'daily_brief'] },
+    } },
+    run: ({ consultant_id: consultantId, job_id: jobId, limit, page_token: pageToken, purpose }) =>
+      (RELOOP_JOB_REF.test(jobId) || jobVisibleTo(db, consultantId, jobId))
+        ? candidateShortlist({ tenantId: BOUND_TENANT_ID, consultantId, jobId, limit, pageToken, purpose })
+        : { error: 'NOT_FOUND_OR_FORBIDDEN' },
   },
   brainx_recommend_run: {
     description: '生成一轮新推荐（写 recommendations + RECOMMENDED 事件；每顾问 60s 限一次）',
@@ -259,7 +286,29 @@ const respond = (id, resultOrError) => {
 };
 const ok = (value) => ({ content: [{ type: 'text', text: JSON.stringify(value, null, 1) }] });
 
-function handle(msg) {
+function toolUsesConsultantId(tool) {
+  return Object.hasOwn(tool?.inputSchema?.properties || {}, 'consultant_id');
+}
+
+function publishedInputSchema(tool) {
+  if (!BOUND_CONSULTANT_ID || !toolUsesConsultantId(tool)) return tool.inputSchema;
+  const { consultant_id: _hidden, ...properties } = tool.inputSchema.properties;
+  return {
+    ...tool.inputSchema,
+    required: (tool.inputSchema.required || []).filter((name) => name !== 'consultant_id'),
+    properties,
+  };
+}
+
+function argumentsWithBoundIdentity(tool, value) {
+  const args = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  if (!BOUND_CONSULTANT_ID || !toolUsesConsultantId(tool)) return args;
+  const claimed = typeof args.consultant_id === 'string' ? args.consultant_id.trim() : '';
+  if (claimed && claimed !== BOUND_CONSULTANT_ID) return null;
+  return { ...args, consultant_id: BOUND_CONSULTANT_ID };
+}
+
+async function handle(msg) {
   const { id, method, params } = msg;
   if (id === undefined || id === null) return; // notification（initialized 等）不回复
   try {
@@ -275,7 +324,8 @@ function handle(msg) {
       case 'tools/list':
         return respond(id, { result: { tools: Object.entries(TOOLS)
           .filter(([name]) => !BLOCKED_TOOLS.has(name))
-          .map(([name, t]) => ({ name, description: t.description, inputSchema: t.inputSchema })) } });
+          .map(([name, t]) => ({ name, description: t.description,
+            inputSchema: publishedInputSchema(t) })) } });
       case 'tools/call': {
         if (BLOCKED_TOOLS.has(params?.name)) {
           return respond(id, { error: { code: -32602,
@@ -283,11 +333,17 @@ function handle(msg) {
         }
         const t = TOOLS[params?.name];
         if (!t) return respond(id, { error: { code: -32601, message: `unknown tool: ${params?.name}` } });
+        const args = argumentsWithBoundIdentity(t, params.arguments);
+        if (args === null) {
+          return respond(id, { error: { code: -32602,
+            message: 'consultant identity is bound by server policy and cannot be overridden' } });
+        }
         try {
-          return respond(id, { result: ok(t.run(params.arguments || {})) });
+          return respond(id, { result: ok(await t.run(args)) });
         } catch (e) {
           return respond(id, { result: { content: [{ type: 'text',
-            text: `ERROR: ${String(e.message || e).slice(0, 500)}` }], isError: true } });
+            text: e?.code ? `ERROR: ${String(e.code).slice(0, 80)}`
+                          : `ERROR: ${String(e.message || e).slice(0, 500)}` }], isError: true } });
         }
       }
       default:
@@ -304,6 +360,6 @@ createInterface({ input: process.stdin, terminal: false })
     if (!s) return;
     let msg;
     try { msg = JSON.parse(s); } catch { return; }
-    handle(msg);
+    void handle(msg);
   });
-process.stderr.write('brainx-mcp ready (stdio)\n');
+process.stderr.write(`brainx-mcp ready (stdio, identity=${BOUND_CONSULTANT_ID ? 'bound' : 'caller-declared'})\n`);

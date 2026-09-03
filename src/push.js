@@ -11,8 +11,8 @@ const execFileP = promisify(execFile);
 import { now, uuid } from './db.js';
 import { larkProfileArgs } from './env.js';
 import { quickLink } from './quickfb.js';
-
-const BASE_URL = process.env.BRAINX_BASE_URL || 'http://127.0.0.1:3000';
+import { sendInteractiveCard } from './feishu-bot.js';
+import { buildBrainxDeepLink, productionBaseUrl } from './brainx-deep-links.js';
 
 const REL_LABEL = { MY_JOB: '我的职位', PRIMARY_PM: '我主PM', TEAM_SHARED: '团队共享',
                     OTHER_CONSULTANT: '他人主做', NOT_JOINED: '未加入', UNKNOWN: '未知' };
@@ -30,7 +30,8 @@ const btn = (text, u, type = 'default') =>
 /** WorkbenchModel → 飞书 card schema 2.0 JSON（纯函数，可单测）。
  * consultant_id 可选：提供且配置了 BRAINX_FEEDBACK_SECRET 时，每个职位追加
  * “忽略”一键按钮（签名直写，无需登录工作台——反馈回写主入口）。 */
-export function buildDailyCard({ consultant_name, consultant_id, run, items, commitments, sync, snapshot_id }) {
+export function buildDailyCard({ consultant_name, consultant_id, run, items, commitments, sync, snapshot_id, publicBaseUrl }) {
+  const baseUrl = productionBaseUrl(publicBaseUrl).href;
   const state = sync?.complete ? 'READY' : 'INCOMPLETE';
   const els = [
     { tag: 'markdown', content: `**今天建议先看 ${Math.min(3, items.length)} 个职位**\n`
@@ -46,11 +47,11 @@ export function buildDailyCard({ consultant_name, consultant_id, run, items, com
       + `综合 **${r.score}** 分 · 置信${{ HIGH: '高', MEDIUM: '中', LOW: '低' }[r.confidence_band]} · ${ACTION_LABEL[r.action]}\n`
       + `理由：${r.reasons[1] || r.reasons[0]}\n⚠️ 风险：${r.risks[0] || '—'}` });
     const actions = [
-      btn('查看详情', `${BASE_URL}/?open=opportunity:${j.project_id}`, 'primary'),
-      btn('回放', `${BASE_URL}/?open=replay:${r.decision_id}`),
+      btn('查看详情', buildBrainxDeepLink({ baseUrl, objectType: 'opportunity', objectRef: j.project_id }), 'primary'),
+      btn('回放', buildBrainxDeepLink({ baseUrl, objectType: 'replay', objectRef: r.decision_id })),
     ];
     // 一键反馈（F2）：签名当日有效；未配置密钥时 quickLink 返 null，按钮不渲染
-    const ignoreUrl = consultant_id && quickLink(BASE_URL, consultant_id, j.project_id, 'ignore', now());
+    const ignoreUrl = consultant_id && quickLink(baseUrl, consultant_id, j.project_id, 'ignore', now());
     if (ignoreUrl) actions.push(btn('✕ 忽略', ignoreUrl, 'danger'));
     els.push({ tag: 'action', actions });
     if (i < Math.min(3, items.length) - 1) els.push({ tag: 'hr' });
@@ -60,7 +61,7 @@ export function buildDailyCard({ consultant_name, consultant_id, run, items, com
   els.push({ tag: 'hr' });
   els.push({ tag: 'markdown', content:
     `我的承接：跟进中 ${commitments.accepted_count} · 需处理 ${commitments.need_action_count}` });
-  els.push({ tag: 'action', actions: [btn('打开工作台', `${BASE_URL}/`, 'primary')] });
+  els.push({ tag: 'action', actions: [btn('打开工作台', baseUrl, 'primary')] });
   els.push({ tag: 'note', elements: [{ tag: 'plain_text',
     content: `run: ${(run?.run_id || '').slice(0, 8)} · snapshot: ${(snapshot_id || '').slice(0, 8)} · ${run?.policy_version || ''}` }] });
 
@@ -73,7 +74,8 @@ export function buildDailyCard({ consultant_name, consultant_id, run, items, com
 }
 
 /** 同步异常卡（文案与前端 PRD §10 逐字一致）。 */
-export function buildSyncAlertCard(sync) {
+export function buildSyncAlertCard(sync, { publicBaseUrl } = {}) {
+  const baseUrl = productionBaseUrl(publicBaseUrl).href;
   const state = sync.complete ? 'READY' : 'INCOMPLETE';
   const msgs = { INCOMPLETE: ['本次同步不完整', '为避免误导，暂不生成正式推荐'],
                  AUTH_EXPIRED: ['TTC 登录状态已失效', '请重新登录后再同步'],
@@ -83,12 +85,13 @@ export function buildSyncAlertCard(sync) {
     header: { template: TEMPLATE[state] || 'orange', title: { tag: 'plain_text', content: `Brain X · ${title}` } },
     elements: [
       { tag: 'markdown', content: `**${title}**\n${sub}\n读取 ${sync.rows_read}/${sync.rows_expected} 行` },
-      { tag: 'action', actions: [btn('打开工作台处理', `${BASE_URL}/?view=sync`, 'primary')] },
+      { tag: 'action', actions: [btn('打开工作台处理', `${baseUrl}?view=sync`, 'primary')] },
     ] };
 }
 
 /** 重大变化提醒卡（P4）：Top1 易主 / ACCEPT 档新进 Top3。仅推顾问本人，绝不推群。 */
-export function buildHeatingAlertCard({ change_label, item }) {
+export function buildHeatingAlertCard({ change_label, item, publicBaseUrl }) {
+  const baseUrl = productionBaseUrl(publicBaseUrl).href;
   const j = item.job;
   return { config: { wide_screen_mode: true },
     header: { template: 'red', title: { tag: 'plain_text',
@@ -99,8 +102,8 @@ export function buildHeatingAlertCard({ change_label, item }) {
         + `综合 **${item.score}** 分 · ${ACTION_LABEL[item.action] || item.action}\n`
         + `理由：${item.reasons?.[1] || item.reasons?.[0] || '—'}` },
       { tag: 'action', actions: [
-        btn('查看详情', `${BASE_URL}/?open=opportunity:${j.project_id}`, 'primary'),
-        btn('打开工作台', `${BASE_URL}/`),
+        btn('查看详情', buildBrainxDeepLink({ baseUrl, objectType: 'opportunity', objectRef: j.project_id }), 'primary'),
+        btn('打开工作台', baseUrl),
       ] },
       { tag: 'note', elements: [{ tag: 'plain_text',
         content: `run: ${(item.run_id || '').slice(0, 8)} · 自动推送（仅发本人）` }] },
@@ -129,20 +132,24 @@ export async function pushCard(db, { consultant_id, kind, run_id, card, target, 
   let status = 'SENT', message_id = null, error = null;
   if (send) {
     try {
-      // lark-cli 1.0.67 无 im messages create 打字命令 → 走 api 逃生舱（bot 身份，im:message:send_as_bot）。
-      // 卡片 content 需要二次 stringify（Feishu 契约：content 是 JSON 字符串）。
-      const { stdout } = await execFileP('lark-cli', [...larkProfileArgs(), 'api', 'POST', '/open-apis/im/v1/messages', '--as', 'bot',
-        '--params', JSON.stringify({ receive_id_type: target.startsWith('oc_') ? 'chat_id' : 'open_id' }),
-        '--data', JSON.stringify({ receive_id: target, msg_type: 'interactive',
-                                   content: JSON.stringify(card) })],
-        { encoding: 'utf8', maxBuffer: 4 * 1024 * 1024, timeout: 45000, killSignal: 'SIGKILL' });
-      const d = JSON.parse(stdout.slice(stdout.indexOf('{')));
-      // api 逃生舱可能直出 Feishu 响应（{code,data:{message_id}}）或包一层 {ok,data}
-      const feishu = d?.data?.code != null ? d.data : d;
-      if (feishu?.code !== 0 && feishu?.ok !== true) {
-        throw new Error(feishu?.msg || feishu?.error?.message || JSON.stringify(d).slice(0, 200));
+      if ((process.env.BRAINX_FEISHU_APP_ID || process.env.LARK_APP_ID)
+          && (process.env.BRAINX_FEISHU_APP_SECRET || process.env.LARK_APP_SECRET)) {
+        const out = await sendInteractiveCard({ target, card });
+        message_id = out.message_id;
+      } else {
+        // 兼容旧环境：未配置直连凭证时仍可使用 lark-cli profile。
+        const { stdout } = await execFileP('lark-cli', [...larkProfileArgs(), 'api', 'POST', '/open-apis/im/v1/messages', '--as', 'bot',
+          '--params', JSON.stringify({ receive_id_type: target.startsWith('oc_') ? 'chat_id' : 'open_id' }),
+          '--data', JSON.stringify({ receive_id: target, msg_type: 'interactive',
+                                     content: JSON.stringify(card) })],
+          { encoding: 'utf8', maxBuffer: 4 * 1024 * 1024, timeout: 45000, killSignal: 'SIGKILL' });
+        const d = JSON.parse(stdout.slice(stdout.indexOf('{')));
+        const feishu = d?.data?.code != null ? d.data : d;
+        if (feishu?.code !== 0 && feishu?.ok !== true) {
+          throw new Error(feishu?.msg || feishu?.error?.message || JSON.stringify(d).slice(0, 200));
+        }
+        message_id = feishu?.data?.message_id || d?.data?.data?.message_id || null;
       }
-      message_id = feishu?.data?.message_id || d?.data?.data?.message_id || null;
     } catch (e) {
       // execFileSync 的 e.message 是命令本体（含整张卡片 JSON），真实 Feishu 错误在
       // e.stderr —— 优先 stderr，截断保护放在最后（2026-08-24 修复：push_log 曾全是无效命令回显）

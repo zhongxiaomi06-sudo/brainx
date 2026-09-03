@@ -1,0 +1,25 @@
+[Unit]
+Description=OpenClaw Gateway for BrainX Feishu agent
+After=network-online.target brainx-agent-gateway.service
+Requires=brainx-agent-gateway.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=brainx
+Group=brainx
+WorkingDirectory=/var/lib/brainx
+EnvironmentFile=/etc/brainx/openclaw.env
+Environment=OPENCLAW_CONFIG_PATH=/var/lib/brainx/.openclaw/openclaw.json
+Environment=OPENCLAW_STATE_DIR=/var/lib/brainx/.openclaw
+ExecStart=/usr/local/bin/openclaw gateway --port 18789
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/brainx
+
+[Install]
+WantedBy=multi-user.target

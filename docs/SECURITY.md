@@ -2,6 +2,10 @@
 
 生产安全操作的三件事：**密钥备份**、**RDS 收紧**、**按人隔离激活**。按 checklist 执行，每项都有验证命令。
 
+OpenClaw Agent 的 App 身份、群 scope、短时签名、十工具边界、撤权和停机顺序见[多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md)。聊天中的姓名、consultant_id 或链接参数都不是可信身份来源。
+
+OpenClaw/Agent Gateway 与后台 worker 不共用人才库账号：`/etc/brainx/agent.env` 只允许读取 `brainx_talent`；`/etc/brainx/worker.env` 只额外允许确定性同步所需的 `reloop_app` SELECT 和 `brainx_talent` SELECT/INSERT/UPDATE/DELETE；DDL 只在迁移窗口使用临时账号，完成后撤销。
+
 ## 一、data/.secret 单点密钥：备份与恢复
 
 ### 密钥用途（为什么它这么重要）

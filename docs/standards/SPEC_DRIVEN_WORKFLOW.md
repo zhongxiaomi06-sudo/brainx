@@ -9,10 +9,8 @@
 | 层 | 文件 | 管什么 |
 |---|---|---|
 | 协作边界 | 根目录 `AGENTS.md` | 工作锁、commit 规范、push 门禁、文档登记——谁在什么时候能写什么 |
-| 产品目标 | `docs/prd-2026-09-02-brainx-workflow.md` | 唯一项目产品 PRD——为什么做、为谁做、产品边界与产品 DoD |
 | 工程原则 | `.specify/memory/constitution.md` | 零依赖、账本先行、安全边界、规格先行、最小 diff——写代码时必须遵守什么 |
-| 单功能规格 | `specs/<feature>/spec.md` 等 | 每个功能的规格、方案、任务清单——这次具体做什么 |
-| 状态证据 | CI、质量门禁、审核台账、Commit 记录 | 当前 commit 是否真的实现、发布并经真实数据验证 |
+| 单功能规格 | `specs/<branch>/spec.md` 等 | 每个功能的规格、方案、任务清单——这次具体做什么 |
 
 冲突时：用户当前指令 > `AGENTS.md` > constitution > 单功能规格。
 
@@ -38,20 +36,6 @@
 7. `analyze`（可选）——跨产物一致性核对；
 8. `implement`——按任务施工，先写能失败的 node:test 回放用例，再实现；
 9. `converge`——对照 spec、plan、tasks 收敛剩余差异，直到报告 Converged。
-
-每个 feature 目录固定使用以下职责，禁止把动态状态重新写成第二份项目 PRD：
-
-```text
-specs/<NNN-feature>/
-├── spec.md       # 用户场景、需求边界、验收标准（做什么）
-├── plan.md       # 架构选择、数据模型、接口与验证策略（怎么做）
-├── tasks.md      # 依赖有序、可勾选、能对应到文件和测试的任务
-├── research.md   # 仅在确有调研结论时存在
-├── data-model.md # 仅在涉及数据模型时存在
-└── quickstart.md # 联调或人工验收步骤
-```
-
-同一时刻只激活一个待实现 feature。没有激活 feature 且已有规格均完成时属于正常状态；维护性修复可以由失败测试、Commit 记录和 PR 直接追踪，但若改变产品行为、接口契约或数据模型，必须新建或激活 feature 后再施工。
 
 ## 4. 与 14 天作战计划的关系
 

@@ -55,11 +55,17 @@ function mcpClient(dbPath) {
   let seq = 0;
   const call = (method, params) => new Promise((resolve, reject) => {
     const id = ++seq;
-    pending.set(id, resolve);
+    // CI 会并行启动多组 MCP/SQLite 集成测试；冷启动偶尔超过 30 秒。
+    // 保留有限超时，但给共享 runner 足够余量，并在收到响应后清理计时器。
+    const timer = setTimeout(() => {
+      pending.delete(id);
+      reject(new Error(`timeout waiting ${method}`));
+    }, 60000);
+    pending.set(id, (message) => {
+      clearTimeout(timer);
+      resolve(message);
+    });
     child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n');
-    // 30s：本机 FS 代理环境下 server.mjs 冷启动实测 ~10s（node_modules + 31 迁移 + seed），
-    // 8s 会误杀（既有 tests/mcp.test.mjs 在本环境同样超时，非逻辑回归）。
-    setTimeout(() => reject(new Error(`timeout waiting ${method}`)), 30000);
   });
   const close = () => child.kill();
   return { call, close };

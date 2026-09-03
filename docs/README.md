@@ -16,6 +16,11 @@
 | 任务类型 | 必读文档 |
 |---|---|
 | 产品范围、功能规划或验收标准 | [BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md) |
+| OpenClaw、飞书机器人、AI 猎头工作流、人才权限或简历解析 | [BrainX × OpenClaw AI 猎头工作流产品需求文档](prd-2026-09-02-openclaw-ai-recruiting-workflow.md)、[安全操作手册](SECURITY.md) |
+| OpenClaw 多顾问安装、上线、运维、故障或回滚 | [OpenClaw 多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md)、[部署编排](DEPLOYMENT.md) |
+| 服务器由同事维护、需要可转交的执行步骤与验收证据 | [BrainX × OpenClaw ECS 部署交接单](2026-09-03-openclaw-ecs-handoff.md)、[OpenClaw 多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md) |
+| 候选人事实版本、人才 RDS 迁移、shortlist 数据契约或授权查询 | [候选人事实与 shortlist 数据契约](2026-09-03-candidate-data-contracts.md)、[BrainX × OpenClaw AI 猎头工作流产品需求文档](prd-2026-09-02-openclaw-ai-recruiting-workflow.md) |
+| 历史 Codex 插件、旧版飞书副驾驶方案 | [历史：BrainX 飞书 AI 猎头副驾驶产品需求文档](prd-2026-09-01-feishu-ai-consultant-copilot.md)、[历史：BrainX Codex Agent 职责与权限规范](codex-agent-responsibilities-and-permissions.md) |
 | 最终产品形态、跨前后端施工顺序或总体验收 | [BrainX 最终交付蓝图与施工总清单](brainx-final-delivery-blueprint.md) |
 | BrainX×reloop 工作流总线、身份、Case 或跨系统桥接 | [Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) |
 | 全景架构、技术施工安排、分步代码逻辑或组件选型 | [全景架构与技术施工蓝图](architecture-2026-09-01-full-blueprint.md)、[Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) |
@@ -31,6 +36,7 @@
 | **给 OpenClaw 侧打包对接信息、MCP 接入配置、consultant_id 映射规则或 Skill 交付** | **[BrainX → OpenClaw 接口包](2026-09-02-openclaw-interface-pack.md)**（三接缝一屏 + 15 工具快照 + 交付包清单）、[下游交付文档](2026-09-02-brainx-mcp-deliverable.md) |
 | **群消息读取归谁（OpenClaw 还是后端）** | **[后端侧模块结构 §1 边界裁定](2026-09-02-backend-module-structure.md)**（**关键纠正：通道层 `src/gateway/ws-client.js` 已在后端仓库建成，不依赖 OpenClaw**）、[飞书权限清单 §6.1](2026-09-02-feishu-permission-scopes.md) |
 | **现在还缺什么、下一步做什么** | **[缺口与下一步总表](2026-09-02-gap-and-next-actions.md)**（五档缺口 + 优先级裁定 + 顺序建议）。**当前全局卡点：飞书 4 个凭证未配**（`.env` 里 `LARK_*` 零命中），卡住 E1 验证与 9/3 demo |
+| **后端架构全貌、现状核实结论或"什么算做完"** | **[BrainX 后端架构 PRD（代码核实版）](prd-2026-09-02-backend-architecture.md)**（六层现状逐项核实 + 差距盘点含 3 个清单外新发现 + 工期关键路径 + 7 条验收标准）、[后端侧模块结构](2026-09-02-backend-module-structure.md) |
 | **飞书后台要勾选哪些权限/scope、事件订阅、敏感权限审批** | **[飞书权限清单（9/2 研发对齐会定论版）](2026-09-02-feishu-permission-scopes.md)**、`src/oauth.js` 用户身份 scope 实证注释 |
 | **这个架构承担哪些业务工作、每段业务走哪个工具** | **[业务工作全景](2026-09-02-business-work-breakdown.md)**（全链路六段 + MVP 每日循环 + 权限对照）、**[AI leader 工作流 + 日历助手](2026-09-02-ai-leader-workflow.md)**（一面前后两种形态）、[Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) |
 | **一面之前怎么串联 AI leader 工作流 / 一面之后的待办提醒** | **[AI leader 工作流 + 日历助手](2026-09-02-ai-leader-workflow.md)**、`src/scheduler.js` `src/engagement.js` `src/push.js` |
@@ -59,6 +65,7 @@
 
 ### 工作规范
 
+- [BrainX Constitution](../.specify/memory/constitution.md)：核心技术与安全约束；1.0.1 明确 Agent 只读账号、确定性 worker 最小 DML 账号和临时 DDL 账号三者分离。
 - [上传前完整验证](standards/PRE_PUSH_VERIFICATION.md)：所有 Agent 的统一验收清单。
 - [质量门禁操作手册](standards/QUALITY_GATE_OPERATIONS.md)：统一命令、机器配置、存量基线、报告和 CI 维护方法。
 - [规范驱动研发流程](standards/SPEC_DRIVEN_WORKFLOW.md)：spec-kit（specify CLI）的接入、单功能规格流程、与 AGENTS.md/constitution 的分工。
@@ -69,11 +76,17 @@
 
 - [安全操作手册](SECURITY.md)：密钥、RDS、授权与数据隔离操作。
 - [部署编排](DEPLOYMENT.md)：生产 systemd、本地开发、隔离 Docker 测试和 CI。
+- [OpenClaw 多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md)：服务端安装、权限绑定、灰度验收、日常运维与可恢复回滚。
+- [BrainX × OpenClaw ECS 部署交接单](2026-09-03-openclaw-ecs-handoff.md)：给服务器维护同事的无密钥执行清单，覆盖前置检查、安装、迁移、身份绑定、启动、验收与脱敏证据回传。
 - [云端恢复清单](cloud-recovery-checklist.md)：现网唯一入口、标准恢复步骤与历史事件。
 - [带宽告警说明](guard-bandwidth-alert.md)：带宽监控与告警规则。
 
 ### 设计与数据
 
+- [候选人事实与 shortlist 数据契约](2026-09-03-candidate-data-contracts.md)：`candidate_fact_v1`、`candidate_match_bundle_v1`、reloop 真实数据转换、人才/职位双授权、固定飞书文案、MCP PoC 暴露条件及当前未完成项的唯一施工说明。
+- [BrainX × OpenClaw AI 猎头工作流产品需求文档](prd-2026-09-02-openclaw-ai-recruiting-workflow.md)：当前阶段权威开发基线；基于代码审计和官方能力，定义 OpenClaw 主 Agent、飞书最小权限、BrainX 窄网关、人才授权、简历事实、匹配、施工阶段和发布门禁。
+- [历史：BrainX 飞书 AI 猎头副驾驶产品需求文档](prd-2026-09-01-feishu-ai-consultant-copilot.md)：主 Agent 调整前的 Codex 方案和用户研究，仅作历史参考。
+- [历史：BrainX Codex Agent 职责与权限规范](codex-agent-responsibilities-and-permissions.md)：旧 Codex 方案的权限、审批和沙箱研究；不得据此向 OpenClaw 开放工具。
 - [OpenClaw 壳子 + 自写 Skill 架构](2026-09-02-openclaw-shell-architecture.md)：以 OpenClaw 为壳子、自写 Skill 包住官方数据接口的新架构（取代原 DataClaw 集成方案）。含开源工具与飞书渠道接入步骤、7 个现有 SKILL.md 的合规实测、接口挂载的 MCP 与 scripts 两条路径、留痕双轨决策、交流会"抄作业"索取清单。
 - [DataClaw 集成交流会历史底稿](2026-09-02-dataclaw-integration-brief.md)：9/2 交流会的原始索取清单与风险列表。**架构结论已被上一条取代**，不得据此施工。
 - [飞书权限清单（9/2 研发对齐会定论版）](2026-09-02-feishu-permission-scopes.md)：依据 9/2「研发对一下」妙记，把会议定的 MVP 能力映射成飞书后台要勾选的精确 scope 与事件。含应用身份 7 项（可批量导入 JSON）、用户身份 9 项、**「拉机器人进群 ≠ 能读群消息」的认知纠正**、三条待审批敏感权限与人才库并行方案。**9/2 晚新增 §6.1「群主邀请机器人入群」低敏感路径**——York 作为团队长拉机器人入群即可群维度读消息，把高敏感权限降级为兜底方案。

@@ -1,7 +1,7 @@
 # 猎头蒸馏:Felix 黄鑫(素材稿 v0,待本人确认)
 
-> meta: 2026-08-31 | 素材来源:BrainX 生产库(事件账本/承接/反馈/人工覆盖/群消息,截至当日)| 完成度 ~35%(纯素材段)| 断点:无
-> **本稿零采访生成。所有 `(待确认)` 段是 15 分钟确认访谈要问的;未标注段均有库内证据。**
+> meta: 2026-08-31 | 版本 v0 | 素材来源:BrainX 生产库(事件账本/承接/反馈/人工覆盖/群消息,截至当日)| 完成度 ~35%(纯素材段)| 断点:无
+> **本稿零采访生成。所有 `# 待确认` 段是 15 分钟确认访谈要问的;未标注段均有库内证据。**
 
 ## 1. 基本信息
 
@@ -14,32 +14,37 @@ workflow:
   - step: 接单判断(值不值得做)
     actions: [推荐榜扫读, 快速划过标记, 不感兴趣反馈(带原因)]
     tools: [BrainX 工作台]
-    duration: 单职位数秒("快速划过"×9 佐证)(待确认)
+    duration: 单职位数秒      # "快速划过"×9 佐证;待确认
     judgment: 方向匹配一票否决(23/35 条反馈原话为"方向不符/方向不对")
-    automation: B(待确认)
+    automation: B             # 待确认
+    detectability:            # 待确认
     automate_what: 按方向的初筛降权(系统已在做)
     never_automate: 接单/放弃的最终决定(待确认)
     data_now: BrainX recommendation_feedback
-  - step: 承接与优先级
+  - step: custom:承接与优先级
     actions: [ACCEPT 接单, RELEASE 释放(带原因), 行动项跟进]
     tools: [BrainX]
     judgment: 释放主因是精力/资源("资源不足"×2,"当前无法投入","当前没精力")+岗位去重("岗位重复")
-    automation: C(待确认)
+    automation: C             # 待确认
+    detectability:            # 待确认
     data_now: BrainX decision_events / commitment_actions
-  - step: 寻访与找人
+  - step: 简历搜寻
     actions: [openmai推荐, 寻访, 找新人]
     tools: [OpenMai(接单自动触发)]
-    automation: A 进行中(待确认:机器结果的人工复核比例)
+    automation: A             # 进行中;待确认:机器结果的人工复核比例
+    detectability:            # 待确认
     data_now: BrainX openmai_results
-  - step: 客户事实维护
+  - step: CRM 录入与数据维护
     actions: [人工事实覆盖:状态/阶段/管线/HC/备注]
     tools: [BrainX 覆盖层]
     judgment: 系统数据滞后时人工改(例:爱诗科技五连改)
-    automation: B(待确认)
+    automation: B             # 待确认
+    detectability:            # 待确认
     data_now: BrainX manual_fact_overrides
   - step: 结果反馈与复盘
     actions: [结果录入:推荐采纳→面试]
-    automation: C(待确认)
+    automation: C             # 待确认
+    detectability:            # 待确认
     data_now: BrainX job_outcomes
 # 素材覆盖不到的环节(必须访谈补):需求澄清、首次触达、跟进培育、推荐报告、面试辅导、offer 谈判、保过期
 ```
@@ -80,4 +85,4 @@ workflow:
 2. 触达与跟进话术(可授权从 job_messages 按 sender 提取,或本人贴聊天记录)
 3. 推荐报告样式与面试辅导(需贴一份脱敏推荐报告)
 4. offer 谈判与保过期(需访谈,约 10 分钟)
-5. 各 automation 分级确认(全稿逐条过,约 5 分钟)
+5. 各 automation 分级 + detectability 确认(全稿逐条过,约 5 分钟)

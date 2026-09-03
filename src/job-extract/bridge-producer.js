@@ -23,7 +23,9 @@ async function presetFromLlm(text) {
   try {
     const { isLlmConfigured } = await import('../llm.js');
     if (!isLlmConfigured()) return null;
-    const { extractLlm } = await import('./classify.js');
+    const { extractLlm, isJobRelevant } = await import('./classify.js');
+    // isJobRelevant 先行砍 LLM 调用（设计口径）：闲聊不烧额度
+    if (!isJobRelevant(text)) return null;
     const fields = await extractLlm(text);
     return fields && Object.values(fields).some((f) => f && f.text) ? fields : null;
   } catch { return null; }

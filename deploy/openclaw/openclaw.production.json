@@ -66,17 +66,24 @@
       "allowFrom": [
         "${BRAINX_FEISHU_ALLOWED_OPEN_ID_1}",
         "${BRAINX_FEISHU_ALLOWED_OPEN_ID_2}",
-        "${BRAINX_FEISHU_ALLOWED_OPEN_ID_3}"
+        "${BRAINX_FEISHU_ALLOWED_OPEN_ID_3}",
+        "${BRAINX_FEISHU_ALLOWED_OPEN_ID_4}",
+        "${BRAINX_FEISHU_ALLOWED_OPEN_ID_5}",
+        "${BRAINX_FEISHU_ALLOWED_OPEN_ID_6}"
       ],
       "groupPolicy": "allowlist",
       "groupAllowFrom": [
         "${BRAINX_FEISHU_ALLOWED_CHAT_ID_1}",
-        "${BRAINX_FEISHU_ALLOWED_CHAT_ID_2}"
+        "${BRAINX_FEISHU_ALLOWED_CHAT_ID_2}",
+        "${BRAINX_FEISHU_ALLOWED_CHAT_ID_3}"
       ],
       "groupSenderAllowFrom": [
         "${BRAINX_FEISHU_ALLOWED_OPEN_ID_1}",
         "${BRAINX_FEISHU_ALLOWED_OPEN_ID_2}",
-        "${BRAINX_FEISHU_ALLOWED_OPEN_ID_3}"
+        "${BRAINX_FEISHU_ALLOWED_OPEN_ID_3}",
+        "${BRAINX_FEISHU_ALLOWED_OPEN_ID_4}",
+        "${BRAINX_FEISHU_ALLOWED_OPEN_ID_5}",
+        "${BRAINX_FEISHU_ALLOWED_OPEN_ID_6}"
       ],
       "requireMention": true,
       "accounts": {

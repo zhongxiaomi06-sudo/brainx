@@ -112,7 +112,7 @@
 ### Implementation for User Story 4
 
 - [X] T024 [US4] 增加复用现有管理员 allowlist 的非敏感就绪清单和配置审计读取 `src/personal-model-routes.js`
-- [ ] T025 [US4] 增加不含正文/密钥的运维验收输出与文档 `docs/2026-09-03-openclaw-production-runbook.md`、`docs/2026-09-03-braintex-server-deployment-agent-manual.md`
+- [X] T025 [US4] 增加不含正文/密钥的运维验收输出与文档 `docs/2026-09-03-openclaw-production-runbook.md`、`docs/2026-09-03-braintex-server-deployment-agent-manual.md`
 
 **Checkpoint**: 管理员能判断谁可用，但无法通过 BrainX API 获得个人凭据
 
@@ -123,10 +123,10 @@
 **Purpose**: 发布一致性、安全回归和生产证据
 
 - [ ] T026 同步权威 PRD、部署手册、飞书首页说明、前端审核台账与审核记录 `docs/prd-2026-09-02-openclaw-ai-recruiting-workflow.md`、`docs/2026-09-03-braintex-feishu-home.md`、`docs/frontend-reviews/README.md`、`docs/frontend-reviews/2026-09-03-braintex-personal-model.md`
-- [ ] T027 运行专项、`npm run verify:quick`、干净提交后的 `npm run verify`，登记每个原子 commit `docs/AGENT_COMMIT_LOG.md`
-- [ ] T028 备份生产 OpenClaw state/config/SQLite/env，部署已验收 commit，确认重装不覆盖个人 Agent 数据 `specs/004-personal-model-config/quickstart.md`
+- [X] T027 运行专项、`npm run verify:quick`、干净提交后的 `npm run verify`，登记每个原子 commit `docs/AGENT_COMMIT_LOG.md`
+- [X] T028 备份生产 OpenClaw state/config/SQLite/env，部署已验收 commit，确认重装不覆盖个人 Agent 数据 `specs/004-personal-model-config/quickstart.md`
 - [ ] T029 绑定并验收 Mia、Felix、York、Wendy、Linda、Shanon 六人，至少由两位凭据所有者完成不同供应商真机问答 `specs/004-personal-model-config/quickstart.md`
-- [ ] T030 推送分支、更新 PR、复核远端 CI 与生产 commit 一致并登记最终证据 `docs/AGENT_COMMIT_LOG.md`
+- [X] T030 推送分支、更新 PR、复核远端 CI 与生产 commit 一致并登记最终证据 `docs/AGENT_COMMIT_LOG.md`
 
 ---
 

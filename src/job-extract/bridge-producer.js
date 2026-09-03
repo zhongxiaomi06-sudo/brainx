@@ -16,8 +16,21 @@ const INSERT_MSG_SQL = `INSERT OR IGNORE INTO lark_messages
   (message_id, chat_id, message_type, text, mentions_json, create_time, received_at)
   VALUES (?,?,?,?,?,?,?)`;
 
+/** E2 LLM 预抽取（异步层，AI_JOB_EXTRACT_ENABLED=1 且 llm 已配置时）：
+ * 至少一个有效字段才注入，否则让消费链走规则层（rules 保底）。 */
+async function presetFromLlm(text) {
+  if (process.env.AI_JOB_EXTRACT_ENABLED !== '1') return null;
+  try {
+    const { isLlmConfigured } = await import('../llm.js');
+    if (!isLlmConfigured()) return null;
+    const { extractLlm } = await import('./classify.js');
+    const fields = await extractLlm(text);
+    return fields && Object.values(fields).some((f) => f && f.text) ? fields : null;
+  } catch { return null; }
+}
+
 /** 单条消息：落原文表 → 追加账本 → 抽 draft。返回 {produced, draft_id?}。 */
-export function produceOne(db, { message_id, chat_id, msg_type = 'text', text = '',
+export async function produceOne(db, { message_id, chat_id, msg_type = 'text', text = '',
                                  sender = {}, mentions = [], create_time }) {
   const createIso = create_time ? new Date(Number(create_time)).toISOString() : now();
   const wrote = db.prepare(INSERT_MSG_SQL).run(message_id, chat_id, msg_type, String(text || ''),
@@ -31,19 +44,21 @@ export function produceOne(db, { message_id, chat_id, msg_type = 'text', text = 
     schema_version: 1,
   });
   if (!ev.ok) return { produced: false, reason: ev.reason };
-  const consumed = consumeJobExtract(db, ev.event.event_id);
+  const presetFields = await presetFromLlm(String(text || ''));
+  const consumed = consumeJobExtract(db, ev.event.event_id, { presetFields });
   return { produced: !ev.deduplicated, event_id: ev.event.event_id,
-           draft: consumed?.result?.draft_id || null, action: consumed?.result?.action || null };
+           draft: consumed?.result?.draft_id || null, action: consumed?.result?.action || null,
+           layer: consumed?.result?.layer || (presetFields ? 'llm' : 'rules') };
 }
 
 /** 一批 bridge 消息（与 ingestMessages 同批）：逐条生产+抽取，返回计数。 */
-export function produceAndExtract(db, chat_id, messages) {
+export async function produceAndExtract(db, chat_id, messages) {
   let produced = 0, drafts = 0, skipped = 0;
   for (const m of messages || []) {
     if (!m?.message_id) { skipped++; continue; }
     const text = typeof m.content === 'string' ? m.content
       : (m.content?.text ?? JSON.stringify(m.content ?? ''));
-    const r = produceOne(db, { message_id: m.message_id, chat_id, msg_type: m.msg_type || 'text',
+    const r = await produceOne(db, { message_id: m.message_id, chat_id, msg_type: m.msg_type || 'text',
                                text, sender: m.sender, mentions: m.mentions,
                                create_time: m.create_time });
     if (r.produced) produced++;
@@ -55,14 +70,14 @@ export function produceAndExtract(db, chat_id, messages) {
 
 /** 回填：从 job_messages 表（bridge 已落库的历史消息）补进提炼闭环。
  * 用途：handler 上线前的存量消息补课；按 chat_id+天数窗口，幂等安全。 */
-export function backfillFromJobMessages(db, { chat_id = null, days = 7, limit = 500 } = {}) {
+export async function backfillFromJobMessages(db, { chat_id = null, days = 7, limit = 500 } = {}) {
   const cutoff = new Date(Date.now() - days * 86400000).toISOString();
   const rows = db.prepare(`SELECT message_id, chat_id, msg_type, text, sent_at
     FROM job_messages WHERE ingested_at >= ? ${chat_id ? 'AND chat_id=?' : ''}
     ORDER BY ingested_at ASC LIMIT ?`).all(...(chat_id ? [cutoff, chat_id, limit] : [cutoff, limit]));
   let produced = 0, drafts = 0;
   for (const r of rows) {
-    const out = produceOne(db, { message_id: r.message_id, chat_id: r.chat_id,
+    const out = await produceOne(db, { message_id: r.message_id, chat_id: r.chat_id,
                                  msg_type: r.msg_type, text: r.text, create_time: Date.parse(r.sent_at) || null });
     if (out.produced) produced++;
     if (out.draft) drafts++;

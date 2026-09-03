@@ -16,7 +16,7 @@
 **Purpose**: 固定契约、迁移和可注入边界
 
 - [X] T001 新增个人模型非敏感状态迁移与迁移回归测试 `migrations/0036_consultant_model_profiles.sql`、`tests/personal-model-config.test.mjs`
-- [ ] T002 [P] 定义个人模型供应商目录、输入校验、错误类型和 OpenClaw 运行路径配置 `src/personal-model-config.js`
+- [X] T002 [P] 定义个人模型供应商目录、输入校验、错误类型和 OpenClaw 运行路径配置 `src/personal-model-config.js`
 - [X] T003 [P] 增加生产功能开关、OpenClaw state/config/bin/account 环境模板 `deploy/openclaw/openclaw.env.example`、`.env.example`
 
 **Checkpoint**: 数据状态与配置入口存在，尚不写任何真实凭据
@@ -27,8 +27,8 @@
 
 **Purpose**: 先证明个人 Agent、凭据和发布不会互相覆盖
 
-- [ ] T004 先写并运行两顾问 Agent 派生、binding 校验、stdin 密钥、固定参数、超时与泄密负向测试 `tests/personal-model-config.test.mjs`
-- [ ] T005 实现无 shell OpenClaw CLI runner、个人 Agent binding 解析、每顾问并发闸和安全错误归一化 `src/personal-model-config.js`
+- [X] T004 先写并运行两顾问 Agent 派生、binding 校验、stdin 密钥、固定参数、超时与泄密负向测试 `tests/personal-model-config.test.mjs`
+- [X] T005 实现无 shell OpenClaw CLI runner、个人 Agent binding 解析、每顾问并发闸和安全错误归一化 `src/personal-model-config.js`
 - [X] T006 先写并运行动态 Agent、会话 self、agent-to-agent 关闭、无全局 StepFun、共享 Skills 与升级保留配置测试 `tests/openclaw-production-config.test.mjs`
 - [X] T007 实现 OpenClaw 动态个人 Agent、安全会话/模型作用域、批准 provider catalog 和无全局个人凭据配置 `deploy/openclaw/openclaw.production.json`
 - [X] T008 改造安装器为首次 seed、升级验证式 patch，并把七个 Skill 安装到 state 级共享目录 `deploy/openclaw/install.sh`
@@ -50,7 +50,7 @@
 
 ### Implementation for User Story 1
 
-- [ ] T011 [US1] 实现按当前 session open_id 查个人 Agent、写个人 auth profile、设置 Agent 显式 model 和非敏感审计状态 `src/personal-model-config.js`
+- [X] T011 [US1] 实现按当前 session open_id 查个人 Agent、写个人 auth profile、设置 Agent 显式 model 和非敏感审计状态 `src/personal-model-config.js`
 - [ ] T012 [US1] 实现 GET/PUT personal model API 并挂载到现有登录鉴权 `src/personal-model-routes.js`、`src/server.js`
 - [ ] T013 [US1] 实现前端 API 客户端和个人模型表单，不把 Key 放入 URL/持久化/错误消息 `frontend/btex-frontend/app/personal-model-api.ts`、`frontend/btex-frontend/app/personal-model-panel.tsx`、`frontend/btex-frontend/app/personal-model-panel.css`
 - [ ] T014 [US1] 把个人模型分组接入真实设置中心并加载当前顾问状态 `frontend/btex-frontend/app/settings-center-review.tsx`、`frontend/btex-frontend/app/workbench-settings-page.tsx`

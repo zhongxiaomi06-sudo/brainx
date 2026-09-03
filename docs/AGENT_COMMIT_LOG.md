@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-03｜feat(model): 隔离写入顾问个人模型凭据
+
+- 入口：实现 OpenAI、Anthropic、Google Gemini、StepFun 四类个人模型校验；拒绝客户端指定身份、Agent、命令、参数、环境变量或自定义网络地址。
+- 隔离：以登录顾问和飞书 open_id 双重核对现有 ACTIVE 业务绑定，再按 OpenClaw 精确 direct peer binding 找到个人 Agent；密钥只通过子进程 stdin 写入该 Agent 的 auth profile。
+- 防护：固定 CLI 参数、禁用 shell、限制输出和执行时间、每顾问互斥写入；业务库只保存非敏感状态，失败归一化且尝试恢复原模型。
+- 验证：先记录缺实现的失败测试；随后两顾问不同供应商隔离、密钥不进 argv/DB、身份错配和并发冲突共 6 条专项通过，快速门禁 16/16 通过。
+
 ## 2026-09-03｜fix(openclaw): 移除共享模型并保护个人 Agent
 
 - 模型：撤销全局 StepFun 密钥、默认模型和别名；四类供应商只保留可选目录，具体模型和凭据归每位顾问的个人 Agent。

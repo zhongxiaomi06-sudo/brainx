@@ -4,6 +4,7 @@ import { jobVisibleTo } from '../visibility.js';
 import { relationOf } from '../relations.js';
 import { currentState } from '../engagement.js';
 import { startOpenmaiTask, getOpenmaiResult } from '../openmai-task.js';
+import { supermaiScoutMatch, getSupermaiCredentials, markSupermaiReauth } from '../supermai-sourcing.js';
 import { getPushPreferences } from '../push-preferences.js';
 
 function fail(code) {
@@ -204,6 +205,37 @@ function openmaiSearch(db, args, principal) {
   };
 }
 
+/** SuperMai 多源搜索（第 22 工具，2026-09-03）：调用 SuperMai 云端 sourcing API
+ * 在领英/GitHub/论文渠道搜索候选人，补充 OpenMai 的 BOSS/脉脉/猎聘渠道。
+ * 凭证从 supermai_credentials 表读取（AES-GCM 加密，同 ttc_tokens 安全纪律）。 */
+async function supermaiScout(db, args, principal) {
+  const creds = getSupermaiCredentials(db, principal.consultantId);
+  if (!creds) fail('SOURCE_UNAVAILABLE');
+  try {
+    const result = await supermaiScoutMatch({
+      criteria: args.criteria,
+      sources: args.sources,
+      limit: args.limit,
+      _credentials: creds,
+    });
+    return {
+      data: result,
+      facts: [],
+      inferences: result.top_candidates?.slice(0, 3).map((c) => ({
+        candidate_ref: c.ref_id, source: c.source_cn, name: c.name, score: c.score,
+      })) || [],
+      recommendations: result.top_candidates?.slice(0, 5).map((c) =>
+        `[${c.source_cn}] ${c.name} ${c.score}分${c.headline ? ` ${c.headline}` : ''}｜${c.reason}`) || [],
+      unknowns: result.empty_reason ? ['未找到匹配候选人，建议调整判据重试'] : [],
+      evidence_refs: [`supermai_scout:${args.criteria.slice(0, 40)}`],
+    };
+  } catch (error) {
+    if (error.code === 'AUTH_EXPIRED') markSupermaiReauth(db, principal.consultantId);
+    if (error.code === 'SOURCE_UNAVAILABLE') fail('SOURCE_UNAVAILABLE');
+    throw error;
+  }
+}
+
 export function createJobToolHandlers({ db }) {
   return {
     brainx_me_context: (args, context) => meContext(db, context.principal),
@@ -213,5 +245,6 @@ export function createJobToolHandlers({ db }) {
     brainx_personal_review: (args, context) => personalReview(db, args, context.principal),
     brainx_run_status: (args, context) => runStatus(db, args, context.principal),
     brainx_openmai_search: (args, context) => openmaiSearch(db, args, context.principal),
+    brainx_supermai_scout: async (args, context) => supermaiScout(db, args, context.principal),
   };
 }

@@ -23,6 +23,7 @@ export const BRAINX_OPENCLAW_TOOLS = Object.freeze([
   { name: 'brainx_personal_review', purpose: () => 'personal_review', parameters: object({ date_from: string({ pattern: '^\\d{4}-\\d{2}-\\d{2}$' }), date_to: string({ pattern: '^\\d{4}-\\d{2}-\\d{2}$' }) }, ['date_from', 'date_to']), description: '读取当前顾问个人复盘数据。' },
   { name: 'brainx_run_status', purpose: () => 'run_status', parameters: object({ run_id: string() }, ['run_id']), description: '查询当前顾问本人任务运行状态。' },
   { name: 'brainx_openmai_search', purpose: () => 'candidate_review', parameters: object({ job_id: string() }, ['job_id']), description: '为当前顾问有权查看的职位启动一次 OpenMai 候选人搜索。' },
+  { name: 'brainx_supermai_scout', purpose: () => 'candidate_review', parameters: object({ criteria: string({ minLength: 5, maxLength: 2000 }), sources: array(string({ enum: ['linkedin', 'github', 'paper'] }), 1, 3), limit: integer(1, 50) }, ['criteria']), description: '通过 SuperMai 云端 sourcing 在领英/GitHub/论文渠道多源搜索候选人，补充 OpenMai 的 BOSS/脉脉/猎聘渠道。' },
   { name: 'brainx_pending_job_facts', purpose: () => 'job_fact_review', parameters: object({ limit: integer(1, 20) }), description: '在私聊中列出当前顾问所在已登记群的待确认职位事实。' },
   { name: 'brainx_review_job_fact', purpose: () => 'job_fact_review', parameters: object({ draft_id: string(), action: string({ enum: ['confirm', 'reject'] }), job_id: string(), confirm: boolean() }, ['draft_id', 'action', 'confirm']), description: '在私聊中经用户明确确认后确认或拒绝一条本人可见的职位事实草稿。' },
   { name: 'brainx_push_preferences', purpose: () => 'preferences', parameters: object({}), description: '读取本人每天的职位推荐时间和数量设置。' },

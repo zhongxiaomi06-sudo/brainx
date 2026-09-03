@@ -1,5 +1,15 @@
 # Agent Commit 记录
 
+## 2026-09-03｜feat(sourcing): 集成 SuperMai 多源候选人搜索工具
+
+- 目标：搜索来源越多越好——在 OpenMai（BOSS/脉脉/猎聘）之外新增 SuperMai 云端 sourcing（领英/GitHub/论文），实现多渠道候选人搜索。
+- 逆向分析：解包 SuperMai 桌面端 v0.3.6 dmg，确认其核心 harness 通过 `createCloudClient({ baseUrl: cloud_base_url, token })` 调用云端 sourcing API（`/search/scout/match`），认证来自 TTC 登录。BrainX 不需要安装桌面端，直接调用同一云端 API。
+- 新增模块：`src/supermai-sourcing.js`——`supermaiScoutMatch()` 调用云端 sourcing API，支持领英/GitHub/论文三渠道；凭证管理（AES-GCM 加密存储，同 ttc_tokens 安全纪律）。
+- 新增工具：`brainx_supermai_scout`（第 22 个生产工具）——参数 `{ criteria, sources?, limit? }`，返回多源候选人匹配结果。
+- 数据库迁移：`migrations/0036_supermai_credentials.sql`——凭证表。
+- 全面对齐：tool-registry、runtime.js、openclaw.plugin.json、openclaw.production.json、plugin-contract fixture、4 个测试断言 21→22。
+- 验证：quick 门禁 16/16 通过；受影响测试 17/17 通过。
+
 ## 2026-09-03｜fix(test): worker 保活测试等就绪日志消除负载竞态假失败
 
 - 根因：测试固定 sleep 2s 后发 SIGTERM，full 门禁连跑 493 个测试时机器负载高、worker 启动变慢，信号可能在 SIGTERM 处理器注册前送达，被默认行为杀死（exit code null），实测 `SIGTERM 应干净退出` 偶发失败（492/493）。

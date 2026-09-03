@@ -47,6 +47,11 @@ export const AGENT_TOOL_ROWS = Object.freeze([
   { name: 'brainx_openmai_search', purpose: ['candidate_review'], parameters: object({
     job_id: string(),
   }, ['job_id']), projectKey: 'job_id' },
+  { name: 'brainx_supermai_scout', purpose: ['candidate_review'], parameters: object({
+    criteria: string({ minLength: 5, maxLength: 2000 }),
+    sources: array(string({ enum: ['linkedin', 'github', 'paper'] }), 1, 3),
+    limit: integer(1, 50),
+  }, ['criteria']), projectKey: 'criteria' },
   { name: 'brainx_pending_job_facts', purpose: ['job_fact_review'], p2pOnly: true, parameters: object({
     limit: integer(1, 20),
   }) },

@@ -57,6 +57,10 @@ test('MCP：initialize → tools/list → tools/call 全链', async () => {
                      'brainx_record_outcome', 'brainx_push_preview']) {
       assert.ok(names.includes(t), `缺工具 ${t}`);
     }
+    // B 档安全硬前置（501b9bd）：黑名单工具不外露
+    for (const t of ['brainx_sync_now', 'brainx_talent']) {
+      assert.ok(!names.includes(t), `黑名单工具 ${t} 不应出现在 tools/list`);
+    }
     assert.equal(names.includes('brainx_sync_now'), false, '危险同步工具不得通过 MCP 对外暴露');
 
     // 花名册（openDb 自动播种）

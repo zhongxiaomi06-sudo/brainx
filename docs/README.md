@@ -4,22 +4,6 @@
 
 这里是仓库文档的统一入口。任何 Agent 读完根目录 `AGENTS.md` 后，都必须先到这里判断本次任务需要阅读哪些文档，不得在不了解相关约束时直接修改代码。
 
-## 唯一 PRD、文档目标与任务框架
-
-项目唯一产品 PRD 是 [BrainX 猎头业务工作流产品 PRD（2026-09-02 当前目标）](prd-2026-09-02-brainx-workflow.md)。它以用户当天最新要求为裁决依据：群聊是主要工作入口，一面之前由 AI Leader 主动串联，一面之后由日历助手提醒；8 月职位决策工作台 PRD只保留为历史产品基线。
-
-| 层级 | 目标 | 权威载体 | 完成判定 |
-|---|---|---|---|
-| P0 产品 | 明确为什么做、为谁做、做什么与不做什么 | 唯一产品 PRD | 产品 DoD 可验证且范围无冲突 |
-| P1 架构 | 说明系统如何分层、模块如何协作、信任边界在哪里 | 全景蓝图、Workflow Hub、后端核实基线 | 契约与真实调用链一致 |
-| P2 功能 | 把一个可交付变化写成可验收规格 | `specs/<feature>/spec.md` | 需求与验收场景明确 |
-| P3 施工 | 明确实现方案、依赖顺序和可勾选任务 | 同目录 `plan.md`、`tasks.md` | 任务完成并有对应测试 |
-| P4 证据 | 记录代码、测试、发布和真实数据状态 | CI/质量门禁、前端审核台账、Commit 记录 | 证据来自当前 commit 和目标环境 |
-
-任务只能按 `产品 PRD → feature spec → plan → tasks → implement → converge → 完整验证 → commit/PR` 流转。
-`2026-09-02-gap-and-next-actions.md` 只负责跨功能优先级与阻塞，不替代任何 feature 的 `tasks.md`；
-没有激活 feature 时表示当前没有进入实现阶段的新增功能，不应为了让工具通过而创建空规格。
-
 ## 所有任务的固定阅读顺序
 
 1. [多 Agent 协作准则](../AGENTS.md)
@@ -31,14 +15,14 @@
 
 | 任务类型 | 必读文档 |
 |---|---|
-| 产品范围、功能规划或产品验收标准 | [唯一产品 PRD](prd-2026-09-02-brainx-workflow.md)；[8 月工作台 PRD](prd-2026-08-24-brainx-v2.md)仅作历史基线 |
+| 产品范围、功能规划或验收标准 | [BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md) |
 | 最终产品形态、跨前后端施工顺序或总体验收 | [BrainX 最终交付蓝图与施工总清单](brainx-final-delivery-blueprint.md) |
 | BrainX×reloop 工作流总线、身份、Case 或跨系统桥接 | [Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) |
 | 全景架构、技术施工安排、分步代码逻辑或组件选型 | [全景架构与技术施工蓝图](architecture-2026-09-01-full-blueprint.md)、[Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) |
 | 开源组件复用、自建边界或权限最小集 | [复用与自建边界及权限需求 PRD](prd-2026-09-01-reuse-selfbuild-boundary.md)、[全景架构与技术施工蓝图](architecture-2026-09-01-full-blueprint.md) |
 | spec-kit、规格驱动开发或 constitution 修订 | [规范驱动研发流程](standards/SPEC_DRIVEN_WORKFLOW.md)、[多 Agent 协作准则](../AGENTS.md) |
 | 参考代码镜像、开源仓库学习或外部设计对照 | [参考代码本地镜像清单](standards/REFERENCE_REPOS.md)、[全景架构与技术施工蓝图](architecture-2026-09-01-full-blueprint.md) |
-| 飞书群聊工作流、BrainTex 机器人、事件/卡片回调或信息鉴权分工 | [BrainTex 群聊工作流技术 PRD](prd-2026-09-01-brainx-group-workflow.md)、[Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) |
+| 飞书群聊工作流、BrainTex 机器人、事件/卡片回调或信息鉴权分工 | [BrainTex 群聊工作流技术 PRD](prd-2026-09-01-braintex-group-workflow.md)、[Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) |
 | OpenClaw 壳子、Skill 编写、飞书渠道接入或外部 Agent 边界 | [OpenClaw 壳子 + 自写 Skill 架构](2026-09-02-openclaw-shell-architecture.md)、[复用与自建边界及权限需求 PRD](prd-2026-09-01-reuse-selfbuild-boundary.md) |
 | DataClaw 交流会索取清单、接口谈判或外部 Agent 边界 | [OpenClaw 壳子 + 自写 Skill 架构](2026-09-02-openclaw-shell-architecture.md)、[DataClaw 集成交流会历史底稿](2026-09-02-dataclaw-integration-brief.md) |
 | **BrainX 下游交付、MCP server 工具契约、接口打包或部署** | **[BrainX 下游交付文档](2026-09-02-brainx-mcp-deliverable.md)**（用户职责边界内）、[OpenClaw 壳子架构 §6 接口挂载](2026-09-02-openclaw-shell-architecture.md) |
@@ -47,7 +31,6 @@
 | **给 OpenClaw 侧打包对接信息、MCP 接入配置、consultant_id 映射规则或 Skill 交付** | **[BrainX → OpenClaw 接口包](2026-09-02-openclaw-interface-pack.md)**（三接缝一屏 + 15 工具快照 + 交付包清单）、[下游交付文档](2026-09-02-brainx-mcp-deliverable.md) |
 | **群消息读取归谁（OpenClaw 还是后端）** | **[后端侧模块结构 §1 边界裁定](2026-09-02-backend-module-structure.md)**（**关键纠正：通道层 `src/gateway/ws-client.js` 已在后端仓库建成，不依赖 OpenClaw**）、[飞书权限清单 §6.1](2026-09-02-feishu-permission-scopes.md) |
 | **现在还缺什么、下一步做什么** | **[缺口与下一步总表](2026-09-02-gap-and-next-actions.md)**（五档缺口 + 优先级裁定 + 顺序建议）。**当前全局卡点：飞书 4 个凭证未配**（`.env` 里 `LARK_*` 零命中），卡住 E1 验证与 9/3 demo |
-| **后端架构全貌、现状核实结论或"什么算做完"** | **[后端架构核实与验收基线](prd-2026-09-02-backend-architecture.md)**（六层现状、差距、关键路径与验收证据，不是产品 PRD）、[后端侧模块结构](2026-09-02-backend-module-structure.md) |
 | **飞书后台要勾选哪些权限/scope、事件订阅、敏感权限审批** | **[飞书权限清单（9/2 研发对齐会定论版）](2026-09-02-feishu-permission-scopes.md)**、`src/oauth.js` 用户身份 scope 实证注释 |
 | **这个架构承担哪些业务工作、每段业务走哪个工具** | **[业务工作全景](2026-09-02-business-work-breakdown.md)**（全链路六段 + MVP 每日循环 + 权限对照）、**[AI leader 工作流 + 日历助手](2026-09-02-ai-leader-workflow.md)**（一面前后两种形态）、[Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) |
 | **一面之前怎么串联 AI leader 工作流 / 一面之后的待办提醒** | **[AI leader 工作流 + 日历助手](2026-09-02-ai-leader-workflow.md)**、`src/scheduler.js` `src/engagement.js` `src/push.js` |
@@ -98,7 +81,7 @@
 - [AI leader 工作流 + 日历助手](2026-09-02-ai-leader-workflow.md)：**一面是产品形态的分界线**——一面之前是 AI leader 主动串联推进，一面之后是日历助手只做「你什么活没干」的提醒。含前半段逐环节现状审计（**发现约面/一面在 `src/` 与 migrations 中零命中，从未被建模**）、串联触发链（含 **9/2 晚 York 群主邀请路径把 ① 段高敏感卡点降级**）、后半段现有家底清单（`scheduler.js` 早晚两次调度 + `commitmentSummary` 的 `need_action_count` 待办判断 + `push.js` 卡片 **均已建成且在跑**）、还缺的三件事（**待办提醒卡**、`next_action` 是硬编码占位符、弹窗时机）。落地顺序建议：**先做后半段 2 天出效果，再做接单自动找人 1 天，最后才碰约面/一面建模**。
 - [工具外露白名单（全量）](2026-09-02-tool-exposure-whitelist.md)：挂在 OpenClaw 前哪些工具能外露的唯一权威。含**两套工具集纠正**（registry 15 个与 MCP server 15 个交集仅 8 个，此前被混为一谈）、**MCP 独有 7 个写操作补审**（`brainx_sync_now` 默认 `source='fixture'`+`dry_run=false` 会把决策库刷成测试数据，比 `brainx_talent` 的隐私泄漏更致命）、合并后的最终白名单表、防止再漏守门的测试与 checklist。
 - [Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md)：BrainX、reloop、TTC、飞书与 OpenMai 的身份纠错、Case 状态机、持久事件、Saga、隐私和施工顺序。
-- [BrainTex 群聊工作流技术 PRD](prd-2026-09-01-brainx-group-workflow.md)：群聊驱动的最终信息架构、五信任域、事件与卡片回调、内外部安全视图、P0-P3 权限模型、鉴权模块实现归属与上线门禁。
+- [BrainTex 群聊工作流技术 PRD](prd-2026-09-01-braintex-group-workflow.md)：群聊驱动的最终信息架构、五信任域、事件与卡片回调、内外部安全视图、P0-P3 权限模型、鉴权模块实现归属与上线门禁。
 - [全景架构与技术施工蓝图](architecture-2026-09-01-full-blueprint.md)：全本机规范收拢后的完整业务架构、四进程技术拓扑、9 张新表、分步代码逻辑（Step 0-7）与开源组件选型结论，附 §9.2 逐仓核实修订。
 - [复用与自建边界及权限需求 PRD](prd-2026-09-01-reuse-selfbuild-boundary.md)：每步"直接可用/借鉴/必须自建"三色清单、七件自建件、飞书权限最小集与明确不采用清单。
 - [AI Native 猎头工作流架构图](design/architecture-workflow.html)：面向业务与 York 的三泳道主循环、人工边界、缺口和数据沉淀视图，附 2026-09-01 施工现状对照。

@@ -26,6 +26,7 @@
     ".toml"
   ],
   "excludedPrefixes": [
+    "_archive/",
     ".specify/scripts/bash/",
     ".prd_pages/",
     ".quality-gate/reports/",
@@ -33,7 +34,8 @@
     "frontend/btex-frontend/dist/",
     "frontend/btex-frontend/.next/",
     "frontend/btex-frontend/.wrangler/",
-    "frontend/btex-frontend/storybook-static/"
+    "frontend/btex-frontend/storybook-static/",
+    "frontend/btex-frontend/reference/"
   ],
   "excludedFiles": [],
   "excludedBasenames": [
@@ -45,6 +47,8 @@
     ".quality-gate/reports/"
   ],
   "textHygieneExcludedPrefixes": [
+    "_archive/",
+    "docs/archive/",
     ".prd_pages/",
     ".quality-gate/reports/"
   ],

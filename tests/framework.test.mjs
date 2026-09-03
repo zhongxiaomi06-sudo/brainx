@@ -206,7 +206,7 @@ test('migrations：旧库 user_version=2 兼容——前 2 个文件标记已应
   legacy.close();
   const reopened = openDb(TMPDB);
   const rows = reopened.prepare('SELECT name FROM schema_migrations ORDER BY name').all().map((r) => r.name);
-  assert.equal(rows.length, 33); // 全部记账（含 Step 0/1 事件、实体、Case、DLQ、群消息与草稿表）
+  assert.equal(rows.length, 33); // 全部记账（…0022 忽略事实 + 0023-0031 工作流/E3 批次）
   assert.equal(reopened.prepare(`SELECT COUNT(*) n FROM decision_events
     WHERE event_type='RECOMMENDED'`).get().n, 0, '历史机器推荐轨迹已清理');
   assert.equal(reopened.prepare(`SELECT COUNT(*) n FROM decision_events

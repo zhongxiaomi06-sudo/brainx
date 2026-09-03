@@ -12,6 +12,7 @@
 
 - BrainX 正式应用与数据库迁移：仓库根目录、`migrations/`、`talent-migrations/`。
 - BrainX 原生 OpenClaw 插件：`plugins/brainx-openclaw/`。
+- 官方飞书渠道插件：安装器固定安装已核实存在且兼容宿主的 `@openclaw/feishu@2026.7.1`。
 - OpenClaw 固定生产配置：`deploy/openclaw/openclaw.production.json`。
 - 无密钥环境模板：`deploy/openclaw/brainx-agent.env.example`、`deploy/openclaw/brainx-worker.env.example`、`deploy/openclaw/openclaw.env.example`。
 - 三个常驻服务：`deploy/systemd/brainx-agent-gateway.service`、`brainx-integration-worker.service`、`openclaw-brainx.service`。
@@ -106,6 +107,7 @@ chown root:brainx /etc/brainx/agent.env /etc/brainx/worker.env /etc/brainx/openc
 - `BRAINX_AGENT_ASSERTION_SECRET` 在两个文件中必须相同；
 - Gateway token、assertion secret、audit key、OpenClaw gateway token 必须分别随机生成且不少于 32 字节，不能复用；
 - `BRAINX_AGENT_FEISHU_APP_KEYS_JSON` 中的 account 名必须与 OpenClaw 飞书 account 一致；
+- 三个 `BRAINX_FEISHU_ALLOWED_OPEN_ID_*` 对应三名灰度顾问，两个 `BRAINX_FEISHU_ALLOWED_CHAT_ID_*` 对应两个白名单测试群；
 - Agent Gateway 的 RDS 账号必须只读，worker 使用另一个最小 DML 账号；
 - 飞书 App Secret、模型密钥、RDS 密码只留在服务器环境文件；
 - 文档原文未获数据责任人批准前，保持 `BRAINX_DOCUMENT_LLM_ENABLED=0`。

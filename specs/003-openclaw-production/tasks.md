@@ -140,4 +140,4 @@
 ## Phase 9: Convergence
 
 - [x] T048 将 Agent Gateway 的 RDS 只读环境与 integration worker 的最小 DML 环境拆分，并更新 systemd、安装器、测试和交接说明 per Constitution III / FR-005 / FR-019 (contradicts, CRITICAL)
-- [ ] T049 让锁定版生产飞书配置显式容纳最多 3 名灰度顾问与 2 个白名单群，并补充配置一致性测试 per SC-001 / US4/AC2 (partial, HIGH)
+- [x] T049 让锁定版生产飞书配置显式容纳最多 3 名灰度顾问与 2 个白名单群，并补充配置一致性测试 per SC-001 / US4/AC2 (partial, HIGH)

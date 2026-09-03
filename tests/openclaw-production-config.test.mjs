@@ -34,14 +34,22 @@ test('production config isolates sessions, sandboxes all runs, and exposes no pl
 
 test('Feishu is websocket-only, allowlisted, and mention-gated in groups', () => {
   const feishu = config.channels.feishu;
+  const allowedPeople = [
+    '${BRAINX_FEISHU_ALLOWED_OPEN_ID_1}',
+    '${BRAINX_FEISHU_ALLOWED_OPEN_ID_2}',
+    '${BRAINX_FEISHU_ALLOWED_OPEN_ID_3}',
+  ];
   assert.equal(feishu.connectionMode, 'websocket');
   assert.equal(feishu.dmPolicy, 'allowlist');
   assert.equal(feishu.groupPolicy, 'allowlist');
   assert.equal(feishu.requireMention, true);
-  assert.deepEqual(feishu.allowFrom, ['${BRAINX_FEISHU_ALLOWED_OPEN_ID}']);
-  assert.deepEqual(feishu.groupAllowFrom, ['${BRAINX_FEISHU_ALLOWED_OPEN_ID}']);
-  assert.equal(feishu.groups['${BRAINX_FEISHU_ALLOWED_CHAT_ID}'].requireMention, true);
-  assert.deepEqual(feishu.groups['${BRAINX_FEISHU_ALLOWED_CHAT_ID}'].allowFrom, ['${BRAINX_FEISHU_ALLOWED_OPEN_ID}']);
+  assert.deepEqual(feishu.allowFrom, allowedPeople);
+  assert.deepEqual(feishu.groupAllowFrom, [
+    '${BRAINX_FEISHU_ALLOWED_CHAT_ID_1}',
+    '${BRAINX_FEISHU_ALLOWED_CHAT_ID_2}',
+  ]);
+  assert.deepEqual(feishu.groupSenderAllowFrom, allowedPeople);
+  assert.equal(feishu.groups, undefined);
 });
 
 test('systemd units keep internal services on one host and load secrets from protected files', async () => {
@@ -63,8 +71,20 @@ test('systemd units keep internal services on one host and load secrets from pro
   assert.match(installer, /openclaw\.env\.example/);
   assert.match(installer, /OPENCLAW_CONFIG_PATH=/);
   assert.match(installer, /OPENCLAW_STATE_DIR=/);
+  assert.match(installer, /@openclaw\/feishu@2026\.7\.1/);
   assert.doesNotMatch(installer, /\$\{env_name\}\.env\.example/);
   assert.doesNotMatch(installer, /install -m 0600 -o root -g brainx/);
+});
+
+test('OpenClaw env template provides three consultants and two groups', async () => {
+  const template = await readFile(new URL('deploy/openclaw/openclaw.env.example', root), 'utf8');
+  for (const suffix of ['1', '2', '3']) {
+    assert.match(template, new RegExp(`^BRAINX_FEISHU_ALLOWED_OPEN_ID_${suffix}=`, 'm'));
+  }
+  for (const suffix of ['1', '2']) {
+    assert.match(template, new RegExp(`^BRAINX_FEISHU_ALLOWED_CHAT_ID_${suffix}=`, 'm'));
+  }
+  assert.doesNotMatch(template, /^BRAINX_FEISHU_ALLOWED_(OPEN|CHAT)_ID=/m);
 });
 
 test('Agent env template uses the exact variable names consumed by runtime', async () => {

@@ -2,6 +2,12 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-03｜fix(feishu): 补齐三人两群生产白名单
+
+- 根因：旧生产模板只能配置一人一群，并错误地把用户 `open_id` 放入 Feishu 的群 ID 白名单；进一步用锁定版 `config get` 实测确认环境变量不会替换 JSON 对象键，原 `groups.${CHAT_ID}` 写法真实运行时无法命中。
+- 修复：完成 T049；DM allowlist 与群 sender allowlist 显式容纳三名顾问，`groupAllowFrom` 使用两个可展开的群 ID 值，统一强制 @；安装器补装并锁定经 npm 元数据核实兼容的官方 `@openclaw/feishu@2026.7.1`，支持幂等覆盖安装。
+- 验证：先让旧配置在新增测试中失败；修复后部署配置专项 7/7 通过，锁定版 OpenClaw `config validate` 返回 valid，运行时配置读取确认三人和两群均展开成实际 ID，未调用模型。
+
 ## 2026-09-03｜fix(auth): 分离 Agent 与 worker 人才库权限
 
 - 收敛：`speckit-converge` 回扫 21 条功能需求、12 条成功标准、4 个用户故事和 5 条 constitution 原则，发现 Agent/worker 共用 DML 凭据，以及生产模板不足以容纳三人两群两项 HIGH 以上缺口，追加 T048-T049。

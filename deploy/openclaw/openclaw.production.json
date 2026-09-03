@@ -63,16 +63,22 @@
       "connectionMode": "websocket",
       "defaultAccount": "mia",
       "dmPolicy": "allowlist",
-      "allowFrom": ["${BRAINX_FEISHU_ALLOWED_OPEN_ID}"],
+      "allowFrom": [
+        "${BRAINX_FEISHU_ALLOWED_OPEN_ID_1}",
+        "${BRAINX_FEISHU_ALLOWED_OPEN_ID_2}",
+        "${BRAINX_FEISHU_ALLOWED_OPEN_ID_3}"
+      ],
       "groupPolicy": "allowlist",
-      "groupAllowFrom": ["${BRAINX_FEISHU_ALLOWED_OPEN_ID}"],
+      "groupAllowFrom": [
+        "${BRAINX_FEISHU_ALLOWED_CHAT_ID_1}",
+        "${BRAINX_FEISHU_ALLOWED_CHAT_ID_2}"
+      ],
+      "groupSenderAllowFrom": [
+        "${BRAINX_FEISHU_ALLOWED_OPEN_ID_1}",
+        "${BRAINX_FEISHU_ALLOWED_OPEN_ID_2}",
+        "${BRAINX_FEISHU_ALLOWED_OPEN_ID_3}"
+      ],
       "requireMention": true,
-      "groups": {
-        "${BRAINX_FEISHU_ALLOWED_CHAT_ID}": {
-          "requireMention": true,
-          "allowFrom": ["${BRAINX_FEISHU_ALLOWED_OPEN_ID}"]
-        }
-      },
       "accounts": {
         "mia": {
           "name": "Mia / BrainX",

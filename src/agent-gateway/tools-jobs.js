@@ -3,6 +3,7 @@ import { latestRun } from '../recommend.js';
 import { jobVisibleTo } from '../visibility.js';
 import { relationOf } from '../relations.js';
 import { currentState } from '../engagement.js';
+import { startOpenmaiTask, getOpenmaiResult } from '../openmai-task.js';
 
 function fail(code) {
   throw Object.assign(new Error(code), { code });
@@ -174,6 +175,33 @@ function runStatus(db, args, principal) {
   return { data: run, facts: [{ run_ref: args.run_id, status: run.status }], inferences: [], recommendations: [], unknowns: [], evidence_refs: [`run:${args.run_id}`] };
 }
 
+/** OpenMai 找人（第 11 工具，2026-09-03）：纪律与承接路由一致——
+ * 仅本人 ACCEPTED/COMPLETED 的职位可触发/读取（fail-closed，不泄露存在性）。
+ * 费用门控：done 读缓存、running 报状态、其他才触发新任务（防重复费用）。 */
+function openmaiSearch(db, args, principal) {
+  const row = db.prepare('SELECT * FROM job_facts WHERE project_id=?').get(args.job_id);
+  if (!row || !jobVisibleTo(db, principal.consultantId, args.job_id)) fail('NOT_FOUND_OR_FORBIDDEN');
+  const st = currentState(db, principal.consultantId, args.job_id)?.state;
+  if (!['ACCEPTED', 'COMPLETED'].includes(st)) fail('NOT_FOUND_OR_FORBIDDEN');
+  const cur = getOpenmaiResult(db, principal.consultantId, args.job_id) || {};
+  if (cur.status === 'done' || cur.status === 'running') {
+    return {
+      data: { job_ref: args.job_id, status: cur.status, result_text: cur.result_text || null,
+              started_at: cur.started_at || null, finished_at: cur.finished_at || null },
+      facts: [], inferences: [], recommendations: [],
+      unknowns: cur.status === 'running' ? ['找人任务进行中'] : [],
+      evidence_refs: [`openmai:${cur.task_id || args.job_id}`],
+    };
+  }
+  const out = startOpenmaiTask(db, null, principal.consultantId, args.job_id);
+  return {
+    data: { job_ref: args.job_id, status: out.status || 'triggered', task_id: out.task_id || null,
+            note: '找人任务已触发，完成后再调本工具取结果（或在工作台承接面板查看）' },
+    facts: [], inferences: [], recommendations: [], unknowns: [],
+    evidence_refs: [`openmai:${out.task_id || args.job_id}`],
+  };
+}
+
 export function createJobToolHandlers({ db }) {
   return {
     brainx_me_context: (args, context) => meContext(db, context.principal),
@@ -182,5 +210,6 @@ export function createJobToolHandlers({ db }) {
     brainx_gap_questions: (args, context) => gapQuestions(db, args, context.principal),
     brainx_personal_review: (args, context) => personalReview(db, args, context.principal),
     brainx_run_status: (args, context) => runStatus(db, args, context.principal),
+    brainx_openmai_search: (args, context) => openmaiSearch(db, args, context.principal),
   };
 }

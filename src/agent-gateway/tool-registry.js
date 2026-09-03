@@ -36,6 +36,9 @@ export const AGENT_TOOL_ROWS = Object.freeze([
     date_to: string({ pattern: '^\\d{4}-\\d{2}-\\d{2}$' }),
   }, ['date_from', 'date_to']) },
   { name: 'brainx_run_status', purpose: ['run_status'], p2pOnly: true, parameters: object({ run_id: string() }, ['run_id']) },
+  { name: 'brainx_openmai_search', purpose: ['candidate_review'], parameters: object({
+    job_id: string(),
+  }, ['job_id']), projectKey: 'job_id' },
 ]);
 
 export class AgentToolError extends Error {

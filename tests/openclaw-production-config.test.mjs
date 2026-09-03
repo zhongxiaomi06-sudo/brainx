@@ -38,6 +38,9 @@ test('Feishu is websocket-only, allowlisted, and mention-gated in groups', () =>
     '${BRAINX_FEISHU_ALLOWED_OPEN_ID_1}',
     '${BRAINX_FEISHU_ALLOWED_OPEN_ID_2}',
     '${BRAINX_FEISHU_ALLOWED_OPEN_ID_3}',
+    '${BRAINX_FEISHU_ALLOWED_OPEN_ID_4}',
+    '${BRAINX_FEISHU_ALLOWED_OPEN_ID_5}',
+    '${BRAINX_FEISHU_ALLOWED_OPEN_ID_6}',
   ];
   assert.equal(feishu.connectionMode, 'websocket');
   assert.equal(feishu.dmPolicy, 'allowlist');
@@ -47,6 +50,7 @@ test('Feishu is websocket-only, allowlisted, and mention-gated in groups', () =>
   assert.deepEqual(feishu.groupAllowFrom, [
     '${BRAINX_FEISHU_ALLOWED_CHAT_ID_1}',
     '${BRAINX_FEISHU_ALLOWED_CHAT_ID_2}',
+    '${BRAINX_FEISHU_ALLOWED_CHAT_ID_3}',
   ]);
   assert.deepEqual(feishu.groupSenderAllowFrom, allowedPeople);
   assert.equal(feishu.groups, undefined);
@@ -76,12 +80,12 @@ test('systemd units keep internal services on one host and load secrets from pro
   assert.doesNotMatch(installer, /install -m 0600 -o root -g brainx/);
 });
 
-test('OpenClaw env template provides three consultants and two groups', async () => {
+test('OpenClaw env template provides six consultants and three groups', async () => {
   const template = await readFile(new URL('deploy/openclaw/openclaw.env.example', root), 'utf8');
-  for (const suffix of ['1', '2', '3']) {
+  for (const suffix of ['1', '2', '3', '4', '5', '6']) {
     assert.match(template, new RegExp(`^BRAINX_FEISHU_ALLOWED_OPEN_ID_${suffix}=`, 'm'));
   }
-  for (const suffix of ['1', '2']) {
+  for (const suffix of ['1', '2', '3']) {
     assert.match(template, new RegExp(`^BRAINX_FEISHU_ALLOWED_CHAT_ID_${suffix}=`, 'm'));
   }
   assert.doesNotMatch(template, /^BRAINX_FEISHU_ALLOWED_(OPEN|CHAT)_ID=/m);

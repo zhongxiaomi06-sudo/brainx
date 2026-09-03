@@ -1,6 +1,6 @@
 # OpenClaw 多顾问生产运行手册
 
-> 上级：[文档书总目录](README.md) · [部署编排](DEPLOYMENT.md) · [安全手册](SECURITY.md) · [验收入口](../specs/003-openclaw-production/quickstart.md)
+> 上级：[文档书总目录](README.md) · [完整施工手册](2026-09-03-braintex-server-deployment-agent-manual.md) · [部署编排](DEPLOYMENT.md) · [安全手册](SECURITY.md) · [验收入口](../specs/003-openclaw-production/quickstart.md)
 
 ## 目标拓扑
 

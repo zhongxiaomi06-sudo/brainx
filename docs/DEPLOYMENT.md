@@ -1,6 +1,6 @@
 # BrainX 部署编排
 
-> 上级：[文档书总目录](README.md) · OpenClaw：[多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md) · 生产恢复：[云端恢复清单](cloud-recovery-checklist.md) · 安全配置：[安全操作手册](SECURITY.md)
+> 上级：[文档书总目录](README.md) · OpenClaw：[完整施工手册](2026-09-03-braintex-server-deployment-agent-manual.md) / [多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md) · 生产恢复：[云端恢复清单](cloud-recovery-checklist.md) · 安全配置：[安全操作手册](SECURITY.md)
 
 ## 应用拓扑
 

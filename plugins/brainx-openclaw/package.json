@@ -7,6 +7,7 @@
   "license": "UNLICENSED",
   "files": [
     "index.js",
+    "onboarding.js",
     "runtime.js",
     "openclaw.plugin.json",
     "README.md"

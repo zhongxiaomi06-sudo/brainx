@@ -14,6 +14,7 @@
 4. 运行 SQLite/RDS additive migration；先做 RDS 备份和只读健康检查，再执行写迁移。
 5. 用 `brainx-agent-admin` 逐一绑定最多三名灰度顾问，并显式登记测试群、sender、purpose 与项目范围。
 6. 依次启动 `brainx-agent-gateway`、`brainx-integration-worker`、`openclaw-brainx`，最后重启现有 `brainx.service`。
+7. 用已绑定顾问的飞书私聊输入 `/brainx`，确认返回六入口功能首页；再点击一条职位入口和一条人才入口。
 
 不得把 Gateway、OpenClaw 控制面、RDS 或 SQLite 暴露公网；不得从聊天文本推断 consultant_id；不得复制 Mia 的授权给其他顾问。
 
@@ -37,6 +38,8 @@ curl -fsS https://base.yorkteam.cn/api/v1/meta/guard
 ```
 
 然后由三名灰度顾问完成私聊、白名单群 @、跨人负向读取、候选敏感字段扫描和手机/异机 HTTPS 深链。只有 10 个批准工具可见，未知群、撤权用户、跨项目和重复 nonce 必须失败。
+
+功能首页验收详见 [BrainTex 飞书功能首页与新用户指引](2026-09-03-braintex-feishu-home.md)。当前锁定版飞书插件不支持自定义 bot-added 回复，不得通过改安装目录或启动第二条同应用 WS 连接绕过。
 
 ## 日常运维
 

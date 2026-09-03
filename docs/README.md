@@ -17,6 +17,7 @@
 |---|---|
 | 产品范围、功能规划或验收标准 | [BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md) |
 | OpenClaw、飞书机器人、AI 猎头工作流、人才权限或简历解析 | [BrainX × OpenClaw AI 猎头工作流产品需求文档](prd-2026-09-02-openclaw-ai-recruiting-workflow.md)、[安全操作手册](SECURITY.md) |
+| BrainTex 飞书欢迎页、功能菜单、按钮卡片或新用户指引 | [BrainTex 飞书功能首页与新用户指引](2026-09-03-braintex-feishu-home.md)、[BrainTex 群聊工作流技术 PRD](prd-2026-09-01-braintex-group-workflow.md) |
 | OpenClaw 多顾问安装、上线、运维、故障或回滚 | [OpenClaw 多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md)、[部署编排](DEPLOYMENT.md) |
 | 服务器由同事维护、需要可转交的执行步骤与验收证据 | [BrainX × OpenClaw ECS 部署交接单](2026-09-03-openclaw-ecs-handoff.md)、[OpenClaw 多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md) |
 | 候选人事实版本、人才 RDS 迁移、shortlist 数据契约或授权查询 | [候选人事实与 shortlist 数据契约](2026-09-03-candidate-data-contracts.md)、[BrainX × OpenClaw AI 猎头工作流产品需求文档](prd-2026-09-02-openclaw-ai-recruiting-workflow.md) |
@@ -83,6 +84,7 @@
 
 ### 设计与数据
 
+- [BrainTex 飞书功能首页与新用户指引](2026-09-03-braintex-feishu-home.md)：定义 `/brainx` 确定性卡片、六个顾问任务入口、权限边界、首次出现时机和真实验收流程。
 - [候选人事实与 shortlist 数据契约](2026-09-03-candidate-data-contracts.md)：`candidate_fact_v1`、`candidate_match_bundle_v1`、reloop 真实数据转换、人才/职位双授权、固定飞书文案、MCP PoC 暴露条件及当前未完成项的唯一施工说明。
 - [BrainX × OpenClaw AI 猎头工作流产品需求文档](prd-2026-09-02-openclaw-ai-recruiting-workflow.md)：当前阶段权威开发基线；基于代码审计和官方能力，定义 OpenClaw 主 Agent、飞书最小权限、BrainX 窄网关、人才授权、简历事实、匹配、施工阶段和发布门禁。
 - [历史：BrainX 飞书 AI 猎头副驾驶产品需求文档](prd-2026-09-01-feishu-ai-consultant-copilot.md)：主 Agent 调整前的 Codex 方案和用户研究，仅作历史参考。

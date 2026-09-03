@@ -3,6 +3,7 @@
   "name": "BrainX Recruiting Tools",
   "description": "Ten least-privilege recruiting decision tools backed by the local BrainX Agent Gateway.",
   "contracts": {
+    "commands": ["brainx"],
     "tools": [
       "brainx_me_context",
       "brainx_daily_brief",

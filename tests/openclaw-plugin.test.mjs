@@ -33,6 +33,7 @@ test('plugin package and manifest declare exactly the approved tools', () => {
   assert.deepEqual(pkg.openclaw.extensions, ['./index.js']);
   assert.equal(manifest.id, 'brainx-openclaw');
   assert.equal(manifest.configSchema.additionalProperties, false);
+  assert.deepEqual(manifest.contracts.commands, ['brainx']);
   assert.deepEqual(manifest.contracts.tools, fixture.allowed_tools);
   assert.deepEqual(BRAINX_OPENCLAW_TOOLS.map(({ name }) => name), fixture.allowed_tools);
   assert.equal(new Set(manifest.contracts.tools).size, 10);

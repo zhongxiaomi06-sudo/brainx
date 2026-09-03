@@ -5,12 +5,13 @@ import { resolve, sep } from 'node:path';
 const execFileAsync = promisify(execFile);
 const INJECTION = /(ignore\s+(all\s+)?previous|system\s+prompt|忽略.{0,8}(指令|规则)|你现在是)/i;
 
-export function classifyExtraction({ sourceFormat, text, parserVersion }) {
+export function classifyExtraction({ sourceFormat, text, parserVersion, sourceHash }) {
   if (!['pdf', 'docx'].includes(sourceFormat)) throw new Error('DOCUMENT_FORMAT_UNSUPPORTED');
   const normalized = String(text || '').trim();
-  if (!normalized) return { status: 'OCR_REQUIRED', text: '', parser_version: parserVersion, warnings: [] };
+  if (!normalized) return { status: 'OCR_REQUIRED', text: '', parser_version: parserVersion,
+    source_hash: sourceHash, warnings: [] };
   return {
-    status: 'EXTRACTED', text: normalized, parser_version: parserVersion,
+    status: 'EXTRACTED', text: normalized, parser_version: parserVersion, source_hash: sourceHash,
     warnings: INJECTION.test(normalized) ? ['PROMPT_INJECTION_SUSPECTED'] : [],
   };
 }
@@ -24,7 +25,8 @@ export async function extractDocument(input, options = {}) {
   const { stdout } = await run(options.python || 'python3',
     [parser, '--input', path, '--root', root], { timeout: 30_000, maxBuffer: 8 * 1024 * 1024 });
   const parsed = JSON.parse(stdout);
-  return classifyExtraction({ sourceFormat: input.sourceFormat, text: parsed.text, parserVersion: parsed.parser_version });
+  return classifyExtraction({ sourceFormat: input.sourceFormat, text: parsed.text,
+    parserVersion: parsed.parser_version, sourceHash: parsed.source_sha256 });
 }
 
 export async function processCandidateDocument(input, options = {}) {

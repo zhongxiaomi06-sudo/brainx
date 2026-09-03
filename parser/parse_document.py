@@ -23,6 +23,7 @@ def main():
         "parser_version": "markitdown-0.1.7",
         "text": text,
         "text_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        "source_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
     }
     print(json.dumps(result, ensure_ascii=False))
 

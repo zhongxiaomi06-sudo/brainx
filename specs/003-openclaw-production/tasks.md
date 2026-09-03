@@ -131,5 +131,5 @@
 ## Phase 8: Convergence
 
 - [ ] T044 为常驻 worker 装配同步、解析和影子评测的固定生产 handler，并验证不会领取未启用类型 per FR-016 / T034 (partial)
-- [ ] T045 将文档状态、来源 hash、结构化事实和证据持久化为可恢复闭环 per FR-013 / SC-006 (partial)
+- [x] T045 将文档状态、来源 hash、结构化事实和证据持久化为可恢复闭环 per FR-013 / SC-006 (partial)
 - [x] T046 在可复跑匹配报告中增加硬条件误放率和证据覆盖率 per FR-015 / SC-011 (partial)

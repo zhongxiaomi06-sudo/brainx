@@ -216,11 +216,41 @@ export function createPersonalModelService(options) {
   }
 
   async function getStatus(identity) {
-    const agent = await resolveAgent(identity);
     const row = rowFor(identity.consultantId);
+    let agent;
+    try { agent = await resolveAgent(identity); }
+    catch (error) {
+      if (error instanceof PersonalModelError && error.code === 'PERSONAL_AGENT_NOT_READY') {
+        return publicRow(row, false);
+      }
+      throw error;
+    }
     if (row && row.agent_id !== agent.agentId) fail('PERSONAL_AGENT_NOT_READY');
     return publicRow(row);
   }
 
-  return { configure, getStatus, resolveAgent };
+  async function disable(identity) {
+    requireEnabled();
+    if (busy.has(identity.consultantId)) fail('MODEL_CONFIG_BUSY');
+    busy.add(identity.consultantId);
+    try {
+      const agent = await resolveAgent(identity);
+      const row = rowFor(identity.consultantId);
+      if (!row || row.status === 'DISABLED') return { ...publicRow(row), already: true };
+      await cli.call(['models', 'auth', 'order', 'clear', '--agent', agent.agentId,
+        '--provider', row.provider_id]);
+      await cli.call(['config', 'unset', `agents.list[${agent.agentIndex}].model`]);
+      const at = clock();
+      db.prepare(`UPDATE consultant_model_profiles SET status='DISABLED',disabled_at=?,
+        last_error_code=NULL,updated_at=? WHERE consultant_id=?`).run(at, at, identity.consultantId);
+      return { ...publicRow(rowFor(identity.consultantId)), already: false };
+    } catch (error) {
+      if (error instanceof PersonalModelError) throw error;
+      fail('MODEL_CONFIG_FAILED', error);
+    } finally {
+      busy.delete(identity.consultantId);
+    }
+  }
+
+  return { configure, disable, getStatus, resolveAgent };
 }

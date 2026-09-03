@@ -45,13 +45,13 @@
 
 ### Tests for User Story 1
 
-- [ ] T009 [P] [US1] 先写 GET/PUT 认证、同意、禁止身份字段、非法输入、Agent 未就绪和响应脱敏接口测试 `tests/personal-model-routes.test.mjs`
+- [X] T009 [P] [US1] 先写 GET/PUT 认证、同意、禁止身份字段、非法输入、Agent 未就绪和响应脱敏接口测试 `tests/personal-model-routes.test.mjs`
 - [ ] T010 [P] [US1] 先写个人模型设置页面存在、无 localStorage/key 回显、同意交互和提交契约静态测试 `frontend/btex-frontend/tests/personal-model-ui.test.mjs`
 
 ### Implementation for User Story 1
 
 - [X] T011 [US1] 实现按当前 session open_id 查个人 Agent、写个人 auth profile、设置 Agent 显式 model 和非敏感审计状态 `src/personal-model-config.js`
-- [ ] T012 [US1] 实现 GET/PUT personal model API 并挂载到现有登录鉴权 `src/personal-model-routes.js`、`src/server.js`
+- [X] T012 [US1] 实现 GET/PUT personal model API 并挂载到现有登录鉴权 `src/personal-model-routes.js`、`src/server.js`
 - [ ] T013 [US1] 实现前端 API 客户端和个人模型表单，不把 Key 放入 URL/持久化/错误消息 `frontend/btex-frontend/app/personal-model-api.ts`、`frontend/btex-frontend/app/personal-model-panel.tsx`、`frontend/btex-frontend/app/personal-model-panel.css`
 - [ ] T014 [US1] 把个人模型分组接入真实设置中心并加载当前顾问状态 `frontend/btex-frontend/app/settings-center-review.tsx`、`frontend/btex-frontend/app/workbench-settings-page.tsx`
 - [ ] T015 [US1] 将 `/brainx` “配置我的模型”改为 HTTPS 设置深链并更新确定性卡片测试 `plugins/brainx-openclaw/onboarding.js`、`tests/braintex-onboarding.test.mjs`
@@ -107,11 +107,11 @@
 
 ### Tests for User Story 4
 
-- [ ] T023 [US4] 先写管理员权限、非管理员拒绝和全响应密钥扫描测试 `tests/personal-model-routes.test.mjs`
+- [X] T023 [US4] 先写管理员权限、非管理员拒绝和全响应密钥扫描测试 `tests/personal-model-routes.test.mjs`
 
 ### Implementation for User Story 4
 
-- [ ] T024 [US4] 增加复用现有管理员 allowlist 的非敏感就绪清单和配置审计读取 `src/personal-model-routes.js`
+- [X] T024 [US4] 增加复用现有管理员 allowlist 的非敏感就绪清单和配置审计读取 `src/personal-model-routes.js`
 - [ ] T025 [US4] 增加不含正文/密钥的运维验收输出与文档 `docs/2026-09-03-openclaw-production-runbook.md`、`docs/2026-09-03-braintex-server-deployment-agent-manual.md`
 
 **Checkpoint**: 管理员能判断谁可用，但无法通过 BrainX API 获得个人凭据

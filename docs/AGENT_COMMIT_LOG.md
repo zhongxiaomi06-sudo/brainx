@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-03｜feat(model): 开放本人模型配置接口
+
+- 接口：新增登录态 GET/PUT/DELETE `/api/v1/model-profile`，服务端只采用签名 Cookie 中的顾问和飞书 open_id，4 KiB 限额并统一脱敏错误。
+- 运维：新增管理员个人模型就绪清单，只展示顾问、Agent、供应商、模型、状态和时间，不提供凭据读取能力。
+- 停用：清除个人 Agent 的模型选择和认证优先级，避免继续调用；固定 OpenClaw 版本未提供删除 auth profile 的官方 CLI，认证材料仍保留在该顾问隔离库中并在运维文档明确限制。
+- 验证：本人身份传递、无 open_id、超限输入、供应商错误脱敏、普通顾问拒绝和管理员响应敏感词扫描共 9 条专项通过。
+
 ## 2026-09-03｜feat(model): 隔离写入顾问个人模型凭据
 
 - 入口：实现 OpenAI、Anthropic、Google Gemini、StepFun 四类个人模型校验；拒绝客户端指定身份、Agent、命令、参数、环境变量或自定义网络地址。

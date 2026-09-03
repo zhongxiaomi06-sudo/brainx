@@ -141,7 +141,8 @@ test('binding mismatch, concurrent mutation and CLI failure fail closed without 
   seedBinding(db, 'mia', 'ou_mia');
   const cli = fakeCli();
   const service = createPersonalModelService({ db, cli, enabled: true, now: () => NOW });
-  await assert.rejects(() => service.getStatus({ consultantId: 'mia', openId: 'ou_other' }), /PERSONAL_AGENT_NOT_READY/);
+  const notReady = await service.getStatus({ consultantId: 'mia', openId: 'ou_other' });
+  assert.equal(notReady.agent_ready, false);
   let release;
   cli.call = async (args, options) => {
     if (args.join(' ') === 'config get bindings --json') return { stdout: JSON.stringify([

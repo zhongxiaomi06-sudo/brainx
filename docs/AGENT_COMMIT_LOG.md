@@ -2,6 +2,12 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-03｜fix(test): worker 保活测试等就绪日志消除负载竞态假失败
+
+- 根因：测试固定 sleep 2s 后发 SIGTERM，full 门禁连跑时机器负载高、worker 启动变慢，信号可能在 SIGTERM 处理器注册前送达，被默认行为杀死（exit code null），实测 `SIGTERM 应干净退出` 偶发失败。
+- 修复：改为等待 `批处理进程已就绪` 日志（就绪日志打印后主块才注册信号处理器）再断言存活并发送 SIGTERM，超时 10s 明确报错；不改动 worker.js 业务代码。
+- 验证：单独运行 1/1 通过；完整门禁随后在本机复跑。cherry-pick 自 `df99fb4`，对齐入 main。
+
 ## 2026-09-03｜fix(openclaw): 安装器加载生产环境文件修复插件安装中断
 
 - 根因：`deploy/openclaw/install.sh` 的 `install_plugin` 调用 OpenClaw CLI 时只传 HOME 与状态目录，未加载 `/etc/brainx/openclaw.env`；CLI 在安装期执行 SecretRef 校验，因 `STEPFUN_API_KEY` 缺失而报错中断，导致 1.1.6 打包成功但扩展目录仍停留 1.1.0（生产实证）。

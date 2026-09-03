@@ -1,5 +1,13 @@
 # Agent Commit 记录
 
+## 2026-09-03｜docs(model): 设计个人 Agent 模型配置方案
+
+- 方案：飞书私聊启用 OpenClaw 动态个人 Agent；API Key 仅通过 stdin 写入个人 Agent 认证库，BrainX 只保存供应商、模型、同意和状态。
+- 安全：共享群不借用个人密钥；关闭 Agent 间通信、会话工具只见当前会话；首版只开放 OpenAI、Anthropic、Google Gemini、StepFun 四类批准供应商。
+- 部署：七个 BrainX Skills 改为 state 级共享安装；升级配置必须保留运行时生成的 Agent、bindings 与 auth store，避免发布覆盖个人设置。
+- 交付：补齐技术计划、官方能力研究、数据状态机、个人模型 API 契约和六人真机验收说明。
+- 验证：constitution 前后门禁均通过；文档均低于 500 行，`git diff --check` 与 `npm run verify:quick` 16/16 通过。
+
 ## 2026-09-03｜docs(model): 明确顾问个人模型产品边界
 
 - 决策：根据用户纠正，撤销“StepFun 作为全员生产默认模型”的产品假设；每个已授权飞书私聊用户应拥有独立 OpenClaw Agent、认证库、会话和模型选择。

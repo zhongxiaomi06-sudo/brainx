@@ -15,7 +15,7 @@
 
 **Purpose**: 固定契约、迁移和可注入边界
 
-- [ ] T001 新增个人模型非敏感状态迁移与迁移回归测试 `migrations/0036_consultant_model_profiles.sql`、`tests/personal-model-config.test.mjs`
+- [X] T001 新增个人模型非敏感状态迁移与迁移回归测试 `migrations/0036_consultant_model_profiles.sql`、`tests/personal-model-config.test.mjs`
 - [ ] T002 [P] 定义个人模型供应商目录、输入校验、错误类型和 OpenClaw 运行路径配置 `src/personal-model-config.js`
 - [ ] T003 [P] 增加生产功能开关、OpenClaw state/config/bin/account 环境模板 `deploy/openclaw/openclaw.env.example`、`.env.example`
 

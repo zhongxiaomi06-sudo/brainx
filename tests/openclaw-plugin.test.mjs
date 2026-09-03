@@ -88,9 +88,13 @@ test('tool request is fixed to loopback and produces a BrainX-verifiable asserti
   );
   const result = await factory(p2pContext).execute('tool-call', { job_id: 'job-1' });
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].url, 'http://127.0.0.1:3102/v1/tools/brainx_job_assessment');
+  assert.equal(calls[0].url, 'http://127.0.0.1:3102/internal/v1/agent/tools/brainx_job_assessment');
   assert.equal(calls[0].options.headers.authorization, 'Bearer token-value');
   const body = JSON.parse(calls[0].options.body);
+  assert.equal(body.schema_version, 'agent_tool_request.v1');
+  assert.deepEqual(body.client, {
+    plugin_version: '1.0.0', openclaw_version: '2026.7.1-2', model_ref: 'openai/gpt-5',
+  });
   const payload = verifyPrincipalAssertion(body.principal_assertion, {
     secret,
     now: new Date('2026-09-03T00:00:01.000Z'),

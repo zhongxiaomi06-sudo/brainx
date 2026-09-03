@@ -76,12 +76,20 @@ test('systemd units keep internal services on one host and load secrets from pro
   assert.match(installer, /OPENCLAW_CONFIG_PATH=/);
   assert.match(installer, /OPENCLAW_STATE_DIR=/);
   assert.match(installer, /@openclaw\/feishu@2026\.7\.1/);
+  for (const skill of [
+    'brainx-today', 'brainx-job', 'brainx-talent', 'brainx-match',
+    'brainx-engagement-draft', 'brainx-interview-prep', 'brainx-review',
+  ]) {
+    assert.match(installer, new RegExp(`^  ${skill}$`, 'm'));
+  }
+  assert.match(installer, /workspace\/skills\/\$skill_name\/SKILL\.md/);
   assert.doesNotMatch(installer, /\$\{env_name\}\.env\.example/);
   assert.doesNotMatch(installer, /install -m 0600 -o root -g brainx/);
 });
 
 test('OpenClaw env template provides six consultants and three groups', async () => {
   const template = await readFile(new URL('deploy/openclaw/openclaw.env.example', root), 'utf8');
+  assert.match(template, /^BRAINX_BASE_URL=https:\/\//m);
   for (const suffix of ['1', '2', '3', '4', '5', '6']) {
     assert.match(template, new RegExp(`^BRAINX_FEISHU_ALLOWED_OPEN_ID_${suffix}=`, 'm'));
   }

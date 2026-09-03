@@ -2,6 +2,13 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-03｜fix(openclaw): 补齐跨设备生产接入链路
+
+- 根因：复核“插件加载后真实查库”链路时发现原生插件仍请求旧 `/v1/tools/*` 路径，且缺少 Agent Gateway 强制要求的 schema/client 字段；安装器也未同步七个已审核生产 Skill，服务器即使显示插件 loaded，真实查询仍可能失败或缺少猎头场景方法。
+- 修复：请求统一切到回环 `/internal/v1/agent/tools/<tool>` 并补齐 `agent_tool_request.v1` 和锁定版本信息；安装器幂等部署七个生产 Skill；OpenClaw 环境模板补充正式 HTTPS 工作台基址。
+- 交付：新增面向部署 Agent/服务器同事的端到端施工手册，以及自包含、响应式、可切换四类业务流程的 BrainTex 生产架构 HTML；文档总目录、交接单、运行手册和部署编排均链接到新权威入口。
+- 验证：插件/生产配置/Skill/首页专项 17/17 通过，安装脚本语法、HTML 四组 tab-panel 契约、响应式标记、`git diff --check` 与快速门禁通过；完整门禁与提交后检查见本提交最终验证。
+
 ## 2026-09-03｜feat(feishu): 增加 BrainTex 可点击功能首页
 
 - 交互：BrainX OpenClaw 插件新增确定性 `/brainx` 命令，以官方渠道 `presentation` 返回简洁飞书卡片；包含今日优先事项、职位推荐、候选人匹配、职位判断、跟进建议和个人复盘六个可点击入口。

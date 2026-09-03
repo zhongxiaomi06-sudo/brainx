@@ -5,6 +5,15 @@ BRAINX_DEPLOY_ROOT=${BRAINX_DEPLOY_ROOT:-/opt/brainx}
 BRAINX_OPENCLAW_STATE=${BRAINX_OPENCLAW_STATE:-/var/lib/brainx/.openclaw}
 BRAINX_OPENCLAW_BIN=${BRAINX_OPENCLAW_BIN:-/usr/local/bin/openclaw}
 BRAINX_INSTALL_MODE=${1:---check}
+BRAINX_PRODUCTION_SKILLS=(
+  brainx-today
+  brainx-job
+  brainx-talent
+  brainx-match
+  brainx-engagement-draft
+  brainx-interview-prep
+  brainx-review
+)
 
 if [[ "$BRAINX_INSTALL_MODE" != "--check" && "$BRAINX_INSTALL_MODE" != "--apply" ]]; then
   echo "usage: sudo deploy/openclaw/install.sh [--check|--apply]" >&2
@@ -13,6 +22,13 @@ fi
 
 for required in node npm "$BRAINX_OPENCLAW_BIN"; do
   command -v "$required" >/dev/null || { echo "missing command: $required" >&2; exit 69; }
+done
+
+for skill_name in "${BRAINX_PRODUCTION_SKILLS[@]}"; do
+  [[ -f "$BRAINX_DEPLOY_ROOT/skills/$skill_name/SKILL.md" ]] || {
+    echo "missing production skill: $skill_name" >&2
+    exit 66
+  }
 done
 
 OPENCLAW_ACTUAL_VERSION=$($BRAINX_OPENCLAW_BIN --version)
@@ -58,6 +74,14 @@ install_env "$BRAINX_DEPLOY_ROOT/deploy/openclaw/openclaw.env.example" /etc/brai
 
 install -m 0640 -o brainx -g brainx "$BRAINX_DEPLOY_ROOT/deploy/openclaw/openclaw.production.json" "$BRAINX_OPENCLAW_STATE/openclaw.json"
 install -m 0644 "$BRAINX_DEPLOY_ROOT/deploy/systemd/"*.service /etc/systemd/system/
+
+install -d -m 0750 -o brainx -g brainx "$BRAINX_OPENCLAW_STATE/workspace/skills"
+for skill_name in "${BRAINX_PRODUCTION_SKILLS[@]}"; do
+  install -d -m 0750 -o brainx -g brainx "$BRAINX_OPENCLAW_STATE/workspace/skills/$skill_name"
+  install -m 0644 -o brainx -g brainx \
+    "$BRAINX_DEPLOY_ROOT/skills/$skill_name/SKILL.md" \
+    "$BRAINX_OPENCLAW_STATE/workspace/skills/$skill_name/SKILL.md"
+done
 
 BRAINX_PLUGIN_TMP=$(mktemp -d /tmp/brainx-openclaw.XXXXXX)
 trap 'rm -rf -- "$BRAINX_PLUGIN_TMP"' EXIT

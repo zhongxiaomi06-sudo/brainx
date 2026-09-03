@@ -1,6 +1,8 @@
 import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
 
-const GATEWAY_URL = 'http://127.0.0.1:3102';
+const GATEWAY_URL = 'http://127.0.0.1:3102/internal/v1/agent/tools';
+const PLUGIN_VERSION = '1.0.0';
+const OPENCLAW_VERSION = '2026.7.1-2';
 const string = (extra = {}) => ({ type: 'string', minLength: 1, maxLength: 512, ...extra });
 const integer = (minimum, maximum) => ({ type: 'integer', minimum, maximum });
 const object = (properties, required = []) => ({
@@ -95,10 +97,20 @@ export function createBrainxToolFactory(tool, dependencies = {}) {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 10_000);
       try {
-        const response = await fetchImpl(`${GATEWAY_URL}/v1/tools/${tool.name}`, {
+        const response = await fetchImpl(`${GATEWAY_URL}/${tool.name}`, {
           method: 'POST', signal: controller.signal,
           headers: { 'content-type': 'application/json', authorization: `Bearer ${gatewayToken}` },
-          body: JSON.stringify({ request_id: signed.requestId, principal_assertion: signed.assertion, arguments: args }),
+          body: JSON.stringify({
+            schema_version: 'agent_tool_request.v1',
+            request_id: signed.requestId,
+            principal_assertion: signed.assertion,
+            arguments: args,
+            client: {
+              plugin_version: PLUGIN_VERSION,
+              openclaw_version: OPENCLAW_VERSION,
+              model_ref: principal.model_ref,
+            },
+          }),
         });
         const body = await response.json();
         return toolResult(body);

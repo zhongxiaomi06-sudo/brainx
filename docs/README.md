@@ -19,6 +19,7 @@
 | OpenClaw、飞书机器人、AI 猎头工作流、人才权限或简历解析 | [BrainX × OpenClaw AI 猎头工作流产品需求文档](prd-2026-09-02-openclaw-ai-recruiting-workflow.md)、[安全操作手册](SECURITY.md) |
 | BrainTex 飞书欢迎页、功能菜单、按钮卡片或新用户指引 | [BrainTex 飞书功能首页与新用户指引](2026-09-03-braintex-feishu-home.md)、[BrainTex 群聊工作流技术 PRD](prd-2026-09-01-braintex-group-workflow.md) |
 | OpenClaw 多顾问安装、上线、运维、故障或回滚 | [BrainTex 服务器部署与飞书接入 Agent 完整施工手册](2026-09-03-braintex-server-deployment-agent-manual.md)、[OpenClaw 多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md)、[部署编排](DEPLOYMENT.md) |
+| 顾问个人模型、自带 API Key、按飞书用户隔离 Agent 或模型切换 | [顾问个人模型配置规格](../specs/004-personal-model-config/spec.md)、[OpenClaw 多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md)、[安全操作手册](SECURITY.md) |
 | 服务器由同事或 Agent 维护、需要从空环境到异机可用的完整步骤与验收证据 | [BrainTex 服务器部署与飞书接入 Agent 完整施工手册](2026-09-03-braintex-server-deployment-agent-manual.md)、[BrainX × OpenClaw ECS 部署交接单](2026-09-03-openclaw-ecs-handoff.md) |
 | 候选人事实版本、人才 RDS 迁移、shortlist 数据契约或授权查询 | [候选人事实与 shortlist 数据契约](2026-09-03-candidate-data-contracts.md)、[BrainX × OpenClaw AI 猎头工作流产品需求文档](prd-2026-09-02-openclaw-ai-recruiting-workflow.md) |
 | 历史 Codex 插件、旧版飞书副驾驶方案 | [历史：BrainX 飞书 AI 猎头副驾驶产品需求文档](prd-2026-09-01-feishu-ai-consultant-copilot.md)、[历史：BrainX Codex Agent 职责与权限规范](codex-agent-responsibilities-and-permissions.md) |
@@ -79,6 +80,7 @@
 - [部署编排](DEPLOYMENT.md)：生产 systemd、本地开发、隔离 Docker 测试和 CI。
 - [BrainTex 服务器部署与飞书接入 Agent 完整施工手册](2026-09-03-braintex-server-deployment-agent-manual.md)：交给部署 Agent 或服务器同事的权威端到端手册，覆盖飞书后台、OpenClaw 插件、三类环境文件、RDS 权限、身份绑定、启动、九步真实验收、故障与回滚。
 - [OpenClaw 多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md)：服务端安装、权限绑定、灰度验收、日常运维与可恢复回滚。
+- [顾问个人模型配置规格](../specs/004-personal-model-config/spec.md)：定义飞书私聊一人一 Agent、个人模型凭据隔离、自助配置、同意留痕、共享群模型边界和多人验收标准；StepFun 仅是可选个人供应商，不是全员默认模型。
 - [BrainX × OpenClaw ECS 部署交接单](2026-09-03-openclaw-ecs-handoff.md)：给服务器维护同事的无密钥执行清单，覆盖前置检查、安装、迁移、身份绑定、启动、验收与脱敏证据回传。
 - [云端恢复清单](cloud-recovery-checklist.md)：现网唯一入口、标准恢复步骤与历史事件。
 - [带宽告警说明](guard-bandwidth-alert.md)：带宽监控与告警规则。

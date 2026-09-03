@@ -28,16 +28,16 @@ const INSERT_DRAFT_SQL = `
  * @returns {{ok:true, skipped:boolean, result?:{action:'extracted', draft_id, fields}|
  *   {action:'skip', reason}}}
  */
-export function consumeJobExtract(db, eventId) {
+export function consumeJobExtract(db, eventId, opts = {}) {
   let result;
   const r = consumeOnce(db, eventId, CONSUMER_NAME, (d) => {
-    result = extractIntoDraft(d, eventId);
+    result = extractIntoDraft(d, eventId, opts);
   });
   if (r.skipped) return { ...r, result: { action: 'skip', reason: 'already_consumed' } };
   return { ...r, result };
 }
 
-function extractIntoDraft(db, eventId) {
+function extractIntoDraft(db, eventId, opts = {}) {
   const event = db.prepare(SELECT_EVENT_SQL).get(eventId);
   if (!event || event.event_type !== 'lark.message_received') {
     return { action: 'skip', reason: 'not_message_event' };
@@ -50,7 +50,10 @@ function extractIntoDraft(db, eventId) {
 
   if (!isJobRelevant(msg.text)) return { action: 'skip', reason: 'irrelevant' };
 
-  const fields = extractRules(msg.text);
+  // 预计算字段（异步生产者已跑过 LLM 层）优先；否则规则层同步抽取。
+  // LLM 不直接进入本同步链——consumeOnce 是同步模板，提取层只接受注入。
+  const fields = opts.presetFields || extractRules(msg.text);
+  const layer = opts.presetFields ? (opts.layer || 'llm') : 'rules';
   const draft = buildDraft(event, msg, fields);
   // zod 只校验 schema 覆盖的字段（safeParse 会剥离未知键，元数据用原始 draft 插库）
   const v = validateDraft({
@@ -67,7 +70,7 @@ function extractIntoDraft(db, eventId) {
     throw new Error(`job_facts_draft_schema_invalid: ${v.errors.join('; ')}`);
   }
   insertDraft(db, draft);
-  return { action: 'extracted', draft_id: draft.draft_id, fields };
+  return { action: 'extracted', draft_id: draft.draft_id, fields, layer };
 }
 
 function buildDraft(event, msg, fields) {

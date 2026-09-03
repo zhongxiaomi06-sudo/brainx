@@ -66,6 +66,67 @@ const PIPELINE_RULES = [
  * @param {string} text 消息正文原文
  * @param {string|null} [_chatName] 群名（事件里没有；register 时可补充，E1 不参与）
  */
+/** E2 LLM 抽取（AI_JOB_EXTRACT_ENABLED=1 且 llm 已配置时由调用方选用）。
+ * 纪律：只抽文本里存在的字段并回带原文证据子串；没有的一律 null（宁缺勿错，
+ * 与规则层同一纪律）。返回与 extractRules 同形：{field: {text, evidence}|null}。 */
+export async function extractLlm(text, chatName = null) {
+  const { chatJson } = await import('../llm.js');
+  const system = `你是猎头业务消息的事实抽取器。从群消息中抽取职位事实，只输出 JSON。
+规则：只抽取消息原文中明确存在的信息；每个字段必须给出 evidence（原文中连续子串，≤40字）；
+不存在的字段输出 null；禁止推测、补全或翻译公司名。`;
+  const user = `群消息（群名：${chatName || '未知'}）：
+---
+${String(text).slice(0, 4000)}
+---
+输出 JSON（null 或字符串）：{"company":{"text":"…","evidence":"…"}|null,"role":{…}|null,"city":{…}|null,"pipeline":{"text":"推荐/面试/Offer/入职等阶段描述","evidence":"…"}|null,"hc":{"text":"数字","evidence":"…"}|null,"active_state":{"text":"OPEN或CLOSED","evidence":"…"}|null}`;
+  const out = await chatJson(system, user);
+  // 与规则层统一形态（{text, evidence, confidence}）：hc/active_state 是结构化字段，
+  // pipeline 用 {stage}，confidence 按 evidence 与原文重合度给（重合=high，否则 medium）。
+  const src = String(text);
+  const field = (v, key = 'text') => {
+    if (!v || typeof v !== 'object') return null;
+    const val = typeof v.text === 'string' ? v.text.trim() : '';
+    if (!val) return null;
+    const evidence = String(v.evidence || '').slice(0, 200);
+    const confidence = evidence && src.includes(evidence.slice(0, Math.min(12, evidence.length)))
+      ? 'high' : 'medium';
+    return { [key]: key === 'hc' ? (Number(val.match(/\d+/)?.[0]) || val) : val.slice(0, 120),
+             evidence: evidence || null, confidence };
+  };
+  const stateField = (v) => {
+    if (!v || typeof v !== 'object') return null;
+    const val = String(v.text || '').toUpperCase();
+    if (!/OPEN|CLOSED/.test(val)) return null;
+    return { state: val.includes('CLOSED') ? 'CLOSED' : 'OPEN',
+             evidence: String(v.evidence || '').slice(0, 200) || null, confidence: 'medium' };
+  };
+  const hcField = (v) => {
+    if (!v || typeof v !== 'object') return null;
+    const n = Number(String(v.text || '').match(/\d+/)?.[0]);
+    if (!Number.isInteger(n) || n <= 0 || n > 999) return null;
+    return { number: n, evidence: String(v.evidence || '').slice(0, 200) || null, confidence: 'medium' };
+  };
+  const STAGE_MAP = [
+    [/offer|Offer|OFFER/i, 'OFFER'], [/入职|onboard/i, 'ONBOARD'],
+    [/面试|一面|二面|三面|终面|interview/i, 'INTERVIEW'],
+    [/筛选|screen/i, 'SCREENING'], [/推荐|寻访|sourcing/i, 'SOURCING'],
+    [/关闭|暂停|取消/i, 'CLOSED'],
+  ];
+  const pipelineField = (v) => {
+    if (!v || typeof v !== 'object') return null;
+    const val = String(v.text || '');
+    if (!val.trim()) return null;
+    const stage = STAGE_MAP.find(([re]) => re.test(val))?.[1];
+    if (!stage) return null;
+    return { stage, evidence: String(v.evidence || '').slice(0, 200) || null, confidence: 'medium' };
+  };
+  return {
+    company: field(out.company), role: field(out.role), city: field(out.city),
+    pipeline: pipelineField(out.pipeline), hc: hcField(out.hc),
+    active_state: stateField(out.active_state),
+  };
+}
+
 export function extractRules(text, _chatName = null) {
   const fields = {
     company: null,

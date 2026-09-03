@@ -4,12 +4,16 @@ import { runShadowEvaluation } from '../src/talent-pipeline/evaluation.js';
 
 test('shadow evaluation reports Recall@20 and NDCG@10 without changing production order', () => {
   const fixture = [{ case_id: 'job-1', production_order: ['a', 'b', 'c'],
-    shadow_order: ['b', 'a', 'c'], labels: { a: 3, b: 2, c: 0 } }];
+    shadow_order: ['b', 'a', 'c'], labels: { a: 3, b: 2, c: 0 },
+    hard_condition_pass: { a: true, b: false, c: true },
+    evidence_coverage: { a: 0.8, b: 0.6, c: 0.4 } }];
   const before = JSON.stringify(fixture[0].production_order);
   const report = runShadowEvaluation(fixture);
   assert.equal(report.mode, 'SHADOW');
   assert.equal(report.recall_at_20, 1);
   assert.ok(report.ndcg_at_10 > 0 && report.ndcg_at_10 < 1);
+  assert.equal(report.hard_condition_false_positive_rate, 1 / 3);
+  assert.equal(report.evidence_coverage, 0.6);
   assert.equal(JSON.stringify(fixture[0].production_order), before);
 });
 

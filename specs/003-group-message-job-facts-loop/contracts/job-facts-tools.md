@@ -22,4 +22,3 @@
 - `NOT_FOUND_OR_FORBIDDEN`：草稿/职位不存在或无权访问，统一响应。
 - `INVALID_ARGUMENT`：参数、状态或显式确认不满足。
 - `SOURCE_UNAVAILABLE`：Gateway 或存储暂不可用，可稍后重试。
-

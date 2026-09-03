@@ -63,4 +63,3 @@ specs/003-group-message-job-facts-loop/
 ## Post-design Constitution Check
 
 设计未新增依赖、未新增数据库表、未扩大模型数据面，也未把历史 108 个群自动授权。写工具强制私聊和显式确认，满足最小权限与审计要求。
-

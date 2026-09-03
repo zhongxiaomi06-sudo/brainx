@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   CheckCircle2,
+  Cpu,
   Database,
   ExternalLink,
   RefreshCw,
@@ -14,9 +15,10 @@ import {
   Tags,
   UserRound,
 } from "lucide-react";
+import { PersonalModelPanel } from "./personal-model-panel";
 import "./settings-center-review.css";
 
-export type SettingsSection = "profile" | "direction" | "connections" | "strategy" | "diagnostics";
+export type SettingsSection = "profile" | "model" | "direction" | "connections" | "strategy" | "diagnostics";
 type ConnectionState = "healthy" | "attention" | "offline";
 
 export type SettingsCenterData = {
@@ -52,6 +54,7 @@ type SettingsCenterReviewProps = {
 const sectionGroups = [
   { label: "个人", items: [
     { id: "profile", label: "个人资料", icon: UserRound },
+    { id: "model", label: "我的模型", icon: Cpu },
     { id: "direction", label: "方向画像", icon: Tags },
   ] },
   { label: "工作台", items: [
@@ -63,6 +66,7 @@ const sectionGroups = [
 
 const sectionCopy: Record<SettingsSection, { title: string; description: string }> = {
   profile: { title: "个人资料", description: "管理当前登录身份和顾问资料。" },
+  model: { title: "我的模型", description: "为你的飞书私聊 Agent 配置供应商、模型和个人密钥。" },
   direction: { title: "方向画像", description: "查看真实参与推荐的关键词，以及仅供记录的画像备注。" },
   connections: { title: "数据连接", description: "管理 TTC、飞书和人才库的真实连接状态。" },
   strategy: { title: "推荐策略", description: "查看当前策略版本，并进入独立策略审核页面。" },
@@ -157,6 +161,7 @@ export function SettingsCenterReview({ data, initialSection = "profile", review 
     </aside>
     <main className="settings-main"><header><span className="settings-eyebrow">SETTINGS</span><h1>{copy.title}</h1><p>{copy.description}</p></header><div className="settings-section-content">
       {active === "profile" && <ProfilePanel {...props} />}
+      {active === "model" && <PersonalModelPanel />}
       {active === "direction" && <DirectionPanel {...props} />}
       {active === "connections" && <ConnectionsPanel {...props} />}
       {active === "strategy" && <StrategyPanel {...props} />}

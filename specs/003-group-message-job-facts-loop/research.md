@@ -29,4 +29,3 @@
 - **Decision**: 本轮使用现行 `brainx-worker.service`；`brainx-integration-worker.service` 保持 disabled，避免双消费者。
 - **Rationale**: 生产实测 `brainx-worker` 正在承担 bridge、简历和推送任务。
 - **Alternatives considered**: 同时启用两个 Worker，会导致重复扫描、游标竞争和运维歧义。
-

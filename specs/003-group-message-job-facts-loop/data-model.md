@@ -43,4 +43,3 @@ ACTIVE identity
 ```
 
 任一条件缺失均返回统一的 `NOT_FOUND_OR_FORBIDDEN` 或 `UNBOUND_IDENTITY`，不泄露草稿是否存在。
-

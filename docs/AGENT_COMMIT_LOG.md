@@ -13,10 +13,88 @@
 - 逆向分析：解包 SuperMai 桌面端 v0.3.6 dmg，确认其核心 harness 通过 `createCloudClient({ baseUrl: cloud_base_url, token })` 调用云端 sourcing API（`/search/scout/match`），认证来自 TTC 登录。BrainX 不需要安装桌面端，直接调用同一云端 API。
 - 新增模块：`src/supermai-sourcing.js`——`supermaiScoutMatch()` 调用云端 sourcing API，支持领英/GitHub/论文三渠道；凭证管理（AES-GCM 加密存储，同 ttc_tokens 安全纪律）。
 - 新增工具：`brainx_supermai_scout`（第 22 个生产工具）——参数 `{ criteria, sources?, limit? }`，返回多源候选人匹配结果。
-- 数据库迁移：`migrations/0036_supermai_credentials.sql`——凭证表。
+- 数据库迁移：`migrations/0037_supermai_credentials.sql`——凭证表（初始 0036，合并个人模型分支时避让其 0036 迁移改为 0037）。
 - 全面对齐：tool-registry、runtime.js、openclaw.plugin.json、openclaw.production.json、plugin-contract fixture、4 个测试断言 21→22。
 - 验证：quick 门禁 16/16 通过；受影响测试 17/17 通过。
 
+## 2026-09-03｜docs(release): 登记个人模型生产证据
+
+- 上线：记录生产固定 commit、root-only 回退点、三服务、HTTPS、插件、六人 ACTIVE 绑定、21 工具和模型隔离检查结果。
+- 安全：共享默认模型、StepFun 环境变量和旧 main Agent 内嵌 Key 均已移除，未在文档中记录任何凭据或完整飞书标识。
+- 未完成：生产尚无动态个人 Agent；两位凭据所有者的不同供应商真实问答仍需本人操作，未冒充六人真机通过。
+
+## 2026-09-03｜fix(deploy): 复用已安装飞书插件
+
+- 根因：ECS 已有精确版本飞书插件，安装器仍强制访问 npm 重装；registry 网络超时导致配置已更新但安装流程中断。
+- 修复：所有 OpenClaw 配置命令统一加载受保护的生产环境文件；先核验飞书插件精确版本，命中时复用，缺失或版本不符时才联网安装。
+- 验证：生产超时证据已保留；安装器语法、配置专项、快速与完整门禁将在重新发布前执行。
+
+## 2026-09-03｜merge(release): 合并服务器六人灰度修复
+
+- 合并：保留服务器已上线的六人职位草稿、OpenMai 与 Bridge/worker 稳定性修复，同时叠加顾问个人 Agent、个人模型和凭据隔离能力。
+- 发布：合并后先通过专项与完整门禁，再以可回退备份和固定 commit 部署；不覆盖服务器未纳入 Git 的备份及 sandbox 数据。
+- 验证：合并冲突、二十一工具契约、OpenClaw 配置升级和个人模型回归将在提交前完成。
+
+## 2026-09-03｜test(migration): 同步个人模型迁移总账
+
+- 修复：完整门禁发现迁移总账仍固定在 0035/37 项，现纳入个人模型 0036 并把旧库迁移总数更新为 38。
+- 验证：先保留完整门禁 497/499 的失败证据；迁移专项、快速门禁与干净提交后的完整门禁继续复跑。
+
+## 2026-09-03｜feat(model): 接入个人模型正式设置页面
+
+- 页面：设置中心新增“我的模型”，提供四类供应商、模型名、密码输入、数据处理同意、替换和停用；成功后立即清空输入，浏览器不持久化或回显密钥。
+- 飞书：`/brainx` 的“配置我的模型”改为正式 HTTPS 深链，直达设置分组，不再依赖服务器统一修改或裸 `/model` 命令。
+- 审核：新增生产组件 Storybook、静态安全测试和前端审核记录；桌面与手机内容区均无横向溢出，用户视觉复看仍明确记为未审核。
+- 验证：前端 42/42、飞书首页 3/3、快速门禁 16/16 通过；真实凭据和生产问答留到凭据所有者操作。
+
+## 2026-09-03｜feat(model): 开放本人模型配置接口
+
+- 接口：新增登录态 GET/PUT/DELETE `/api/v1/model-profile`，服务端只采用签名 Cookie 中的顾问和飞书 open_id，4 KiB 限额并统一脱敏错误。
+- 运维：新增管理员个人模型就绪清单，只展示顾问、Agent、供应商、模型、状态和时间，不提供凭据读取能力。
+- 停用：清除个人 Agent 的模型选择和认证优先级，避免继续调用；固定 OpenClaw 版本未提供删除 auth profile 的官方 CLI，认证材料仍保留在该顾问隔离库中并在运维文档明确限制。
+- 验证：本人身份传递、无 open_id、超限输入、供应商错误脱敏、普通顾问拒绝和管理员响应敏感词扫描共 9 条专项通过。
+
+## 2026-09-03｜feat(model): 隔离写入顾问个人模型凭据
+
+- 入口：实现 OpenAI、Anthropic、Google Gemini、StepFun 四类个人模型校验；拒绝客户端指定身份、Agent、命令、参数、环境变量或自定义网络地址。
+- 隔离：以登录顾问和飞书 open_id 双重核对现有 ACTIVE 业务绑定，再按 OpenClaw 精确 direct peer binding 找到个人 Agent；密钥只通过子进程 stdin 写入该 Agent 的 auth profile。
+- 防护：固定 CLI 参数、禁用 shell、限制输出和执行时间、每顾问互斥写入；业务库只保存非敏感状态，失败归一化且尝试恢复原模型。
+- 验证：先记录缺实现的失败测试；随后两顾问不同供应商隔离、密钥不进 argv/DB、身份错配和并发冲突共 6 条专项通过，快速门禁 16/16 通过。
+
+## 2026-09-03｜fix(openclaw): 移除共享模型并保护个人 Agent
+
+- 模型：撤销全局 StepFun 密钥、默认模型和别名；四类供应商只保留可选目录，具体模型和凭据归每位顾问的个人 Agent。
+- 隔离：飞书私聊首次接触可创建最多 20 个独立 Agent；会话工具可见性限制为本人、关闭 Agent 间通信，七个 BrainX Skill 安装为 state 级共享能力。
+- 发布：首次安装才写基础配置，升级使用 OpenClaw 官方 patch 并清除旧共享模型字段，保留运行时产生的 Agent、binding 与认证库。
+- 验证：先观察 4 条契约用例失败，再实现配置；专项、配置 dry-run 与快速门禁结果在提交前记录。
+
+## 2026-09-03｜feat(model): 建立个人模型非敏感状态表
+
+- 数据：新增顾问、飞书账号、个人 Agent、供应商、模型、授权同意和配置状态的审计投影；模型密钥继续只属于 OpenClaw 个人 Agent 认证库。
+- 约束：限制四类批准供应商、状态流转值、激活时间和 Agent 唯一归属，数据库结构不包含 Key、Secret、Token 或 Credential 字段。
+- 验证：新增迁移字段、敏感列扫描、非法供应商和重复 Agent 归属回归测试；专项与快速门禁结果在提交前记录。
+
+## 2026-09-03｜docs(model): 拆解个人模型施工任务
+
+- 拆解：形成 7 个阶段、30 个依赖有序任务，覆盖迁移、CLI 安全适配、动态个人 Agent、真实设置页、凭据轮换、管理员状态、生产部署和六人验收。
+- 验收：所有用户故事均有独立测试标准；实现任务前置失败用例，明确假密钥隔离实验与真实凭据所有者操作的边界。
+- 顺序：先消除共享默认模型与部署覆盖风险，再做自助配置；最后才允许真实供应商调用和生产灰度。
+- 验证：30 个任务格式全部合规、T001—T030 连续、用户故事标签完整；`git diff --check` 与 `npm run verify:quick` 16/16 通过。
+
+## 2026-09-03｜docs(model): 设计个人 Agent 模型配置方案
+
+- 方案：飞书私聊启用 OpenClaw 动态个人 Agent；API Key 仅通过 stdin 写入个人 Agent 认证库，BrainX 只保存供应商、模型、同意和状态。
+- 安全：共享群不借用个人密钥；关闭 Agent 间通信、会话工具只见当前会话；首版只开放 OpenAI、Anthropic、Google Gemini、StepFun 四类批准供应商。
+- 部署：七个 BrainX Skills 改为 state 级共享安装；升级配置必须保留运行时生成的 Agent、bindings 与 auth store，避免发布覆盖个人设置。
+- 交付：补齐技术计划、官方能力研究、数据状态机、个人模型 API 契约和六人真机验收说明。
+- 验证：constitution 前后门禁均通过；文档均低于 500 行，`git diff --check` 与 `npm run verify:quick` 16/16 通过。
+
+## 2026-09-03｜docs(model): 明确顾问个人模型产品边界
+
+- 决策：根据用户纠正，撤销“StepFun 作为全员生产默认模型”的产品假设；每个已授权飞书私聊用户应拥有独立 OpenClaw Agent、认证库、会话和模型选择。
+- 规格：新增个人模型配置用户故事、19 条可验收需求、凭据不落业务库/日志/聊天的安全边界、共享群不得借用个人密钥的规则，以及六人多模型真机验收指标。
+- 调研：OpenClaw 2026.7.1-2 官方能力和本地隔离实验均证明，飞书可动态创建个人 Agent，`models auth --agent` 可把 API Key 写入该 Agent 独立认证库。
+- 验证：规格质量清单 16/16 通过；`npm run verify:quick` 16/16 通过。
 ## 2026-09-03｜fix(test): worker 保活测试等就绪日志消除负载竞态假失败
 
 - 根因：测试固定 sleep 2s 后发 SIGTERM，full 门禁连跑 493 个测试时机器负载高、worker 启动变慢，信号可能在 SIGTERM 处理器注册前送达，被默认行为杀死（exit code null），实测 `SIGTERM 应干净退出` 偶发失败（492/493）。

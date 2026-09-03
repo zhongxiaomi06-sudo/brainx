@@ -46,7 +46,6 @@ function projection(row) {
     extracted_at: row.extracted_at,
   };
 }
-
 function visibleDraft(db, consultantId, draftId) {
   return db.prepare(`${VISIBLE_DRAFT} WHERE d.draft_id=? LIMIT 1`).get(consultantId, draftId);
 }
@@ -107,4 +106,3 @@ export function createJobFactsToolHandlers({ db }) {
     },
   };
 }
-

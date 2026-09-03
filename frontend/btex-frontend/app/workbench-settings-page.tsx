@@ -116,7 +116,9 @@ function WorkbenchSettingsPage({
     notify(action === "edit-profile" ? "方向画像将在下一批通过审核后的组件接入" : "推荐策略将在只读预演接口完成后接入");
   };
 
-  return <SettingsCenterReview data={data} review={false} onBack={onBack} onAction={handleAction} />;
+  const initialSection = typeof window !== "undefined"
+    && new URLSearchParams(window.location.search).get("settings") === "model" ? "model" : "profile";
+  return <SettingsCenterReview data={data} initialSection={initialSection} review={false} onBack={onBack} onAction={handleAction} />;
 }
 
 export { WorkbenchSettingsPage };

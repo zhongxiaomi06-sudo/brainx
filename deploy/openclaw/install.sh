@@ -86,7 +86,10 @@ done
 BRAINX_PLUGIN_TMP=$(mktemp -d /tmp/brainx-openclaw.XXXXXX)
 trap 'rm -rf -- "$BRAINX_PLUGIN_TMP"' EXIT
 npm pack "$BRAINX_DEPLOY_ROOT/./plugins/brainx-openclaw" --pack-destination "$BRAINX_PLUGIN_TMP" >/dev/null
-BRAINX_PLUGIN_ARCHIVE="$BRAINX_PLUGIN_TMP/brainx-openclaw-plugin-1.0.0.tgz"
+BRAINX_PLUGIN_VERSION=$(node -p \
+  "JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8')).version" \
+  "$BRAINX_DEPLOY_ROOT/plugins/brainx-openclaw/package.json")
+BRAINX_PLUGIN_ARCHIVE="$BRAINX_PLUGIN_TMP/brainx-openclaw-plugin-${BRAINX_PLUGIN_VERSION}.tgz"
 [[ -f "$BRAINX_PLUGIN_ARCHIVE" ]] || { echo "plugin package missing" >&2; exit 70; }
 install_plugin() {
   local plugin_spec=$1

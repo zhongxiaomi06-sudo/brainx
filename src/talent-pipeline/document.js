@@ -40,5 +40,6 @@ export async function processCandidateDocument(input, options = {}) {
   if (!fact || fact.schema_version !== 'candidate_fact_v1' || !fact.fact_version_id || !Array.isArray(fact.evidence)) {
     return { ...extraction, status: 'NEEDS_REVIEW', error_code: 'FACT_SCHEMA_INVALID' };
   }
-  return { status: 'READY', parser_version: extraction.parser_version, warnings: extraction.warnings, fact };
+  return { status: 'READY', parser_version: extraction.parser_version,
+    source_hash: extraction.source_hash, warnings: extraction.warnings, fact };
 }

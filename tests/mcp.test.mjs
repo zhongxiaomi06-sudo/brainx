@@ -54,8 +54,12 @@ test('MCP：initialize → tools/list → tools/call 全链', async () => {
     const names = list.result.tools.map((t) => t.name);
     for (const t of ['brainx_consultants', 'brainx_workbench', 'brainx_recommendations',
                      'brainx_opportunity', 'brainx_engage', 'brainx_replay',
-                     'brainx_record_outcome', 'brainx_sync_now', 'brainx_push_preview']) {
+                     'brainx_record_outcome', 'brainx_push_preview']) {
       assert.ok(names.includes(t), `缺工具 ${t}`);
+    }
+    // B 档安全硬前置（501b9bd）：黑名单工具不外露
+    for (const t of ['brainx_sync_now', 'brainx_talent']) {
+      assert.ok(!names.includes(t), `黑名单工具 ${t} 不应出现在 tools/list`);
     }
 
     // 花名册（openDb 自动播种）

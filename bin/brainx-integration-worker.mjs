@@ -4,11 +4,12 @@ import { hostname } from 'node:os';
 import { openDb } from '../src/db.js';
 import { createJobRepository } from '../src/integration-jobs/repository.js';
 import { runWorkerOnce } from '../src/integration-jobs/worker.js';
+import { createProductionHandlers } from '../src/integration-jobs/production-handlers.js';
 
 const db = openDb();
 const repository = createJobRepository(db);
 const workerId = `${hostname()}:${process.pid}`;
-const handlers = Object.freeze({});
+const handlers = createProductionHandlers();
 let stopping = false;
 process.once('SIGTERM', () => { stopping = true; });
 process.once('SIGINT', () => { stopping = true; });

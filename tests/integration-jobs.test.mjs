@@ -5,6 +5,7 @@ import { openDb } from '../src/db.js';
 import { createJobRepository } from '../src/integration-jobs/repository.js';
 import { createOutbox } from '../src/integration-jobs/outbox.js';
 import { runWorkerOnce } from '../src/integration-jobs/worker.js';
+import { createProductionHandlers } from '../src/integration-jobs/production-handlers.js';
 
 const t0 = new Date('2026-09-03T00:00:00.000Z');
 const at = minutes => new Date(t0.getTime() + minutes * 60_000);
@@ -66,4 +67,17 @@ test('outbox deduplicates and reauthorizes immediately before delivery', async (
   });
   assert.equal(result.status, 'CANCELLED');
   assert.equal(sent, false);
+});
+
+test('production worker only claims explicitly enabled fixed handlers', async () => {
+  const calls = [];
+  const handlers = createProductionHandlers({ BRAINX_RELOOP_SYNC_ENABLED: '1',
+    BRAINX_MATCH_EVAL_ENABLED: '1', BRAINX_DOCUMENT_PARSER_ENABLED: '0' }, {
+    syncTalent: async payload => { calls.push(['sync', payload]); return { result_ref: 'sync:1' }; },
+    evaluate: async payload => { calls.push(['eval', payload]); return { result_ref: 'eval:1' }; },
+  });
+  assert.deepEqual(Object.keys(handlers).sort(), ['MATCH_EVAL', 'TALENT_SYNC']);
+  assert.equal((await handlers.TALENT_SYNC({ source_ref: 'reloop' })).result_ref, 'sync:1');
+  assert.equal((await handlers.MATCH_EVAL({ dataset_ref: 'gold.json' }, { job: { job_id: 'j1' } })).result_ref, 'eval:1');
+  assert.equal(calls.length, 2);
 });

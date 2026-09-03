@@ -20,7 +20,7 @@ npm ci
 npm pack --dry-run
 npm pack
 openclaw --profile brainx plugins install ./brainx-openclaw-*.tgz
-openclaw --profile brainx plugins inspect brainx --runtime --json
+openclaw --profile brainx plugins inspect brainx-openclaw --runtime --json
 ```
 
 检查：manifest、运行时注册和配置 allowlist 中的 10 个工具完全一致；没有 MCP、exec、process、read/write/edit/apply_patch、browser/web、session send/spawn 或飞书 workspace 管理工具。

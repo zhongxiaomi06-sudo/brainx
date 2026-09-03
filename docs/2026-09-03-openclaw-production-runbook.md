@@ -21,9 +21,17 @@
 
 ```text
 npm run verify
-openclaw --profile brainx plugins inspect brainx --runtime --json
-openclaw --profile brainx doctor
-openclaw --profile brainx security audit
+sudo -u brainx /bin/bash
+set -a
+source /etc/brainx/openclaw.env
+set +a
+export HOME=/var/lib/brainx
+export OPENCLAW_CONFIG_PATH=/var/lib/brainx/.openclaw/openclaw.json
+export OPENCLAW_STATE_DIR=/var/lib/brainx/.openclaw
+openclaw plugins inspect brainx-openclaw --runtime --json
+openclaw doctor
+openclaw security audit
+exit
 curl -fsS http://127.0.0.1:3102/internal/v1/agent/health
 curl -fsS https://base.yorkteam.cn/api/v1/meta/guard
 ```

@@ -58,5 +58,21 @@ test('systemd units keep internal services on one host and load secrets from pro
   assert.match(gateway, /BRAINX_AGENT_GATEWAY_PORT=3102/);
   const installer = await readFile(new URL('deploy/openclaw/install.sh', root), 'utf8');
   assert.match(installer, /install -m 0640 -o root -g brainx/);
+  assert.match(installer, /brainx-agent\.env\.example/);
+  assert.match(installer, /openclaw\.env\.example/);
+  assert.match(installer, /OPENCLAW_CONFIG_PATH=/);
+  assert.match(installer, /OPENCLAW_STATE_DIR=/);
+  assert.doesNotMatch(installer, /\$\{env_name\}\.env\.example/);
   assert.doesNotMatch(installer, /install -m 0600 -o root -g brainx/);
+});
+
+test('Agent env template uses the exact variable names consumed by runtime', async () => {
+  const template = await readFile(new URL('deploy/openclaw/brainx-agent.env.example', root), 'utf8');
+  assert.match(template, /^BRAINX_AGENT_AUDIT_KEY=/m);
+  assert.match(template, /^BRAINX_DB=/m);
+  assert.match(template, /^BRAINX_AGENT_FEISHU_APP_KEYS_JSON=/m);
+  assert.match(template, /^BRAINX_AGENT_ADMIN_ID=/m);
+  assert.match(template, /^BRAINX_AGENT_ADMIN_ALLOWLIST=/m);
+  assert.doesNotMatch(template, /^BRAINX_AGENT_AUDIT_SECRET=/m);
+  assert.doesNotMatch(template, /^BRAINX_DB_PATH=/m);
 });

@@ -188,11 +188,13 @@ sudo deploy/openclaw/install.sh --apply
 |---|---|
 | `OPENCLAW_GATEWAY_TOKEN` | 独立随机值，不与 BrainX token 复用 |
 | `BRAINX_FEISHU_APP_ID/SECRET` | 同一个已发布飞书应用 |
-| `BRAINX_FEISHU_ALLOWED_OPEN_ID_1..3` | 最多三名灰度顾问；未使用槽位重复一个已授权 ID，不得填新人或伪造 ID |
-| `BRAINX_FEISHU_ALLOWED_CHAT_ID_1..2` | 最多两个测试群；未使用槽位重复一个已授权群 ID，不扩大范围 |
+| `BRAINX_FEISHU_ALLOWED_OPEN_ID_1..6` | 六名已批准顾问；每个 Open ID 还必须在 Agent Gateway 中绑定到同一个飞书 account `mia` 和本人 consultant |
+| `BRAINX_FEISHU_ALLOWED_CHAT_ID_1..3` | 最多三个批准群；未使用槽位重复一个已授权群 ID，不扩大范围 |
 | `BRAINX_BASE_URL` | 正式 HTTPS 根地址，用于 `/brainx` 工作台按钮 |
 | 两个 Agent secret | 与 `agent.env` 对应值逐字一致 |
-| 模型凭证 | 至少一个 OpenClaw 已支持 provider 的真实服务端凭证 |
+| `STEPFUN_API_KEY` | 公司默认模型凭证，仅保存在服务器；配置通过 SecretRef 读取，不得写入仓库或聊天 |
+
+生产默认模型为 `stepfun/step-3.5-flash`，失败时回退到 `stepfun/step-3.7-flash`。私聊会话按飞书用户隔离，顾问可发送 `/model`，或点击 `/brainx` 首页的“切换我的模型”，在管理员已批准的模型目录内改变本人当前会话模型；该操作不修改其他顾问会话，也不需要编辑服务器文件。个人自带 API Key/OAuth 属于后续独立 Agent 认证能力，不得通过飞书消息收集密钥。
 
 校验所有占位符已经替换，但不要输出值：
 
@@ -311,7 +313,7 @@ exit
 
 按顺序完成，不跳步：
 
-1. 已绑定顾问私聊发送 `/brainx`，看到六个业务按钮和 HTTPS 工作台按钮；该页不调用模型。
+1. 已绑定顾问私聊发送 `/brainx`，看到八个业务按钮（含推荐设置和会话模型切换）及 HTTPS 工作台按钮；该页不调用模型。
 2. 点击“今天先做什么”，确认回复只基于本人授权数据，并标记事实、判断、风险与下一步。
 3. 点击“推荐值得做的职位”，核对职位确实属于本人或项目授权。
 4. 选择一个授权职位找人，返回最多三名脱敏候选；手机号、邮箱、完整姓名和简历原文命中为零。

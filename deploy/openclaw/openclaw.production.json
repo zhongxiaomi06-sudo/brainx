@@ -4,6 +4,21 @@
       "default": { "source": "env" }
     }
   },
+  "models": {
+    "mode": "merge",
+    "providers": {
+      "stepfun": {
+        "baseUrl": "https://api.stepfun.com/step_plan/v1",
+        "apiKey": { "source": "env", "provider": "default", "id": "STEPFUN_API_KEY" },
+        "api": "openai-completions",
+        "auth": "api-key",
+        "models": [
+          { "id": "step-3.5-flash", "name": "Step 3.5 Flash" },
+          { "id": "step-3.7-flash", "name": "Step 3.7 Flash" }
+        ]
+      }
+    }
+  },
   "gateway": {
     "mode": "local",
     "bind": "loopback",
@@ -18,6 +33,14 @@
   },
   "agents": {
     "defaults": {
+      "model": {
+        "primary": "stepfun/step-3.5-flash",
+        "fallbacks": ["stepfun/step-3.7-flash"]
+      },
+      "models": {
+        "stepfun/step-3.5-flash": { "alias": "fast" },
+        "stepfun/step-3.7-flash": { "alias": "strong" }
+      },
       "sandbox": {
         "mode": "all",
         "scope": "session",

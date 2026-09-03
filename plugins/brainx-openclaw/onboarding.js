@@ -28,6 +28,10 @@ const ACTIONS = Object.freeze([
     label: '设置每日推荐',
     command: '请先读取我的每日推荐设置，再问我想每天几点、每次推荐多少个职位；复述新设置并在我确认后保存。',
   },
+  {
+    label: '切换我的模型',
+    command: '/model',
+  },
 ]);
 
 function safeWorkbenchUrl(value) {
@@ -64,7 +68,7 @@ export function createBraintexHomePresentation({ publicBaseUrl } = {}) {
   }
   blocks.push({
     type: 'context',
-    text: '机器人可读授权职位负责人；接单、启动找人、保存设置和记录进展会先确认。候选人联系方式与外发仍按单独授权控制。随时输入 /brainx 回到这里。',
+    text: '机器人可读授权职位负责人；接单、启动找人、保存设置和记录进展会先确认。候选人联系方式与外发仍按单独授权控制。输入 /model 可切换本会话模型，输入 /brainx 回到这里。',
   });
   return { title: 'BrainTex · 你的 AI 猎头助手', tone: 'info', blocks };
 }

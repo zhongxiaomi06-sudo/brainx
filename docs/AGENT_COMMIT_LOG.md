@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-03｜fix(openclaw): 固定生产模型并开放会话切换
+
+- 根因：生产配置未显式声明模型和 provider，安装后 OpenClaw 回退到无认证的 `openai/gpt-5.5`，所有飞书用户均无法获得模型回答。
+- 修复：以 SecretRef 接入已核验的 StepFun provider，默认 `step-3.5-flash`、失败回退 `step-3.7-flash`；两个模型分别提供 `fast`、`strong` 别名，并在 `/brainx` 首页加入“切换我的模型”，用户可在隔离的私聊会话内使用 `/model` 自助切换。
+- 权限：生产 SQLite 已先做 root-only 一致性备份，再通过审计管理接口把六名顾问统一绑定到真实飞书 account `mia`；逐槽位无模型验证 6/6 通过，旧错误绑定已撤销。
+- 验证：模型目录 API 只读核验成功；OpenClaw、首页、插件和卡片专项 20/20 通过；`npm run verify:quick` 16/16 通过；完整门禁与服务器部署证据将在推送前后继续记录。
+
 ## 2026-09-03｜fix(feishu): 修复职位推荐互动卡真实投递
 
 - 根因：OpenClaw 插件未声明网关启动加载，且把 typed `reply_payload_sending` 错注册成旧 custom hook；即时推卡入口又未读取顾问推荐数量，可能把完整榜单塞进单卡。

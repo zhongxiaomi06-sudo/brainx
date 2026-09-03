@@ -15,11 +15,11 @@ test('BrainTex 首页覆盖顾问核心工作入口和推荐设置', () => {
     '今天先做什么', '推荐值得做的职位', '为职位找候选人',
     '判断一个职位', '看跟进建议', '生成个人复盘',
   ]);
-  assert.equal(labels[6], '设置每日推荐');
+  assert.deepEqual(labels.slice(6, 8), ['设置每日推荐', '切换我的模型']);
   assert.equal(buttons.at(-1).url, 'https://brainx.example.com/');
-  for (const button of buttons.slice(0, 7)) {
+  for (const button of buttons.slice(0, 8)) {
     assert.equal(button.action.type, 'command');
-    assert.ok(button.action.command.length > 20);
+    assert.ok(button.action.command === '/model' || button.action.command.length > 20);
     assert.doesNotMatch(button.action.command, /ou_|oc_|@|1[3-9]\d{9}/);
   }
 });

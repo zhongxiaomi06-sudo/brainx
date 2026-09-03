@@ -21,6 +21,7 @@ import { promisify } from 'node:util';
 // B11（2026-08-24）：bridge 批处理 sync execFileSync 实测 3.3s 尖刺冻结事件循环 → 异步化
 const execFileP = promisify(execFile);
 import { now, uuid } from './db.js';
+import { produceAndExtract } from './job-extract/bridge-producer.js';
 import { runSync } from './sync.js';
 import { getValidAccessToken, listUserChats, listChatMessages, listBitableRecords, markReauth } from './feishu.js';
 import { BITABLE_BASE, BITABLE_TABLE, deriveProjectId, flatLark, flatApi, parseBitableRecord } from './bitable.js';
@@ -325,6 +326,8 @@ export async function bridgeOnce(db, { consultant_ids, execImpl = lark, api = { 
         try {
           const msgs = await fetchNewMessagesApi(db, cid, chat.chat_id, token, fetchImpl);
           const { inserted, matched } = ingestMessages(db, chat.chat_id, msgs, cid);
+          try { produceAndExtract(db, chat.chat_id, msgs); } // E3：群消息→账本→draft
+          catch (e) { errors.push(`e3:${chat.chat_id.slice(0, 10)}:${String(e.message || e).slice(0, 60)}`); }
           newMessages += inserted; matchedTotal += matched;
         } catch (e) {
           if (String(e.message).includes('230027')) markReauth(db, cid); // 缺 scope（如 group_msg:get_as_user 新加）→ 点亮重登胶囊
@@ -355,6 +358,8 @@ export async function bridgeOnce(db, { consultant_ids, execImpl = lark, api = { 
           try {
             const msgs = await fetchNewMessagesApi(db, cid, chatId, token, fetchImpl);
             const { inserted, matched } = ingestMessages(db, chatId, msgs, cid);
+            try { produceAndExtract(db, chatId, msgs); } // E3：同上
+            catch (e) { errors.push(`e3:${chatId.slice(0, 10)}:${String(e.message || e).slice(0, 60)}`); }
             newMessages += inserted; matchedTotal += matched;
           } catch (e) {
             if (String(e.message).includes('230027')) markReauth(db, cid);

@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-03｜fix(openclaw): 安装器加载生产环境文件修复插件安装中断
+
+- 根因：`deploy/openclaw/install.sh` 的 `install_plugin` 调用 OpenClaw CLI 时只传 HOME 与状态目录，未加载 `/etc/brainx/openclaw.env`；CLI 在安装期执行 SecretRef 校验，因 `STEPFUN_API_KEY` 缺失而报错中断，导致 1.1.6 打包成功但扩展目录仍停留 1.1.0（生产实证）。
+- 修复：`install_plugin` 改为以 brainx 身份 `set -a; . /etc/brainx/openclaw.env; set +a` 后再执行 `plugins install`（env 权限 0640 root:brainx，brainx 可读，密钥不落日志）。
+- 验证：`bash -n` 语法通过；`tests/openclaw-production-config.test.mjs` 新增 source 断言防回归，7/7 通过；`npm run verify:quick` 16/16 通过（quick 不作为 push 依据）。
+
 ## 2026-09-03｜fix(bridge): 兼容飞书消息多种时间格式
 
 - 根因：飞书拉取层已把毫秒时间戳转换为上海本地时间字符串，职位提炼生产者却再次强制按毫秒数字解析，导致 Bridge 每轮 133 条 `Invalid time value` 并持续退避。

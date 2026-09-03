@@ -89,6 +89,7 @@ test('systemd units keep internal services on one host and load secrets from pro
   assert.match(installer, /openclaw\.env\.example/);
   assert.match(installer, /OPENCLAW_CONFIG_PATH=/);
   assert.match(installer, /OPENCLAW_STATE_DIR=/);
+  assert.match(installer, /\. \/etc\/brainx\/openclaw\.env; set \+a; exec "\$0" "\$@"/);
   assert.match(installer, /@openclaw\/feishu@2026\.7\.1/);
   assert.match(installer, /plugins\/brainx-openclaw\/package\.json/);
   assert.match(installer, /brainx-openclaw-plugin-\$\{BRAINX_PLUGIN_VERSION\}\.tgz/);

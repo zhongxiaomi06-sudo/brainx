@@ -13,6 +13,7 @@ import { openDb } from '../src/db.js';
 import { registerChatContext } from '../src/gateway/chat-contexts.js';
 import { processLarkEvent } from '../src/gateway/lark-gateway.js';
 import { consumeJobExtract, CONSUMER_NAME } from '../src/job-extract/index.js';
+import { produceOne, backfillFromJobMessages } from '../src/job-extract/bridge-producer.js';
 
 const newDb = () => openDb(join(mkdtempSync(join(tmpdir(), 'brainx-e1-')), 'test.db'));
 
@@ -124,4 +125,29 @@ test('E1: 正文缺失（网关旧事件/异常）→ skip message_text_missing�
   assert.equal(r.result.action, 'skip');
   assert.equal(r.result.reason, 'message_text_missing');
   assert.equal(db.prepare('SELECT COUNT(*) n FROM job_facts_drafts').get().n, 0);
+});
+
+test('bridge-producer：消息→账本→draft 全链 + 三层幂等', () => {
+  const db = newDb();
+  const r1 = produceOne(db, { message_id: 'om_prod_1', chat_id: 'oc_x',
+    text: '示例客户招高级数据产品经理 2 名，base 上海', create_time: Date.now() });
+  assert.equal(r1.produced, true);
+  const again = produceOne(db, { message_id: 'om_prod_1', chat_id: 'oc_x', text: '重复' });
+  assert.equal(again.produced, false, 'idem_key 去重');
+  const ledger = db.prepare('SELECT COUNT(*) n FROM workflow_event_log').get().n;
+  const originals = db.prepare('SELECT COUNT(*) n FROM lark_messages').get().n;
+  assert.ok(ledger >= 1 && originals >= 1);
+  // 账本 payload 不含正文 PII（FR-006）
+  const payloads = db.prepare('SELECT payload FROM workflow_event_log').all();
+  for (const row of payloads) assert.doesNotMatch(row.payload, /高级数据产品经理/);
+});
+
+test('backfill：从 job_messages 存量回填幂等安全', () => {
+  const db = newDb();
+  db.prepare(`INSERT INTO job_messages (message_id, chat_id, sender_name, msg_type, text, sent_at, matched_project_id, ingested_at)
+    VALUES ('om_bf_1','oc_x','tester','text','沐仞科技招 HR 专员 1 名，base 上海',datetime('now'),NULL,datetime('now'))`).run();
+  const out = backfillFromJobMessages(db, { days: 1 });
+  assert.ok(out.scanned >= 1 && out.produced >= 1);
+  const again = backfillFromJobMessages(db, { days: 1 });
+  assert.equal(again.produced, 0, '重复回填全部幂等短路');
 });

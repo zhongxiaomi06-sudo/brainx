@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-04｜feat(sourcing): SuperMai 凭证复用顾问本人 TTC JWT
+
+- 目标：接续 `ee33805` 的 SuperMai 集成——用户确认 SuperMai 云端 sourcing 的 Bearer token 即顾问本人登录的 TTC JWT（凭证鉴权"就是大家登录的"），无需另建独立凭证体系。
+- 根因：`ee33805` 里 `getSupermaiCredentials` 只读独立凭证表 / 环境变量，但 `saveSupermaiCredentials` 没有任何路由入口，导致 SuperMai 搜索在生产上永远 `SOURCE_UNAVAILABLE`。
+- 修复：`getSupermaiCredentials` 增加回退——独立凭证表无记录时，复用 `ttc_tokens` 表中顾问本人有效 JWT 作为 Bearer token，`cloud_base_url` 默认 OpenMai 同一 TTC gateway（`https://gateway.ttcadvisory.com`，可用 `BRAINX_SUPERMAI_CLOUD_BASE_URL` 覆盖）。凭证优先级：独立凭证表 > 环境变量 token > 顾问本人 JWT，均无则返回 null（fail-closed）。
+- 验证：新增 `tests/supermai-sourcing.test.mjs` 三用例（JWT 复用 / 独立凭证优先 / fail-closed）3/3 通过；受影响 agent 测试 10/10 通过。
+
 ## 2026-09-03｜feat(sourcing): 集成 SuperMai 多源候选人搜索工具
 
 - 目标：搜索来源越多越好——在 OpenMai（BOSS/脉脉/猎聘）之外新增 SuperMai 云端 sourcing（领英/GitHub/论文），实现多渠道候选人搜索。

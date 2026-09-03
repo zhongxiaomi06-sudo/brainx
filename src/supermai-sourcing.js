@@ -17,26 +17,31 @@
  */
 import { now } from './db.js';
 import { enc, dec } from './feishu.js';
+import { getValidTtcJwt } from './ttcsdk/auth.js';
 
-const DEFAULT_CLOUD_BASE_URL = process.env.BRAINX_SUPERMAI_CLOUD_BASE_URL || '';
+// SuperMai 云端 sourcing API 地址。token=JWT（2026-09-04 确认：凭证鉴权即顾问本人
+// 登录的 TTC JWT），因此默认复用 OpenMai 同一 TTC gateway；若 SuperMai 有独立云端
+// 地址，用 BRAINX_SUPERMAI_CLOUD_BASE_URL 覆盖。
+const DEFAULT_CLOUD_BASE_URL = process.env.BRAINX_SUPERMAI_CLOUD_BASE_URL || 'https://gateway.ttcadvisory.com';
 const TIMEOUT_MS = 5 * 60_000;
 
 const SCOUT_SOURCES = ['linkedin', 'github', 'paper'];
 const SOURCE_CN = { linkedin: '领英', github: 'GitHub', paper: '论文' };
 
-/** 获取 SuperMai 凭证（cloud_base_url + token），优先环境变量，其次数据库。 */
+/** 获取 SuperMai 凭证（cloud_base_url + token），优先级：
+ *  1. 独立 SuperMai 凭证表（顾问级 cloud_base_url + token，若曾单独保存）；
+ *  2. 复用 TTC JWT 作为 Bearer token（token=JWT）：cloud_base_url 用环境变量或默认
+ *     TTC gateway，token 优先环境变量 BRAINX_SUPERMAI_TOKEN，其次顾问本人有效 JWT。 */
 export function getSupermaiCredentials(db, consultantId) {
-  if (DEFAULT_CLOUD_BASE_URL) {
-    const token = process.env.BRAINX_SUPERMAI_TOKEN || '';
-    if (token) return { cloudBaseUrl: DEFAULT_CLOUD_BASE_URL, token };
-  }
   const r = db.prepare(
     'SELECT cloud_base_url_enc, token_enc, needs_reauth FROM supermai_credentials WHERE consultant_id=?',
   ).get(consultantId);
-  if (!r || r.needs_reauth) return null;
-  try {
-    return { cloudBaseUrl: dec(r.cloud_base_url_enc), token: dec(r.token_enc) };
-  } catch { return null; }
+  if (r && !r.needs_reauth) {
+    try { return { cloudBaseUrl: dec(r.cloud_base_url_enc), token: dec(r.token_enc) }; } catch { /* 回退 JWT 复用 */ }
+  }
+  const token = process.env.BRAINX_SUPERMAI_TOKEN || getValidTtcJwt(db, consultantId);
+  if (token) return { cloudBaseUrl: DEFAULT_CLOUD_BASE_URL, token };
+  return null;
 }
 
 /** 托管/更新某顾问的 SuperMai 凭证。 */

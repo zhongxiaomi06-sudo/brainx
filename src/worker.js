@@ -18,6 +18,7 @@ import { startScheduler } from './scheduler.js';
 import { makeAutoPush } from './autopush.js';
 import { recommend, loadConsultants } from './recommend.js';
 import { relayBus } from './worker-relay.js';
+import { intakeAllConsultants } from './resume-intake.js';
 
 /** 启动全部批处理任务。bus 由调用方给（嵌入=server.bus；独立=relayBus）。 */
 export function startWorkerTasks(db, bus) {
@@ -34,6 +35,25 @@ export function startWorkerTasks(db, bus) {
   // 定时推送：每天 07:00 / 19:00（CST）；BRAINX_PUSH_SCHEDULE=0 关闭
   handles.push(startScheduler(db));
   console.log('[worker] 定时推送已启动（07:00 / 19:00 CST）');
+
+  // 简历文件入口：飞书群/私聊的 PDF/DOCX → 解析入库（BRAINX_RESUME_INTAKE_OFF=1 关闭）
+  if (process.env.BRAINX_RESUME_INTAKE_OFF !== '1') {
+    const iv = Number(process.env.BRAINX_RESUME_INTAKE_INTERVAL_MS || 300000);
+    let running = false;
+    const tick = async () => {
+      if (running) return;
+      running = true;
+      try {
+        const out = await intakeAllConsultants(db);
+        if (out.ingested) console.log(`[worker] 简历入库 ${out.ingested} 份（${out.at}）`);
+      } catch (e) { console.error(`[worker] 简历入口异常: ${String(e.message || e).slice(0, 120)}`); }
+      finally { running = false; }
+    };
+    const timer = setInterval(tick, iv);
+    timer.unref?.();
+    handles.push({ stop: () => clearInterval(timer) });
+    console.log(`[worker] 简历文件入口已启动（间隔 ${iv / 1000}s）`);
+  }
   return { stop: () => handles.forEach((h) => h?.stop?.()) };
 }
 

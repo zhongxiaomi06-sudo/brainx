@@ -65,6 +65,7 @@
 
 ### 工作规范
 
+- [BrainX Constitution](../.specify/memory/constitution.md)：核心技术与安全约束；1.0.1 明确 Agent 只读账号、确定性 worker 最小 DML 账号和临时 DDL 账号三者分离。
 - [上传前完整验证](standards/PRE_PUSH_VERIFICATION.md)：所有 Agent 的统一验收清单。
 - [质量门禁操作手册](standards/QUALITY_GATE_OPERATIONS.md)：统一命令、机器配置、存量基线、报告和 CI 维护方法。
 - [规范驱动研发流程](standards/SPEC_DRIVEN_WORKFLOW.md)：spec-kit（specify CLI）的接入、单功能规格流程、与 AGENTS.md/constitution 的分工。

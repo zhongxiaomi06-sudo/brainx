@@ -24,6 +24,7 @@ OPENCLAW_ACTUAL_VERSION=$($BRAINX_OPENCLAW_BIN --version)
 for required_file in \
   "$BRAINX_DEPLOY_ROOT/deploy/openclaw/openclaw.production.json" \
   "$BRAINX_DEPLOY_ROOT/deploy/openclaw/brainx-agent.env.example" \
+  "$BRAINX_DEPLOY_ROOT/deploy/openclaw/brainx-worker.env.example" \
   "$BRAINX_DEPLOY_ROOT/deploy/openclaw/openclaw.env.example" \
   "$BRAINX_DEPLOY_ROOT/plugins/brainx-openclaw/package.json" \
   "$BRAINX_DEPLOY_ROOT/deploy/systemd/brainx-agent-gateway.service" \
@@ -51,6 +52,7 @@ install_env() {
 }
 
 install_env "$BRAINX_DEPLOY_ROOT/deploy/openclaw/brainx-agent.env.example" /etc/brainx/agent.env
+install_env "$BRAINX_DEPLOY_ROOT/deploy/openclaw/brainx-worker.env.example" /etc/brainx/worker.env
 install_env "$BRAINX_DEPLOY_ROOT/deploy/openclaw/openclaw.env.example" /etc/brainx/openclaw.env
 
 install -m 0640 -o brainx -g brainx "$BRAINX_DEPLOY_ROOT/deploy/openclaw/openclaw.production.json" "$BRAINX_OPENCLAW_STATE/openclaw.json"

@@ -59,6 +59,7 @@ test('systemd units keep internal services on one host and load secrets from pro
   const installer = await readFile(new URL('deploy/openclaw/install.sh', root), 'utf8');
   assert.match(installer, /install -m 0640 -o root -g brainx/);
   assert.match(installer, /brainx-agent\.env\.example/);
+  assert.match(installer, /brainx-worker\.env\.example/);
   assert.match(installer, /openclaw\.env\.example/);
   assert.match(installer, /OPENCLAW_CONFIG_PATH=/);
   assert.match(installer, /OPENCLAW_STATE_DIR=/);
@@ -75,4 +76,21 @@ test('Agent env template uses the exact variable names consumed by runtime', asy
   assert.match(template, /^BRAINX_AGENT_ADMIN_ALLOWLIST=/m);
   assert.doesNotMatch(template, /^BRAINX_AGENT_AUDIT_SECRET=/m);
   assert.doesNotMatch(template, /^BRAINX_DB_PATH=/m);
+  assert.match(template, /^BRAINX_MYSQL_USER=brainx_agent_readonly$/m);
+  assert.doesNotMatch(template, /^BRAINX_(RELOOP_SYNC|MATCH_EVAL|DOCUMENT_PARSER)_ENABLED=/m);
+});
+
+test('worker has a separate least-DML environment and systemd does not reuse Agent credentials', async () => {
+  const template = await readFile(new URL('deploy/openclaw/brainx-worker.env.example', root), 'utf8');
+  assert.match(template, /^BRAINX_DB=\/opt\/brainx\/data\/brainx\.sqlite$/m);
+  assert.match(template, /^BRAINX_MYSQL_USER=brainx_worker_runtime$/m);
+  assert.match(template, /^BRAINX_RELOOP_SYNC_ENABLED=1$/m);
+  assert.match(template, /^BRAINX_DOCUMENT_LLM_ENABLED=0$/m);
+  assert.match(template, /^BRAINX_TENANT_ID=/m);
+  assert.match(template, /^BRAINX_RELOOP_SOURCE_OWNER_ID=/m);
+  assert.doesNotMatch(template, /^BRAINX_AGENT_(GATEWAY_TOKEN|ASSERTION_SECRET|AUDIT_KEY)=/m);
+
+  const worker = await readFile(new URL('deploy/systemd/brainx-integration-worker.service', root), 'utf8');
+  assert.match(worker, /^EnvironmentFile=\/etc\/brainx\/worker\.env$/m);
+  assert.doesNotMatch(worker, /^EnvironmentFile=\/etc\/brainx\/agent\.env$/m);
 });

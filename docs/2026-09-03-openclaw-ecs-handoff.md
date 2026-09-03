@@ -13,7 +13,7 @@
 - BrainX 正式应用与数据库迁移：仓库根目录、`migrations/`、`talent-migrations/`。
 - BrainX 原生 OpenClaw 插件：`plugins/brainx-openclaw/`。
 - OpenClaw 固定生产配置：`deploy/openclaw/openclaw.production.json`。
-- 无密钥环境模板：`deploy/openclaw/brainx-agent.env.example`、`deploy/openclaw/openclaw.env.example`。
+- 无密钥环境模板：`deploy/openclaw/brainx-agent.env.example`、`deploy/openclaw/brainx-worker.env.example`、`deploy/openclaw/openclaw.env.example`。
 - 三个常驻服务：`deploy/systemd/brainx-agent-gateway.service`、`brainx-integration-worker.service`、`openclaw-brainx.service`。
 - 幂等安装器：`deploy/openclaw/install.sh`。
 
@@ -71,7 +71,7 @@ cd /opt/brainx
 npm run talent:health
 ```
 
-RDS 运行账号只应拥有 BrainX 专库的 `SELECT/INSERT/UPDATE/DELETE`。执行首次 additive migration 时临时使用具备所需 DDL 权限的迁移账号；迁移完成后立即换回运行账号。禁止使用超管作为常驻凭据。
+准备两个互不复用的常驻账号：Gateway 账号只允许 `brainx_talent` SELECT；worker 账号只允许 `reloop_app` 所需来源表 SELECT，以及 `brainx_talent` 的 SELECT/INSERT/UPDATE/DELETE。执行首次 additive migration 时临时使用具备所需 DDL 权限的迁移账号；迁移完成后立即撤销。禁止使用超管作为常驻凭据。
 
 ## 四、预检并安装三个服务
 
@@ -84,6 +84,7 @@ sudo deploy/openclaw/install.sh --apply
 安装器会创建：
 
 - `/etc/brainx/agent.env`
+- `/etc/brainx/worker.env`
 - `/etc/brainx/openclaw.env`
 - `/var/lib/brainx/.openclaw/openclaw.json`
 - 三个 systemd unit
@@ -92,11 +93,11 @@ sudo deploy/openclaw/install.sh --apply
 
 ## 五、只在服务器写真实配置
 
-分别编辑两个环境文件，替换所有 `replace-`、`cli_replace`、`ou_replace`、`oc_replace` 和 `must-equal-` 占位值：
+分别编辑三个环境文件，替换所有 `replace-`、`cli_replace`、`ou_replace`、`oc_replace` 和 `must-equal-` 占位值：
 
 ```bash
-chmod 0640 /etc/brainx/agent.env /etc/brainx/openclaw.env
-chown root:brainx /etc/brainx/agent.env /etc/brainx/openclaw.env
+chmod 0640 /etc/brainx/agent.env /etc/brainx/worker.env /etc/brainx/openclaw.env
+chown root:brainx /etc/brainx/agent.env /etc/brainx/worker.env /etc/brainx/openclaw.env
 ```
 
 关键规则：
@@ -105,23 +106,29 @@ chown root:brainx /etc/brainx/agent.env /etc/brainx/openclaw.env
 - `BRAINX_AGENT_ASSERTION_SECRET` 在两个文件中必须相同；
 - Gateway token、assertion secret、audit key、OpenClaw gateway token 必须分别随机生成且不少于 32 字节，不能复用；
 - `BRAINX_AGENT_FEISHU_APP_KEYS_JSON` 中的 account 名必须与 OpenClaw 飞书 account 一致；
+- Agent Gateway 的 RDS 账号必须只读，worker 使用另一个最小 DML 账号；
 - 飞书 App Secret、模型密钥、RDS 密码只留在服务器环境文件；
 - 文档原文未获数据责任人批准前，保持 `BRAINX_DOCUMENT_LLM_ENABLED=0`。
 
 ## 六、迁移与显式身份绑定
 
-先用临时迁移账号执行：
+先在一次性的 root shell 中注入临时迁移账号执行；下列 `export` 只表示变量名，真实值不得写进本文或 shell history：
 
 ```bash
 cd /opt/brainx
-set -a
-. /etc/brainx/agent.env
-set +a
+export BRAINX_MYSQL_HOST=<RDS_HOST>
+export BRAINX_MYSQL_PORT=3306
+export BRAINX_MYSQL_DATABASE=brainx_talent
+export BRAINX_MYSQL_USER=<TEMP_MIGRATION_USER>
+read -rsp "Migration password: " BRAINX_MYSQL_PASSWORD
+export BRAINX_MYSQL_PASSWORD
+export BRAINX_MYSQL_SSL=1
 npm run init-talent
 npm run talent:health
+exit
 ```
 
-迁移成功后换回 RDS 运行账号。然后由管理员逐个绑定灰度顾问；以下仅是形状示例，尖括号必须替换，不能从聊天文本猜身份：
+迁移成功后撤销临时迁移账号。然后由加载了 `/etc/brainx/agent.env` 的管理员 shell 逐个绑定灰度顾问；以下仅是形状示例，尖括号必须替换，不能从聊天文本猜身份：
 
 ```bash
 node bin/brainx-agent-admin.mjs bind-identity \

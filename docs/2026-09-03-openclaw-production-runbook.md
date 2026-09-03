@@ -10,7 +10,7 @@
 
 1. 将已验收 commit 部署到 `/opt/brainx`，安装 Node 依赖并构建前端。
 2. 安装并锁定 OpenClaw `2026.7.1-2`，执行 `sudo deploy/openclaw/install.sh --check`。
-3. 执行 `--apply`，然后在 `/etc/brainx/agent.env` 与 `openclaw.env` 替换全部占位值；文件保持 `0640 root:brainx`。
+3. 执行 `--apply`，然后在 `/etc/brainx/agent.env`、`worker.env` 与 `openclaw.env` 替换全部占位值；文件保持 `0640 root:brainx`。Gateway 使用人才库只读账号，确定性 worker 使用独立最小 DML 账号。
 4. 运行 SQLite/RDS additive migration；先做 RDS 备份和只读健康检查，再执行写迁移。
 5. 用 `brainx-agent-admin` 逐一绑定最多三名灰度顾问，并显式登记测试群、sender、purpose 与项目范围。
 6. 依次启动 `brainx-agent-gateway`、`brainx-integration-worker`、`openclaw-brainx`，最后重启现有 `brainx.service`。

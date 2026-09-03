@@ -136,3 +136,8 @@
 - [x] T044 为常驻 worker 装配同步、解析和影子评测的固定生产 handler，并验证不会领取未启用类型 per FR-016 / T034 (partial)
 - [x] T045 将文档状态、来源 hash、结构化事实和证据持久化为可恢复闭环 per FR-013 / SC-006 (partial)
 - [x] T046 在可复跑匹配报告中增加硬条件误放率和证据覆盖率 per FR-015 / SC-011 (partial)
+
+## Phase 9: Convergence
+
+- [x] T048 将 Agent Gateway 的 RDS 只读环境与 integration worker 的最小 DML 环境拆分，并更新 systemd、安装器、测试和交接说明 per Constitution III / FR-005 / FR-019 (contradicts, CRITICAL)
+- [ ] T049 让锁定版生产飞书配置显式容纳最多 3 名灰度顾问与 2 个白名单群，并补充配置一致性测试 per SC-001 / US4/AC2 (partial, HIGH)

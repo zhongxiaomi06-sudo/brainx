@@ -21,7 +21,7 @@ LLM 永不参与权限判断——`decide()` 决策表是唯一裁决权威，�
 
 - **时间盒**：一切施工对齐 14 天作战计划（9/3 全员使用 → 9/4 桥 1 联调 → 9/8 推人循环 → 9/14 决赛）；阶段验收不绑定具体日期，但演示主线节点不可顺延。
 - **成本控制**：LLM 调用必须有 kill-switch（如 `AI_ENABLED`）；token 用量可观测。
-- **权限最小集**：飞书 scope 仅 `im.message.receive_v1`、`im:message:send_as_bot`、`im:chat:readonly` + 卡片回调；MySQL 人才库只读；超出即退回重审（见[复用与自建边界 PRD](../../docs/prd-2026-09-01-reuse-selfbuild-boundary.md) §4）。
+- **权限最小集**：飞书 scope 仅 `im.message.receive_v1`、`im:message:send_as_bot`、`im:chat:readonly` + 卡片回调；Agent-facing MySQL 账号只读，确定性同步 worker 使用与 Agent 分离的最小 DML 账号，DDL 仅允许临时迁移账号；超出即退回重审（见[复用与自建边界 PRD](../../docs/prd-2026-09-01-reuse-selfbuild-boundary.md) §4）。
 
 ## Development Workflow
 
@@ -35,4 +35,4 @@ LLM 永不参与权限判断——`decide()` 决策表是唯一裁决权威，�
 - 复杂性必须证明价值；安全原则（I/II/III）不可被任何"临时绕过"稀释；
 - 运行时开发指引见 `docs/README.md` 任务路由。
 
-**Version**: 1.0.0 | **Ratified**: 2026-09-01 | **Last Amended**: 2026-09-01
+**Version**: 1.0.1 | **Ratified**: 2026-09-01 | **Last Amended**: 2026-09-03

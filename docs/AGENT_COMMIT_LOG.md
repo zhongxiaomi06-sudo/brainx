@@ -2,6 +2,13 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
+## 2026-09-03｜fix(auth): 分离 Agent 与 worker 人才库权限
+
+- 收敛：`speckit-converge` 回扫 21 条功能需求、12 条成功标准、4 个用户故事和 5 条 constitution 原则，发现 Agent/worker 共用 DML 凭据，以及生产模板不足以容纳三人两群两项 HIGH 以上缺口，追加 T048-T049。
+- 修复：完成 T048；Gateway 环境仅使用 `brainx_agent_readonly`，worker 改用独立 `/etc/brainx/worker.env` 和最小 DML 账号，DDL 只允许临时迁移账号；安装器、systemd、安全手册、运行手册和 ECS 交接单同步更新。
+- 治理：constitution 升级到 1.0.1，把原笼统“人才库只读”澄清为 Agent 只读、确定性 worker 最小 DML、迁移临时 DDL 三段边界，以匹配已批准的增量同步需求。
+- 验证：先新增回归测试并确认旧配置 2 项失败；实现后部署配置专项 6/6、安装脚本语法和快速门禁 16/16 通过。
+
 ## 2026-09-03｜fix(deploy): 修复生产安装错配并补齐 ECS 交接
 
 - 根因：发布复核发现安装器引用不存在的 `agent.env.example`，环境模板又使用运行时代码不读取的数据库与审计变量名；照旧说明执行会在安装或 Gateway 启动阶段失败。

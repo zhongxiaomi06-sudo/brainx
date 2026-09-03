@@ -2,6 +2,7 @@ import { createJobToolHandlers } from './tools-jobs.js';
 import { createTalentToolHandlers } from './tools-talent.js';
 import { createActionToolHandlers } from './tools-actions.js';
 import { createCandidateActionToolHandlers } from './tools-candidate-actions.js';
+import { createJobFactsToolHandlers } from './tools-job-facts.js';
 
 const BANNED_ARGUMENTS = new Set([
   'tenant_id', 'consultant_id', 'sender', 'open_id', 'scope', 'sql', 'url', 'command', 'file',
@@ -46,6 +47,12 @@ export const AGENT_TOOL_ROWS = Object.freeze([
   { name: 'brainx_openmai_search', purpose: ['candidate_review'], parameters: object({
     job_id: string(),
   }, ['job_id']), projectKey: 'job_id' },
+  { name: 'brainx_pending_job_facts', purpose: ['job_fact_review'], p2pOnly: true, parameters: object({
+    limit: integer(1, 20),
+  }) },
+  { name: 'brainx_review_job_fact', purpose: ['job_fact_review'], p2pOnly: true, parameters: object({
+    draft_id: string(), action: string({ enum: ['confirm', 'reject'] }), job_id: string(), confirm: boolean(),
+  }, ['draft_id', 'action', 'confirm']) },
   { name: 'brainx_push_preferences', purpose: ['preferences'], p2pOnly: true, parameters: object({}) },
   { name: 'brainx_update_push_preferences', purpose: ['preferences'], p2pOnly: true, parameters: object({
     times: array(string({ pattern: '^(?:[01]\\d|2[0-3]):[0-5]\\d$' })), job_count: integer(1, 10),
@@ -148,9 +155,10 @@ export function createProductionToolRegistry({ db, talentDependencies = {}, acti
   const jobs = createJobToolHandlers({ db });
   const actions = createActionToolHandlers({ db, ...actionDependencies });
   const candidateActions = createCandidateActionToolHandlers({ db, ...talentDependencies });
+  const jobFacts = createJobFactsToolHandlers({ db });
   const talent = createTalentToolHandlers({
     ...talentDependencies,
     jobGapHandler: jobs.brainx_gap_questions,
   });
-  return createToolRegistry({ handlers: { ...jobs, ...talent, ...actions, ...candidateActions } });
+  return createToolRegistry({ handlers: { ...jobs, ...talent, ...actions, ...candidateActions, ...jobFacts } });
 }

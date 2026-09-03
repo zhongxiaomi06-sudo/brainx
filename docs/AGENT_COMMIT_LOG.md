@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-03｜feat(gray): 接通六人职位草稿审核与 OpenMai 入口
+
+- 范围：按 York 业务主体、稳定技术账号、真实操作者三层身份收口六人灰度；Otto 离职撤权保留历史，历史 108 个群不自动扩权，首轮只登记明确授权群。
+- 工具：Agent Gateway 新增本人可见的 `brainx_pending_job_facts` 与显式确认/拒绝的 `brainx_review_job_fact`；OpenClaw 同时补上已存在但未暴露的 `brainx_openmai_search`，插件 1.1.6 的批准工具总数为 21。
+- 安全：草稿读取要求 active 顾问、已登记群和真实群成员关系；写操作仅私聊、强制 `confirm=true`，证据片段脱敏手机号/邮箱，OpenClaw 不接触数据库。
+- 验证：新增测试先失败后通过；草稿工具/OpenClaw/生产配置 15/15、Gateway HTTP 4/4、`npm run verify:quick` 16/16 通过。完整门禁将在提交后于干净 HEAD 执行。
+
 ## 2026-09-03｜fix(openclaw): 固定生产模型并开放会话切换
 
 - 根因：生产配置未显式声明模型和 provider，安装后 OpenClaw 回退到无认证的 `openai/gpt-5.5`，所有飞书用户均无法获得模型回答。

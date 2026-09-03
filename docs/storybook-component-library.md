@@ -43,6 +43,8 @@
 
 飞书卡片对象深链不新增视觉组件，复用完整工作台、`JobDetailCard` 和真实数据入口三态的既有 Storybook。生产代码只接受 HTTPS 基址，职位与回放在正式数据加载并完成 Web 会话鉴权后打开；候选引用只用于预填对话问题。深链不携带 consultant、tenant、open_id、token 或 scope，也不能替代后端对象权限检查。接入状态见[飞书卡片 HTTPS 深链接入记录](frontend-reviews/2026-09-03-feishu-card-deep-links.md)。
 
+BrainTex 飞书功能首页不在 React Storybook 里复制一套仿真卡片；仓库输出 OpenClaw 通用 `presentation`，由锁定版官方飞书渠道生成真实卡片 2.0。因此 Storybook 状态保持“未开始”，视觉验收必须在真实飞书客户端完成，自动测试只验证内容、按钮命令、HTTPS 和授权边界。状态见 [BrainTex 飞书功能首页审核记录](frontend-reviews/2026-09-03-braintex-feishu-home.md)。
+
 ## 使用命令
 
 从仓库根目录执行：

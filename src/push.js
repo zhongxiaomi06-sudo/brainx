@@ -50,7 +50,7 @@ export function buildDailyCard({ consultant_name, consultant_id, run, items, ite
       + `**风险**：${(r.risks || []).slice(0, 2).join('；') || '暂无显著风险'}\n`
       + `**下一步**：${r.action === 'RECOMMEND_ACCEPT' ? '打开职位，确认接单后自动启动找人' : '打开职位，补齐关键信息后再判断'}` });
     const actions = [
-      btn(r.action === 'RECOMMEND_ACCEPT' ? '打开并接单' : '查看完整分析', buildBrainxDeepLink({ baseUrl, objectType: 'opportunity', objectRef: j.project_id }), 'primary'),
+      btn(r.action === 'RECOMMEND_ACCEPT' ? '接单与启动找人' : '联系人与推进', buildBrainxDeepLink({ baseUrl, objectType: 'opportunity', objectRef: j.project_id }), 'primary'),
       btn('回放', buildBrainxDeepLink({ baseUrl, objectType: 'replay', objectRef: r.decision_id })),
     ];
     // 一键反馈（F2）：签名当日有效；未配置密钥时 quickLink 返 null，按钮不渲染
@@ -72,7 +72,7 @@ export function buildDailyCard({ consultant_name, consultant_id, run, items, ite
   // markdown/hr/note/action/multi_url 全部支持，深链按钮行为一致。
   return { config: { wide_screen_mode: true },
     header: { template: TEMPLATE[state], title: { tag: 'plain_text',
-      content: `Brain X · 今日职位决策 ${now().slice(5, 16).replace('T', ' ')}` } },
+      content: `BrainTex · 今日职位推荐 ${now().slice(5, 16).replace('T', ' ')}` } },
     elements: els };
 }
 

@@ -10,10 +10,11 @@ export default definePluginEntry({
   description: 'Least-privilege recruiting decision tools for Feishu consultants.',
   register(api) {
     api.registerCommand(createBraintexHomeCommand());
-    api.registerHook('reply_payload_sending', formatBrainxReplyPayload, {
-      name: 'brainx-rich-replies',
-      description: '把 BrainTex 的飞书最终回答渲染为结构化卡片。',
-    });
+    api.on('reply_payload_sending', (event, context) => {
+      const result = formatBrainxReplyPayload(event, context);
+      api.logger?.info?.(`[brainx-rich-replies] kind=${event?.kind || 'unknown'} channel=${event?.channel || context?.channelId || 'unknown'} applied=${Boolean(result)}`);
+      return result;
+    }, { priority: 50 });
     for (const row of BRAINX_OPENCLAW_TOOLS) {
       api.registerTool(createBrainxToolFactory(row), { name: row.name });
     }

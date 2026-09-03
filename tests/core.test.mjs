@@ -179,6 +179,8 @@ test('推送卡片：结构合法 + 三段信号 + 深链；同 run 重复推 SK
   assert.ok(card.elements.some((e) => e.tag === 'action'));
   const text = JSON.stringify(card);
   assert.match(text, /Fit /);
+  assert.match(text, /BrainTex · 今日职位推荐/);
+  assert.match(text, /联系人与推进|接单与启动找人/);
   assert.match(text, /https:\/\/base\.yorkteam\.cn\/\?open=opportunity%3A/);
   const r1 = await pushCard(db, { consultant_id: CID, kind: 'DAILY_TOP3', run_id: run.run.run_id,
                             card, target: 'oc_test', send: false });

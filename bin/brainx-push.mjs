@@ -6,6 +6,7 @@ import { latestSync, latestCompleteSnapshot } from '../src/sync.js';
 import { latestRun, loadConsultants } from '../src/recommend.js';
 import { commitmentSummary } from '../src/engagement.js';
 import { buildDailyCard, buildSyncAlertCard, pushCard } from '../src/push.js';
+import { DEFAULT_PUSH_PREFERENCES, getPushPreferences } from '../src/push-preferences.js';
 
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i > -1 ? process.argv[i + 1] : d; };
 const cid = arg('consultant', 'felix');
@@ -16,9 +17,11 @@ const run = latestRun(db, cid, { hideEngaged: true });
 const c = commitmentSummary(db, cid);
 const consultant = loadConsultants(db).find((x) => x.consultant_id === cid);
 const name = consultant?.display_name || cid;
+const preferences = getPushPreferences(db, cid) || DEFAULT_PUSH_PREFERENCES;
 const kind = sync && !sync.complete ? 'SYNC_ALERT' : 'DAILY_TOP3';
 const card = kind === 'SYNC_ALERT' ? buildSyncAlertCard(sync)
-  : buildDailyCard({ consultant_name: name, consultant_id: cid, run: run?.run, items: run?.items || [],
+  : buildDailyCard({ consultant_name: name, consultant_id: cid, run: run?.run,
+                     items: (run?.items || []).slice(0, preferences.job_count), item_limit: preferences.job_count,
                      commitments: c, sync, snapshot_id: snapshot?.sync_id });
 if (!process.argv.includes('--send')) {
   console.log(JSON.stringify(card, null, 2));

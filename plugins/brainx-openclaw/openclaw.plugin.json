@@ -2,6 +2,9 @@
   "id": "brainx-openclaw",
   "name": "BrainX Recruiting Tools",
   "description": "Least-privilege recruiting decision and workflow tools backed by the local BrainX Agent Gateway.",
+  "activation": {
+    "onStartup": true
+  },
   "contracts": {
     "commands": ["brainx"],
     "tools": [

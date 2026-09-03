@@ -43,6 +43,7 @@ test('Feishu is websocket-only, allowlisted, and mention-gated in groups', () =>
     '${BRAINX_FEISHU_ALLOWED_OPEN_ID_6}',
   ];
   assert.equal(feishu.connectionMode, 'websocket');
+  assert.equal(feishu.streaming, false, 'final reply hook needs to own the completed rich card');
   assert.equal(feishu.dmPolicy, 'allowlist');
   assert.equal(feishu.groupPolicy, 'allowlist');
   assert.equal(feishu.requireMention, true);

@@ -69,6 +69,7 @@
     "feishu": {
       "enabled": true,
       "connectionMode": "websocket",
+      "streaming": false,
       "defaultAccount": "mia",
       "dmPolicy": "allowlist",
       "allowFrom": [

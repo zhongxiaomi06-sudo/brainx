@@ -1,6 +1,6 @@
 {
   "name": "@brainx/openclaw-plugin",
-  "version": "1.1.0",
+  "version": "1.1.5",
   "private": true,
   "type": "module",
   "description": "Least-privilege OpenClaw tools for the BrainX recruiting workflow",

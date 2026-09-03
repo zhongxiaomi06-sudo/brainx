@@ -11,6 +11,7 @@ import {
   checkTrackedFilesPresent,
   checkUnsafeTrackedEntries,
   countPhysicalLines,
+  isLineChecked,
   runCommand,
   scanPortablePaths,
   scanSecrets,
@@ -76,6 +77,17 @@ test("物理行计数兼容空文件、末尾换行和 CRLF", () => {
   assert.equal(countPhysicalLines("a"), 1);
   assert.equal(countPhysicalLines("a\n"), 1);
   assert.equal(countPhysicalLines("a\r\nb\r\n"), 2);
+});
+
+test("Spec Kit 官方生成脚本不按手写源码行数审计", () => {
+  const config = {
+    lineExtensions: [".sh"],
+    excludedPrefixes: [".specify/scripts/bash/"],
+    excludedFiles: [],
+    excludedBasenames: [],
+  };
+  assert.equal(isLineChecked(".specify/scripts/bash/common.sh", config), false);
+  assert.equal(isLineChecked("scripts/common.sh", config), true);
 });
 
 test("完整检出检查会列出缺失的被跟踪文件", () => {

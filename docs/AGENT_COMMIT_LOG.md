@@ -2,12 +2,317 @@
 
 所有 Agent 在创建代码或文档 commit 前，都必须在本文件顶部追加一条简明中文记录，并将记录与对应改动放入同一个 commit。
 
-<<<<<<< HEAD
-## 2026-08-30｜merge(main): 以本地版本完成远端同步
+## 2026-09-02｜feat(job-extract): E3 确认闭环（drafts→job_facts 转正）+ recommend_run 限流
 
-- 改动：将最新 `origin/main` 记录为已合入演示功能分支；按用户明确要求，合并结果完整保留本地已经确认的代码、页面、交互与数据闭环，不引入远端同位置旧实现，避免工作台回退。原工作目录中的未提交路演文件未进入本次分支。
-- 验证：合并前后文件树仅增加本条记录；提交后执行快速质量门禁、推荐分页专项、前端构建与 Git 差异检查，再推送功能分支并创建 PR。
-=======
+- **背景**：按[缺口总表](2026-09-02-gap-and-next-actions.md) D2 实施（用户裁定顺序 D2 在 D1 之前——先让草稿能进 job_facts，E1 才不是「写了但没用」的代码）；顺带完成 B 档遗留小项 recommend_run 限流（白名单文档 P0 第 3 件）。E2 LLM 层按裁定等 gold set，本轮不动。
+- **改动**：①新增 `src/job-extract/confirm.js`——`confirmDraft(db, {draft_id, consultant_id, project_id})`：无 pid 走新建路径（须草稿有 company+role，否则 400 `insufficient_fields`），事务内 INSERT job_facts + INSERT job_memberships（'MY_JOB'，确认人立即可见）+ 专用 sync_runs 血缘行（source='lark_extract'）；有 pid 走更新路径（先 `jobVisibleTo` 前置校验，fail-closed 不区分「不存在」与「不可见」均 404；草稿须至少一个可更新字段），UPDATE 用 `COALESCE(?, city)` 不覆盖既有值、active_state='UNKNOWN' 不落地；确认幂等：重复确认返回 409 `already_confirmed`；`rejectDraft` 置 rejected 终态。②`mcp/server.mjs` 新增 `brainx_confirm_facts` 工具（confirm/reject 两动作，带 pid 时 jobVisibleTo 前置检查）+ `brainx_recommend_run` 60s 进程内限流（`RECOMMEND_RUN_AT` Map 按 consultant_id 记上次调用时间戳，超限返回 `{error:'rate_limited', retry_after_ms}` 不执行）。③新增 `tests/job-extract-confirm.test.mjs` 7 用例（新建+血缘+membership / 重复确认 409 / 更新不覆盖既有值 / 不可见职位 NOT_FOUND / 缺 company+role 400 / 未知草稿 404 / rejected 终态）；`tests/mcp-write-guard.test.mjs` 扩至 8 用例（新增 E3-MCP×2 全链 + B6 限流）。
+- **文档回写**：缺口总表 D2 标 ✅（「E1→E3 闭环打通」）；工具外露白名单 P0 三件全部 ✅（第 3 件限流含实施细节）；OpenClaw 接口包工具快照 15→16（补 `brainx_confirm_facts`，record_outcome ⚠️→✅——上一轮 501b9bd 的守门状态本文件此前未回写，本轮补上）。
+- **更新路径 insufficient_fields 校验修正**：首版校验过严——更新路径草稿只有 active_state 也被「缺 company/role」拒绝；拆分为：新建须 company+role，更新只须任一可更新字段（city/pipeline_stage/hc/非 UNKNOWN 状态）。
+- 验证：`node --test tests/mcp-write-guard.test.mjs` 8/8；`tests/job-extract-confirm.test.mjs` 7/7；全量回归 `job-extract-*(26) + gateway-process + hub-consumer` 50/50；`node --check mcp/server.mjs` 通过；`npm run verify:quick` 仍被执行环境沙箱拦截（同前次记录，非仓库问题，以定向测试替代）。
+
+## 2026-09-02｜fix(mcp): B 档安全硬前置三件（黑名单机制 + sync_now 屏蔽 + record_outcome 守门）
+
+- **背景**：按[缺口总表](2026-09-02-gap-and-next-actions.md) B 档实施（另一线程核实「三个硬前置一个没做」，本线程独立复核属实后修复）。
+- **改动**：`mcp/server.mjs` 三处——①新增 `BLOCKED_TOOLS = new Set(['brainx_sync_now', 'brainx_talent'])` 黑名单机制：`tools/list` 过滤黑名单工具 + `tools/call` 命中即返回 `tool blocked by policy` JSON-RPC 错误（code -32602），**绝不执行**（sync_now 默认 `source='fixture'`+`dry_run=false` 会把决策库刷成测试数据）；工具定义保留在 TOOLS 里（解封只需移出 Set）。②`brainx_record_outcome` run 块补 `jobVisibleTo(db, cid, pid)` 守门，无关职位返回 `NOT_FOUND`——与其余 5 个跨职位工具对齐；`src/visibility.js` 的 fail-closed 实现 server.mjs 本来就 import 了，只是这个工具漏接线（守门策略不一致的根因即此遗漏）。③新增 `tests/mcp-write-guard.test.mjs` 5 用例（测试先行，先 5/5 红灯后全绿）：B1 黑名单不外露 / B2 命中黑名单显式报错不执行 / B3 无关职位 NOT_FOUND / B4 有关系职位放行不误伤 / B5 静态扫描断言四个跨职位写工具（engage/record_progress/terminal_result/record_outcome）run 块必须含 `jobVisibleTo`（防再漏守门）。
+- **文档回写**：缺口总表 B 档标 ✅ 并记录修复落点；后端模块结构 §3 待补 1/1a/1b/1c 标完成；工具外露白名单 §3 三件 P0 标 1、2 完成（第 3 件 recommend_run 限流未做）。
+- **排障记录（环境坑，防复踩）**：守门测试首跑 B1 超时——排查发现本机 FS 代理环境下 `mcp/server.mjs` 冷启动实测 ~10s（node_modules 大模块 + 31 迁移 + seed 全走代理 IPC），8s timeout 必超；**既有 `tests/mcp.test.mjs` 3/3 在本环境同样超时挂掉，属环境问题非逻辑回归**（其 8s timeout 未动，属他人文件且与本次任务无直接关系）；新测试 timeout 提至 30s 并在代码注释说明。另：macOS BSD grep 的 `\|` 交替不可靠，核实 MCP 工具守门状态必须用 `grep -nE`（`\|` 模式会零命中误判「已修复」）。
+- 验证：`node --test tests/mcp-write-guard.test.mjs` 5/5；回归 `tests/job-extract-*.test.mjs + gateway-process + hub-consumer` 32/32；`node --check mcp/server.mjs` 通过；`npm run verify:quick` 仍被执行环境沙箱在 secrets 扫描阶段拦截（同前次记录，非仓库问题）。
+
+## 2026-09-02｜feat(job-extract): E1 群消息提炼规则层 MVP（挂账本消费者）
+
+- **改动**：按 [job_facts 提炼层研发路径](2026-09-02-job-facts-extraction-roadmap.md) §6 E1 实施。新增 `migrations/0030_lark_messages.sql`（消息正文落库，补齐规格 002 留待后续决定的缺口——evidence_refs 引用目标此前不存在）、`migrations/0031_job_facts_drafts.sql`（草稿 staging：字段对齐 job_facts + 逐字段 evidence 列 + status=pending/confirmed/rejected）；新增 `src/job-extract/`（classify.js 规则层纯函数 / schema.js zod 输出契约 / index.js `consumeJobExtract` 消费者主入口）；新增 `src/gateway/lark-messages.js`（`persistLarkMessage` INSERT OR IGNORE 幂等落正文，`processLarkEvent` 通过事件时调用，DENY 不落）；新增 `tests/job-extract-rules.test.mjs`（12 用例）+ `tests/job-extract-consumer.test.mjs`（7 用例）；roadmap 文档补 E1 实施记录；specs/002 data-model 修订 `lark_messages` 决定条目。
+- **关键实现决策**：①提炼层是 L1 账本的一个消费者——`consumeOnce(db, eventId, 'job-extract', fn)` 直接复用 Step 0 幂等模板，同事件重放不重复抽（有测试）；②规则层全部保守正则，每个命中字段带 evidence 原文锚定片段，无证据不编造（company/role/city/pipeline/hc 无命中即 null）；③skip 三路径显式返回：not_message_event（DENY 不抽）/ message_text_missing（旧事件无正文不编造）/ irrelevant（分类先行，零成本砍无关消息）；④zod `safeParse` 剥离未知键——校验只针对 schema 覆盖字段，元数据用原始 draft 插库（测试暴露后修正）；⑤node:sqlite 正则坑：`\b` 是锚点不能加量词（`\b?` 抛 ERR_INVALID_ARG_TYPE）。
+- **测试先行过程**：先写 19 用例见红灯（模块不存在）→ 实现后 8/19 → 修 3 处（city 正则 `\b?` / 测试助手接受 duplicate / zod 剥离）→ 19/19 全绿；回归 gateway+hub 既有 31 用例全绿。
+- 验证：`node --test tests/job-extract-*.test.mjs` 19/19；gateway/hub 回归 31/31；`npm run verify:quick` 在 secrets 扫描阶段仍被执行环境沙箱拦截（`CODEBUDDY_BROKER_DENY` 读取未跟踪文件审批超时，非仓库基线失败），本次以定向测试替代并在下个全量门禁运行时复核。
+
+## 2026-09-02｜build(scripts): 网关 CLI 挂 npm script（gateway / gateway:start / gateway:list-chats）
+
+- **改动**：`package.json` scripts 新增三条：`gateway`（免凭证子命令入口）、`gateway:start`（`node --env-file=.env … start`）、`gateway:list-chats`（`node --env-file=.env … list-chats`）。响应后端模块结构文档 §4 指出的「CLI 存在但没挂 npm script，每次手敲全路径」。
+- 验证：`npm run gateway -- list-chats` 实跑通过，缺凭证时按设计优雅提示 LARK_* 键名与 quickstart 指引，不崩溃。
+
+## 2026-09-02｜docs(roadmap): 群消息→job_facts 提炼层研发路径 + OpenClaw 接口包（开源调研综合）
+
+- **改动**：用户指令「按照这个架构，给出你觉得接下来的研发路径，后端的结构我打包给对方模块化的信息，然后全面的阅读分类，然后信息需要结构，你可以参考开源的 github 的算法和组件，你阅读先广泛的学习」。同一任务两份产出：新建 `docs/2026-09-02-job-facts-extraction-roadmap.md`（约 150 行）与 `docs/2026-09-02-openclaw-interface-pack.md`（约 120 行）；README 任务路由 +2 行、文档书目录 +2 条。
+- **调研范围（5 大方向 12 个项目）**：①结构化抽取框架——google/langextract（38k★，**原文锚定**：每字段对齐回原文字符区间，对不上即过滤，挡幻觉）、instructor-js（zod schema 约束 + 校验失败重问）、CorrDyn/job-posting-structure（规则层与 LLM 层并存的论文级架构）；②聊天→结构化事实——ReNodeX/ai-delegator（Telegram 群→线索，**先分类后抽取**砍 LLM 调用）、AmirrG1/ai-automation-agent、megaDeathChav/asapp-project（字段级评测脚本结构）；③招聘 agent——punkisnotdead3/open_recruiter（**抽取与确认分离**、Slack 群收简历同构场景、PII 过滤）、interviewstreet/hiring-agent（规则/LLM **双后端可切换**，82% top-10 基准）、farahdimshawy/RecruitmentAgent；④中文兜底——PaddleNLP UIE/PP-UIE（MVP 不采用，栈不匹配，记为降级选项）；⑤实体对齐——dedupe/splink（MVP 用规范化键 + 既有 entity_links，后期才评估）。
+- **核心选型判断：借思想不引依赖，零新增运行时依赖**。全部项目为 Python 栈或引入即超 deps≤4 约束；instructor-js 核心机制约 40 行可自建（zod 已在 deps，DeepSeek 自带 json_object）。
+- **关键架构决策：提炼层是 L1 事件账本的一个消费者**，不是新服务——`consumeOnce(db, eventId, 'job-extract', fn)` 直接复用 Step 0 幂等消费器（同 message_id 不重复抽，LLM 调用也是钱），LLM 失败走既有 `event_dlq` 可重放，实体对齐复用既有 `entity_links` 五列解析。
+- **双层管线**：①规则层（群名 `Offer-{团队}-{候选人}-{岗位}` 解析 + 状态关键词 + 正则，零成本永远在）→ ②LLM 层（`AI_JOB_EXTRACT_ENABLED` 默认关，kill-switch 对齐用户成本控制偏好）。抽取落 staging（`active_state='UNKNOWN'`），经人工/MCP `brainx_confirm_facts` 才转正——杜绝「群聊一句气话把项目标停」。
+- **抽取 schema 回答「信息需要结构」**：与 0001_init 的 job_facts 字段一一对应，每字段带 `evidence`（langextract 原文锚定思想，与账本 evidence_refs 证据链同构）+ 置信度三级（rules=high / LLM 有证据=medium / 无证据=low 不展示）。
+- **时间线 E0-E4 共 2.5 天**（E0 随 9/3 demo 攒 gold set 0.5d → E1 规则层 1d → E2 LLM 层 1d → E3 确认闭环 0.5d → E4 归一 post-deadline），与模块结构文档「2 天」估算同量级；P0 硬前置优先级不变，提炼层排其后。含不做清单（不引 UIE、不做向量匹配、LLM 不直写权威表）。
+- **产出 2（接口包，`2026-09-02-openclaw-interface-pack.md`）**：交给 OpenClaw 侧的**单一打包文档**——对方拿这一份即可完成对接，不重复后端内部实现（内部/守门/部署均以链接引用避免复制冲突）。§1 三接缝一屏图（工具调用 / consultant_id 身份映射 / Skill 素材）+ 三条红线对方侧同样适用；§2 stdio MCP 接入配置模板（`openclaw.json` 挂 `brainx-domain`）+ 15 工具快照表（明确 🚫 黑名单 `brainx_sync_now`/`brainx_talent` 与 ⚠️ 待补守门的 `brainx_record_outcome`，并注明**运行时 `tools/list` 为准**）+ 三条调用纪律；§3 身份映射规则（后端唯一身份键 `consultant_id`、映射权威在对方、**群消息通道与身份映射互不相干**——chat_contexts 只存 chat_id）；§4 Skill 交付与合规基线；§5 后端六层一屏（仅作对方理解工具行为的上下文）；§6 交付包清单 6 项。
+- 验证：调研基于 6 轮 GitHub 检索结果交叉比对；架构决策逐条对照 Step 0/1 既有代码（`consumeOnce`/`event_dlq`/`entity_links` 均已在仓库）；目标字段与 `migrations/0001_init.sql` 实读对齐；接口包三接缝与红线逐条对照 `2026-09-02-backend-module-structure.md` §5-§6 原始裁定，工具状态与白名单文档一致；两份文档均 ≤500 行（176/132）；README 已同步。`npm run verify:quick` 本次运行至 secrets 扫描阶段被执行环境沙箱拦截（`CODEBUDDY_BROKER_DENY`，读取未跟踪文件审批超时，非仓库基线失败；前 5 项检查全部通过）；本提交为纯文档改动，不触碰代码与配置。
+
+## 2026-09-02｜docs(gap): 缺口与下一步总表（核实另一线程产出后的优先级裁定）
+
+- **改动**：用户贴来另一线程（`a3b676f` 调研+两份文档 / `2497670` gateway script / `dc4f88a` E1 规则层）的汇报并问「这个还缺什么，然后还需要写什么」。**逐项核实仓库现状**（非复述汇报）后新建 `docs/2026-09-02-gap-and-next-actions.md`（107 行），同步更新[后端模块结构](2026-09-02-backend-module-structure.md) §3 待补第 5 项状态、README 任务路由与目录。
+- **核实结论 1（全局卡点）**：`.env` 存在（1927 字节）但 **`LARK_APP_ID`/`LARK_APP_SECRET`/`LARK_ENCRYPT_KEY`/`LARK_VERIFICATION_TOKEN` 四项命中数为 0**。链路：凭证没配 → 网关 `credentials_missing` → 收不到群消息 → **E1 提炼层无输入（写了跑不了）** → 9/3 demo 无法演示 → gold set 攒不到 → E2 动不了。**这是全部待办里唯一"零成本、纯手动、卡住全局"的动作**，昨晚已列为「今晚三件事」第 1 条，至今未做。
+- **核实结论 2（B 档安全硬前置一个没动，均 grep 实证）**：①`brainx_sync_now` 仍在 15 个工具里（`mcp/server.mjs:181`），`run: ({... source = 'fixture', dry_run = false})`，**全文件 grep `BLOCKED`/`blacklist`/`disabled`/`DENY_LIST` 零命中——黑名单机制根本不存在**；②`brainx_record_outcome`（`mcp/server.mjs:174`）`run: ({consultant_id: cid, ...b}) => recordOutcome(db, cid, b)`，**MCP 层无守门直接透传** `src/replay.js:35`（那里只校验职位全局存在）；③机制层缺失导致以后从 registry 那套加工具还会漏。
+- **顺带纠正易错点**：`mcp/server.mjs` 的 15 个工具是**对象 key 格式**（`brainx_consultants: {`），不是 `name: 'brainx_xxx'`。用后者 grep 会零命中、**误判成"已修复"**。核实守门状态正确命令：`grep -n "^  brainx_[a-z_]*: {" mcp/server.mjs`。
+- **核实结论 3（C 档日历助手三件套未动）**：`src/push.js:33` `buildDailyCard` 仍推「今天建议先看 3 个职位」（**推新东西不是催旧账，方向反了**）；`src/engagement.js:120` 仍硬编码 `'推进交付或记录结果'`；`src/scheduler.js:17` 仍只有 `SLOTS = [7, 19]`。
+- **核实结论 4（D 档关键）**：`src/job-extract/index.js` 只 `INSERT INTO job_facts_drafts`（第 19 行），**不写 `job_facts`**。E3 确认闭环未做，所以 **E1 对 MVP 主循环尚无实际贡献**——`job_facts` 是推荐/接单/进展的唯一输入源，草稿进不去等于没提炼。
+- **优先级判断（本文核心）**：另一线程产出质量没问题（发现并补齐了 `lark_messages` 表缺失这个真实缺口，规格 002 原写"留待后续规格决定"；19 新测试 + 31 回归全绿）。**问题在排序**——用同一把尺子量：E1 现在跑不了且只能测纯函数、需 A1+E3 后才有业务价值；B 档立竿见影消除不可逆风险；C 档 2 天出效果。**正确顺序：A1（0 成本解锁全局）→ B（消除风险）→ C（2 天见效）→ D2 E3 确认闭环 → D1 E2 LLM → E 档其余。现在的顺序是反的。**
+- **§5 还需写什么**：代码侧 A1/B/C/D；文档侧除本文外还缺——**E1 端到端验证方案**（凭证配好后怎么验无文档，容易配完却不知验没验对）、**后端模块结构 §3 待补清单同步**（另一线程三个 commit 都没更新它，导致文档间状态不一致）、**E3 `brainx_confirm_facts` 接口契约**（接口包未纳入，OpenClaw 侧对接会缺一块）。
+- 验证：全部基于 grep 与源码实读（`.env` 键值、`mcp/server.mjs` 15 个工具 key 与 174/181 行实现、`src/job-extract/index.js:19`、`src/push.js:33`、`src/engagement.js:120`、`src/scheduler.js:17`）；新文档 107 行 ≤500；他人改动未触碰。
+
+## 2026-09-02｜docs(architecture): 后端侧模块结构与下一步安排（职责边界裁定）
+
+- **改动**：用户明确边界「现在是对于群里的信息的读取，这个是 openclaw 的事情，还是我后端多的，**openclaw 的接口这一块我不负责，我就负责后端的其他点**；现在按照这个架构还有模块，给结构还有下一步的安排」。据此新建 `docs/2026-09-02-backend-module-structure.md`（155 行），只写后端侧。README 任务路由新增 2 行（后端模块结构 / 群消息读取归谁）、文档书目录登记 1 条。
+- **核心纠正（最重要，代码核实得出）**：之前架构文档 §7 写「两条都不能砍」，容易被读成"群消息读取要依赖 OpenClaw"。**实读 `src/gateway/ws-client.js` 后确认：它是一条完整的、独立的、已在后端仓库里的飞书 WS 长连接客户端**——118 行（不是注释里写的"骨架"），用 `@larksuiteoapi/node-sdk` 的 `WSClient` + `EventDispatcher` 订阅 `im.message.receive_v1`，解密后交 `processLarkEvent()`，启动时调 `bot/v3/info` 拿机器人真实 open_id（已修 `BOT_OPEN_ID` 占位符缺陷）。**配好 4 个凭证就能跑，不依赖 OpenClaw 任何东西**。OpenClaw 那条是**额外的前台对话通道**，挂了不影响后端收消息。
+- **§1 边界裁定（群消息读取拆三段）**：①飞书后台配置（建应用/勾 scope/订阅事件/**建版本发布**）→ **你手动**，谁都替不了；②**通道层 WS 长连接 → 后端（你），已建成**；③OpenClaw 飞书插件 → OpenClaw 侧，只负责前台 @机器人 对话。
+- **§2 六层结构**：L0 飞书网关（`src/gateway/` 4 文件）/ L1 事件账本（`src/hub/` 6 文件，`consumeOnce` 幂等 + `workflow_event_log`）/ L2 领域数据（`src/db.js` + 31 个 migrations）/ L3 业务领域（`src/*.js` 48 个模块）/ L4 调度推送（`scheduler.js` 早7晚7 **默认开** + `push.js` 只推私聊）/ L5 MCP 交付（`mcp/server.mjs` 15 工具）。
+- **§3 待补清单的关键发现**：**「把一段群消息提炼成结构化的 `job_facts` 字段」这段还没有代码**。L0 网关只负责收到消息并落成事件，提炼逻辑缺失——**这正是 MVP ① 段缺的那一块，2 天工期的来源**。此前所有文档都没点破这一层。
+- **顺带发现的小坑**：`bin/brainx-lark-gateway.mjs` 这个 CLI **存在但没挂 npm script**（package.json 里只在 `bin` 字段登记了 `braintex-lark-gateway`）。已建议补一条 `"gateway": "bin/brainx-lark-gateway.mjs"`，避免每次手敲全路径。
+- **§5 与 OpenClaw 只有三个接缝**：①工具调用（`mcp/server.mjs` stdio）②身份映射（**后端只认 `consultant_id`，不碰飞书 open_id**）③Skill 素材（`skills/` 8 个 md）。**红线：后端不实现任何飞书 open_id 相关业务逻辑**，这条划清楚两边才能各改各的。
+- **§4 下一步**：今晚三件事（配 4 凭证启网关 / 做挂 MCP 前三个硬前置 / `verify:quick` 确认基线）；9/3 优先级（跑通群主邀请端到端 demo → 扫 7 个 offer 群群主 → 验 OpenClaw 透传 → OpenMai 暴露 MCP → engage 挂找人钩子）；**9/3 第 3 条不影响第 1 条，自建网关照跑**。
+- 验证：全部基于源码实读（`src/gateway/ws-client.js` 118 行全文、`src/hub/consumer.js`、`bin/brainx-lark-gateway.mjs`、package.json scripts 与 bin 字段、specs 目录）与既有文档交叉引用；新文档 155 行 ≤500；与既有表述一致无冲突（README 已同步）。
+
+## 2026-09-02｜docs(product): York 团队实证 + 群主邀请低敏感路径（9/2 晚更新）
+
+- **改动**：Mia 通过 York 飞书账号提供 4 张截图（Offer 项目 7 个、团队职位优先级 9/1 评分 10 人、Wendy 名下 11 个群、DataClaw 自建定时任务 8 个），把"York 团队"从抽象对手盘**实证为**真实工作面，并据此发现了一条**全新低敏感路径**：York 作为群主把 BrainX 机器人拉进特定群即可群维度读消息，无需全局 `im:message.group_msg` 高敏感权限。同步更新三份权威文档：
+  - `docs/2026-09-02-business-work-breakdown.md`（133 → 182 行）：§1 主链路表 ① 与 ⑤ 行加新路径标注；**新增 §1.5「York 团队实证」**（团队结构 10 成员 / DataClaw 8 个定时任务清单 / 现行 7 个 Offer 项目表 / Wendy 名下 11 个群压力面 / 两条推论）；§4 角色分工 York 角色升级为「团队长档 · 一句话决定机器人能否进任何群」；§5 权限档位加「低 + 群主邀请」新档（覆盖 ①⑤ 80% 场景）；§6 阻塞项加「跑群主邀请 demo」与「扫 7 个 offer 群群主」；§7 三决策按新路径重写（不再二选一）。
+  - `docs/2026-09-02-ai-leader-workflow.md`（179 行）：§2.2 表 ① 状态从 ❌ 缺改为 ⚠️ **新路径**：York 群主邀请即可，不依赖高敏感；§2.3 触发链 ① 行更新；§2.4 行 5 工期阻塞从「高敏感未批」改为「9/2 晚降级，剩 20% 仍需」。
+  - `docs/2026-09-02-feishu-permission-scopes.md`（177 → 199 行）：**新增 §6.1「群主邀请机器人入群低敏感路径」**——把妙记里的高敏感权限降级为兜底方案；§6 原表格状态列改为「9/2 晚降级为兜底方案」；§9 待确认补「扫 7 个 offer 群群主」新项，去掉「群里 @机器人 才响应降级方案」（已被群主邀请路径取代）。
+- **核心发现 1（York 团队实证 ≠ 原对手盘假设）**：DataClaw 不是抽象产品，是 York 团队每天上班用的那个机器人——**已有 8 个自建定时任务（额度 10 个，已用 80%）、有 9/1 评分样本（10 人均值约 60 分，JD 30 严重拖后腿）、有完整 Offer 标签体系**。9/14 演示要赢的是它，不是空想。
+- **核心发现 2（Offer 段已不再是抽象）**：York 团队"Offer项目"标签下**7 个在跑**（WD-MY-从容地-UIUX / LD-韬润-IR / SN-LD-助理-行政专项群（已通过）/ 超行-杨东旭 / WD-Fanal-雷绳照 / SN-LD-Oiioii销售-曹一清 / WD-王含章），**每个 Offer 都有自己的小群，群名格式统一**（`Offer-{团队}-{候选人/客户简称}-{岗位}`）。**这些群主都是 York 或牵头人（内部人）**——理论上都能走群主邀请低敏感路径，不需要私聊读取权限。
+- **核心发现 3（Wendy 的群压力面）**：Wendy 名下 11 个群：WD-从容地 / Offer-WD-MY-从容地-UIUX / WD-职位优先级 / WD-SN-JX-ZH-荆华密算-Agent研发岗 / FLX-WD-MY-SN-星曜科技OrdoAI / WD-物外智趣PM / WD-JX-JD-EC-物外智趣 语音对话技术负责人 / WD-JX-AI4S专项 / WD-煌炎科技PM / WD-MY-煌炎产品 / WD-SN-LD-kira.art。**每个顾问可能同时背 7-8 个 offer 群，没机器人提醒谁漏一个跟进谁就掉单**——这正是 §3 后半段日历助手的痛点（昨天刚梳理出来的"AI leader 后半段 = 日历助手"在此得到需求印证）。
+- **核心发现 4（路径降级）**：原方案把"读群全量消息"列为高敏感卡点。**9/2 实证发现**：群主主动拉机器人入群 = 群主授权，**群维度即可读消息，不需要全局高敏感权限**。门槛从「飞书管理员审批」降到「York 一句话」。**MVP 主循环 + 80% offer 群现在可以完全走低敏感路径**。
+- **9/3 第一件事（已固化为阻塞项 §6 第 8 行）**：跑通「York 群主邀请机器人入群 → 读到群消息 → 提炼职位」端到端 demo，把这条低敏感路径坐实。
+- **9/3 第二件事（已固化为阻塞项 §6 第 9 行）**：扫现行 7 个 offer 群，**群主都是谁、是否愿意拉 BrainX 机器人**，决定 §1 行 5 能否完全走低敏感路径。
+- 验证：全部基于 4 张 York 飞书账号截图（Offer 标签、团队职位优先级评分、Wendy 标签、DataClaw 自建定时任务列表）+ 三份权威文档交叉引用；所有改动 560 行 ≤500；与既有文档表述一致无冲突（README 文档书目录已同步标注 §6.1 与 §1.5）。
+
+## 2026-09-02｜docs(product): AI leader 工作流（一面之前）+ 日历助手（一面之后）
+
+- 改动：用户明确产品定位——**「一面之后的推进，机器人主要做工作弹窗提醒，类似日历助手，你什么活没干、还有什么没干；一面之前的工作流比较重要，这个 AI leader 的工作流要串联起来」**。据此新建 `docs/2026-09-02-ai-leader-workflow.md`（154 行），把产品切成以「一面」为界的两种形态：前半段 AI leader（主动串联、自动化高、失败代价是漏机会）vs 后半段日历助手（只提醒不代做、自动化低、失败代价是丢单）。同步在[业务工作全景](2026-09-02-business-work-breakdown.md)顶部与 §1 回填分界线说明，README 任务路由新增 1 行、文档书目录登记 1 条。
+- **核心发现 1（前半段断链）**：`grep -rln "一面|约面|面试|interview" src/` 与 `grep migrations/*.sql` **双双零命中**——**「约面」与「一面」在系统里从未被建模**。系统当前只到「接单 → 推荐 → 进展记录 → 终局（入职/关闭）」。这也解释了会上 York 说的"客户招聘驾驶舱仅能覆盖一二面"是**外部系统**能力，不是 BrainX 的。逐环节审计：①职位录入无（需读群消息，高敏感未批）②接单 `brainx_engage` ACCEPT ✅ 守门正确 ③后台找人 `startOpenmaiTask` 有实现未暴露 MCP ④推荐 ✅ ④b 人才供给/④c 找人结果均 registry 独有未暴露 MCP ⑤约面❌⑥一面❌。**现在能立刻串起来的只有 ②→③**（接单后自动起找人，实现都有，只差暴露 + 在 engage ACCEPT 分支挂钩子），③→⑤ 是断的。
+- **核心发现 2（后半段家底比想象中全）**：日历助手所需的四件套**均已建成且在跑**——`src/scheduler.js` 早 7 晚 7 两次调度（默认开，`BRAINX_PUSH_SCHEDULE=0` 可关）、`src/engagement.js:112` `commitmentSummary` 的 **`need_action_count` 就是"什么活没干"的数**（`src/engagement.js:124-132` 三条规则：无跟进动作 / 动作 BLOCKED / `due_at < now` 逾期）、`brainx_progress_suggestion` 的 `suggestedAction` 提供下一步、`src/push.js` 卡片构建 + lark-cli `--as bot` 私聊通道（**绝不推群**，与 `autopush.js` 安全边界一致）。
+- **还缺的三件事**：①**待办提醒卡**——`buildDailyCard` 现在推的是「今天建议先看 3 个职位」，是**推新东西**不是**催旧账**，日历助手需要另一张卡；②**`next_action` 是硬编码占位符**——`src/engagement.js:120` 里每个 item 都是同一句 `'推进交付或记录结果'`，不是真下一步，应改用 `suggestedAction` 逐条生成；③弹窗时机不止早晚两班，应加"到期前提醒 + 逾期加急"。
+- **落地顺序建议（重要判断）**：**先做后半段（2 天出效果，家底齐全只差一张卡）→ 再做 ②→③ 接单自动找人（1 天）→ 最后才碰 ⑤⑥ 建模（1.5 天，最重且要先定业务含义）**。理由：这样 9/14 演示时日历助手 + 接单自动找人已能串成看得见的线，故事是"帮你接单、找人、催你跟进"而非"只帮你挑职位"；即便约面/一面没做完故事也完整。
+- 验证：现状审计全部基于 grep 与源码实读（`src/scheduler.js` 头部注释、`src/autopush.js` 头部注释、`src/engagement.js:112-138`、`src/push.js:33-58`、`src/commitment.js:10` CLOSE_REASONS），无估算；原文 154 行 ≤500；与既有文档表述一致无冲突（业务工作全景已同步分界线）。
+
+## 2026-09-02｜docs(architecture): 架构细节改正 + 业务工作全景 + 白名单拆文
+
+用户要求「像一些细节要改正，然后这个架构明确一下所有的业务的工作」。逐条核实代码后改正 7 处错误，并新增 2 份文档。
+
+**改正的错误（全部经代码核实，无估算）：**
+
+1. **「15 个只读工具」是错的（全文 5 处）**——仓库有**两套不同的 15 个工具**：`src/agent/registry.js` 的 `TOOL_ROWS` 与 `mcp/server.mjs` 的 `TOOLS`，**交集只有 8 个**（consultants/workbench/recommendations/opportunity/progress_suggestion/replay/profile/push_preview），各自独有 7 个。MCP server 那套是 **7 读 + 8 写**，根本不是只读。§5.1 生成素材因此要指明用 MCP 那套，否则写进 Skill 会调用失败。
+2. **白名单盲区（最严重）**——§5.2 白名单只审了 registry 那套，**MCP server 独有的 7 个写操作从未审查**。逐个读 `run` 实现后补审：**`brainx_sync_now` 默认 `source='fixture'` 且 `dry_run=false`，群里一句话就能把决策库刷成 fixture 测试数据直接落库**；**`brainx_record_outcome`（`src/replay.js:35`）只校验职位全局存在、无 `jobVisibleTo`，可给任意职位录结果**；`brainx_recommend_run` 无守门可反复重置推荐；`brainx_feedback` 待核归属。守门正确的是 `engage`/`record_progress`/`terminal_result`。**判断：`sync_now` 比 `brainx_talent` 更危险——隐私泄漏能补救，数据被刷没得救。**
+3. **§6 路径 A 文件名错误**：`mcp/domain-server.mjs` → 实际是 **`mcp/server.mjs`**。
+4. **§6 env 键错误**：`BRAINX_DB` → `src/env.js` 的零依赖加载器只认 **`BRAINX_ENV_FILE`**，写错会导致环境变量全部加载失败并静默降级。与下游交付文档 §6.3 统一。
+5. **§4.4 权限清单不精确** → 指向新权限清单，并补**「拉机器人进群 ≠ 能读群消息」**的认知纠正。
+6. **§7 双轨判断前提错误**——原结论「验证透传后自建网关可能退居纯账本」假设 OpenClaw 插件能看到群里所有消息，实际它只收 @它 的消息。改为**两条都不能砍**：OpenClaw 管前台对话（@触发），自建网关管全量消息通道 + 账本；高敏感权限能否批下来是独立变量，不能赌。
+7. **§8.1 坑 1 / §10 日程 / §12 待确认** 按 9/2 会议结论更新（人才库已拍板并行推进、日程反映会议后实际状态）。
+
+**新增文档：**
+
+- `docs/2026-09-02-business-work-breakdown.md`（122 行）：**用户要的「所有业务工作」**。猎头全链路六段逐段标注现状/承担者/工具/权限，指出 **offer 谈判段是数据盲区**（驾驶舱只能监控一二面，三面与 offer 全在私聊小群）；MVP 每日七步循环；支撑类工作（群信息提炼、目标检查、数据验算——明确是交叉验算而非接口监控）；权限档位 × 业务对照；**关键结论：MVP 主循环只依赖低敏感权限，不必等审批就能跑通**。
+- `docs/2026-09-02-tool-exposure-whitelist.md`（170 行）：白名单三节从架构文档拆出独立成文（原文已超 500 行上限，且白名单需持续增补）。新增**合并后最终白名单表**（21 个工具 × 当前在哪 / 读写 / 判定 / 外露前必做）与**防漏机制**（建议加 `tests/mcp-write-guard.test.mjs` 断言所有写工具含守门 + 新增工具 checklist 5 条）。
+
+同步：docs/README.md 任务路由新增 3 行、文档书目录登记 2 条；架构文档相关文档区补链接。
+
+- 验证：工具清单用 `grep -nE "^  brainx_[a-z_]+:" mcp/server.mjs` 与 `sed -n '/TOOL_ROWS/,/^\];/p' src/agent/registry.js` 实测提取后逐项比对交集；守门情况逐个读 `mcp/server.mjs` 的 `run` 实现与 `src/replay.js:35` 的 `recordOutcome` 源码确认（该函数只 `SELECT 1 FROM job_facts WHERE project_id=?`，确无归属校验）；架构文档 ASCII 图修改后逐行核对无重复行无断框；四份文档行数 450/170/122/177 均 ≤500。
+
+## 2026-09-02｜docs(architecture): 回填人才库契约拍板结论到下游交付文档
+
+- 改动：9/2 会议已拍板人才库契约，回填 `docs/2026-09-02-brainx-mcp-deliverable.md` 三处，避免与新出的[飞书权限清单](2026-09-02-feishu-permission-scopes.md)打架：①§7.1 P0-3「人才库契约对齐」由"只读 vs 可写二选一"划线改为**并行推进**，并在表下补一段说明——临时方案（成员各自共享给 TTC/York AI 助手，半小时、开发量极低，代价是必须额外写数据隔离模块）+ 整库权限同步申请（拿到后省约两个模块开发量，隔离模块再下线）；明确 **P0-2 的 cid 隔离改造不能省**，因为整库权限尚未通过，工具返回需带 `backend` 字段标注两态。②§10 今晚清单第 1 条标记为已完成，并把原来的 3 条补成 4 条——新增"发起人才库共享：把成员各自共享的操作步骤发到群里"这一落地动作。③相关文档加入飞书权限清单链接。
+- 验证：纯文档改动，无代码与配置影响；三处改动与 `2026-09-02-feishu-permission-scopes.md` §6 表述一致，无冲突。
+
+## 2026-09-02｜docs(architecture): 飞书权限清单（9/2 研发对齐会定论版）
+
+- 改动：用户给妙记 `obcnsf91z37eqqv8d87f591q`（2026-09-02 16:27「研发对一下」，38 分 53 秒，York 姚堃 / Mia 钟笑咪），要求通过飞书阅读并回答"需要的权限是什么"。用 lark-cli `--as user` 读到 AI 总结 / 12 个章节 / 3 条待办 / 关键词后，新建 `docs/2026-09-02-feishu-permission-scopes.md` 把会议定的 MVP 能力映射成飞书后台可勾选的精确 scope 与事件。**核心判断：会议里 York 那句"直接把机器人拉进所有群，减少接口权限开发"的假设不成立** —— 机器人入群只能收到 @它 的消息（`im:message.group_at_msg:readonly`），而会议定的「读群内全量历史与实时消息 / 群信息提炼为标准化字段 / 目标检查」必须开高敏感的 `im:message.group_msg`（应用身份）或 `im:message.group_msg:get_as_user`（用户身份）。文档内容：①一句话结论（MVP 需两套身份权限，不是一套）；②纠正"拉机器人进群不够"并列出三档权限实际能读到什么；③会议定论→权限映射表（8 项能力，标注身份与敏感度）；④精确 scope 清单——应用身份 7 项可批量导入的 JSON（逐项注明缺了会怎样，如缺 `contact:user.base:readonly` 报 `99991672` 无法识别说话人、缺 `im:message.group_at_msg:readonly` 群里 @机器人 完全没反应）+ 用户身份 9 项（沿用 `src/oauth.js:27-38` 已实证白名单清单，**明确不要改**）；⑤事件订阅 4 项（必须选长连接不要 Webhook，且必须先本地配好凭证重启网关再去后台配，反了提示"未建立长连接"）；⑥三条待审批敏感权限 + 人才库两条路并行方案（**这条回答了下游交付文档 §7.1 P0-3「人才库契约对齐」——会议拍板是先走"成员各自共享"临时方案 + 同步申请整库，不是二选一**）；⑦与现有代码关系表；⑧红线 5 条（改完权限必须建版本发布否则不生效、不要申请全量包——2026-08-10 实证被管理员驳回）；⑨待确认 5 项。同步：docs/README.md 任务路由新增"飞书后台要勾选哪些权限/scope"行、文档书目录登记。
+- 验证：纯文档 + README/日志改动，无代码与配置影响；妙记通过 lark-cli user 身份实读成功（`minutes minutes get` + `minutes +detail --summary --todo --chapter --keyword`），`note_id` 为空（无关联智能纪要，未追 note）；scope 名称经两源交叉验证——飞书 OpenClaw 接入公开教程（im:message / im:message.p2p_msg:readonly / im:message.group_at_msg:readonly / im:message:send_as_bot / im:chat / contact:user.base:readonly / im:resource / im:message.group_msg / im:message:readonly）与仓库 `src/oauth.js` 实证清单（im:message:readonly / im:message.group_msg:get_as_user / im:chat:read / im:chat.members:read）；无估算 scope 名。
+
+## 2026-09-02｜docs(architecture): 下游交付文档 §10 编号修正与补项
+
+- 改动：`docs/2026-09-02-brainx-mcp-deliverable.md` §10「今晚（9/2）」清单原本编号从 1 直接跳到 3（漏 2），修正为 1/2/3 连续，并把原第 3 项「端到端实调 5 个工具」补上工具全名（consultants / workbench / opportunity / engage / feedback）。同时补一条今晚可并行推进的确认项：向用户索取演示机信息（macOS 还是 Linux、出口 IP 是否在 RDS 白名单），该项决定 P0-4 的排期方式。
+- 验证：纯文档改动，无代码与配置影响；§10 三条编号连续，与 §7.1 P0 四件一一对应可追溯。
+
+## 2026-09-02｜docs(architecture): 下游交付文档（用户职责边界内 MCP server 契约）
+
+- 改动：用户明确"我只负责 openclaw 调度的下游的信息，openclaw 的接口不是我负责写"，据此新建 `docs/2026-09-02-brainx-mcp-deliverable.md`（334 行）作为用户下游交付权威。**关键发现**：仓库已有完整 MCP server `mcp/server.mjs`（272 行，零依赖手写 NDJSON + JSON-RPC 2.0），已暴露 15 个工具（含 8 个写操作），被 Codex CLI / Claude Code / OpenCode 三端注册，共享 `src/visibility.js` 单一可见性权威。文档章节：①责任边界一句话 + 表（用户管工具/契约/数据源/打包/凭据，OpenClaw 侧管 Skill/渠道/open_id 映射/Gateway）；②架构层次 ASCII 图标注下游交付物在哪一层；③MCP server 工具现状（15 工具分读写表，含 actor 守门 + idempotency_key + 错误码规范 + 未暴露清单：OpenMai/人才库/人才供给/雷达/客户洞察/reloop/官方接口）；④接口契约（JSON-RPC 2.0 + NDJSON + protocol_version 2024-11-05 + 5 条不变量）；⑤数据源表（决策库/人才库/reloop/TTC/OpenMai/官方接口）+ 人才库两个坑（契约 vs 代码不一致 / 静默降级）+ .env 全部键（含 fail-closed 提醒）；⑥打包部署（启动命令、生产地址 `47.110.93.137:3101/4322/3000`、systemd/launchd/Docker、部署清单）+ OpenClaw 侧 `~/.openclaw/openclaw.json` 配置模板；⑦推进计划 P0/P1/P2 三档（P0 = OpenMai 工具暴露 + talent 隔离改造 + 契约对齐 + 白名单验证；P1 = 人才供给脱敏 + 雷达客户 + reloop 桥 1；P2 = 官方接口 MCP server + reloop 桥 2/3 + query_sql 等价物）；⑧红线（隐私/演员守门/静默降级/幂等键/凭据/写入边界）；⑨OpenClaw 侧需求清单（用户不写只列要求）；⑩今晚 9/2 起推进（今晚 3 件 + 明天 9/3 五件 + 9/4 后推人循环优先）。同步：docs/README.md 任务路由加新行、文档书目录登记。OpenClaw 架构文档与本新文档互为表里（架构=上游边界，本文档=下游边界）。
+- 验证：纯文档改动；MCP server 工具清单逐文件读取 `mcp/server.mjs:27-219` 工具表 + `src/agent/tools/*.js` schema；数据源状态逐个 grep `src/openmai-task.js` / `src/talent.js` / `src/talent-supply.js` 导出函数确认；环境变量清单来自 `src/env.js` + `src/db.js` + grep；行数 334 ≤500；章节 §1-§10 + 相关文档连续无跳号。
+
+## 2026-09-02｜docs(architecture): 工具外露白名单（15 个 read-only 工具实测）
+
+- 改动：依据用户授权"继续推进 §5.1 流水线前置"逐个读 `src/agent/registry.js` 与 `src/agent/tools/*.js` 的 schema + 隔离实现，**实测产出工具外露白名单**，新增 `docs/2026-09-02-openclaw-shell-architecture.md` §5.2：①**第一档 ✅ 直接外露 9 个**：`brainx_consultants`（花名册无业务数据）、`brainx_workbench`（恒 cid）、`brainx_recommendations`（blocked 自身守门）、`brainx_profile`（仅本人）、`brainx_radar`（可见池不含候选人）、`brainx_clients`（客户聚合不含候选人）、`brainx_progress_suggestion`（jobVisibleTo）、`brainx_push_preview`（仅本人）、`brainx_replay`（跨人=NOT_FOUND）；②**第二档 ⚠️ 需脚本级脱敏 3 个**：`brainx_opportunity`（job_facts 表可能有客户 BD 联系人）、`brainx_openmai_result`（结果候选人池）、`brainx_talent_supply`（Top 匹配）；③**第三档 ❌ 禁止外露 3 个**：**`brainx_talent`（最危险，无 cid 隔离，查 MySQL 全库等于任何群成员能查所有候选人手机号邮箱）**、`query_sql`（SQL 注入面扩到群）、`brainx_load_skill`（元工具对外无价值）；④改造落地顺序：`talent_supply` 脱敏今天可搞、`openmai_result` 脱敏明天、`opportunity` 看 `job_facts` migrations 1 小时内定、`talent` 改造为"我的候选人"cid 隔离视角列入决赛后（涉及接口签名 + MySQL 查询改造）；⑤与 §5.1 流水线对接——白名单是 AI 生成 Skill 的输入，TOOL_ROWS 需加 `exposeable` 标记让 AI 跳过第三档；现有 `skills/brainx-talent/SKILL.md` 因含 `brainx_talent({...})` 工具调用记号，**生成前必须从 MCP server 启动黑名单中移除 `brainx_talent`**，否则 MCP 一挂上它就暴露——这是历史上"已合规"判断的盲点。`§12` 待确认第一项划线标记为"已实测"指向 §5.2。
+- 验证：15 个工具逐文件读 `name` / `description` / `parameters` / 隔离实现（`loadConsultants` / `jobVisibleTo` / `cid` 解构位置 / `latestSync(complete)` 守门），无估算；其中 6 个工具发现需要 `grep` 上下文（progress-suggestion/talent-supply/push-preview/opportunity/replay/load-skill），已用 `sed -n 1,40p` 批量读全头部；文档 439 行 ≤500 行限制，章节 §1-§12 连续。
+
+## 2026-09-02｜docs(design): 导出 OpenClaw 壳子架构图 SVG + PNG
+
+- 改动：用户要"这张架构给我一张图片"。新增 `docs/design/openclaw-shell-architecture.svg`（白底矢量，680×666）与同目录 `openclaw-shell-architecture.png`（1360×1332，由 SVG 经 Chrome headless --force-device-scale-factor=2 渲染生成，白底适合直接分享与插入 PPT）；PNG 为生成物，不应独立维护。`docs/README.md` 设计与数据段登记一行指向 SVG 并注明 PNG 同目录提供。
+- 验证：Chrome headless 渲染输出 1360×1332 / 187KB；五层架构完整呈现，中文/英文/符号（·/↔）正常显示，箭头 marker 正常（SVG 中 marker `stroke` 由 `context-stroke` 改为固定 `#888780` 以兼容非 WebKit 渲染器）；无需他人改动（distilled/felix.md、docs/hunter-distillation.md、docs/design/architecture-workflow.html 全程未纳入）。
+- 注：图取自 `docs/2026-09-02-openclaw-shell-architecture.md` §3。修改架构图请改 SVG，重新渲染 PNG。
+
+## 2026-09-02｜docs(architecture): 补 Skill 工业化生成与壁垒重判
+
+- 改动：用户补充第五条事实——**DataClaw 也用官方接口，且 Skill 是找 AI 写的、自己改**。据此更新 `docs/2026-09-02-openclaw-shell-architecture.md`：①§1 结论重判——壳子（开源 OpenClaw）、数据（同为官方接口）、Skill（同为 AI 生成）三条技术路径**全部同一水平线，技术壁垒为零**；差距只剩"谁的领域知识更准"（我们占优：领域权威层 + 15 个只读工具 + 7 个已合规 Skill）与"谁的效果数据更早"（他们占优：35%→80%，是跑得早的红利不是能力差，不必追）；②§2 改标题为"五个新事实"并新增差异点对照表（领域口径我优 / 数据接口持平 / 效果数据他优 / IM 多轮持平）；③新增 **§5.1「Skill 应当工业化生成，人工只改口径」**——既然对方也是 AI 生成 + 人工改，这层的正确姿势是批量生成 + 人工校准，而非逐个手写；我们的素材更优（15 个工具已带完整中文 schema，description 本身就是口径来源）；给出生成流水线（工具 schema → AI 批量生成 → 人工只改三处：口径校正 / 脱敏规则 / 写意图指引 → 合规校验）与**AI 生成 Skill 的四个典型坑**（触发词写错致不加载、工具名与真名不符、敏感字段直出、幻觉出不存在的参数）及各自检查方式；核心判断"人工改的是口径不是语法——语法错会崩肉眼可见，口径错要等演示现场才暴露"；**并明确生成前先划白名单：`query_sql`（agent 直查 SQL，挂进 OpenClaw 等于把决策库开给群里的自然语言输入，SQL 注入面从 Web 扩到群里）与 `load_skill`（元工具）必须先排除，先定白名单再生成**；④§9 交流会清单第 1 项从"看 Skill 目录结构"改为"**AI 生成的 Skill 你们自己改了哪些地方**"（结构是可抄的公开规范且我们已全部合规，真正值钱的是抄不到的经验），新增 1b"几个 Skill、怎么切粒度"，第 3 项改为"官方接口哪些字段好用哪些是坑"（双方都用官方接口，此项交流性价比最高）；谈判姿态改为同行切磋（"我们也在用 OpenClaw，Skill 也是 AI 生成 + 自己改"），并给出可亮的两张牌（7 个 SKILL.md 已过合规校验、手上有官方数据接口）用于换取对等信息；⑤§11 风险新增第 3 条"AI 生成 Skill 的口径错误（高）"并给出对策（三处人工校正不得省、每个 Skill 用真实问法试触发、人才库相关 Skill 必须额外试"连不通"场景），原 3-8 顺延为 4-9，第 8 条人才库静默降级补注"与第 3 条叠加最危险：AI 生成的 Skill 把假数据说得更自信"；⑥§10 今晚拆成两件事（先跑通 OpenClaw + 迁移 7 个 Skill，再批量生成剩余 Skill），强调顺序——没跑通就批量生成等于批量生产无法验证的东西；⑦§12 待确认新增三项（哪些工具允许外露 / 官方接口覆盖哪些业务域）。
+- 验证：纯文档改动，不触碰代码与他人未提交改动（distilled/felix.md、docs/hunter-distillation.md、docs/design/architecture-workflow.html 全程未纳入 `git add`）；文档 387 行 ≤500 行限制；章节 §1-§12 连续 + 相关文档；风险条目重编号后无重复无跳号。
+
+## 2026-09-02｜docs(architecture): 架构翻转为 OpenClaw 壳子 + 自写 Skill
+
+- 改动：用户提供四条决定性新事实——①DataClaw 同样以 OpenClaw 当壳子；②Skill 是自写的；③不允许我们直接使用其产品；④**用户手上有官方数据接口**。据此推翻原"BrainX 作 DataClaw 插件"方案（A 方案已被明确封死，不是谈判问题），新建 `docs/2026-09-02-openclaw-shell-architecture.md` 作为新架构权威：①一句话结论——DataClaw 是同构参照物而非上游，我们同样用开源壳子，且拥有其没有的官方数据接口与已建成的领域权威层；②四新事实对照表说明各自推翻了什么假设；③新架构图（飞书渠道 → OpenClaw Gateway → Skill 层 / MCP 层 → BrainX 领域权威层）与三条分工铁律（OpenClaw 拥有对话、BrainX 拥有事实；写动作回领域函数；留痕唯一权威仍是 workflow_event_log）；④**开源工具清单**（必装：OpenClaw 本体 + 飞书渠道插件 `plugins enable feishu` / `plugins install @m1heng-clawd/feishu`；选装：飞书官方 CLI `npx @larksuite/cli@latest`（MIT，12 项业务能力，最适合做 Skill 内确定性脚本）、ClawHub、MCP 生态、`openclaw mcp serve` 反向暴露）与完整接入步骤（OpenClaw 侧 `onboard`/`channels add`/直接写 `~/.openclaw/openclaw.json` 的 `channels.feishu`；飞书后台 6 步含**创建版本→确认发布**关键步）；⑤**关键实测发现**——对 `skills/brainx-*` 逐个验证 OpenClaw SKILL.md 三条硬门槛，7 个全部合规（目录名==name 全部一致；description 70-133 字符全 <160；正文 28-66 行全 <500），零改造可直接 `cp` 迁移，只需补 gating 与工具名落地；⑥官方数据接口挂载的两条路径（A：MCP server，规范但需写 server 代码；B：Skill + `scripts/`，一天可通）与判断——**9/14 前用 B、决赛后用 A**，附三条硬约束（凭证只走 env、敏感字段脚本内投影、接口形状先写进 `references/api-contract.md`）；⑦**留痕双轨决策**——OpenClaw 插件当对话前台、自建 ws-client 继续当账本，不二选一，理由是账本是审计底线不能寄托于第三方插件内部行为；9/3 第一件事是验证"原始消息字段能否透传给 Skill"，透传成功则自建网关退居纯账本，失败则双轨并存；⑧保留并改写人才库与 reloop 层（原 §6 并入 §8，新增"换壳子后调用入口变多导致隐私出口变多"的新增约束与"一个隐私出口原则"）；⑨交流会索取清单从"求集成"改为"**抄作业**"10 项（Skill 目录能否看、飞书用官方插件还是自写 channel、接口怎么挂、留痕怎么做、脱敏怎么防、York 口径、多群隔离、OpenClaw 的坑、成本、Skill 互通），并明确谈判姿态是"我们也在用 OpenClaw，交流下 Skill 怎么写"而非"让我们接进你们"；⑩风险新增三条（版本与文档不一致——插件有 enable/install 两套说法、配置键有 `mcpServers` 与 `mcp.servers` 两种，对策是一切以本机实测为准并锁版本；权限敞口——先最小化再逐项开；凭证泄漏——SKILL.md 内只写 `${VAR}`）。旧文档 `2026-09-02-dataclaw-integration-brief.md` 顶部加取代横幅降级为交流会历史底稿，`docs/README.md` 任务路由拆成两行（OpenClaw 壳子 / DataClaw 交流会）并在文档书目录登记新文档。
+- 验证：纯文档改动，不触碰代码与他人未提交改动（工作区 distilled/felix.md、docs/hunter-distillation.md、docs/design/architecture-workflow.html 为他人改动，未纳入）；SKILL.md 合规数据由脚本逐文件实测得出（awk 提取 frontmatter、wc 统计字符数与行数、比对目录名与 name），非估算；新文档 331 行 ≤500 行限制，章节 §1-§12 连续 + 相关文档；`git status --short` 仅本次三个文件。
+
+## 2026-09-02｜docs(architecture): 简报补人才库与 reloop 层
+
+- 改动：用户要求把人才库与 reloop 两层写入 `docs/2026-09-02-dataclaw-integration-brief.md`。新增 §6「人才库与 reloop 层（领域权威的另外两块）」：①6.1 人才库（阿里云 RDS MySQL `ttc-rds-public-0707`，IP 白名单，BrainX 入口 `src/talent.js`/`pingMysql()`/`bin/brainx-ttc-sync.mjs`），点出两个已核实坑——契约与代码不一致（reuse PRD §6 定"只读账号禁止写人才库"，但 `src/talent.js` 是可写层：候选人 UPSERT/标签写入/匹配覆盖写）与**静默降级演示风险**（未配置或连不通 MySQL 时自动退进程内内存库，语义一致且无报错，演示当天会显示内存假数据）；②6.2 reloop 权威范围（candidate_identity/resume_document/candidate_field_fact）、三方 ID 映射（TTC job_id ↔ BrainX project_id ↔ reloop position_id 进 entity_links）、桥 1（9/4，未过 Step 0 回放门禁不得称打通）、推人循环（9/8 里程碑）、代码现状已核实（`src/ scripts/ bin/ tests/` 中 reloop 与 position_id **零命中**，桥 1 只有规格未开工）、reloop 侧 3 个未修 P1（BUG-101/103/105，不修则推人循环现场露馅）；③6.3 与 DataClaw 的边界——人才库核对诊断只给脱敏投影，评分口径由 BrainX 统一供数（B 方案）避免它直连人才库形成第二个隐私出口，桥 1 与推人循环归属不因集成改变；④6.4 这一层可复用清单（entity-links + migrations 0025、talent.js、ttc-sync、resume.js/openmai-task.js）与明确不重造项。同步：§2 补"领域权威层三个物理库"对照表；§7 加 9/7 盯 reloop P1 与人才库权限拍板、9/11-9/13 联排前 `pingMysql()` 留证；§8 风险加 5 人才库静默降级、6 reloop P1 未修；§9 待确认从 6 项扩到 9 项（新增 reloop 与人才库是否同实例、人才库账号只读还是可写、演示机 IP 是否在 RDS 白名单、reloop P1 修复排期）。
+- 验证：纯文档改动，不触碰代码与他人未提交改动；所有事实均标注来源（workflow-hub §3/§4.2 所有权、reuse PRD §6 权限、week-plan reloop P1 修复窗口、src/talent.js 头部设计约束注释、grep 全仓 `reloop|position_id` 在 src/scripts/bin/tests 零命中）；文档 204 行 ≤500 行限制，章节编号连续（§1-§9 + 相关文档）。
+
+## 2026-09-02｜docs(architecture): DataClaw 集成交流与架构重排简报
+
+- 改动：用户提供 DataClaw 事实（自研 AI 数据管理 Agent，已跑通"读群消息→核对后台数据→打分→建议"闭环，York 用它搭团队目标评分系统，约一面 17→25→36、推荐→约面转化 35%→80%，支持一切皆插件，9/2 下午谈集成），据此重排架构并产出 `docs/2026-09-02-dataclaw-integration-brief.md`：①一句话结论——BrainX 不再做通用 IM Agent，收缩为"职位决策与推人的领域权威 + 安全边界"，DataClaw 承担群脑层；②三层分工（群入口 / DataClaw 群脑 + BrainX 领域权威 / 共享 workflow_event_log 与 entity_links 契约层）与三条分工铁律；③今天下午交流会 10 项索取清单（每项含为什么问、可接受答案、谈不拢时的红线），按 1 插件协议→2 结构化原始消息→6 数据边界→8 排期责任人的谈判顺序；④三种集成拓扑（A BrainX 作 DataClaw 插件、B BrainX 作数据源、C 双向事件留到决赛后）与 A+B 并行的推荐；⑤可复现 vs 可接入二分表（账本/幂等/确定性评分/只读工具注册表自建保留；群入口/意图识别/经营诊断/目标评分/权限审计不重造）；⑥你重点做的事（今天谈集成 + 并行配飞书凭证保底 + York 对齐；9/3 全员使用；9/4 桥 1；9/7-9/8 推人循环优先于集成）；⑦四条风险红线（All-in 风险、候选人隐私、两套评分口径打架、留痕分裂）；⑧仍不完整的信息（需从 DataClaw 拿 10 项、需从用户拿 6 项）。`docs/README.md` 同步登记任务路由与文档书目录。
+- 验证：纯文档改动，不触碰代码与他人未提交改动；结论全部标注依据来源（week-plan 9/3 全员使用与 9/14 决赛、blueprint §9 已有可靠基础、reuse PRD §3 七件自建、Step 0/1 已完成事实）；`git status --short` 仅本次两个文件。
+
+## 2026-09-02｜fix(gateway): 修复 BOT_OPEN_ID 占位符缺陷 + bin 启动脚本
+
+- 改动：用户指出 `src/gateway/lark-gateway.js` 的 `BOT_OPEN_ID='ou_bot'` 占位符缺陷——真实飞书事件机器人 open_id 是 ou_xxxx 永不匹配，会导致所有 @机器人 消息误判 not_mentioned 落 lark.ignored。按 A 方案修：① `processLarkEvent(db, evt, botOpenId)` 第三参数化（默认 BOT_OPEN_ID 测试约定，真实运行注入）；② `src/gateway/ws-client.js` 新增 `getBotOpenId(credentials)` 用 fetch 调 tenant_access_token/internal + bot/v3/info 拿真实 open_id，live 模式启动时注入 onMessage 回调，失败显式返回 bot_info_failed 不静默回落占位值；③ 新增 `bin/brainx-lark-gateway.mjs` 启动脚本（start [--mock] / list-chats / register 子命令，import '../src/env.js' 加载 .env，SIGINT/SIGTERM 自动 stopGateway）；④ quickstart 真实联调清单重写：分工表（用户跑 1-5/6，助手跑 5.5/7/8）、.env 键名约定（新增 LARK_* 不改旧 BRAINX_FEISHU_*）、可跑命令、版本发布关键一步、已知修复记录；⑤ package.json bin 登记 braintex-lark-gateway。
+- 验证：gateway 测试 22/22 全绿（新增 4 用例：缺陷复现+注入修复、getBotOpenId 成功/失败 mock fetch、startGateway live 失败显式 bot_info_failed）；bin 脚本三条路径（无凭证 list-chats 提示、未知子命令、start --mock 降级）均不崩；`node --check bin/brainx-lark-gateway.mjs` 语法 OK。
+
+## 2026-09-02｜feat(gateway): Step 1 门禁收口
+
+- 改动：quickstart 核对清单逐项打勾（SC-001~007 全达成，真实联调待凭证）、tasks T001-T011 全部勾选。
+- 验证：`node --test tests/gateway-*.test.mjs` 18/18 全绿（chat-contexts 6 + process 8 + ws-client 4）；SC-006 grep lark-gateway src/gateway/ 4 文件真实命中；package.json deps=mysql2,zod,@larksuiteoapi/node-sdk（3 项 ≤4 达标）；`:memory: 迁移 0029 自动应用（schema_migrations 计数 31）；`npm run verify:quick` 14/16——仅余其他协作者未跟踪文件的 2 项既有失败（week-plan HTML 超长行、health-brief 行尾空白），与本任务无关，未触碰。Step 1（specs/002 T001-T011）可测部分实施完成，真实联调待飞书凭证；push 仍按门禁暂缓。
+
+## 2026-09-02｜feat(gateway): Step 1 SDK WS 传输层骨架
+
+- 改动：按 tasks.md T009-T010 测试先行——新增 `tests/gateway-ws-client.test.mjs`（4 用例：无凭证降级 credentials_missing、缺 App ID 降级、mock 模式 ready 标记不真实连接、stopGateway 空操作安全）；实现 `src/gateway/ws-client.js`（startGateway/stopGateway 单例，凭证缺失优雅降级，live 模式动态 import SDK 的 WSClient+EventDispatcher 订阅 im.message.receive_v1 解密后调 processLarkEvent，含 decodeLarkMessage 归一函数，≤120 行）。
+- 验证：测试先行确认初始失败（async 返回 Promise 未 await，修正测试为 await）；`node --test tests/gateway-ws-client.test.mjs` 4/4 通过；mock 模式不真实连 WS。
+
+## 2026-09-02｜feat(gateway): Step 1 网关纯逻辑层 + 信封映射
+
+- 改动：按 tasks.md T005-T008 测试先行——新增 `tests/fixtures/step1/` 6 场景 JSON（已登记@消息/未登记群/已登记非@/无 message_id 非法/无 chat_scope/已登记禁用群）与 `tests/gateway-process.test.mjs`（8 用例：通过落 lark.message_received、未登记 DENY unregistered_chat、禁用群 DENY chat_disabled、非@ DENY not_mentioned、重复投递 duplicate、malformed 拒绝不落账、no_chat_scope DENY、同一 message_id 既 DENY 又登记后通过两类事件各自幂等不被吃掉）；实现 `src/gateway/envelope-mapper.js`（通过/DENY 两类信封，DENY idem_key 独立，≤80 行）与 `src/gateway/lark-gateway.js`（processLarkEvent 纯逻辑：解析→chat_contexts 查询→MENTION 过滤→映射→appendEvent，≤100 行）。
+- 验证：测试先行确认初始失败；`node --test tests/gateway-process.test.mjs` 8/8 通过；payload 不含消息正文 PII 经断言核对。
+
+## 2026-09-02｜feat(gateway): Step 1 chat_contexts 注册工具
+
+- 改动：按 tasks.md T003-T004 测试先行——新增 `tests/gateway-chat-contexts.test.mjs`（6 用例：注册写入查询、默认 bot_mode=MENTION_ONLY 且未登记返回 null、重复 chat_id upsert 不重置 enabled、启停、未登记 setChatEnabled 返回 not_found、listChatContexts 列举）；实现 `src/gateway/chat-contexts.js`（registerChatContext upsert/setChatEnabled/getChatContext/listChatContexts，≤60 行）。
+- 验证：测试先行确认初始失败；`node --test tests/gateway-chat-contexts.test.mjs` 6/6 通过。
+
+## 2026-09-02｜feat(gateway): Step 1 迁移 0029 + 飞书 SDK 采购
+
+- 改动：新增 `migrations/0029_chat_contexts.sql`（chat_contexts 群登记表：chat_id PK、enabled、bot_mode 默认 MENTION_ONLY、default_deny_reason、registered_at/updated_at、notes）；按蓝图 §6.2 采购清单 `npm install @larksuiteoapi/node-sdk`（运行时 deps 达 mysql2+zod+@larksuiteoapi/node-sdk=3，≤4 达标）。对应 tasks.md T001-T002。
+- 验证：`:memory:` 库经 src/db.js migrate() 自动应用后 chat_contexts 表存在、schema_migrations 记账正常；SDK 安装无漏洞。
+
+## 2026-09-02｜docs(spec): Step 1 规格补 plan/data-model/quickstart/tasks 四件套
+
+- 改动：完成 specs/002-step1-lark-gateway/ 的 speckit Phase 0-2 产物——plan.md（Technical Context、Constitution Check 五条全过、src/gateway/ 四模块 + migrations 0029 + 三个测试文件落点、纯逻辑层与传输层物理分离使可测部分无凭证依赖）；data-model.md（chat_contexts DDL + 信封映射契约表：通过 lark.message_received / DENY lark.ignored 两类，DENY idem_key 独立避免被通过事件吃掉）；quickstart.md（回放门禁 + 手工幂等单行 + 飞书凭证 8 步清单交付）；tasks.md（11 任务按 US1-US5 分组、测试先行、依赖与并行关系）。
+- 验证：`git diff --check` 通过；迁移 0029 与 0028 尾序核对一致；文件路径与 src/ tests/ 平铺惯例核对一致；仅暂存 specs/ 与本日志。
+
+## 2026-09-02｜docs(spec): 建立 Step 1 飞书事件网关规格
+
+- 改动：Step 0 全绿后启动 Step 1，新建 `specs/002-step1-lark-gateway/spec.md`——5 个用户故事（P1 已登记群消息落标准信封、P1 未登记群默认 DENY、P1 @机器人过滤、P1 重复投递幂等、P2 凭证缺失优雅降级）+ 边界（无 message_id/无 chat_scope/evidence_refs 不存 PII）+ 9 条功能需求（chat_contexts 表、processLarkEvent 纯函数、复用 idx_wel_idem 入站幂等不新建去重表、信封映射、chat_contexts 注册工具、SDK WS 骨架、3s ACK、仅新增 @larksuiteoapi/node-sdk、fixtures 先行）+ 7 条可测成功标准。两处裁决记录于 Assumptions：①传输层采 SDK WS（蓝图 §5 伪代码为逻辑说明，§9 决议为准）；②入站幂等复用 Step 0 idx_wel_idem，不新建 lark_event_dedupe 表（Step 0 已提供更强保证）。
+- 验证：`git diff --check` 通过；spec 内链接核对正常；仅暂存 specs/ 与本日志。
+
+## 2026-09-02｜feat(hub): T015 upcaster 逐级转换 + Step 0 门禁收口
+
+- 改动：新增 `tests/hub-upcaster.test.mjs`（5 用例：当前版本直通、upcastTo 逐级转换 1→2→3、转换链缺口落 DLQ upcast_failed、转换抛错落 DLQ、比当前更新的未知版本落 DLQ schema_invalid）与 `src/hub/upcaster.js`（注册表驱动的逐级 upcast + event_dlq 落表，upcastTo 承载机制、upcastEvent 以 CURRENT_SCHEMA_VERSION 为目标）；quickstart.md 运行命令/手工验证片段修正并逐项打勾（另经 :memory: 单行验证 SC-002 rows=1）；tasks.md T001-T016 全部勾选。
+- 验证：`node --test tests/hub-*.test.mjs` 23/23 全绿；SC-004 grep 真实命中 src/hub/event-log.js 与 migrations/0023；package.json 依赖仅 mysql2+zod；`npm run verify:quick` 14/16——仅余其他协作者未跟踪文件的 2 项既有失败（week-plan HTML 超长行、health-brief 行尾空白），与本任务无关，未触碰。Step 0（specs/001 T001-T016）实施完成，push 仍按门禁暂缓。
+
+## 2026-09-02｜feat(hub): US4 跨系统身份链接（linkEntities / resolveEntity）
+
+- 改动：按 tasks.md T013-T014 测试先行——新增 `tests/hub-entity-links.test.mjs`（4 用例：任一侧 ID 解析全链、未知 ID 返回 null、同一外键重复链接到新实体拒绝 already_linked、对不存在 case 链接被外键拒绝 case_not_found）；实现 `src/hub/entity-links.js`（≤60 行：resolveEntity 五列任一解析全链；linkEntities 先查 case 存在、再查别名是否被其他 case 占用、同一 case 重复链接按 upsert 刷新）。
+- 验证：测试先行确认初始失败；`node --test tests/hub-entity-links.test.mjs` 4/4 通过。
+
+## 2026-09-02｜feat(hub): US3 Case 双轴状态机（合法推进 + 乐观锁留痕）
+
+- 改动：按 tasks.md T011-T012 测试先行——新增 `tests/hub-case-machine.test.mjs`（5 用例：合法相邻推进版本+1 并落 case.stage_advanced、全链 DISCOVERED→PLACED 七步推进、非法跳跃拒绝且落 case.transition_rejected 留痕、未知 Case 显式 case_not_found、持陈旧快照并发推进 version_conflict 显式失败）；实现 `src/hub/case-machine.js`（合法迁移表常量 + advanceCase 乐观锁推进，≤100 行）。advanceCase 支持可选 caseRow 快照入参，使"读取后他人已推进"的并发冲突路径可确定性测试（同步单进程事件循环会串行化双连接调用，重读必然拿到最新状态）。
+- 验证：测试先行确认初始失败；修正拒绝事件 payload 与测试约定一致（{from,to}，event_type 已区分）；`node --test tests/hub-case-machine.test.mjs` 5/5 通过。
+
+## 2026-09-02｜feat(hub): US2 消费者幂等事务模板 + processed_events 主键修正
+
+- 改动：按 tasks.md T009-T010 测试先行——新增 `tests/hub-consumer.test.mjs`（4 用例：恰好一次执行、已标记跳过零副作用、不同消费者各自幂等、崩溃注入回滚后重放与恰好一次一致）；实现 `src/hub/consumer.js`（consumeOnce：BEGIN IMMEDIATE 内二次确认→fn(db)→标记→COMMIT，抛错整体回滚）。测试暴露 0024 契约矛盾（event_id 单列 PK 使"不同消费者各自幂等"失效）：新增 `migrations/0028_processed_events_pk_fix.sql` 重建为复合主键（迁移 append-only 不改写 0024），并同步修正 data-model.md 契约与修正记录。
+- 验证：测试先行确认初始失败（第二消费者标记触发 UNIQUE 冲突）；`node --test tests/hub-consumer.test.mjs` 4/4 通过；0028 在 :memory: 迁移链自动应用。
+
+## 2026-09-02｜feat(hub): US1 事件只落账一次（信封校验 + 幂等账本）
+
+- 改动：按 tasks.md T006-T008 测试先行落地——新增 `tests/hub-event-log.test.mjs`（5 用例：重复 idem_key 幂等、1000 次投递恒 1 行、并发双连接唯一索引兜底、信封缺字段拒绝、payload 超 64KB 拒绝）与 fixtures `tests/fixtures/step0/`；实现 `src/hub/envelope.js`（zod 信封 schema + validateEnvelope，evidence_refs 仅 {table,id} 引用）与 `src/hub/event-log.js`（appendEvent：校验→64KB 上限→INSERT，唯一冲突读回既有行，≤80 行）。package.json 引入 zod（蓝图 §6.2 采购清单既定项）。
+- 验证：测试先行确认初始失败；`node --test tests/hub-event-log.test.mjs` 5/5 通过；修正 node:sqlite 唯一冲突识别（code=ERR_SQLITE_ERROR 而非 SQLITE_CONSTRAINT_UNIQUE）。
+
+## 2026-09-02｜feat(hub): Step 0 迁移落库（0023-0027 五张表）
+
+- 改动：按 specs/001-step0-event-ledger/data-model.md 契约新增五个迁移——0023 `workflow_event_log`（账本 + `idx_wel_idem` 唯一索引 + `idx_wel_case`）、0024 `processed_events`（消费幂等标记，UNIQUE(event_id, consumer_name)）、0025 `entity_links`（跨系统 ID 链接，case_id 锚点）、0026 `cases`（双轴状态机 + version 乐观锁 + UNIQUE(position_id, candidate_ref)）、0027 `event_dlq`（不可 upcast 事件落表）。对应 tasks.md T001-T005。
+- 验证：`:memory:` 库经 src/db.js migrate() 自动应用后五表两索引全部存在；idem_key 重复插入触发 UNIQUE 冲突；entity_links 对 cases 的外键前向引用在 DML 时正常解析；schema_migrations 记账正常。
+
+## 2026-09-02｜docs(standards): 建立参考代码本地镜像清单
+
+- 改动：新增 `docs/standards/REFERENCE_REPOS.md`——5 个经 GitHub API 核实的参考仓库（open_recruiter/Resume-Matcher/sledge/reflow-ts/lark-samples）源码快照落位仓库外 `/Users/ashley/Downloads/brainx-refs/`，逐项标注学习用途与许可证；明确三条使用规则（读设计不复制代码、设计引用需标注出处、镜像无历史可覆盖重取）；获取方式记录 git 通道代理 502、改走 api.github.com tarball 端点的实操路径。README 登记路由与目录。
+- 验证：`git diff --check` 通过；五个源码包 tar 校验通过（Resume-Matcher 首包截断已重取）；仅暂存新文档、README 与本日志。
+
+## 2026-09-02｜docs(spec): Step 0 规格补 plan/data-model/quickstart/tasks 四件套
+
+- 改动：完成 specs/001-step0-event-ledger/ 的 speckit Phase 0-2 产物——plan.md（Technical Context、Constitution Check 五条全过、按仓库平铺惯例确定 src/hub/ 六模块 + migrations 0023-0027 + 五个测试文件的真实落点）；data-model.md（四张新表 + DLQ 的 DDL 契约与合法迁移表）；quickstart.md（回放门禁运行方法与 Codex 交回核对清单）；tasks.md（16 个任务按 US1-US4 分组、测试先行标注、依赖与并行关系），作为 Codex 施工清单。
+- 验证：`git diff --check` 通过；迁移编号 0023-0027 与现有 0022 尾序核对一致；文件路径与 src/ tests/ 平铺惯例核对一致；仅暂存 specs/ 与本日志。
+
+## 2026-09-02｜docs(spec): 建立 Step 0 事件账本规格
+
+- 改动：按复用与自建边界 PRD §3"七件必须自建件"之首，新建 spec-kit 规格 `specs/001-step0-event-ledger/spec.md`：4 个用户故事（P1 事件只落账一次、P1 消费者崩溃重放无副作用、P2 Case 双轴状态机合法推进、P3 entity_links 跨系统解析）+ 边界用例（64KB 负载上限、upcaster/DLQ）+ 9 条功能需求（idx_wel_idem 唯一索引、consumeOnce 同事务标记、乐观锁推进、zod 信封校验、evidence_refs 不存 PII、零新增依赖、fixtures 先行）+ 5 条可测成功标准（含 `grep workflow_event_log` 归零转命中）。规格对应 Codex 施工输入，实现细节以蓝图 §5 Step 0 为准。
+- 验证：`git diff --check` 通过；规格内链接与表格检查正常；仅暂存 specs/ 与本日志。
+
+## 2026-09-02｜build(workflow): 补齐 Codex Spec Kit 集成
+
+- 改动：保留既有 CodeBuddy 默认集成，通过官方 Specify CLI 为 BrainX 并存安装 Codex skills 集成，新增 `.agents/skills/speckit-*` 10 个项目级技能及 Codex manifest；更新研发流程文档，明确 CodeBuddy `/speckit.*` 与 Codex `$speckit-*` 双入口、全局新项目询问门禁，以及官方 `v1.0.2` 标签与运行时 `1.0.4.dev0` 的版本显示差异。质量门禁仅精确排除可重建的 Spec Kit 官方 bash 脚本的手写源码行数检查，秘密与文本卫生检查仍保留，并补最小回归测试。
+- 验证：`specify integration install codex --integration-options=--skills` 成功；`specify integration list` 显示 `codebuddy` 与 `codex` 均已安装且允许并存；10 个 Codex `SKILL.md` 全部存在；质量门禁专项测试 19/19、`git diff --check` 通过；`npm run verify:quick` 中本次新增的 Spec Kit 行数问题已清零、前端 40/40 通过，整体仍被既有未跟踪 `week-plan-brainx-reloop.html` 超长行和 `health-brief-2026-09-01.md` 行尾空白阻断。本次不 push。
+
+## 2026-09-01｜build(workflow): 接入 spec-kit 规范驱动研发流程
+
+- 改动：安装 github/spec-kit specify CLI v1.0.4（uv tool，仓库外），在仓库根初始化 `.specify/`（模板/scripts/workflow）与 `.codebuddy/commands/`（10 个 /speckit.* 命令）；把 constitution 模板填成 BrainX 工程原则 v1.0.0（零依赖、账本先行、安全边界不可协商、规格先行、最小 diff 五条 + 时间盒/成本/权限最小集约束）；新增 `docs/standards/SPEC_DRIVEN_WORKFLOW.md` 说明用法与 AGENTS.md 分工。
+- 验证：`specify --version` 输出 1.0.4.dev0；init 产物 30 文件结构检查正常；constitution 为纯文档无代码影响。
+
+## 2026-09-01｜docs(prd): 复用与自建边界及权限需求 PRD
+
+- 改动：基于 30 个仓库 GitHub API 逐仓核实结果——新增 `prd-2026-09-01-reuse-selfbuild-boundary.md`：三色总判断（直接可用/借鉴设计/必须自建）、Step 0-7 逐步"可用代码+借鉴+自建+所需权限+可避开项"、必须自建七件事清单（账本/状态机/五信任域/能力令牌/权限引擎/投影/Saga）、权限最小集（飞书 3+1 项 + MySQL 只读 + reloop token）、明确不采用清单（LangBot 仅兜底、lark-openapi-mcp 停更一年、文档导出全家桶避开、死链级项目点名）；蓝图新增 §9.2 核实修订（勘误三个仓库名大小写、移除停维护项、新增 larksuite/cli 与 LangBot 等核实数据）；README 登记两个新文档、spec-kit 流程文档与任务路由。
+- 验证：`git diff --check` 通过；PRD 内外链与表格渲染检查正常；核实数据来自本日 GitHub API 查询会话，仓库地址以 API 返回为准。
+
+## 2026-09-01｜docs(architecture): 蓝图补 §9.1 GitHub 同类开源项目映射
+
+- 改动：回应"GitHub 有没有同类开源项目、可直接用的代码仓库"，全网搜索后在蓝图新增 §9.1，分四类映射：A 同类产品（open_recruiter/Resume-Matcher/ai-job-search/TalentWizard——抄业务与交互设计）；B SQLite 持久执行引擎（sledge 账本设计一一对应、reflow-ts 唯一零依赖可直装候选、durabletasks 生产参考、拒绝 Postgres 系）；C 飞书侧（官方 node-sdk + lark-samples 直接用）；D Agent 权限治理（Cedar 抄模型不引引擎、awesome-ai-agent-governance 作索引）。总判断：直接可装 3+1 件；抄设计 3 家；五信任域投影/disclosure_bundles/Case 双轴无人可抄必须自建。
+- 验证：`git diff --check` 通过；外链均为搜索结果中核实的仓库地址；仅暂存蓝图与本日志两个文件。
+
+## 2026-09-01｜docs(architecture): 蓝图补 §9 每步不足与云端组件映射
+
+- 改动：在 `architecture-2026-09-01-full-blueprint.md` 新增 §9——按 Step 0-7 逐项给出"当前不足（代码审计证据：账本/状态机/网关/令牌/权限引擎/投影/写工具/桥接各缺口）↔ 云端可获 npm 组件（zod、@larksuiteoapi/node-sdk、pino、mysql2、node 内建，可选 casl）↔ 自建/引入判断"；横切补充 pino/randomUUID/otel 的引入时机。结论：云端只取 3 件，其余内建 + 自建，与 §6 选型原则一致。
+- 验证：`git diff --check` 通过；表格渲染检查正常；仅暂存蓝图与本日志两个文件。
+
+## 2026-09-01｜docs(architecture): 全景架构与技术施工蓝图
+
+- 改动：收拢本机全部规范（交付蓝图、Workflow Hub 权威架构、群聊工作流 PRD、Codex 职责权限规范、package.json 零依赖栈确认）与 workflow 项目开发目标，落成 `architecture-2026-09-01-full-blueprint.md`：§1 规范清单与关系矩阵（含 P0-P3 ↔ P0-P5 映射）；§2 开发目标锚定 9/14 决赛演示闭环；§3 完整业务架构图（单机器人分层 + Case 双轴 + 三座桥）；§4 技术架构安排（server/worker/gateway/lark-gateway 四进程拓扑、新代码落点 `src/hub/*.js` 与 `src/gateway/*.js`、9 张新表清单）；§5 七个施工步骤的分步代码逻辑（Step 0 事件账本 SQL 与 `idx_wel_idem` 唯一索引、entity_links、advanceCase 乐观锁、consumeOnce 幂等事务模板、fixtures 回放门禁；Step 1 lark-gateway HMAC 校验；Step 2 能力令牌 seal/verify；Step 3 权限引擎 decide()；Step 4 projectExternal 白名单投影；Step 5 agent 写工具注册与审批重读流；Step 6/7 桥接）；§6 开源组件选型（保留 node 内建，推荐 zod/@larksuiteoapi/node-sdk/pino，明确拒绝 Kafka/Express/Prisma/LangChain）；§7 施工顺序对齐 14 天计划；§8 规范关系与权限等级映射。登记文档总目录任务路由与目录。未改动蒸馏素材、架构图及其他既有文件。
+- 验证：`git diff --check` 通过；文档内部链接与章节锚点检查正常；改动仅限蓝图新文件、docs/README.md 与本日志三处，工作区其他未提交改动（蒸馏稿、架构图）未触碰。
+
+## 2026-09-01｜docs(prd): 新增 BrainTex 群聊工作流技术 PRD
+
+- 改动：整合三轮架构讨论（外部安全视图/事件入口/卡片回调、五信任域与三阶段试点、群聊驱动架构判断）为最终信息架构并落成技术 PRD `prd-2026-09-01-braintex-group-workflow.md`：确立"飞书机器人是嘴耳、BrainTex 是大脑、BrainX/Hub 是规则账本、Codex 是建设执行"的单机器人分层；定义五类群信任域与 chat_contexts（未登记默认 DENY）、事件入口十步与标准信封、卡片能力令牌、内外部动作隔离清单、P0-P3 四级权限与五态引擎输出、8 张权限数据表；给出鉴权模块"实现者/裁决权威/验收审核"三列归属表（严格鉴权代码可由 Codex 写，裁决权威必须落在 BrainX 侧，LLM 不参与权限判断）；列明 persona.js 只读、事件网关不存在等六项现状差距；阶段验收不绑定具体日期，外部群上线门禁一票否决。登记文档总目录任务路由与目录。未改动架构图、蒸馏素材及其他既有文件；两张正式架构图按 PRD §1 升级为群聊驱动视图 v2 列为后续任务。
+- 验证：`git diff --check` 通过；PRD 内代码块与表格渲染检查正常；改动仅限 PRD 新文件、docs/README.md 与本日志三处，工作区其他未提交改动（蒸馏稿、架构图）未触碰。
+
+## 2026-09-01｜docs(design): 架构图 v1.5 对齐决赛主线与 14 天节点
+
+- 改动：为工作流与技术两张架构图新增 D-13 决赛时间线条带（9/2 York 对齐 + Felix 确认访谈 → 9/3 全员使用 → 9/4 桥 1 联调 → 9/8 推人循环 → 9/11/12 联排 → 9/14 决赛，来源 week-plan-brainx-reloop.html）；工作流图给 9/14 演示主线的 6 个节点（接单、获取简历、Case、评估同意、推荐推人、结果回流）增加"演示段"标注与图例；技术图把桥 1 门禁的"第 0 步最小集"落成五项可核对交付清单 chips；全链路轨迹图升级 v1.1——对齐 Felix v0.5 / Miya v0 已于 9/1 本人确认的素材状态（阶段三缺口改为"细节待 9/2 访谈填实后出 v1.2"），桥 1 卡片补工程现状（上游已实现、Saga/下游 0%）；文档总目录登记轨迹图与 14 天作战计划两个工作稿。轨迹图一并入库；周计划工作稿保持未跟踪，待其作者确认后入库。未改动蒸馏素材与其他既有未提交文件。
+- 验证：三个 HTML 的 div 标签配对检查通过（31/31、44/44、25/25）；`git diff --check` 通过；改动仅限本任务声明的 5 个文件，浏览器预览由 present_files 交付复核。
+
+## 2026-09-01｜docs(design): 架构图 v1.4 增补施工现状对照
+
+- 改动：依据同日 Workflow Hub 架构完整度代码审计，为工作流架构图与技术架构图新增"施工现状"对照层：第 0 步不可逆边界落地率 0%（workflow_event_log、entity_links、case_id、processed_events、upcaster 零命中）、reloop/position_id 零命中、openmai_results 覆盖式 Markdown、SQLite/MySQL 分库无映射落点；三座桥卡片补现状徽标（桥 1 上游已实现/Saga 与下游 0%，桥 2 触发已有/结构化未做，桥 3 仅职位级），桥 1 门禁补最小集要求；两图升级 v1.4，文档总目录描述同步。未改动蒸馏工作稿、周计划、蒸馏素材及其他既有文件。
+- 验证：两张静态 HTML 浏览器渲染无横向溢出、控制台无错误（Playwright 1440px/390px）；`git diff --check` 通过；`npm run verify:quick` 如实记录（既有未跟踪 health-brief 行尾空格失败为存量问题，非本次改动引入）。
+
+## 2026-09-01｜docs(log): 解决提交记录遗留冲突标记
+
+- 改动：`docs/AGENT_COMMIT_LOG.md` 此前被以含冲突标记的状态直接提交，`<<<<<<< / ======= / >>>>>>>`（HEAD 与 origin/codex/app-shell-layout-review-20260827）滞留在 2026-08-30～08-31 区段。按"保留双方记录、按日期排序"的最小方式解决：删除三处标记，将 2026-08-30 merge 记录移至 08-31 记录之后，未删改任何一条既有记录的内容。
+- 验证：冲突标记 grep 归零；`git diff --check` 通过；仅暂存本文件创建原子 commit。
+
+## 2026-09-01｜docs(architecture): 确认 Felix 与 Miya 素材状态
+
+- 改动：根据用户明确确认，将 Workflow Hub 权威方案和两张架构图中的 Felix v0.5、Miya v0 统一升级为本人确认素材，并把视图升级为 v1.3；同时明确区分“素材本人确认”“具体环节仍缺案例/数据”和“知识获准自动执行”三种状态，保留已确认的细节缺口与发布门禁。未改动或提交原始蒸馏稿和其他既有文件。
+- 验证：`git diff --check` 通过；Playwright 在 1440px/390px 下渲染两张静态 HTML，页面无横向溢出且控制台无错误；快速门禁中本次改动相关检查及功能测试 40/40 通过，唯一失败来自既有未跟踪文件 `docs/health-brief-2026-09-01.md` 的行尾空格，按协作边界未改动该文件。
+
+## 2026-09-01｜docs(architecture): 建立 Workflow Hub 全链路方案
+
+- 改动：依据 Felix v0.5 的本人确认项与 Miya v0 待确认素材，将工作流从职位级直线升级为“职位主轴 + 职位×人选 Case 主轴”；新增 Workflow Hub 权威架构，定义可拆分身份链接、双轴 Case 状态机、持久账本与瞬态 relay、Saga、消费者幂等、DLQ/upcasting、证据隐私和 AI 回放；同步把业务与技术架构图升级为 v1.2，并登记到文档总目录。未修改或提交原始蒸馏稿和其他既有文件。
+- 验证：Playwright 在 1440px/390px 下渲染两张静态 HTML，页面无横向溢出且控制台无错误；`git diff --check` 通过；快速门禁中本次改动相关检查及功能测试 40/40 通过，唯一失败来自既有未跟踪文件 `docs/health-brief-2026-09-01.md` 的行尾空格，按协作边界未改动该文件。
+
+## 2026-08-31｜docs(architecture): 回填 Felix 工作流事实
+
+- 改动：依据 Felix v0 素材稿更新面向业务/York 的三泳道工作流架构图和面向研发的五层技术架构图；补入方向不符、资源不足/岗位重复释放、OpenMai 简历输入、人工事实覆盖及推荐采纳/面试结果回流等现有证据，将推荐报告、面试辅导和 offer 统一标为红色虚线“Felix 蒸馏回填中”，并把两张图升级为 v1.1、登记到文档总目录。未改动或提交 Felix 素材稿及工作区其他既有文件。
+- 验证：`npm run verify:quick` 16/16 通过；Playwright 在 1440px 下完整渲染两张静态 HTML，页面与控制台均无错误；`git diff --check` 通过。
+
 ## 2026-08-31｜fix(compat): 保留空的旧原因接口
 
 - 改动：完整门禁发现正式前端启动仍会请求旧 `dismiss-reasons` 地址，删除路由会产生不影响功能但污染控制台的 404。增加只返回空列表的兼容响应，不恢复暂不考虑原因、动作或状态，并同步质量债务行数基线。
@@ -57,7 +362,11 @@
 
 - 改动：对照合并前推荐卡恢复 AI 匹配分、证据覆盖和探索价值三项真实评分；删除“数据来源”及会筛空当前20条的阶段筛选，改为综合推荐、推进活跃、最近活跃、事实优先和探索发现五种完整冻结队列视图，每种视图服务端稳定分页且在真实数据上产生不同顺序。主导航“今日决策”收口为“精选盘”，原同名收藏区改为“已收藏”。同步补齐 `baseline-1.1` 六维评分与目标学习排序边界文档、Storybook、中央审核台账、单次复核和施工清单。用户指定的路演 HTML 已移到工作区外；本次未拉取、推送或发布远端。
 - 验证：快速门禁 16/16、推荐分页与 HTTP 契约 11/11、Storybook 19 文件 79 项交互测试、正式前端生产构建和 `git diff --check` 通过；本地真实队列200条，五种视图均展示20条且首屏顺序不同，卡片评分与精选盘命名在正式页面可见；目标环境尚未发布或验证，提交后在洁净工作区复跑完整门禁。
->>>>>>> origin/codex/app-shell-layout-review-20260827
+
+## 2026-08-30｜merge(main): 以本地版本完成远端同步
+
+- 改动：将最新 `origin/main` 记录为已合入演示功能分支；按用户明确要求，合并结果完整保留本地已经确认的代码、页面、交互与数据闭环，不引入远端同位置旧实现，避免工作台回退。原工作目录中的未提交路演文件未进入本次分支。
+- 验证：合并前后文件树仅增加本条记录；提交后执行快速质量门禁、推荐分页专项、前端构建与 Git 差异检查，再推送功能分支并创建 PR。
 
 ## 2026-08-30｜fix(recommend): 切断分钟级推荐轨迹膨胀
 

@@ -1,0 +1,139 @@
+# 缺口与下一步总表（9/2 晚核实版）
+
+> 上级入口：[BrainX 文档书](README.md) · [后端侧模块结构](2026-09-02-backend-module-structure.md) · [业务工作全景](2026-09-02-business-work-breakdown.md)
+>
+> 定位：**回答"现在还缺什么、下一步做什么"的唯一入口。** 其他文档各管一段，本文只管优先级与卡点。
+>
+> 依据：2026-09-02 晚对仓库现状的逐项核实（非汇报复述），覆盖另一线程 `a3b676f` / `2497670` / `dc4f88a` 三个 commit 的实际产物。
+
+## 1. 一句话结论
+
+**两个线程并行之后，做了「重要但不紧急、且现在跑不起来」的 E1 提炼层，没做「紧急且能立刻出效果」的安全硬前置与日历助手三件套。**
+
+**全链路卡在一个点上：飞书 4 个凭证没配。** 它卡住 E1 验证、卡住 9/3 demo、卡住 gold set 积累、进而卡住 E2。
+
+## 2. 全局卡点：凭证（0 成本，纯手动，但没人做）
+
+核实结果：`.env` 存在（1927 字节），但 **`LARK_APP_ID` / `LARK_APP_SECRET` / `LARK_ENCRYPT_KEY` / `LARK_VERIFICATION_TOKEN` 四项命中数为 0**。
+
+```text
+凭证没配
+  → 网关 startGateway() 返回 credentials_missing
+    → 收不到任何群消息
+      → E1 提炼层无输入（写了但跑不了）
+      → 9/3 demo 无法演示
+        → gold set 攒不到
+          → E2 LLM 层动不了
+```
+
+**这是所有待办里唯一一个"零成本、纯手动、卡住全局"的动作。** 我昨晚已把它列为「今晚三件事」第 1 条，至今未做。
+
+## 3. 缺口总表（五档，按紧急度）
+
+### A 档｜卡住全局（不做，其他全白搭）
+
+| # | 缺口 | 现状 | 成本 |
+|---|---|---|---|
+| **A1** | **配飞书 4 个凭证** | `.env` 里 `LARK_*` 零命中 | **0 天，纯手动** |
+
+### B 档｜安全硬前置（挂 MCP 前必做）—— ✅ 2026-09-02 晚已全部完成
+
+核实结果（逐项 grep，非估算）→ **随后同晚已修复（commit 见 [Agent Commit 记录](AGENT_COMMIT_LOG.md)）**：
+
+| # | 缺口 | 核实证据（修复前） | 修复落点 | 状态 |
+|---|---|---|---|---|
+| **B1** | `brainx_sync_now` 仍在暴露且默认参数危险 | `mcp/server.mjs:181` 仍在 15 个工具里；`run: ({...source = 'fixture', dry_run = false})`。**全文件 grep `BLOCKED`/`blacklist`/`disabled`/`DENY_LIST` 零命中——没有任何黑名单机制** | `BLOCKED_TOOLS` 集合（含 `brainx_sync_now` + `brainx_talent`），`tools/list` 过滤 + `tools/call` 显式 `tool blocked by policy` 错误，绝不执行 | ✅ |
+| **B2** | `brainx_record_outcome` 补 `jobVisibleTo` | `mcp/server.mjs:174` `run: ({consultant_id: cid, ...b}) => recordOutcome(db, cid, b)`——**MCP 层无守门**，直接透传 `src/replay.js:35`，那里只校验职位全局存在 | `run` 块补 `jobVisibleTo(db, cid, pid)`，无关职位返回 `NOT_FOUND`（与其余 5 个跨职位工具对齐；`src/visibility.js` 的 fail-closed 实现本来就 import 了，只是这个工具没接线） | ✅ |
+| **B3** | 建立 MCP 工具黑名单机制 | 同上 grep 零命中，**机制层面不存在** | `BLOCKED_TOOLS` 即机制本体：未来从 registry 加新工具，进黑名单一行即可拦；`tests/mcp-write-guard.test.mjs` B5 用静态扫描断言四个跨职位写工具（engage/record_progress/terminal_result/record_outcome）的 run 块都必须含 `jobVisibleTo`，防再漏 | ✅ |
+
+> **守门测试**：`tests/mcp-write-guard.test.mjs` 5 用例——B1 黑名单不外露 / B2 命中黑名单显式报错不执行 / B3 无关职位 NOT_FOUND / B4 有关系职位放行（守门不误伤）/ B5 静态扫描防再漏。**注意**：本机 FS 代理环境下 `mcp/server.mjs` 冷启动实测 ~10s，测试 timeout 用 30s；既有 `tests/mcp.test.mjs` 的 8s timeout 在本环境同样超时（环境问题非逻辑回归）。
+
+> **顺带纠正一个易错点**：`mcp/server.mjs` 的 15 个工具是**对象 key 格式**（`brainx_consultants: {`），不是 `name: 'brainx_xxx'`。用后者 grep 会零命中、误判成"已修复"。**核实守门状态请用 `grep -n "^  brainx_[a-z_]*: {" mcp/server.mjs`。**
+
+### C 档｜能立刻出效果（日历助手三件套，我建议"最先做"的，未动）
+
+| # | 缺口 | 核实证据 | 成本 |
+|---|---|---|---|
+| **C1** | 待办提醒卡 | `src/push.js:33` `buildDailyCard` 推的仍是「今天建议先看 3 个职位」——**推新东西，不是催旧账，方向反了** | 1 天 |
+| **C2** | `next_action` 改 `suggestedAction` | `src/engagement.js:120` 仍是硬编码 `'推进交付或记录结果'`，每个 item 同一句废话 | 0.5 天 |
+| **C3** | 到期前弹窗 + 逾期加急 | `src/scheduler.js:17` 仍只有 `SLOTS = [7, 19]` 早晚两班 | 0.5 天 |
+
+> **这三件做完，顾问明天早上就能收到「你有 3 项待办逾期」**——是全部待办里**唯一不依赖任何外部条件、2 天能见效**的部分。
+
+### D 档｜E1 提炼层的下半段
+
+| # | 缺口 | 现状 |
+|---|---|---|
+| **D1** | E2 LLM 层（DeepSeek + evidence + 失败进 DLQ） | `AI_JOB_EXTRACT_ENABLED` 开关位已留，实现未做。**等 gold set（A1 配凭证 → 9/3 demo 攒真实消息）** |
+| **D2** | **E3 确认闭环（drafts → job_facts 转正）** | **✅ 9/2 晚完成**：`src/job-extract/confirm.js`（confirmDraft/rejectDraft，血缘 sync_runs source='lark_extract'，新建职位同事务落 membership）+ MCP `brainx_confirm_facts` 工具（带 jobVisibleTo 守门 + reject 动作）；`tests/job-extract-confirm.test.mjs` 7 用例 + MCP 端到端用例全绿。**E1→E3 闭环打通：群消息 → 草稿 → 确认 → job_facts 权威表** |
+
+> **D2 已闭合**：E1 的提炼结果现在可以经显式确认进 `job_facts`（推荐、接单、进展的输入源），E1 不再是"写了但没用"的代码。剩余 D1 只提精度（LLM 补规则层抽不到的字段），是锦上添花。
+
+### E 档｜其余后端待补（未动）
+
+| # | 缺口 | 成本 |
+|---|---|---|
+| E1 | OpenMai 工具暴露到 MCP | 0.5 天 |
+| E2' | `brainx_talent` cid 隔离改造 | 1.5 天 |
+| E3' | 演示机 IP 加 RDS 白名单 + `talent:health` 留证 | 0.5 天 |
+| E4' | 人才供给 / 找人结果脱敏脚本 | 1 天 |
+| E5' | 约面 / 一面建模 | 1.5 天（**待拍板**） |
+
+## 4. 优先级错配说明
+
+另一线程的产出本身是扎实的——**发现并补齐了 `lark_messages` 表缺失这个真实缺口**（规格 002 明确写了"消息正文落库留待后续规格决定"，E1 就是那个后续决定），19 个新测试 + 31 个回归全绿，质量没问题。
+
+**问题在排序。** 用同一把尺子量：
+
+| 维度 | E1 提炼层（已做） | B 档安全硬前置 | C 档日历助手 |
+|---|---|---|---|
+| 现在能跑吗 | ❌ **不能，缺凭证** | ✅ 能 | ✅ 能 |
+| 现在能验吗 | ❌ 只能测纯函数，无法端到端 | ✅ 能 | ✅ 能 |
+| 见效时间 | 需 A1 + E3 后才有业务价值 | 立竿见影（消除风险） | **2 天出效果** |
+| 不做会怎样 | 慢一点 | **数据被刷没** | 演示没亮点 |
+
+**判断：先做 A1（0 成本解锁全局）→ B 档（消除不可逆风险）→ C 档（2 天出效果）→ 再回 D 档。** 现在的顺序是反的。
+
+## 5. 还需要写什么
+
+### 代码（按上表顺序）
+
+1. **A1**：配凭证（无代码，纯手动）
+2. **B 档**：`mcp/server.mjs` 加黑名单机制 + `sync_now` 进黑名单或改默认参数、`record_outcome` 补守门 + 建议加 `tests/mcp-write-guard.test.mjs` 断言所有写工具含守门
+3. **C 档**：待办提醒卡 + `next_action` 改造 + 到期弹窗
+4. **D 档**：E2 LLM 层 + E3 确认闭环（E3 优先级高于 E2——**先让草稿能进 `job_facts`，再谈 LLM 提精度**）
+
+### 文档
+
+| 缺什么 | 为什么需要 |
+|---|---|
+| **本文（缺口与下一步总表）** | 仓库已有 10+ 份文档、47 个 commit，但**没有一份能回答"我现在该做什么"** |
+| **E1 的端到端验证方案** | E1 现在跑不了。凭证配好后怎么验（拿哪个群、看哪张表、期望什么结果）没有文档，容易配完凭证却不知道验没验对 |
+| **[后端模块结构](2026-09-02-backend-module-structure.md) §3 待补清单需同步** | 另一线程的三个 commit 都没更新它，导致**文档间状态不一致**：待补第 5 项「群消息提炼」已部分完成、第 8 项脱敏未动，但清单显示的还是原样 |
+| E3 确认闭环的接口契约 | 接口包文档目前只覆盖 15 个现有工具，E3 新增的 `brainx_confirm_facts` 未纳入，OpenClaw 侧对接时会缺一块 |
+
+## 6. 下一步顺序建议
+
+```text
+① A1 配 4 个凭证                    ← 0 成本，解锁全局，今晚就能做
+   ↓
+② B1/B2/B3 安全硬前置                ← 0.5 天，消除不可逆风险，挂 MCP 前必做
+   ↓
+③ C1/C2/C3 日历助手三件套            ← 2 天，唯一能立刻见效的，9/14 演示亮点
+   ↓
+④ D2 E3 确认闭环（drafts→job_facts）  ← 0.5 天，让 E1 真正产生业务价值
+   ↓
+⑤ D1 E2 LLM 层                      ← 1 天，等 9/3 demo 攒到 gold set 再做
+   ↓
+⑥ E 档其余                          ← 排期见后端模块结构 §3
+```
+
+> **④ 要在 ⑤ 之前**：现在 E1 的产物停在 staging 表进不去 `job_facts`，**先打通转正路径，E1 才不是一段"写了但没用"的代码**；LLM 只是提高提炼精度，属于锦上添花。
+
+## 相关文档
+
+- [后端侧模块结构与下一步安排](2026-09-02-backend-module-structure.md) — 六层结构与职责边界
+- [业务工作全景](2026-09-02-business-work-breakdown.md) — 全链路六段 + York 团队实证（§1.5）
+- [AI leader 工作流 + 日历助手](2026-09-02-ai-leader-workflow.md) — C 档三件套的设计依据
+- [工具外露白名单](2026-09-02-tool-exposure-whitelist.md) — B 档守门与黑名单的判定依据
+- [飞书权限清单](2026-09-02-feishu-permission-scopes.md) — A1 配凭证时要勾的 scope

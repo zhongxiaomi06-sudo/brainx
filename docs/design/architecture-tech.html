@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Native 猎头工作流 · 技术架构图</title>
+<style>
+  :root{--brainx:#2563eb;--reloop:#059669;--hub:#7c3aed;--ai:#0891b2;--data:#b45309;--danger:#dc2626;--ok:#166534;--bg:#f6f8fb;--card:#fff;--ink:#0f172a;--muted:#64748b;--line:#dbe3ee}
+  *{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--ink);padding:25px}.wrap{max-width:1280px;margin:auto}
+  h1{text-align:center;font-size:23px}.sub{text-align:center;font-size:12.5px;color:var(--muted);margin-top:6px}.layer{margin-top:17px}.title{display:flex;align-items:center;gap:9px;margin-bottom:8px}.bar{width:6px;height:19px;border-radius:4px}.title h2{font-size:14px}.title small{font-size:11px;color:var(--muted)}
+  .boxes{display:grid;grid-template-columns:repeat(auto-fit,minmax(235px,1fr));gap:10px}
+  .box{background:var(--card);border:1.5px solid var(--line);border-radius:11px;padding:11px 13px}
+  .box h3{font-size:12.5px;display:flex;align-items:center;gap:6px}
+  .box ul{list-style:none;margin-top:6px;font-size:10.6px;line-height:1.65;color:#42526a}
+  .box li::before{content:"· ";color:#94a3b8}.badge{font-size:8.5px;border-radius:99px;color:#fff;padding:1px 6px;font-weight:500}
+  .temp{background:var(--data)}.final{background:var(--hub)}.live{background:var(--ok)}.draft{background:var(--danger)}
+  .flow{text-align:center;color:#94a3b8;font-size:15px;line-height:1;margin:6px}.hub{background:linear-gradient(125deg,#eef2ff,#faf5ff);border:2px solid #c4b5fd}.hub-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px}.hub-cell{background:#fff;border:1px solid #ddd6fe;border-radius:8px;padding:8px}.hub-cell b{display:block;color:#5b21b6;font-size:11px}.hub-cell span{display:block;color:#5e5872;font-size:9.8px;line-height:1.5;margin-top:3px}
+  .bridge{margin-top:17px;background:linear-gradient(90deg,#eff6ff,#ecfdf5,#faf5ff);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .bridge h2{font-size:13px}.gate{margin:7px 0;background:#fff7ed;border:1px dashed #fb923c;border-radius:8px;padding:7px 10px;font-size:10.5px;color:#9a3412}
+  .status-strip{margin-top:12px;background:#fef2f2;border:1.5px dashed var(--danger);border-radius:10px;padding:9px 13px;font-size:10.6px;line-height:1.65;color:#7f1d1d}.status-strip b{color:var(--danger)}
+  .timeline{margin:10px 0 0;display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:10.8px;color:#42526a}
+  .timeline b{color:var(--hub);font-size:11.5px}
+  .timeline span{border:1px solid var(--line);border-radius:99px;padding:3px 10px;background:#fff}
+  .timeline .hot{border-color:#fb923c;background:#fff7ed;color:#9a3412;font-weight:600}
+  .timeline .fin{border-color:#c4b5fd;background:#f5f3ff;color:#4c1d95;font-weight:600}
+  .chips{display:flex;flex-wrap:wrap;gap:5px;margin:6px 0 2px}
+  .chips span{border:1px solid #c4b5fd;background:#faf5ff;border-radius:99px;padding:3px 10px;font-size:10.3px;color:#4c1d95}
+  .bridge-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .bridge-card{background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:10.4px;line-height:1.55}
+  .bridge-card b{display:block;color:var(--hub);font-size:11px}
+  .err{color:var(--danger);font-weight:700}.good{color:var(--ok);font-weight:700}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:9.7px}
+  .principles{margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:10px}.note{background:#fff;border:1px solid var(--line);border-radius:9px;padding:8px 11px;font-size:10.3px;line-height:1.55;color:#42526a}.note b{color:var(--hub)}footer{text-align:center;margin-top:17px;color:var(--muted);font-size:9.8px;line-height:1.6}
+  @media(max-width:900px){body{padding:15px}.hub-grid,.bridge-grid,.principles{grid-template-columns:1fr 1fr}}@media(max-width:620px){.hub-grid,.bridge-grid,.principles{grid-template-columns:1fr}.title{align-items:flex-start}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>AI Native 猎头工作流 · 技术架构图</h1>
+  <div class="sub">2026-09-01 v1.5 · 五层架构 · Workflow Hub 是契约与持久事件层，不是第三套业务产品 · 本版新增决赛时间线与第 0 步最小集清单</div>
+  <div class="status-strip"><b>施工现状（2026-09-01 代码审计）：</b>本图描述目标架构，不等于已实现。第 0 步不可逆边界落地率 <b>0%</b>——workflow_event_log、entity_links、case_id、processed_events、upcaster 在 migrations/src/tests 全部零命中；reloop / position_id 在 BrainX 代码零命中；openmai_results 仍是覆盖式 Markdown（正命中权威方案 §3 禁止项）；BrainX SQLite 与人才库 MySQL 物理分库，project_id ↔ position_id 暂无落点。</div>
+  <div class="timeline"><b>D-13 · 9/1 → 9/14</b>
+    <span>9/2 架构图 × York 对齐 + Felix 确认访谈</span>
+    <span class="hot">9/3 🚀 全员真实使用</span>
+    <span>9/4 桥 1 联调</span>
+    <span class="hot">9/8 推人循环打通</span>
+    <span>9/11 联排① + 录 demo</span>
+    <span>9/12 联排② + 物料</span>
+    <span class="fin">9/14 🏁 决赛</span>
+  </div>
+
+  <section class="layer">
+    <div class="title"><span class="bar" style="background:var(--hub)"></span><h2>① 入口层</h2><small>页面是工作面，对话是动作入口；所有写动作仍经过领域守卫</small></div>
+    <div class="boxes">
+      <div class="box" style="border-color:var(--brainx)"><h3>B-tex Web <span class="badge temp">临时载体</span></h3><ul><li>职位决策、项目行动、Case 时间线</li><li>身份确认/拆分队列、失败重试和 DLQ 入口</li></ul></div>
+      <div class="box" style="border-color:var(--hub)"><h3>飞书机器人 <span class="badge final">终态</span></h3><ul><li>查项目/Case、候选人同意、话术终审、录结果</li><li>草稿展示 ≠ 已发送；写动作需要显式确认</li></ul></div>
+      <div class="box" style="border-color:var(--reloop)"><h3>reloop Web + TalentLens <span class="badge live">人选工作面</span></h3><ul><li>人才、简历、Mapping、匹配、触达和阶段</li><li>招聘网站撞库只产外部身份与证据引用</li></ul></div>
+    </div>
+  </section>
+  <div class="flow">▼</div>
+
+  <section class="layer">
+    <div class="title"><span class="bar" style="background:var(--brainx)"></span><h2>② 领域服务层</h2><small>一个事实一个 owner；两产品各自写自己的领域</small></div>
+    <div class="boxes">
+      <div class="box" style="border-color:var(--brainx)"><h3>BrainX · 职位与行动</h3><ul><li>冻结推荐、membership、decision_events</li><li>commitment_actions、job_outcomes、回放与合法动作</li><li>现有表经 Contract Adapter 输出标准事件</li></ul></div>
+      <div class="box" style="border-color:var(--reloop)"><h3>reloop · 人选与触达</h3><ul><li>FastAPI + RDS：candidate、resume、position、match</li><li>Mapping、activity、interaction、submission/pipeline</li><li>拥有人选 canonical identity 和多简历 provenance</li></ul></div>
+    </div>
+  </section>
+  <div class="flow">▼</div>
+
+  <section class="layer">
+    <div class="title"><span class="bar" style="background:var(--hub)"></span><h2>③ Workflow Hub · 身份 / Case / 持久事件</h2><small>首版复用 BrainX 资产并写 reloop 连接器；不用 Kafka，不另起业务产品</small></div>
+    <div class="box hub">
+      <div class="hub-grid">
+        <div class="hub-cell"><b>Identity Resolver</b><span>entity_links：显式 ID 优先；模糊匹配进人工队列；支持 verify、unmerge/split 和多简历归一。</span></div>
+        <div class="hub-cell"><b>Case State Machine</b><span>职位×人选 case_id；业务里程碑 + 触达双轴；守卫、乐观锁、乱序和 stage_corrected。</span></div>
+        <div class="hub-cell"><b>Durable Ledger + Saga</b><span>workflow_event_log、processed_events、outbox/inbox、failed/timeout、补偿、DLQ 与 upcasting。</span></div>
+        <div class="hub-cell"><b>Projection + Context</b><span>workflow_cases、case_context、当前行动、SLA；记录事件水位、模型、提示词和知识版本。</span></div>
+      </div>
+    </div>
+  </section>
+  <div class="flow">▼</div>
+
+  <section class="layer">
+    <div class="title"><span class="bar" style="background:var(--ai)"></span><h2>④ AI、知识与证据层</h2><small>AI 读投影和证据引用；建议本身也可回放</small></div>
+    <div class="boxes">
+      <div class="box" style="border-color:var(--ai)"><h3>OpenMai / LLM</h3><ul><li>sourcing run、简历结构化、匹配解释、话术与下一行动草稿</li><li>ai.context_built / shown / accepted / edited / rejected</li></ul></div>
+      <div class="box" style="border-color:var(--ai)"><h3>蒸馏知识库 <span class="badge live">本人确认</span></h3><ul><li>Felix v0.5 / Miya v0：均为 CONFIRMED</li><li>确认状态 ≠ 自动执行授权；细节缺口单独标注</li><li>DRAFT → CONFIRMED → PUBLISHED → RETIRED</li></ul></div>
+      <div class="box" style="border-color:var(--data)"><h3>Evidence Store / PII Vault</h3><ul><li>简历、消息、录音、附件只存 evidence_ref</li><li>TTL、访问审计、candidate data key、删除与 crypto-shredding</li></ul></div>
+    </div>
+  </section>
+  <div class="flow">▼</div>
+
+  <section class="layer">
+    <div class="title"><span class="bar" style="background:var(--data)"></span><h2>⑤ 数据源与连接器层</h2><small>首次全量 + 增量游标/Webhook + 定期对账；对账结果也走事件管道</small></div>
+    <div class="boxes">
+      <div class="box" style="border-color:var(--data)"><h3>TTC CRM</h3><ul><li>职位、HC、招聘状态和权威 job_id</li><li>snapshot freshness / completeness gate</li></ul></div>
+      <div class="box" style="border-color:var(--data)"><h3>飞书与招聘网站</h3><ul><li>message_id、thread/card context、external candidate id</li><li>正文/联系方式进 Evidence Store，不进事件 payload</li></ul></div>
+      <div class="box" style="border-color:#64748b"><h3>worker_events <span class="badge temp">瞬态 relay</span></h3><ul><li>worker→API→SSE，1h GC，启动不回放</li><li>禁止作为历史账本、统计源或业务回放来源</li></ul></div>
+    </div>
+  </section>
+
+  <section class="bridge">
+    <h2>三座桥 = 三组 Saga</h2>
+    <div class="gate"><b>桥 1 上线前门禁：</b>先完成 envelope、entity_links、Case 状态机、消费者幂等、upcaster/DLQ，并用 fixtures 回放成功、失败、超时、重复、乱序和补偿。施工窗口 9/3–9/4 不等于跳过门禁。<b>现状：</b>上述前置项代码落地率 0%，9/4 联调前须先补第 0 步最小集。</div>
+    <div class="gate" style="border-style:solid;background:#faf5ff;border-color:#c4b5fd;color:#4c1d95"><b>第 0 步最小集（9/4 桥 1 联调前的五项交付）：</b>
+      <div class="chips">
+        <span>① 事件信封 + workflow_event_log 迁移</span>
+        <span>② entity_links + 人工确认队列</span>
+        <span>③ 桥 1 事件族（requested / created / failed / timed_out）</span>
+        <span>④ processed_events 消费者幂等</span>
+        <span>⑤ fixtures 回放六场景（成功/失败/超时/重复/乱序/补偿）</span>
+      </div>
+    </div>
+    <div class="bridge-grid">
+      <div class="bridge-card"><b>桥 1 · 接单 → 建岗</b> <span class="badge draft">上游已实现 · Saga/下游 0%</span><span class="mono">job.accepted → position.create_requested → created | failed | timed_out</span><br>成功写 project_id ↔ position_id；释放后发 close_requested 补偿。<br><b>现状：</b>engagement ACCEPTED 状态机已有；position.create_requested 无人发出，reloop 侧零代码。</div>
+      <div class="bridge-card"><b>桥 2 · Case → 审核 → 推人</b> <span class="badge draft">触发已有 · 结构化未做</span><span class="mono">candidates.ready → case.created → draft → consent → approved → sent</span><br>9/8 目标；送达失败用 <span class="err">bounced</span>，不能混为无回应。<br><b>现状：</b>接单已自动触发 OpenMai，但结果存 openmai_results 覆盖式 Markdown，无 sourcing run / candidate_ref / case。</div>
+      <div class="bridge-card"><b>桥 3 · 结果 → 下一轮</b> <span class="badge draft">仅职位级已有</span><span class="mono">interaction.resulted → case/project projection → followup | retry | conversion</span><br>前置修 BUG-101/103；采用事件投影，<span class="good">禁止同步双写两库</span>。<br><b>现状：</b>commitment_actions / job_outcomes 已覆盖职位级进展与终局；Case 级投影、面试/Offer/重搜未建模。</div>
+    </div>
+  </section>
+
+  <div class="principles">
+    <div class="note"><b>首日指标：</b>source freshness、event lag、DLQ depth、case SLA violations、saga stuck count。</div>
+    <div class="note"><b>不可逆边界：</b>错合并可拆分；阶段回退只发 correction；旧事件只 upcast 不改写；未确认知识不自动执行。</div>
+  </div>
+  <footer>权威方案：docs/workflow-hub-architecture.md · 素材：Felix v0.5 / Miya v0（均为本人确认） · 配套：architecture-workflow.html · 时间线来源：week-plan-brainx-reloop.html · 施工现状来源：2026-09-01 Workflow Hub 架构完整度代码审计（grep migrations/src/tests/scripts/bin）</footer>
+</div>
+</body>
+</html>

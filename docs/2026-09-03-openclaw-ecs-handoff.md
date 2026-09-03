@@ -1,5 +1,7 @@
 # BrainX × OpenClaw ECS 部署交接单
 
+> 完整权威施工步骤见 [BrainTex 服务器部署与飞书接入 Agent 完整施工手册](2026-09-03-braintex-server-deployment-agent-manual.md)。本页保留为服务器同事的短交接清单；两者冲突时以完整施工手册和当前代码为准。
+
 > 上级：[文档书总目录](README.md) · [生产运行手册](2026-09-03-openclaw-production-runbook.md) · [部署编排](DEPLOYMENT.md) · [安全手册](SECURITY.md)
 
 ## 这是什么

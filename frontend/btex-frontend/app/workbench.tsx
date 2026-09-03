@@ -147,6 +147,7 @@ export default function DecisionWorkbench({demo=false}:{demo?:boolean}={}){
   }
  });
  useEffect(()=>{const savedState=readSavedWorkbenchState();setDone(savedState.done||[]);setSnoozed(savedState.snoozed||[]);setExtraTasks(savedState.extraTasks||[]);setWeights(savedState.weights?.length===3?savedState.weights:[60,25,15]);setDecisionActions(savedState.decisionActions||[]);setMembershipRelations(savedState.membershipRelations||{});setTray(savedState.tray??INITIAL_TRAY_IDS);setFolders(savedState.folders?.length?savedState.folders:DEFAULT_FOLDERS);setFolderMode(!!savedState.folderMode);setEngagement({...initialEngagement,...(savedState.engagement||{})});setDecisionEvents({...initialEvents,...(savedState.events||{})});setOutcomes({...initialOutcomes,...(savedState.outcomes||{})});setSync(savedState.sync||seedSync);setAuth(savedState.auth||seedAuth);setNotifications(savedState.notifications||seedNotifications);setHydrated(true)},[]);
+ useEffect(()=>{if(new URLSearchParams(window.location.search).get("settings")==="model")setPage("settings")},[]);
  useEffect(()=>{const update=(event:Event)=>{const detail=(event as CustomEvent<{jobId:string;state:EngagementState}>).detail;if(detail?.jobId&&detail?.state)setEngagement(current=>({...current,[detail.jobId]:detail.state}))};window.addEventListener("brainx:commitment-updated",update);return()=>window.removeEventListener("brainx:commitment-updated",update)},[]);
  useEffect(()=>{if(!hydrated)return;if(brainxMode==="connected"){localStorage.setItem("decision-workbench",JSON.stringify({tray,folders,folderMode,weights,decisionActions,membershipRelations}));void updateWorkbenchPreferences({tray,folders,folderMode}).catch(()=>{});return}localStorage.setItem("decision-workbench",JSON.stringify({done,snoozed,extraTasks,weights,decisionActions,membershipRelations,tray,folders,folderMode,engagement,events:decisionEvents,outcomes,sync,auth,notifications}))},[hydrated,brainxMode,done,snoozed,extraTasks,weights,decisionActions,membershipRelations,tray,folders,folderMode,engagement,decisionEvents,outcomes,sync,auth,notifications]);
  // 正式工作台不再把演示数据作为失败回退；演示态只能由 Storybook 显式开启。
@@ -304,7 +305,6 @@ export default function DecisionWorkbench({demo=false}:{demo?:boolean}={}){
   </>:toast.actions?.map(a=><button key={a.label} className="toast-action" onClick={()=>{const fn=a.onClick;setToast(null);fn()}}>{a.label}</button>)}</div>}
  </div>
 }
-
 function ChatbotDrawer({messages,input,setInput,busy,tool,onSend,onStop,onClear,onClose,mode,page,settings,setSettings,contextJob}:{messages:AssistantMessage[];input:string;setInput:(value:string)=>void;busy:boolean;tool:string|null;onSend:()=>void;onStop:()=>void;onClear:()=>void;onClose:()=>void;mode:"connecting"|"connected"|"offline";page:Page;settings:boolean;setSettings:(value:boolean)=>void;contextJob:DecisionJob|null}){
  const messagesRef=useRef<HTMLDivElement>(null);
  useEffect(()=>{const el=messagesRef.current;if(el)el.scrollTop=el.scrollHeight},[messages,busy,tool]);// 新内容/工具活动变化滚到底,agent 回答长不滚看不到新文本

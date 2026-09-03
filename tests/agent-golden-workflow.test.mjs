@@ -38,7 +38,7 @@ function context(consultantId, purpose) {
   return { principal: { tenantId: 'tenant-a', consultantId, chatType: 'p2p', purpose } };
 }
 
-test('11 个生产工具全部接入，黄金工作流连续只读完成', async () => {
+test('21 个生产工具全部接入，黄金读取工作流连续完成', async () => {
   const db = openDb(':memory:');
   runSync(db, { source: 'fixture', consultant_id: 'felix' });
   recommend(db, 'felix', { top: 5 });
@@ -52,7 +52,7 @@ test('11 个生产工具全部接入，黄金工作流连续只读完成', async
       data_scope: { ...bundle.data_scope, purpose: input.purpose } }),
     loadCandidateFactFn: async () => fact,
   } });
-  assert.equal(registry.names().length, 11);
+  assert.equal(registry.names().length, 21);
   const before = db.prepare('SELECT COUNT(*) n FROM decision_events').get().n;
 
   const me = await registry.execute('brainx_me_context', {}, context('felix', 'self_context'));

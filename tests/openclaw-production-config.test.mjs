@@ -24,12 +24,35 @@ test('production config isolates sessions, sandboxes all runs, and exposes no pl
   assert.deepEqual(config.gateway.auth.token, {
     source: 'env', provider: 'default', id: 'OPENCLAW_GATEWAY_TOKEN',
   });
+  assert.equal(config.agents.defaults.model, undefined, 'personal credentials must not inherit a global model');
+  assert.equal(config.agents.defaults.models, undefined, 'global aliases must not constrain personal selection');
+  assert.equal(config.models.providers.stepfun.apiKey, undefined, 'StepFun belongs to the configuring user');
+  assert.deepEqual(config.models.providers.stepfun.models.map(({ id }) => id), [
+    'step-3.5-flash', 'step-3.7-flash',
+  ]);
   const mia = config.channels.feishu.accounts.mia;
   assert.deepEqual(mia.appSecret, {
     source: 'env', provider: 'default', id: 'BRAINX_FEISHU_APP_SECRET',
   });
   const serialized = JSON.stringify(config);
   assert.doesNotMatch(serialized, /cli_[a-f0-9]{12,}|sk-[A-Za-z0-9]|Bearer\s+/);
+});
+
+test('personal Feishu DMs get isolated dynamic agents and shared BrainX skills', () => {
+  const feishu = config.channels.feishu;
+  assert.equal(feishu.configWrites, true);
+  assert.deepEqual(feishu.dynamicAgentCreation, {
+    enabled: true,
+    workspaceTemplate: '/var/lib/brainx/.openclaw/workspace-{agentId}',
+    agentDirTemplate: '/var/lib/brainx/.openclaw/agents/{agentId}/agent',
+    maxAgents: 20,
+  });
+  assert.equal(config.tools.sessions.visibility, 'self');
+  assert.equal(config.tools.agentToAgent.enabled, false);
+  assert.deepEqual(config.agents.defaults.skills, [
+    'brainx-today', 'brainx-job', 'brainx-talent', 'brainx-match',
+    'brainx-engagement-draft', 'brainx-interview-prep', 'brainx-review',
+  ]);
 });
 
 test('Feishu is websocket-only, allowlisted, and mention-gated in groups', () => {
@@ -43,6 +66,7 @@ test('Feishu is websocket-only, allowlisted, and mention-gated in groups', () =>
     '${BRAINX_FEISHU_ALLOWED_OPEN_ID_6}',
   ];
   assert.equal(feishu.connectionMode, 'websocket');
+  assert.equal(feishu.streaming, false, 'final reply hook needs to own the completed rich card');
   assert.equal(feishu.dmPolicy, 'allowlist');
   assert.equal(feishu.groupPolicy, 'allowlist');
   assert.equal(feishu.requireMention, true);
@@ -75,13 +99,33 @@ test('systemd units keep internal services on one host and load secrets from pro
   assert.match(installer, /openclaw\.env\.example/);
   assert.match(installer, /OPENCLAW_CONFIG_PATH=/);
   assert.match(installer, /OPENCLAW_STATE_DIR=/);
+  assert.match(installer, /config patch --file/);
+  assert.doesNotMatch(installer, /install[^\n]+openclaw\.production\.json[^\n]+openclaw\.json/);
+  assert.match(installer, /plugins inspect feishu --json/);
+  assert.match(installer, /plugin\?\.version===process\.argv\[1\]/);
+  assert.match(installer, /\. \/etc\/brainx\/openclaw\.env; set \+a; exec "\$0" "\$@"/);
   assert.match(installer, /@openclaw\/feishu@2026\.7\.1/);
+  assert.match(installer, /plugins\/brainx-openclaw\/package\.json/);
+  assert.match(installer, /brainx-openclaw-plugin-\$\{BRAINX_PLUGIN_VERSION\}\.tgz/);
+  assert.doesNotMatch(installer, /brainx-openclaw-plugin-1\.0\.0\.tgz/);
+  assert.match(installer, /chown brainx:brainx "\$BRAINX_PLUGIN_TMP"/);
+  assert.match(installer, /sudo -u brainx env HOME=\/var\/lib\/brainx\s+\\\s+npm pack/);
+  for (const skill of [
+    'brainx-today', 'brainx-job', 'brainx-talent', 'brainx-match',
+    'brainx-engagement-draft', 'brainx-interview-prep', 'brainx-review',
+  ]) {
+    assert.match(installer, new RegExp(`^  ${skill}$`, 'm'));
+  }
+  assert.match(installer, /\$BRAINX_OPENCLAW_STATE\/skills\/\$skill_name\/SKILL\.md/);
   assert.doesNotMatch(installer, /\$\{env_name\}\.env\.example/);
   assert.doesNotMatch(installer, /install -m 0600 -o root -g brainx/);
 });
 
 test('OpenClaw env template provides six consultants and three groups', async () => {
   const template = await readFile(new URL('deploy/openclaw/openclaw.env.example', root), 'utf8');
+  assert.match(template, /^BRAINX_BASE_URL=https:\/\//m);
+  assert.doesNotMatch(template, /^STEPFUN_API_KEY=/m);
+  assert.match(template, /^BRAINX_PERSONAL_MODELS_ENABLED=1$/m);
   for (const suffix of ['1', '2', '3', '4', '5', '6']) {
     assert.match(template, new RegExp(`^BRAINX_FEISHU_ALLOWED_OPEN_ID_${suffix}=`, 'm'));
   }

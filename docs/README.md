@@ -17,8 +17,10 @@
 |---|---|
 | 产品范围、功能规划或验收标准 | [BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md) |
 | OpenClaw、飞书机器人、AI 猎头工作流、人才权限或简历解析 | [BrainX × OpenClaw AI 猎头工作流产品需求文档](prd-2026-09-02-openclaw-ai-recruiting-workflow.md)、[安全操作手册](SECURITY.md) |
-| OpenClaw 多顾问安装、上线、运维、故障或回滚 | [OpenClaw 多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md)、[部署编排](DEPLOYMENT.md) |
-| 服务器由同事维护、需要可转交的执行步骤与验收证据 | [BrainX × OpenClaw ECS 部署交接单](2026-09-03-openclaw-ecs-handoff.md)、[OpenClaw 多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md) |
+| BrainTex 飞书欢迎页、功能菜单、按钮卡片或新用户指引 | [BrainTex 飞书功能首页与新用户指引](2026-09-03-braintex-feishu-home.md)、[BrainTex 群聊工作流技术 PRD](prd-2026-09-01-braintex-group-workflow.md) |
+| OpenClaw 多顾问安装、上线、运维、故障或回滚 | [BrainTex 服务器部署与飞书接入 Agent 完整施工手册](2026-09-03-braintex-server-deployment-agent-manual.md)、[OpenClaw 多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md)、[部署编排](DEPLOYMENT.md) |
+| 顾问个人模型、自带 API Key、按飞书用户隔离 Agent 或模型切换 | [顾问个人模型配置规格](../specs/004-personal-model-config/spec.md)、[OpenClaw 多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md)、[安全操作手册](SECURITY.md) |
+| 服务器由同事或 Agent 维护、需要从空环境到异机可用的完整步骤与验收证据 | [BrainTex 服务器部署与飞书接入 Agent 完整施工手册](2026-09-03-braintex-server-deployment-agent-manual.md)、[BrainX × OpenClaw ECS 部署交接单](2026-09-03-openclaw-ecs-handoff.md) |
 | 候选人事实版本、人才 RDS 迁移、shortlist 数据契约或授权查询 | [候选人事实与 shortlist 数据契约](2026-09-03-candidate-data-contracts.md)、[BrainX × OpenClaw AI 猎头工作流产品需求文档](prd-2026-09-02-openclaw-ai-recruiting-workflow.md) |
 | 历史 Codex 插件、旧版飞书副驾驶方案 | [历史：BrainX 飞书 AI 猎头副驾驶产品需求文档](prd-2026-09-01-feishu-ai-consultant-copilot.md)、[历史：BrainX Codex Agent 职责与权限规范](codex-agent-responsibilities-and-permissions.md) |
 | 最终产品形态、跨前后端施工顺序或总体验收 | [BrainX 最终交付蓝图与施工总清单](brainx-final-delivery-blueprint.md) |
@@ -76,13 +78,16 @@
 
 - [安全操作手册](SECURITY.md)：密钥、RDS、授权与数据隔离操作。
 - [部署编排](DEPLOYMENT.md)：生产 systemd、本地开发、隔离 Docker 测试和 CI。
+- [BrainTex 服务器部署与飞书接入 Agent 完整施工手册](2026-09-03-braintex-server-deployment-agent-manual.md)：交给部署 Agent 或服务器同事的权威端到端手册，覆盖飞书后台、OpenClaw 插件、三类环境文件、RDS 权限、身份绑定、启动、九步真实验收、故障与回滚。
 - [OpenClaw 多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md)：服务端安装、权限绑定、灰度验收、日常运维与可恢复回滚。
+- [顾问个人模型配置规格](../specs/004-personal-model-config/spec.md)：定义飞书私聊一人一 Agent、个人模型凭据隔离、自助配置、同意留痕、共享群模型边界和多人验收标准；StepFun 仅是可选个人供应商，不是全员默认模型。
 - [BrainX × OpenClaw ECS 部署交接单](2026-09-03-openclaw-ecs-handoff.md)：给服务器维护同事的无密钥执行清单，覆盖前置检查、安装、迁移、身份绑定、启动、验收与脱敏证据回传。
 - [云端恢复清单](cloud-recovery-checklist.md)：现网唯一入口、标准恢复步骤与历史事件。
 - [带宽告警说明](guard-bandwidth-alert.md)：带宽监控与告警规则。
 
 ### 设计与数据
 
+- [BrainTex 飞书功能首页与新用户指引](2026-09-03-braintex-feishu-home.md)：定义 `/brainx` 确定性卡片、六个顾问任务入口、权限边界、首次出现时机和真实验收流程。
 - [候选人事实与 shortlist 数据契约](2026-09-03-candidate-data-contracts.md)：`candidate_fact_v1`、`candidate_match_bundle_v1`、reloop 真实数据转换、人才/职位双授权、固定飞书文案、MCP PoC 暴露条件及当前未完成项的唯一施工说明。
 - [BrainX × OpenClaw AI 猎头工作流产品需求文档](prd-2026-09-02-openclaw-ai-recruiting-workflow.md)：当前阶段权威开发基线；基于代码审计和官方能力，定义 OpenClaw 主 Agent、飞书最小权限、BrainX 窄网关、人才授权、简历事实、匹配、施工阶段和发布门禁。
 - [历史：BrainX 飞书 AI 猎头副驾驶产品需求文档](prd-2026-09-01-feishu-ai-consultant-copilot.md)：主 Agent 调整前的 Codex 方案和用户研究，仅作历史参考。
@@ -99,12 +104,14 @@
 - [复用与自建边界及权限需求 PRD](prd-2026-09-01-reuse-selfbuild-boundary.md)：每步"直接可用/借鉴/必须自建"三色清单、七件自建件、飞书权限最小集与明确不采用清单。
 - [AI Native 猎头工作流架构图](design/architecture-workflow.html)：面向业务与 York 的三泳道主循环、人工边界、缺口和数据沉淀视图，附 2026-09-01 施工现状对照。
 - [AI Native 猎头技术架构图](design/architecture-tech.html)：面向研发的五层架构与 BrainX、reloop 三套桥接施工视图，附 2026-09-01 施工现状对照与桥 1 门禁现状。
+- [BrainTex 生产架构与工作流](design/braintex-production-workflow.html)：面向业务、产品和部署同事的简洁交互式全景，展示任意设备飞书入口、OpenClaw 编排、BrainX 可信数据链、顾问四类工作流、六道权限门和真实上线状态。
 - [OpenClaw 壳子分层架构图](design/openclaw-shell-architecture.svg)：[OpenClaw 壳子 + 自写 Skill 架构](2026-09-02-openclaw-shell-architecture.md) §3 的可视化版本——飞书渠道 → OpenClaw Gateway → Skill 层 / MCP 层 → BrainX 领域权威层，标注 7 个已合规 Skill 与 3 个 MCP server。同目录提供 PNG 版 `openclaw-shell-architecture.png`（1360×1332，白底），可直接用于交流会与演示材料。
 - [BrainX 下游交付文档（用户职责边界内）](2026-09-02-brainx-mcp-deliverable.md)：把 BrainX 决策库/人才库/reloop/官方接口以 MCP server 形式交付给 OpenClaw 侧。**责任边界**：用户只管工具集、接口契约、数据源读写、打包部署、环境凭据；OpenClaw 侧负责 Skill 编写、飞书渠道、open_id↔consultant_id 映射、Gateway 配置。含 15 个已暴露工具清单、JSON-RPC 2.0 协议、数据源现状、P0/P2 推进计划与红线。
 - [缺口与下一步总表](2026-09-02-gap-and-next-actions.md)：**回答"现在该做什么"的唯一入口**。9/2 晚逐项核实仓库现状后产出（非汇报复述）。§1 结论：做了「重要但不紧急且跑不起来」的 E1 提炼层，没做「紧急且能立刻出效果」的安全硬前置与日历助手三件套。§2 **全局卡点：飞书 4 个凭证未配**（`.env` 里 `LARK_*` 零命中 → 网关起不来 → E1 无输入 → 9/3 demo 跑不了 → gold set 攒不到 → E2 动不了）。§3 五档缺口（A 卡住全局 / B 安全硬前置 / C 日历助手三件套 / D 提炼层下半段 / E 其余）。**B 档核实**：`brainx_sync_now` 仍在暴露且默认 `source='fixture'`+`dry_run=false`、**全文件无黑名单机制**；`brainx_record_outcome` MCP 层无守门。**D 档核实**：`src/job-extract/index.js` 只 `INSERT INTO job_facts_drafts`，**不写 `job_facts`，E1 对 MVP 主循环尚无实际贡献**。§4 优先级错配说明。§5 还需写什么。§6 顺序建议：A1 → B → C → **D2（E3 确认闭环，先让草稿能进 job_facts）** → D1（E2 LLM）→ E。
 - [后端侧模块结构与下一步安排](2026-09-02-backend-module-structure.md)：用户 9/2 晚明确边界「openclaw 的接口我不负责，我只负责后端其他点」后的**后端侧权威结构**。§1 **边界裁定**：群消息读取拆三段——①飞书后台配置（你手动）②**通道层 `src/gateway/ws-client.js` 已在后端仓库建成（118 行完整实现，非骨架，不依赖 OpenClaw）**③OpenClaw 插件只负责前台对话。**关键纠正：能读群消息的那条通道本来就在后端，OpenClaw 挂了不影响收消息**。§2 六层结构（L0 飞书网关 / L1 事件账本 / L2 领域数据 / L3 业务领域 / L4 调度推送 / L5 MCP 交付）。§3 已建成 vs 待补对照（**待补第 5 项「群消息提炼成业务字段」尚无代码，是 MVP ① 段缺的那一块**）。§4 今晚三件事 + 9/3 优先级。§5 与 OpenClaw 只有三个接缝。
 - [群消息 → job_facts 提炼层研发路径](2026-09-02-job-facts-extraction-roadmap.md)：后端模块结构 §3 待补第 5 项的展开。**§2 开源调研综合**（google/langextract 原文锚定、instructor-js zod 约束重试、ai-delegator 先分类后抽取、open_recruiter 抽取确认分离、hiring-agent 双后端可切换、PaddleNLP UIE 中文兜底、dedupe/splink 实体对齐——共 5 大方向 12 个项目）。**§3 选型判断：借思想不引依赖，零新增运行时依赖**。§4 关键架构：**提炼层是 L1 事件账本的一个消费者**（`consumeOnce('job-extract')`，幂等与 DLQ 免费复用），规则层先行 + LLM 层（`AI_JOB_EXTRACT_ENABLED` 默认关）双层管线。§5 抽取 schema：每字段带 `evidence` 原文引用与置信度，staging 转正须确认。§6 时间线 E0-E4 共 2.5 天，对齐 9/3 demo 与 9/14 deadline。
 - [BrainX → OpenClaw 接口包（模块化交付信息）](2026-09-02-openclaw-interface-pack.md)：用户指令「后端的结构我打包给对方模块化的信息」的**单一打包文档**。§1 三接缝一屏图 + 三条红线；§2 stdio MCP 接入配置模板 + 15 工具快照（含黑名单 `brainx_sync_now`/`brainx_talent`）+ 调用纪律；§3 consultant_id 身份映射规则（**后端不碰 open_id，映射权威在对方**；群消息通道与身份映射互不相干）；§4 Skill 素材交付与合规基线；§6 交付包清单。
+- [OpenClaw 招聘闭环（2026-09-03）](2026-09-03-openclaw-recruiting-loop.md)：记录用户从“只读首版”升级为可执行闭环后的权威范围：卡片化回复、自然语言推送设置、职位负责人、确认后接单/找人/进展、候选 Case 推进、联系方式独立授权，以及尚未接通的外发和建群。
 - [AI Native 猎头全链路轨迹图](design/ai-native-headhunter-workflow.html)：环节级轨迹、人工/自动分工与证据来源的蒸馏工作稿，阶段三回填进行中。
 - [双项目 14 天作战计划](design/week-plan-brainx-reloop.html)：BrainX × reloop 至 9/14 决赛的双泳道排期、底线条件与不做清单。
 - [BrainX 最终交付蓝图与施工总清单](brainx-final-delivery-blueprint.md)：基于当前代码审计定义最终产品形态、黄金路径、跨前后端施工顺序和端到端验收。

@@ -32,6 +32,7 @@ import { syncTalentsFromCsv, listTalents as listTalentsRepo, getTalent, talentBa
 import { talentSupplyForJob, talentSupplyEnabled } from './talent-supply.js';
 import { effectiveJob, effectiveFactPayload, updateFactOverrides } from './facts.js';
 import { assistantRoutes } from './assistant-routes.js';
+import { personalModelRoutes } from './personal-model-routes.js';
 import { pickTray, nextBatch, feedback as recommendationFeedback, undoFeedback as recommendationUndoFeedback } from './recommendation-batch.js';
 import { recommendationPage } from './recommendation-page.js';
 import { verifyQuick, quickResultPage, QUICK_ACTIONS } from './quickfb.js';
@@ -41,7 +42,6 @@ import { recordOpportunityIgnore } from './opportunity-ignore.js';
 import { makeClientErrorRoute } from './client-error.js';
 import { body, err, isPathInside, json, normalizeWorkbenchPreferences, proxyFrontend,
   safeJsonArray, STATIC_MIME } from './server-http.js';
-
 export { isPathInside } from './server-http.js';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const FRONTEND_DIR = join(ROOT, 'frontend', 'btex-frontend');
@@ -59,7 +59,6 @@ export function createServer(db = openDb(), deps = {}) {
     if (!s) err(res, 401, 'UNAUTHORIZED', '未登录或会话已过期');
     return s?.consultant_id || null;
   };
-
   // SSE 广播总线：res → consultant_id；事件带 consultant_id 时只发给本人（定向隔离）
   const sseClients = new Map();
   const bus = {
@@ -76,6 +75,7 @@ export function createServer(db = openDb(), deps = {}) {
   const routes = {
     ...assistantRoutes(db, deps),
     ...projectRoutes(db),
+    ...personalModelRoutes(db, deps),
     'GET /api/v1/consultants': (req, res) => {
       json(res, 200, { items: loadConsultants(db)
         .map((c) => ({ consultant_id: c.consultant_id, display_name: c.display_name })) });

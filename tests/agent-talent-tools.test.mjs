@@ -48,8 +48,17 @@ function handlers(calls = []) {
       return { ...bundle, data_scope: { ...bundle.data_scope, purpose: input.purpose } };
     },
     loadCandidateFactFn: async (input) => { calls.push(input); return fact; },
+    loadCandidateContactFn: async (input) => { calls.push(input); return { phone: '13800138000', email: 'candidate@example.com' }; },
   });
 }
+
+test('候选联系方式走独立读取器并保留访问理由', async () => {
+  const calls = [];
+  const out = await handlers(calls).brainx_candidate_contact({ candidate_ref: 'cand-a', reason: '联系前确认' },
+    principal('p2p', 'candidate_contact'));
+  assert.equal(out.data.contact.phone, '13800138000');
+  assert.equal(calls[0].consultantId, 'mia');
+});
 
 test('shortlist 从可信 principal 注入范围，群聊上限三人', async () => {
   const calls = [];

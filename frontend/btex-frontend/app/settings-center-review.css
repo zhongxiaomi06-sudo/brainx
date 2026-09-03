@@ -214,7 +214,7 @@
   .settings-sidebar nav { display: block; }
   .settings-sidebar nav section { display: contents; }
   .settings-sidebar nav button {
-    width: 20%;
+    width: 16.666%;
     height: 52px;
     float: left;
     display: grid;

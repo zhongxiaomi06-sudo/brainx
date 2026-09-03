@@ -13,7 +13,7 @@ import { openDb } from '../src/db.js';
 import { registerChatContext } from '../src/gateway/chat-contexts.js';
 import { processLarkEvent } from '../src/gateway/lark-gateway.js';
 import { consumeJobExtract, CONSUMER_NAME } from '../src/job-extract/index.js';
-import { produceOne, backfillFromJobMessages } from '../src/job-extract/bridge-producer.js';
+import { produceOne, backfillFromJobMessages, normalizeCreateTime } from '../src/job-extract/bridge-producer.js';
 
 const newDb = () => openDb(join(mkdtempSync(join(tmpdir(), 'brainx-e1-')), 'test.db'));
 
@@ -140,6 +140,14 @@ test('bridge-producer：消息→账本→draft 全链 + 三层幂等', async ()
   // 账本 payload 不含正文 PII（FR-006）
   const payloads = db.prepare('SELECT payload FROM workflow_event_log').all();
   for (const row of payloads) assert.doesNotMatch(row.payload, /高级数据产品经理/);
+});
+
+test('bridge-producer：兼容本地时间、秒和毫秒时间戳，脏值安全回退', () => {
+  assert.equal(normalizeCreateTime('2026-09-03 19:30'), '2026-09-03T11:30:00.000Z');
+  assert.equal(normalizeCreateTime('1788435000'), '2026-09-03T11:30:00.000Z');
+  assert.equal(normalizeCreateTime('1788435000000'), '2026-09-03T11:30:00.000Z');
+  assert.equal(normalizeCreateTime('not-a-date', 'fallback'), 'fallback');
+  assert.equal(normalizeCreateTime('0', 'fallback'), 'fallback');
 });
 
 test('backfill：从 job_messages 存量回填幂等安全', async () => {

@@ -16,6 +16,19 @@ const INSERT_MSG_SQL = `INSERT OR IGNORE INTO lark_messages
   (message_id, chat_id, message_type, text, mentions_json, create_time, received_at)
   VALUES (?,?,?,?,?,?,?)`;
 
+/** Bridge 既可能传飞书毫秒/秒时间戳，也可能传已格式化的上海本地时间。 */
+export function normalizeCreateTime(value, fallback = now()) {
+  if (value === undefined || value === null || value === '') return fallback;
+  const raw = String(value).trim();
+  const numeric = Number(raw);
+  const millis = Number.isFinite(numeric) && numeric > 0
+    ? (Math.abs(numeric) < 1e12 ? numeric * 1000 : numeric)
+    : Date.parse(raw.includes('T') ? raw : `${raw.replace(' ', 'T')}+08:00`);
+  if (!Number.isFinite(millis)) return fallback;
+  const parsed = new Date(millis);
+  return Number.isFinite(parsed.getTime()) ? parsed.toISOString() : fallback;
+}
+
 /** E2 LLM 预抽取（异步层，AI_JOB_EXTRACT_ENABLED=1 且 llm 已配置时）：
  * 至少一个有效字段才注入，否则让消费链走规则层（rules 保底）。 */
 async function presetFromLlm(text) {
@@ -34,7 +47,7 @@ async function presetFromLlm(text) {
 /** 单条消息：落原文表 → 追加账本 → 抽 draft。返回 {produced, draft_id?}。 */
 export async function produceOne(db, { message_id, chat_id, msg_type = 'text', text = '',
                                  sender = {}, mentions = [], create_time }) {
-  const createIso = create_time ? new Date(Number(create_time)).toISOString() : now();
+  const createIso = normalizeCreateTime(create_time);
   const wrote = db.prepare(INSERT_MSG_SQL).run(message_id, chat_id, msg_type, String(text || ''),
                                  JSON.stringify(mentions || []), createIso, now());
   const ev = appendEvent(db, {

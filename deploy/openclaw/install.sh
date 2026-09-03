@@ -5,6 +5,15 @@ BRAINX_DEPLOY_ROOT=${BRAINX_DEPLOY_ROOT:-/opt/brainx}
 BRAINX_OPENCLAW_STATE=${BRAINX_OPENCLAW_STATE:-/var/lib/brainx/.openclaw}
 BRAINX_OPENCLAW_BIN=${BRAINX_OPENCLAW_BIN:-/usr/local/bin/openclaw}
 BRAINX_INSTALL_MODE=${1:---check}
+BRAINX_PRODUCTION_SKILLS=(
+  brainx-today
+  brainx-job
+  brainx-talent
+  brainx-match
+  brainx-engagement-draft
+  brainx-interview-prep
+  brainx-review
+)
 
 if [[ "$BRAINX_INSTALL_MODE" != "--check" && "$BRAINX_INSTALL_MODE" != "--apply" ]]; then
   echo "usage: sudo deploy/openclaw/install.sh [--check|--apply]" >&2
@@ -13,6 +22,13 @@ fi
 
 for required in node npm "$BRAINX_OPENCLAW_BIN"; do
   command -v "$required" >/dev/null || { echo "missing command: $required" >&2; exit 69; }
+done
+
+for skill_name in "${BRAINX_PRODUCTION_SKILLS[@]}"; do
+  [[ -f "$BRAINX_DEPLOY_ROOT/skills/$skill_name/SKILL.md" ]] || {
+    echo "missing production skill: $skill_name" >&2
+    exit 66
+  }
 done
 
 OPENCLAW_ACTUAL_VERSION=$($BRAINX_OPENCLAW_BIN --version)
@@ -56,25 +72,63 @@ install_env "$BRAINX_DEPLOY_ROOT/deploy/openclaw/brainx-agent.env.example" /etc/
 install_env "$BRAINX_DEPLOY_ROOT/deploy/openclaw/brainx-worker.env.example" /etc/brainx/worker.env
 install_env "$BRAINX_DEPLOY_ROOT/deploy/openclaw/openclaw.env.example" /etc/brainx/openclaw.env
 
-install -m 0640 -o brainx -g brainx "$BRAINX_DEPLOY_ROOT/deploy/openclaw/openclaw.production.json" "$BRAINX_OPENCLAW_STATE/openclaw.json"
+OPENCLAW_CONFIG="$BRAINX_OPENCLAW_STATE/openclaw.json"
+run_openclaw() {
+  sudo -u brainx env \
+    HOME=/var/lib/brainx \
+    OPENCLAW_CONFIG_PATH="$OPENCLAW_CONFIG" \
+    OPENCLAW_STATE_DIR="$BRAINX_OPENCLAW_STATE" \
+    bash -c 'set -a; . /etc/brainx/openclaw.env; set +a; exec "$0" "$@"' \
+    "$BRAINX_OPENCLAW_BIN" "$@"
+}
+
+if [[ ! -f "$OPENCLAW_CONFIG" ]]; then
+  cp "$BRAINX_DEPLOY_ROOT/deploy/openclaw/openclaw.production.json" "$OPENCLAW_CONFIG"
+  chown brainx:brainx "$OPENCLAW_CONFIG"
+  chmod 0640 "$OPENCLAW_CONFIG"
+else
+  # Patch 只更新产品受管字段；运行时生成的 agents.list、bindings 和个人认证库必须保留。
+  run_openclaw config patch --file \
+    "$BRAINX_DEPLOY_ROOT/deploy/openclaw/openclaw.production.json"
+  # 清除旧版本曾错误下发的共享默认模型；不存在时保持幂等。
+  for obsolete_path in agents.defaults.model agents.defaults.models models.providers.stepfun.apiKey; do
+    run_openclaw config unset "$obsolete_path" >/dev/null 2>&1 || true
+  done
+fi
 install -m 0644 "$BRAINX_DEPLOY_ROOT/deploy/systemd/"*.service /etc/systemd/system/
+
+install -d -m 0750 -o brainx -g brainx "$BRAINX_OPENCLAW_STATE/skills"
+for skill_name in "${BRAINX_PRODUCTION_SKILLS[@]}"; do
+  install -d -m 0750 -o brainx -g brainx "$BRAINX_OPENCLAW_STATE/skills/$skill_name"
+  install -m 0644 -o brainx -g brainx \
+    "$BRAINX_DEPLOY_ROOT/skills/$skill_name/SKILL.md" \
+    "$BRAINX_OPENCLAW_STATE/skills/$skill_name/SKILL.md"
+done
 
 BRAINX_PLUGIN_TMP=$(mktemp -d /tmp/brainx-openclaw.XXXXXX)
 trap 'rm -rf -- "$BRAINX_PLUGIN_TMP"' EXIT
-npm pack "$BRAINX_DEPLOY_ROOT/./plugins/brainx-openclaw" --pack-destination "$BRAINX_PLUGIN_TMP" >/dev/null
-BRAINX_PLUGIN_ARCHIVE="$BRAINX_PLUGIN_TMP/brainx-openclaw-plugin-1.0.0.tgz"
+chown brainx:brainx "$BRAINX_PLUGIN_TMP"
+sudo -u brainx env HOME=/var/lib/brainx \
+  npm pack "$BRAINX_DEPLOY_ROOT/./plugins/brainx-openclaw" --pack-destination "$BRAINX_PLUGIN_TMP" >/dev/null
+BRAINX_PLUGIN_VERSION=$(node -p \
+  "JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8')).version" \
+  "$BRAINX_DEPLOY_ROOT/plugins/brainx-openclaw/package.json")
+BRAINX_PLUGIN_ARCHIVE="$BRAINX_PLUGIN_TMP/brainx-openclaw-plugin-${BRAINX_PLUGIN_VERSION}.tgz"
 [[ -f "$BRAINX_PLUGIN_ARCHIVE" ]] || { echo "plugin package missing" >&2; exit 70; }
 install_plugin() {
   local plugin_spec=$1
   shift
-  sudo -u brainx env \
-    HOME=/var/lib/brainx \
-    OPENCLAW_CONFIG_PATH="$BRAINX_OPENCLAW_STATE/openclaw.json" \
-    OPENCLAW_STATE_DIR="$BRAINX_OPENCLAW_STATE" \
-    "$BRAINX_OPENCLAW_BIN" plugins install --force "$@" "$plugin_spec"
+  # OpenClaw CLI 在安装期执行 SecretRef 校验；必须以 brainx 身份加载
+  # /etc/brainx/openclaw.env（0640 root:brainx，brainx 可读），否则会因
+  # 飞书或 Gateway 的环境变量未解析而中断安装（2026-09-03 生产实证）。
+  run_openclaw plugins install --force "$@" "$plugin_spec"
 }
 
-install_plugin @openclaw/feishu@2026.7.1 --pin
+if ! run_openclaw plugins inspect feishu --json 2>/dev/null | \
+  node -e 'let s="";process.stdin.on("data",c=>s+=c).on("end",()=>{process.exit(JSON.parse(s).plugin?.version===process.argv[1]?0:1)})' \
+  2026.7.1; then
+  install_plugin @openclaw/feishu@2026.7.1 --pin
+fi
 install_plugin "$BRAINX_PLUGIN_ARCHIVE"
 systemctl daemon-reload
 echo "installed; fill /etc/brainx/*.env, then validate and enable services per runbook"

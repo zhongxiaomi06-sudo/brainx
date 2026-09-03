@@ -4,6 +4,20 @@
       "default": { "source": "env" }
     }
   },
+  "models": {
+    "mode": "merge",
+    "providers": {
+      "stepfun": {
+        "baseUrl": "https://api.stepfun.com/step_plan/v1",
+        "api": "openai-completions",
+        "auth": "api-key",
+        "models": [
+          { "id": "step-3.5-flash", "name": "Step 3.5 Flash" },
+          { "id": "step-3.7-flash", "name": "Step 3.7 Flash" }
+        ]
+      }
+    }
+  },
   "gateway": {
     "mode": "local",
     "bind": "loopback",
@@ -18,6 +32,15 @@
   },
   "agents": {
     "defaults": {
+      "skills": [
+        "brainx-today",
+        "brainx-job",
+        "brainx-talent",
+        "brainx-match",
+        "brainx-engagement-draft",
+        "brainx-interview-prep",
+        "brainx-review"
+      ],
       "sandbox": {
         "mode": "all",
         "scope": "session",
@@ -37,6 +60,8 @@
     }
   },
   "tools": {
+    "sessions": { "visibility": "self" },
+    "agentToAgent": { "enabled": false },
     "allow": [
       "brainx_me_context",
       "brainx_daily_brief",
@@ -47,7 +72,18 @@
       "brainx_gap_questions",
       "brainx_interview_prep",
       "brainx_personal_review",
-      "brainx_run_status"
+      "brainx_run_status",
+      "brainx_openmai_search",
+      "brainx_pending_job_facts",
+      "brainx_review_job_fact",
+      "brainx_push_preferences",
+      "brainx_update_push_preferences",
+      "brainx_job_contacts",
+      "brainx_candidate_contact",
+      "brainx_accept_job",
+      "brainx_start_candidate_search",
+      "brainx_record_job_progress",
+      "brainx_candidate_workflow"
     ],
     "deny": [
       "exec", "process", "read", "write", "edit", "apply_patch",
@@ -61,6 +97,14 @@
     "feishu": {
       "enabled": true,
       "connectionMode": "websocket",
+      "streaming": false,
+      "configWrites": true,
+      "dynamicAgentCreation": {
+        "enabled": true,
+        "workspaceTemplate": "/var/lib/brainx/.openclaw/workspace-{agentId}",
+        "agentDirTemplate": "/var/lib/brainx/.openclaw/agents/{agentId}/agent",
+        "maxAgents": 20
+      },
       "defaultAccount": "mia",
       "dmPolicy": "allowlist",
       "allowFrom": [

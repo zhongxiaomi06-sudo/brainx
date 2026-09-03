@@ -13,6 +13,7 @@ const root = new URL('../', import.meta.url);
 const fixture = JSON.parse(await readFile(new URL('tests/fixtures/openclaw-production/plugin-contract.json', root)));
 const manifest = JSON.parse(await readFile(new URL('plugins/brainx-openclaw/openclaw.plugin.json', root)));
 const pkg = JSON.parse(await readFile(new URL('plugins/brainx-openclaw/package.json', root)));
+const entrySource = await readFile(new URL('plugins/brainx-openclaw/index.js', root), 'utf8');
 const secret = 'p'.repeat(32);
 
 const p2pContext = {
@@ -32,10 +33,14 @@ test('plugin package and manifest declare exactly the approved tools', () => {
   assert.equal(pkg.peerDependencies.openclaw, fixture.plugin_api_min);
   assert.deepEqual(pkg.openclaw.extensions, ['./index.js']);
   assert.equal(manifest.id, 'brainx-openclaw');
+  assert.deepEqual(manifest.activation, { onStartup: true });
+  assert.match(entrySource, /api\.on\('reply_payload_sending'/);
+  assert.doesNotMatch(entrySource, /registerHook\('reply_payload_sending'/);
   assert.equal(manifest.configSchema.additionalProperties, false);
+  assert.deepEqual(manifest.contracts.commands, ['brainx']);
   assert.deepEqual(manifest.contracts.tools, fixture.allowed_tools);
   assert.deepEqual(BRAINX_OPENCLAW_TOOLS.map(({ name }) => name), fixture.allowed_tools);
-  assert.equal(new Set(manifest.contracts.tools).size, 10);
+  assert.equal(new Set(manifest.contracts.tools).size, 21);
   for (const tool of BRAINX_OPENCLAW_TOOLS) {
     assert.equal(tool.parameters.additionalProperties, false);
     assert.equal('url' in tool.parameters.properties, false);
@@ -87,9 +92,13 @@ test('tool request is fixed to loopback and produces a BrainX-verifiable asserti
   );
   const result = await factory(p2pContext).execute('tool-call', { job_id: 'job-1' });
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].url, 'http://127.0.0.1:3102/v1/tools/brainx_job_assessment');
+  assert.equal(calls[0].url, 'http://127.0.0.1:3102/internal/v1/agent/tools/brainx_job_assessment');
   assert.equal(calls[0].options.headers.authorization, 'Bearer token-value');
   const body = JSON.parse(calls[0].options.body);
+  assert.equal(body.schema_version, 'agent_tool_request.v1');
+  assert.deepEqual(body.client, {
+    plugin_version: '1.1.6', openclaw_version: '2026.7.1-2', model_ref: 'openai/gpt-5',
+  });
   const payload = verifyPrincipalAssertion(body.principal_assertion, {
     secret,
     now: new Date('2026-09-03T00:00:01.000Z'),

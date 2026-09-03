@@ -13,18 +13,19 @@ import { latestRun } from './recommend.js';
 import { latestRealSync, latestCompleteSnapshot } from './sync.js';
 import { commitmentSummary } from './engagement.js';
 import { buildDailyCard, buildSyncAlertCard, pushCard, syncAlertKey } from './push.js';
+import { DEFAULT_PUSH_PREFERENCES, getPushPreferences } from './push-preferences.js';
 
-const SLOTS = [7, 19]; //  CST 小时
 const WINDOW_MS = 30 * 60 * 1000;
 
 /** 当前 CST 的「今日日期#时段」与是否处于发射窗口（纯函数，可注入时钟测试）。 */
-export function slotState(at = new Date()) {
+export function slotState(at = new Date(), times = DEFAULT_PUSH_PREFERENCES.times) {
   const cst = new Date(at.getTime() + 8 * 3600 * 1000); // 用 UTC 字段读 CST
   const day = cst.toISOString().slice(0, 10);
-  for (const h of SLOTS) {
-    const slotStart = Date.UTC(cst.getUTCFullYear(), cst.getUTCMonth(), cst.getUTCDate(), h, 0, 0) - 8 * 3600 * 1000;
+  for (const value of times) {
+    const [h, minute] = value.split(':').map(Number);
+    const slotStart = Date.UTC(cst.getUTCFullYear(), cst.getUTCMonth(), cst.getUTCDate(), h, minute, 0) - 8 * 3600 * 1000;
     if (at.getTime() >= slotStart && at.getTime() < slotStart + WINDOW_MS) {
-      return { inWindow: true, slotKey: `${day}#${String(h).padStart(2, '0')}00` };
+      return { inWindow: true, slotKey: `${day}#${value.replace(':', '')}` };
     }
   }
   return { inWindow: false, slotKey: null };
@@ -32,6 +33,8 @@ export function slotState(at = new Date()) {
 
 /** 给一位顾问发今日卡（幂等：该时段已发则跳过）。返回 pushCard 结果或 null。 */
 export async function pushSlotFor(db, consultant_id, open_id, slotKey, { send = true } = {}) {
+  const preferences = getPushPreferences(db, consultant_id) || DEFAULT_PUSH_PREFERENCES;
+  if (!preferences.enabled) return null;
   const sync = latestRealSync(db, consultant_id);
   const snapshot = latestCompleteSnapshot(db, consultant_id);
   const run = latestRun(db, consultant_id, { hideEngaged: true });
@@ -42,7 +45,8 @@ export async function pushSlotFor(db, consultant_id, open_id, slotKey, { send = 
   const kind = sync && !sync.complete ? 'SYNC_ALERT' : 'DAILY_TOP3';
   if (kind === 'DAILY_TOP3' && (!run || !run.items.length)) return null; // 无推荐不发（告警不受此限）
   const card = kind === 'SYNC_ALERT' ? buildSyncAlertCard(sync)
-    : buildDailyCard({ consultant_name: name, consultant_id, run: run.run, items: run.items,
+    : buildDailyCard({ consultant_name: name, consultant_id, run: run.run,
+                       items: run.items.slice(0, preferences.job_count), item_limit: preferences.job_count,
                        commitments: c, sync, snapshot_id: snapshot?.sync_id });
   return pushCard(db, { consultant_id, kind,
                         run_id: kind === 'SYNC_ALERT' ? syncAlertKey() : slotKey, card,
@@ -54,12 +58,14 @@ export function startScheduler(db, { log = console.log } = {}) {
   const tick = () => {
     void (async () => {
       try {
-        const { inWindow, slotKey } = slotState();
-        if (!inWindow) return;
         const consultants = db.prepare(`SELECT consultant_id, open_id FROM consultants
           WHERE active=1 AND open_id IS NOT NULL AND open_id != ''`).all();
-        log(`[scheduler] 进入推送窗口 ${slotKey}，对象 ${consultants.length} 人`); // 窗口可观测性（2026-08-14 19:00 未触发排查）
         for (const c of consultants) {
+          const preferences = getPushPreferences(db, c.consultant_id);
+          if (!preferences?.enabled) continue;
+          const { inWindow, slotKey } = slotState(new Date(), preferences.times);
+          if (!inWindow) continue;
+          log(`[scheduler] 进入推送窗口 ${slotKey}，对象 ${c.consultant_id}`);
           const out = await pushSlotFor(db, c.consultant_id, c.open_id, slotKey, { send: true });
           log(`[scheduler] ${slotKey} ${c.consultant_id}: ${out ? out.status : 'null(无推荐轮)'}`);
         }

@@ -5,11 +5,19 @@ import { openDb } from '../src/db.js';
 import { runSync } from '../src/sync.js';
 import { recommend } from '../src/recommend.js';
 import { slotState, pushSlotFor } from '../src/scheduler.js';
+import { updatePushPreferences } from '../src/push-preferences.js';
 
 let db;
 before(() => {
   process.env.BRAINX_BASE_URL = 'https://base.example.test';
   db = openDb(':memory:');
+});
+
+test('slotState 支持顾问自定义分钟级时间', () => {
+  assert.deepEqual(slotState(new Date('2026-08-14T00:30:30Z'), ['08:30']), {
+    inWindow: true, slotKey: '2026-08-14#0830',
+  });
+  assert.equal(slotState(new Date('2026-08-14T00:29:59Z'), ['08:30']).inWindow, false);
 });
 after(() => { delete process.env.BRAINX_BASE_URL; });
 
@@ -30,6 +38,7 @@ test('pushSlotFor：同一时段幂等（push_log 唯一键），无推荐不发
       hc: 2, active_state: 'OPEN', relation: null, source_url: 'ttc://job/JT1' },
   ] } });
   recommend(db, 'felix', { top: 10 });
+  updatePushPreferences(db, 'felix', { times: ['07:00'], job_count: 1, enabled: true });
   const r1 = await pushSlotFor(db, 'felix', 'ou_felix', '2026-08-14#0700', { send: false });
   assert.equal(r1.status, 'PREVIEW'); // send:false → PREVIEW 记录
   // 同时段重发：push_log 唯一键（felix, DAILY_TOP3, 2026-08-14#0700）→ 幂等跳过
@@ -40,6 +49,10 @@ test('pushSlotFor：同一时段幂等（push_log 唯一键），无推荐不发
   assert.equal(r3.status, 'PREVIEW');
   const n = db.prepare(`SELECT COUNT(*) n FROM push_log WHERE consultant_id='felix' AND kind='DAILY_TOP3'`).get().n;
   assert.equal(n, 2);
+  const card = JSON.parse(db.prepare(`SELECT card_json FROM push_log WHERE consultant_id='felix'
+    AND kind='DAILY_TOP3' ORDER BY created_at LIMIT 1`).get().card_json);
+  assert.equal(card.elements.filter((element) => element.tag === 'action').length, 2,
+    '一条职位动作 + 底部工作台动作');
 });
 
 test('0012：零引用占位行删除、有引用行 CLOSED（回放不破）', () => {

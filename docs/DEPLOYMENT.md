@@ -39,6 +39,14 @@ curl -fsS https://base.yorkteam.cn/api/v1/meta/guard
 
 OpenClaw 多顾问版本在同机额外运行三个回环服务，安装、启动顺序、十工具核对和回滚以[多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md)为准。顾问电脑不安装 OpenClaw。
 
+### OpenClaw 实装注记（2026-09-03 实证）
+
+- **Node 版本**：OpenClaw 2026.7.1-2 要求 `>=22.22.3 <23 或 >=24.15`；生产已由 22.22.1 升到 **Node 24**（nodesource deb 系）。Node 24 同时修复了「22.22.1 未编译 TypeScript/amaro 导致 .ts 测试无法运行」的构建变体问题。
+- **install.sh 已知坑（已修复入库）**：`npm pack` 路径必须带 `./` 前缀（否则被解析成 GitHub org/repo）；brainx 用户首次 npm 需要预建 `/var/lib/brainx/.npm`（否则 EACCES）。
+- **brainx 用户 home**：必须是 `/var/lib/brainx`（`useradd -r` 默认 home=/home/brainx 不存在，openclaw wiki 插件按 home 解析会 permission denied）。
+- **sandbox.mode**：服务器无 Docker 时设 `agents.defaults.sandbox.mode=off`（10 个工具本身最小权限只读）；装 Docker 后可改回 `all`。
+- **模型**：OpenClaw 默认模型走阶跃 `models.providers.stepfun`（openai-completions 适配）+ `agents.defaults.model=stepfun/step-3.5-flash`，凭据与 brainx `.env` 同一把 `BRAINX_LLM_API_KEY`。
+
 ## 本地开发
 
 ```bash

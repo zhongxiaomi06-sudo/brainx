@@ -41,6 +41,7 @@ fi
 [[ $(id -u) -eq 0 ]] || { echo "--apply requires root" >&2; exit 77; }
 id brainx >/dev/null 2>&1 || useradd --system --home-dir /var/lib/brainx --create-home brainx
 install -d -m 0750 -o brainx -g brainx /etc/brainx "$BRAINX_OPENCLAW_STATE" "$BRAINX_DEPLOY_ROOT/data"
+install -d -m 0755 -o brainx -g brainx /var/lib/brainx/.npm # brainx 首次 npm 写缓存 EACCES（2026-09-03 实证）
 
 install_env() {
   local env_source=$1
@@ -60,7 +61,7 @@ install -m 0644 "$BRAINX_DEPLOY_ROOT/deploy/systemd/"*.service /etc/systemd/syst
 
 BRAINX_PLUGIN_TMP=$(mktemp -d /tmp/brainx-openclaw.XXXXXX)
 trap 'rm -rf -- "$BRAINX_PLUGIN_TMP"' EXIT
-npm pack "$BRAINX_DEPLOY_ROOT/plugins/brainx-openclaw" --pack-destination "$BRAINX_PLUGIN_TMP" >/dev/null
+npm pack "$BRAINX_DEPLOY_ROOT/./plugins/brainx-openclaw" --pack-destination "$BRAINX_PLUGIN_TMP" >/dev/null
 BRAINX_PLUGIN_ARCHIVE="$BRAINX_PLUGIN_TMP/brainx-openclaw-plugin-1.0.0.tgz"
 [[ -f "$BRAINX_PLUGIN_ARCHIVE" ]] || { echo "plugin package missing" >&2; exit 70; }
 install_plugin() {

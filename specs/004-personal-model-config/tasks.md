@@ -17,7 +17,7 @@
 
 - [X] T001 新增个人模型非敏感状态迁移与迁移回归测试 `migrations/0036_consultant_model_profiles.sql`、`tests/personal-model-config.test.mjs`
 - [ ] T002 [P] 定义个人模型供应商目录、输入校验、错误类型和 OpenClaw 运行路径配置 `src/personal-model-config.js`
-- [ ] T003 [P] 增加生产功能开关、OpenClaw state/config/bin/account 环境模板 `deploy/openclaw/openclaw.env.example`、`.env.example`
+- [X] T003 [P] 增加生产功能开关、OpenClaw state/config/bin/account 环境模板 `deploy/openclaw/openclaw.env.example`、`.env.example`
 
 **Checkpoint**: 数据状态与配置入口存在，尚不写任何真实凭据
 
@@ -29,9 +29,9 @@
 
 - [ ] T004 先写并运行两顾问 Agent 派生、binding 校验、stdin 密钥、固定参数、超时与泄密负向测试 `tests/personal-model-config.test.mjs`
 - [ ] T005 实现无 shell OpenClaw CLI runner、个人 Agent binding 解析、每顾问并发闸和安全错误归一化 `src/personal-model-config.js`
-- [ ] T006 先写并运行动态 Agent、会话 self、agent-to-agent 关闭、无全局 StepFun、共享 Skills 与升级保留配置测试 `tests/openclaw-production-config.test.mjs`
-- [ ] T007 实现 OpenClaw 动态个人 Agent、安全会话/模型作用域、批准 provider catalog 和无全局个人凭据配置 `deploy/openclaw/openclaw.production.json`
-- [ ] T008 改造安装器为首次 seed、升级验证式 patch，并把七个 Skill 安装到 state 级共享目录 `deploy/openclaw/install.sh`
+- [X] T006 先写并运行动态 Agent、会话 self、agent-to-agent 关闭、无全局 StepFun、共享 Skills 与升级保留配置测试 `tests/openclaw-production-config.test.mjs`
+- [X] T007 实现 OpenClaw 动态个人 Agent、安全会话/模型作用域、批准 provider catalog 和无全局个人凭据配置 `deploy/openclaw/openclaw.production.json`
+- [X] T008 改造安装器为首次 seed、升级验证式 patch，并把七个 Skill 安装到 state 级共享目录 `deploy/openclaw/install.sh`
 
 **Checkpoint**: Foundation ready；假密钥隔离实验可证明两个 Agent 互不读取，重复安装不删除动态路由
 
@@ -68,11 +68,11 @@
 
 ### Tests for User Story 2
 
-- [ ] T016 [US2] 扩展生产配置契约测试，覆盖动态 Agent 上限、named account peer binding、个人 session 和共享 Skill 可见性 `tests/openclaw-production-config.test.mjs`
+- [X] T016 [US2] 扩展生产配置契约测试，覆盖动态 Agent 上限、named account peer binding、个人 session 和共享 Skill 可见性 `tests/openclaw-production-config.test.mjs`
 
 ### Implementation for User Story 2
 
-- [ ] T017 [US2] 完成动态 Agent workspace/agentDir 模板、20 人上限、configWrites 与 allowlist 共存配置 `deploy/openclaw/openclaw.production.json`
+- [X] T017 [US2] 完成动态 Agent workspace/agentDir 模板、20 人上限、configWrites 与 allowlist 共存配置 `deploy/openclaw/openclaw.production.json`
 - [ ] T018 [US2] 在安装/验收脚本中增加 Agent/binding/auth 元数据只读核验且不输出凭据 `deploy/openclaw/install.sh`、`specs/004-personal-model-config/quickstart.md`
 
 **Checkpoint**: US1 与 US2 组合后无需管理员为新增白名单顾问手建 Agent

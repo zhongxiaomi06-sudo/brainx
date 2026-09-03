@@ -9,7 +9,6 @@
     "providers": {
       "stepfun": {
         "baseUrl": "https://api.stepfun.com/step_plan/v1",
-        "apiKey": { "source": "env", "provider": "default", "id": "STEPFUN_API_KEY" },
         "api": "openai-completions",
         "auth": "api-key",
         "models": [
@@ -33,14 +32,15 @@
   },
   "agents": {
     "defaults": {
-      "model": {
-        "primary": "stepfun/step-3.5-flash",
-        "fallbacks": ["stepfun/step-3.7-flash"]
-      },
-      "models": {
-        "stepfun/step-3.5-flash": { "alias": "fast" },
-        "stepfun/step-3.7-flash": { "alias": "strong" }
-      },
+      "skills": [
+        "brainx-today",
+        "brainx-job",
+        "brainx-talent",
+        "brainx-match",
+        "brainx-engagement-draft",
+        "brainx-interview-prep",
+        "brainx-review"
+      ],
       "sandbox": {
         "mode": "all",
         "scope": "session",
@@ -60,6 +60,8 @@
     }
   },
   "tools": {
+    "sessions": { "visibility": "self" },
+    "agentToAgent": { "enabled": false },
     "allow": [
       "brainx_me_context",
       "brainx_daily_brief",
@@ -93,6 +95,13 @@
       "enabled": true,
       "connectionMode": "websocket",
       "streaming": false,
+      "configWrites": true,
+      "dynamicAgentCreation": {
+        "enabled": true,
+        "workspaceTemplate": "/var/lib/brainx/.openclaw/workspace-{agentId}",
+        "agentDirTemplate": "/var/lib/brainx/.openclaw/agents/{agentId}/agent",
+        "maxAgents": 20
+      },
       "defaultAccount": "mia",
       "dmPolicy": "allowlist",
       "allowFrom": [

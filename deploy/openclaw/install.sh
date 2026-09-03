@@ -72,15 +72,32 @@ install_env "$BRAINX_DEPLOY_ROOT/deploy/openclaw/brainx-agent.env.example" /etc/
 install_env "$BRAINX_DEPLOY_ROOT/deploy/openclaw/brainx-worker.env.example" /etc/brainx/worker.env
 install_env "$BRAINX_DEPLOY_ROOT/deploy/openclaw/openclaw.env.example" /etc/brainx/openclaw.env
 
-install -m 0640 -o brainx -g brainx "$BRAINX_DEPLOY_ROOT/deploy/openclaw/openclaw.production.json" "$BRAINX_OPENCLAW_STATE/openclaw.json"
+OPENCLAW_CONFIG="$BRAINX_OPENCLAW_STATE/openclaw.json"
+if [[ ! -f "$OPENCLAW_CONFIG" ]]; then
+  cp "$BRAINX_DEPLOY_ROOT/deploy/openclaw/openclaw.production.json" "$OPENCLAW_CONFIG"
+  chown brainx:brainx "$OPENCLAW_CONFIG"
+  chmod 0640 "$OPENCLAW_CONFIG"
+else
+  # Patch 只更新产品受管字段；运行时生成的 agents.list、bindings 和个人认证库必须保留。
+  sudo -u brainx env HOME=/var/lib/brainx \
+    OPENCLAW_CONFIG_PATH="$OPENCLAW_CONFIG" OPENCLAW_STATE_DIR="$BRAINX_OPENCLAW_STATE" \
+    "$BRAINX_OPENCLAW_BIN" config patch --file \
+    "$BRAINX_DEPLOY_ROOT/deploy/openclaw/openclaw.production.json"
+  # 清除旧版本曾错误下发的共享默认模型；不存在时保持幂等。
+  for obsolete_path in agents.defaults.model agents.defaults.models models.providers.stepfun.apiKey; do
+    sudo -u brainx env HOME=/var/lib/brainx \
+      OPENCLAW_CONFIG_PATH="$OPENCLAW_CONFIG" OPENCLAW_STATE_DIR="$BRAINX_OPENCLAW_STATE" \
+      "$BRAINX_OPENCLAW_BIN" config unset "$obsolete_path" >/dev/null 2>&1 || true
+  done
+fi
 install -m 0644 "$BRAINX_DEPLOY_ROOT/deploy/systemd/"*.service /etc/systemd/system/
 
-install -d -m 0750 -o brainx -g brainx "$BRAINX_OPENCLAW_STATE/workspace/skills"
+install -d -m 0750 -o brainx -g brainx "$BRAINX_OPENCLAW_STATE/skills"
 for skill_name in "${BRAINX_PRODUCTION_SKILLS[@]}"; do
-  install -d -m 0750 -o brainx -g brainx "$BRAINX_OPENCLAW_STATE/workspace/skills/$skill_name"
+  install -d -m 0750 -o brainx -g brainx "$BRAINX_OPENCLAW_STATE/skills/$skill_name"
   install -m 0644 -o brainx -g brainx \
     "$BRAINX_DEPLOY_ROOT/skills/$skill_name/SKILL.md" \
-    "$BRAINX_OPENCLAW_STATE/workspace/skills/$skill_name/SKILL.md"
+    "$BRAINX_OPENCLAW_STATE/skills/$skill_name/SKILL.md"
 done
 
 BRAINX_PLUGIN_TMP=$(mktemp -d /tmp/brainx-openclaw.XXXXXX)

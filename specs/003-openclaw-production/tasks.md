@@ -104,7 +104,7 @@
 - [x] T040 在最新 commit 的干净工作区运行 npm run verify，确认 .quality-gate/reports/latest.md 为通过且 Push 条件满足
 - [ ] T041 按 docs/2026-09-03-openclaw-production-runbook.md 部署 ECS、迁移真实库、绑定最多三名灰度顾问并完成私聊/群聊/HTTPS 深链真实验收
 - [ ] T042 复核 git diff、提交记录和生产证据后推送 codex/feishu-agent-prd-20260901 并创建 GitHub PR
-- [ ] T043 运行 speckit-converge 对照 spec/plan/tasks 回扫缺口；如追加任务则继续 implement，直到报告 Converged
+- [x] T043 运行 speckit-converge 对照 spec/plan/tasks 回扫缺口；如追加任务则继续 implement，直到报告 Converged
 - [x] T047 根据 2026-09-03 用户责任调整，修复部署模板/安装器变量错配并新增可直接转交服务器维护同事的无密钥 ECS 部署交接单
 
 > 2026-09-03 责任调整：用户明确服务器一直由同事维护。T041 改为外部部署验收项，在维护同事回传真实证据前保持未完成；代码评审与 PR 可先进行，但 PR 和文档必须明确“生产待部署”，不得宣称多人生产已上线。

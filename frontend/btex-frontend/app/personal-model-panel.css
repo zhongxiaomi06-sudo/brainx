@@ -1,0 +1,37 @@
+.personal-model-panel { display: grid; gap: 20px; }
+.personal-model-summary { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; align-items: center; gap: 16px; padding: 22px; border: 1px solid #dce8e4; border-radius: 16px; background: linear-gradient(135deg, #f4fbf8, #fff); }
+.personal-model-icon { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 14px; background: #dff6ee; color: #08715c; }
+.personal-model-icon svg { width: 24px; }
+.personal-model-summary span, .personal-model-summary p { color: #74807c; font-size: 11px; }
+.personal-model-summary h2 { margin: 4px 0; font-size: 18px; }
+.personal-model-summary p { margin: 0; line-height: 1.5; }
+.personal-model-summary > span { display: inline-flex; align-items: center; gap: 5px; padding: 6px 9px; border-radius: 999px; font-weight: 700; }
+.personal-model-summary > span svg { width: 14px; }
+.model-ready { background: #e5f7f0; color: #08715c !important; }
+.model-waiting { background: #fff2d8; color: #875800 !important; }
+.personal-model-notice { display: flex; gap: 8px; padding: 13px 15px; border: 1px solid #efdfbd; border-radius: 10px; background: #fffaf0; color: #765019; font-size: 12px; }
+.personal-model-notice svg { width: 17px; flex: none; }
+.personal-model-form { display: grid; gap: 16px; max-width: 660px; }
+.personal-model-form > label { display: grid; gap: 7px; color: #34423e; font-size: 12px; font-weight: 700; }
+.personal-model-form input, .personal-model-form select { width: 100%; box-sizing: border-box; height: 42px; padding: 0 12px; border: 1px solid #dce3e1; border-radius: 10px; background: #fff; color: #26332f; font: inherit; font-weight: 500; outline: none; }
+.personal-model-form input:focus, .personal-model-form select:focus { border-color: #72c7ae; box-shadow: 0 0 0 3px rgba(47, 211, 167, .1); }
+.personal-model-key { position: relative; }
+.personal-model-key svg { position: absolute; left: 12px; top: 12px; width: 17px; color: #8b9692; }
+.personal-model-key input { padding-left: 39px; }
+.personal-model-consent { grid-template-columns: 18px minmax(0, 1fr); align-items: start; font-weight: 500 !important; line-height: 1.65; }
+.personal-model-consent input { width: 16px; height: 16px; margin: 2px 0 0; }
+.personal-model-actions { display: flex; gap: 10px; }
+.personal-model-actions button { height: 40px; display: inline-flex; align-items: center; gap: 7px; padding: 0 14px; border-radius: 9px; font-weight: 700; cursor: pointer; }
+.personal-model-actions button svg { width: 15px; }
+.personal-model-actions button:disabled { cursor: not-allowed; opacity: .5; }
+.model-save { border: 0; background: #0b725d; color: #fff; }
+.model-disable { border: 1px solid #e1e6e4; background: #fff; color: #8c4741; }
+.personal-model-message { margin: 0; color: #315d51; font-size: 12px; }
+.personal-model-footnote { margin: 0; color: #74807c; font-size: 11px; line-height: 1.6; }
+.personal-model-loading { display: flex; align-items: center; gap: 8px; color: #74807c; }
+.personal-model-loading svg, .model-save svg { width: 16px; animation: model-spin 1s linear infinite; }
+@keyframes model-spin { to { transform: rotate(360deg); } }
+@media (max-width: 620px) {
+  .personal-model-summary { grid-template-columns: 48px minmax(0, 1fr); }
+  .personal-model-summary > span { grid-column: 2; justify-self: start; }
+}

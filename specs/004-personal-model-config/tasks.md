@@ -46,15 +46,15 @@
 ### Tests for User Story 1
 
 - [X] T009 [P] [US1] 先写 GET/PUT 认证、同意、禁止身份字段、非法输入、Agent 未就绪和响应脱敏接口测试 `tests/personal-model-routes.test.mjs`
-- [ ] T010 [P] [US1] 先写个人模型设置页面存在、无 localStorage/key 回显、同意交互和提交契约静态测试 `frontend/btex-frontend/tests/personal-model-ui.test.mjs`
+- [X] T010 [P] [US1] 先写个人模型设置页面存在、无 localStorage/key 回显、同意交互和提交契约静态测试 `frontend/btex-frontend/tests/personal-model-ui.test.mjs`
 
 ### Implementation for User Story 1
 
 - [X] T011 [US1] 实现按当前 session open_id 查个人 Agent、写个人 auth profile、设置 Agent 显式 model 和非敏感审计状态 `src/personal-model-config.js`
 - [X] T012 [US1] 实现 GET/PUT personal model API 并挂载到现有登录鉴权 `src/personal-model-routes.js`、`src/server.js`
-- [ ] T013 [US1] 实现前端 API 客户端和个人模型表单，不把 Key 放入 URL/持久化/错误消息 `frontend/btex-frontend/app/personal-model-api.ts`、`frontend/btex-frontend/app/personal-model-panel.tsx`、`frontend/btex-frontend/app/personal-model-panel.css`
-- [ ] T014 [US1] 把个人模型分组接入真实设置中心并加载当前顾问状态 `frontend/btex-frontend/app/settings-center-review.tsx`、`frontend/btex-frontend/app/workbench-settings-page.tsx`
-- [ ] T015 [US1] 将 `/brainx` “配置我的模型”改为 HTTPS 设置深链并更新确定性卡片测试 `plugins/brainx-openclaw/onboarding.js`、`tests/braintex-onboarding.test.mjs`
+- [X] T013 [US1] 实现前端 API 客户端和个人模型表单，不把 Key 放入 URL/持久化/错误消息 `frontend/btex-frontend/app/personal-model-api.ts`、`frontend/btex-frontend/app/personal-model-panel.tsx`、`frontend/btex-frontend/app/personal-model-panel.css`
+- [X] T014 [US1] 把个人模型分组接入真实设置中心并加载当前顾问状态 `frontend/btex-frontend/app/settings-center-review.tsx`、`frontend/btex-frontend/app/workbench-settings-page.tsx`
+- [X] T015 [US1] 将 `/brainx` “配置我的模型”改为 HTTPS 设置深链并更新确定性卡片测试 `plugins/brainx-openclaw/onboarding.js`、`tests/braintex-onboarding.test.mjs`
 
 **Checkpoint**: US1 可在本地 HTTP 集成与隔离 OpenClaw state 中独立验收
 
@@ -88,12 +88,12 @@
 ### Tests for User Story 3
 
 - [ ] T019 [P] [US3] 先写替换、停用幂等、并发冲突、CLI 部分失败和回滚测试 `tests/personal-model-config.test.mjs`、`tests/personal-model-routes.test.mjs`
-- [ ] T020 [P] [US3] 先写前端停用确认、保存中禁用和失败恢复交互测试 `frontend/btex-frontend/tests/personal-model-ui.test.mjs`
+- [X] T020 [P] [US3] 先写前端停用确认、保存中禁用和失败恢复交互测试 `frontend/btex-frontend/tests/personal-model-ui.test.mjs`
 
 ### Implementation for User Story 3
 
 - [ ] T021 [US3] 实现 profile 原子替换、旧 provider 清理、Agent model 回滚、DELETE 幂等停用 `src/personal-model-config.js`、`src/personal-model-routes.js`
-- [ ] T022 [US3] 实现前端状态、轮换和停用交互 `frontend/btex-frontend/app/personal-model-panel.tsx`
+- [X] T022 [US3] 实现前端状态、轮换和停用交互 `frontend/btex-frontend/app/personal-model-panel.tsx`
 
 **Checkpoint**: 凭据生命周期可由本人完成，错误不影响其他顾问
 

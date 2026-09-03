@@ -4,6 +4,7 @@ import { jobVisibleTo } from '../visibility.js';
 import { relationOf } from '../relations.js';
 import { currentState } from '../engagement.js';
 import { startOpenmaiTask, getOpenmaiResult } from '../openmai-task.js';
+import { getPushPreferences } from '../push-preferences.js';
 
 function fail(code) {
   throw Object.assign(new Error(code), { code });
@@ -77,7 +78,8 @@ function meContext(db, principal) {
 }
 
 function dailyBrief(db, args, principal) {
-  const limit = Math.min(args.limit || 3, principal.chatType === 'group' ? 3 : 5);
+  const preferred = getPushPreferences(db, principal.consultantId)?.job_count || 3;
+  const limit = Math.min(args.limit || preferred, principal.chatType === 'group' ? 3 : 10);
   const latest = latestRun(db, principal.consultantId, { hideEngaged: true });
   if (!latest) return {
     data: { date: args.date || shanghaiDate(), items: [] },
@@ -96,7 +98,7 @@ function dailyBrief(db, args, principal) {
     unknowns: items.flatMap((item) => item.risks || []).slice(0, 10),
     evidence_refs: [`decision_run:${latest.run.run_id}`, ...items.map((item) => `job_fact:${item.job.project_id}`)],
     source_versions: { jobs: latest.run.snapshot_id, policy: latest.run.policy_version },
-    next_allowed_actions: ['brainx_job_assessment'],
+    next_allowed_actions: ['brainx_job_assessment', 'brainx_job_contacts', 'brainx_accept_job'],
   };
 }
 
@@ -116,7 +118,7 @@ function jobAssessment(db, args, principal) {
     unknowns,
     evidence_refs: [`job_fact:${row.project_id}`, ...(rec ? [`recommendation:${rec.decision_ref}`] : [])],
     source_versions: { job_sync: row.sync_id, policy: rec?.policy_version || null },
-    next_allowed_actions: ['brainx_gap_questions', 'brainx_candidate_shortlist'],
+    next_allowed_actions: ['brainx_gap_questions', 'brainx_job_contacts', 'brainx_accept_job', 'brainx_candidate_shortlist'],
   };
 }
 

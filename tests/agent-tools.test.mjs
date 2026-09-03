@@ -172,7 +172,10 @@ test('OpenClaw 安装集只引用当前精确白名单工具', () => {
     'brainx-engagement-draft', 'brainx-interview-prep', 'brainx-review'];
   const allowed = new Set(['brainx_me_context', 'brainx_daily_brief', 'brainx_job_assessment',
     'brainx_candidate_shortlist', 'brainx_candidate_facts', 'brainx_candidate_fit',
-    'brainx_gap_questions', 'brainx_interview_prep', 'brainx_personal_review', 'brainx_run_status']);
+    'brainx_gap_questions', 'brainx_interview_prep', 'brainx_personal_review', 'brainx_run_status',
+    'brainx_push_preferences', 'brainx_update_push_preferences', 'brainx_job_contacts',
+    'brainx_candidate_contact', 'brainx_accept_job', 'brainx_start_candidate_search',
+    'brainx_record_job_progress', 'brainx_candidate_workflow']);
   for (const name of installable) {
     const body = loadSkill(index, name).body;
     const referenced = body.match(/brainx_[a-z_]+/g) || [];

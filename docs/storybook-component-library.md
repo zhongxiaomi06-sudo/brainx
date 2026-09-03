@@ -45,6 +45,8 @@
 
 BrainTex 飞书功能首页不在 React Storybook 里复制一套仿真卡片；仓库输出 OpenClaw 通用 `presentation`，由锁定版官方飞书渠道生成真实卡片 2.0。因此 Storybook 状态保持“未开始”，视觉验收必须在真实飞书客户端完成，自动测试只验证内容、按钮命令、HTTPS 和授权边界。状态见 [BrainTex 飞书功能首页审核记录](frontend-reviews/2026-09-03-braintex-feishu-home.md)。
 
+普通 BrainTex 最终回复现也复用同一套 OpenClaw `presentation` 渲染，不在 Storybook 复制飞书组件。推荐卡的条数来自本人配置，正文固定组织为结论、依据、风险和下一步；URL 仍只负责打开已鉴权的正式工作台。候选 Case 专页尚未设计，不能把底层状态工具记为前端完成。状态见 [BrainTex 富卡片与业务闭环审核记录](frontend-reviews/2026-09-03-braintex-rich-cards-loop.md)。
+
 ## 使用命令
 
 从仓库根目录执行：

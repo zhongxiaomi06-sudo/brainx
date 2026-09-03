@@ -30,31 +30,34 @@ const btn = (text, u, type = 'default') =>
 /** WorkbenchModel → 飞书 card schema 2.0 JSON（纯函数，可单测）。
  * consultant_id 可选：提供且配置了 BRAINX_FEEDBACK_SECRET 时，每个职位追加
  * “忽略”一键按钮（签名直写，无需登录工作台——反馈回写主入口）。 */
-export function buildDailyCard({ consultant_name, consultant_id, run, items, commitments, sync, snapshot_id, publicBaseUrl }) {
+export function buildDailyCard({ consultant_name, consultant_id, run, items, item_limit, commitments, sync, snapshot_id, publicBaseUrl }) {
   const baseUrl = productionBaseUrl(publicBaseUrl).href;
   const state = sync?.complete ? 'READY' : 'INCOMPLETE';
+  const limit = Math.min(item_limit || items.length || 3, items.length);
   const els = [
-    { tag: 'markdown', content: `**今天建议先看 ${Math.min(3, items.length)} 个职位**\n`
-        + `${run?.candidate_count ?? items.length} 个候选 · ${state === 'READY' ? '数据完整' : '数据不完整'} · ${run?.policy_version || 'baseline-1.0'}` },
+    { tag: 'markdown', content: `**${consultant_name || '你好'}，今天建议优先处理 ${limit} 个职位**\n`
+        + `从 ${run?.candidate_count ?? items.length} 个职位中筛选 · ${state === 'READY' ? '数据完整' : '数据不完整'} · 每项含依据、风险和下一步` },
   ];
-  const medals = ['1️⃣', '2️⃣', '3️⃣'];
-  items.slice(0, 3).forEach((r, i) => {
+  const medals = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+  items.slice(0, limit).forEach((r, i) => {
     const j = r.job;
     const hot = j.priority === 'HIGH' ? '🔥 ' : ''; // 重点高优（还做吗结构化，0007 起）
     els.push({ tag: 'markdown', content:
       `**${medals[i]} ${hot}${j.role}**\n${j.company}${j.city ? ' · ' + j.city : ''} · ${REL_LABEL[j.relation] || j.relation}\n`
       + `\`Fit ${dim(r, 'direction')}  Activity ${dim(r, 'activity')}  Evidence ${Math.round(r.evidence_coverage * 100)}\`\n`
       + `综合 **${r.score}** 分 · 置信${{ HIGH: '高', MEDIUM: '中', LOW: '低' }[r.confidence_band]} · ${ACTION_LABEL[r.action]}\n`
-      + `理由：${r.reasons[1] || r.reasons[0]}\n⚠️ 风险：${r.risks[0] || '—'}` });
+      + `**依据**：${(r.reasons || []).slice(0, 2).join('；') || '暂无充分依据'}\n`
+      + `**风险**：${(r.risks || []).slice(0, 2).join('；') || '暂无显著风险'}\n`
+      + `**下一步**：${r.action === 'RECOMMEND_ACCEPT' ? '打开职位，确认接单后自动启动找人' : '打开职位，补齐关键信息后再判断'}` });
     const actions = [
-      btn('查看详情', buildBrainxDeepLink({ baseUrl, objectType: 'opportunity', objectRef: j.project_id }), 'primary'),
+      btn(r.action === 'RECOMMEND_ACCEPT' ? '打开并接单' : '查看完整分析', buildBrainxDeepLink({ baseUrl, objectType: 'opportunity', objectRef: j.project_id }), 'primary'),
       btn('回放', buildBrainxDeepLink({ baseUrl, objectType: 'replay', objectRef: r.decision_id })),
     ];
     // 一键反馈（F2）：签名当日有效；未配置密钥时 quickLink 返 null，按钮不渲染
     const ignoreUrl = consultant_id && quickLink(baseUrl, consultant_id, j.project_id, 'ignore', now());
     if (ignoreUrl) actions.push(btn('✕ 忽略', ignoreUrl, 'danger'));
     els.push({ tag: 'action', actions });
-    if (i < Math.min(3, items.length) - 1) els.push({ tag: 'hr' });
+    if (i < limit - 1) els.push({ tag: 'hr' });
   });
   const shared = items.filter((r) => r.job.relation === 'TEAM_SHARED').length;
   if (shared) els.push({ tag: 'markdown', content: `👀 团队共享观察 ${shared} 个（打开工作台查看）` });

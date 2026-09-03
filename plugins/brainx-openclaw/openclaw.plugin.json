@@ -1,7 +1,7 @@
 {
   "id": "brainx-openclaw",
   "name": "BrainX Recruiting Tools",
-  "description": "Ten least-privilege recruiting decision tools backed by the local BrainX Agent Gateway.",
+  "description": "Least-privilege recruiting decision and workflow tools backed by the local BrainX Agent Gateway.",
   "contracts": {
     "commands": ["brainx"],
     "tools": [
@@ -14,7 +14,15 @@
       "brainx_gap_questions",
       "brainx_interview_prep",
       "brainx_personal_review",
-      "brainx_run_status"
+      "brainx_run_status",
+      "brainx_push_preferences",
+      "brainx_update_push_preferences",
+      "brainx_job_contacts",
+      "brainx_candidate_contact",
+      "brainx_accept_job",
+      "brainx_start_candidate_search",
+      "brainx_record_job_progress",
+      "brainx_candidate_workflow"
     ]
   },
   "configSchema": {

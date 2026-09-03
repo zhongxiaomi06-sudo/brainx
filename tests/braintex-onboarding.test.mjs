@@ -6,7 +6,7 @@ import {
   createBraintexHomePresentation,
 } from '../plugins/brainx-openclaw/onboarding.js';
 
-test('BrainTex 首页覆盖顾问六个核心工作入口', () => {
+test('BrainTex 首页覆盖顾问核心工作入口和推荐设置', () => {
   const presentation = createBraintexHomePresentation({ publicBaseUrl: 'https://brainx.example.com/' });
   assert.equal(presentation.title, 'BrainTex · 你的 AI 猎头助手');
   const buttons = presentation.blocks.flatMap((block) => block.type === 'buttons' ? block.buttons : []);
@@ -15,8 +15,9 @@ test('BrainTex 首页覆盖顾问六个核心工作入口', () => {
     '今天先做什么', '推荐值得做的职位', '为职位找候选人',
     '判断一个职位', '看跟进建议', '生成个人复盘',
   ]);
+  assert.equal(labels[6], '设置每日推荐');
   assert.equal(buttons.at(-1).url, 'https://brainx.example.com/');
-  for (const button of buttons.slice(0, 6)) {
+  for (const button of buttons.slice(0, 7)) {
     assert.equal(button.action.type, 'command');
     assert.ok(button.action.command.length > 20);
     assert.doesNotMatch(button.action.command, /ou_|oc_|@|1[3-9]\d{9}/);

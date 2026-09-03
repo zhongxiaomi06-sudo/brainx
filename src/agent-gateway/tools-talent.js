@@ -47,6 +47,33 @@ async function loadAuthorizedCandidateFact(input, dependencies = {}) {
   }
 }
 
+async function loadAuthorizedCandidateContact(input, dependencies = {}) {
+  const withConnection = dependencies.withConnection || withMysql;
+  const sql = `SELECT t.phone, t.email
+    FROM candidate_fact_versions cfv
+    JOIN talent t ON t.id=cfv.talent_id
+    WHERE cfv.tenant_id=? AND cfv.candidate_ref=?
+      AND EXISTS (SELECT 1 FROM talent_access_grants tag
+        WHERE tag.tenant_id=cfv.tenant_id AND tag.talent_id=cfv.talent_id
+          AND tag.status='ACTIVE' AND tag.scope='contact' AND tag.purpose='candidate_contact'
+          AND tag.grantee_type='consultant' AND tag.grantee_ref=?
+          AND tag.granted_at <= CURRENT_TIMESTAMP(3)
+          AND (tag.expires_at IS NULL OR tag.expires_at > CURRENT_TIMESTAMP(3))
+          AND (tag.revoked_at IS NULL OR tag.revoked_at > CURRENT_TIMESTAMP(3)))
+    ORDER BY cfv.created_at DESC LIMIT 1`;
+  try {
+    const rows = await withConnection(async (connection) => {
+      const [result] = await connection.execute(sql, [input.tenantId, input.candidateRef, input.consultantId]);
+      return result;
+    });
+    if (!rows[0]) fail('NOT_FOUND_OR_FORBIDDEN');
+    return { phone: rows[0].phone || null, email: rows[0].email || null };
+  } catch (error) {
+    if (error?.code === 'NOT_FOUND_OR_FORBIDDEN') throw error;
+    fail('SOURCE_UNAVAILABLE');
+  }
+}
+
 function publicFact(fact) {
   const constraints = fact.constraints
     .filter((entry) => entry.name !== 'salary')
@@ -115,6 +142,7 @@ function shortlistResult(bundle) {
 export function createTalentToolHandlers(options = {}) {
   const shortlistFn = options.candidateShortlistFn || candidateShortlist;
   const loadFact = options.loadCandidateFactFn || ((input) => loadAuthorizedCandidateFact(input, options));
+  const loadContact = options.loadCandidateContactFn || ((input) => loadAuthorizedCandidateContact(input, options));
   const getShortlist = async (args, context, purpose = context.principal.purpose) => {
     const limit = Math.min(args.limit || 5, context.principal.chatType === 'group' ? 3 : 5);
     const bundle = await shortlistFn({
@@ -141,6 +169,15 @@ export function createTalentToolHandlers(options = {}) {
   };
 
   return {
+    brainx_candidate_contact: async (args, context) => {
+      const contact = await loadContact({ tenantId: context.principal.tenantId,
+        consultantId: context.principal.consultantId, candidateRef: args.candidate_ref });
+      return { data: { candidate_ref: args.candidate_ref, contact },
+        facts: [{ candidate_ref: args.candidate_ref, contact_available: Boolean(contact.phone || contact.email) }],
+        inferences: [], recommendations: [], unknowns: contact.phone || contact.email ? [] : ['候选人联系方式为空'],
+        evidence_refs: [`candidate_contact:${args.candidate_ref}`],
+        next_allowed_actions: ['brainx_candidate_fit'] };
+    },
     brainx_candidate_shortlist: async (args, context) => shortlistResult(await getShortlist(args, context)),
     brainx_candidate_facts: async (args, context) => {
       const fact = await getFact(args.candidate_ref, context, args.purpose);

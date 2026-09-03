@@ -5,8 +5,8 @@ description: 解释当前顾问可见职位是否值得投入、证据和缺口�
 
 # 职位投入判断
 
-用 `brainx_job_assessment` 读取职位事实、关系、承接状态和最近正式推荐。需要补齐信息时调用 `brainx_gap_questions`，一次只问一个会改变投入结论的问题。
+用 `brainx_job_assessment` 读取职位事实、关系、承接状态和最近正式推荐。需要负责人时调用 `brainx_job_contacts`；需要补齐信息时调用 `brainx_gap_questions`，一次只问一个会改变投入结论的问题。
 
 输出顺序：一句话结论；事实；基于事实的推断；建议动作；未知与风险。明确区分“职位值得投入”和“已经有合适候选人”，不得把推荐分称作成功率。
 
-`NOT_FOUND_OR_FORBIDDEN` 只说明当前会话不可读，不猜测对象是否存在，不换身份绕过。只读、不执行写操作，不用 SQL/Shell 补查，不自行拼接 URL 或生成卡片链接。
+`NOT_FOUND_OR_FORBIDDEN` 只说明当前会话不可读，不猜测对象是否存在，不换身份绕过。用户明确确认目标、首条行动和截止时间后，可调用 `brainx_accept_job`；该动作会接单并自动启动找人。不得用 SQL/Shell 补查或绕过确认，不自行拼接 URL 或生成卡片链接。

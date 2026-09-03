@@ -1,9 +1,16 @@
+import { createJobToolHandlers } from './tools-jobs.js';
+import { createTalentToolHandlers } from './tools-talent.js';
+import { createActionToolHandlers } from './tools-actions.js';
+import { createCandidateActionToolHandlers } from './tools-candidate-actions.js';
+
 const BANNED_ARGUMENTS = new Set([
   'tenant_id', 'consultant_id', 'sender', 'open_id', 'scope', 'sql', 'url', 'command', 'file',
 ]);
 
 const string = (extra = {}) => ({ type: 'string', minLength: 1, maxLength: 512, ...extra });
 const integer = (minimum, maximum) => ({ type: 'integer', minimum, maximum });
+const boolean = () => ({ type: 'boolean' });
+const array = (items, minItems = 1, maxItems = 4) => ({ type: 'array', items, minItems, maxItems });
 const object = (properties, required = []) => ({
   type: 'object', properties, required, additionalProperties: false,
 });
@@ -39,6 +46,32 @@ export const AGENT_TOOL_ROWS = Object.freeze([
   { name: 'brainx_openmai_search', purpose: ['candidate_review'], parameters: object({
     job_id: string(),
   }, ['job_id']), projectKey: 'job_id' },
+  { name: 'brainx_push_preferences', purpose: ['preferences'], p2pOnly: true, parameters: object({}) },
+  { name: 'brainx_update_push_preferences', purpose: ['preferences'], p2pOnly: true, parameters: object({
+    times: array(string({ pattern: '^(?:[01]\\d|2[0-3]):[0-5]\\d$' })), job_count: integer(1, 10),
+    enabled: boolean(), confirm: boolean(),
+  }, ['confirm']) },
+  { name: 'brainx_job_contacts', purpose: ['job_contact'], p2pOnly: true, parameters: object({ job_id: string() }, ['job_id']), projectKey: 'job_id' },
+  { name: 'brainx_candidate_contact', purpose: ['candidate_contact'], p2pOnly: true, parameters: object({
+    candidate_ref: string(), reason: string({ maxLength: 240 }),
+  }, ['candidate_ref', 'reason']) },
+  { name: 'brainx_accept_job', purpose: ['job_action'], p2pOnly: true, parameters: object({
+    job_id: string(), goal: string({ maxLength: 240 }), action_title: string({ maxLength: 240 }),
+    due_at: string(), idempotency_key: string(), confirm: boolean(),
+  }, ['job_id', 'goal', 'action_title', 'due_at', 'idempotency_key', 'confirm']), projectKey: 'job_id' },
+  { name: 'brainx_start_candidate_search', purpose: ['job_action'], p2pOnly: true, parameters: object({
+    job_id: string(), force: boolean(), confirm: boolean(),
+  }, ['job_id', 'confirm']), projectKey: 'job_id' },
+  { name: 'brainx_record_job_progress', purpose: ['job_action'], p2pOnly: true, parameters: object({
+    job_id: string(), action_id: string(), kind: string({ enum: ['PROGRESS', 'STAGE', 'BLOCKED'] }),
+    stage: string({ maxLength: 40 }), summary: string({ maxLength: 1000 }),
+    next_action_title: string({ maxLength: 240 }), next_due_at: string(), idempotency_key: string(), confirm: boolean(),
+  }, ['job_id', 'action_id', 'kind', 'summary', 'next_action_title', 'next_due_at', 'idempotency_key', 'confirm']), projectKey: 'job_id' },
+  { name: 'brainx_candidate_workflow', purpose: ['candidate_action'], p2pOnly: true, parameters: object({
+    job_id: string(), candidate_ref: string(), action: string({ enum: ['ADD_TO_PROJECT', 'MARK_PREPARING',
+      'RECORD_OUTREACH_SENT', 'RECORD_REPLIED', 'SUBMIT_TO_CLIENT', 'MOVE_TO_INTERVIEW'] }),
+    note: string({ maxLength: 1000 }), confirm: boolean(),
+  }, ['job_id', 'candidate_ref', 'action', 'confirm']), projectKey: 'job_id' },
 ]);
 
 export class AgentToolError extends Error {
@@ -63,6 +96,12 @@ function validateValue(value, schema) {
   }
   if (schema.type === 'integer') {
     if (!Number.isInteger(value) || value < schema.minimum || value > schema.maximum) invalid();
+    return;
+  }
+  if (schema.type === 'boolean') { if (typeof value !== 'boolean') invalid(); return; }
+  if (schema.type === 'array') {
+    if (!Array.isArray(value) || value.length < schema.minItems || value.length > schema.maxItems) invalid();
+    for (const item of value) validateValue(item, schema.items);
   }
 }
 
@@ -78,7 +117,7 @@ export function createToolRegistry(options = {}) {
   const handlers = options.handlers || {};
   const rows = new Map(AGENT_TOOL_ROWS.map((row) => [row.name, row]));
   return Object.freeze({
-    version: 'agent-tools.v1',
+    version: 'agent-tools.v2',
     names: () => [...rows.keys()],
     has: (name) => rows.has(name),
     schema: (name) => rows.get(name)?.parameters || null,
@@ -105,13 +144,13 @@ export function createToolRegistry(options = {}) {
   });
 }
 
-export function createProductionToolRegistry({ db, talentDependencies = {} }) {
+export function createProductionToolRegistry({ db, talentDependencies = {}, actionDependencies = {} }) {
   const jobs = createJobToolHandlers({ db });
+  const actions = createActionToolHandlers({ db, ...actionDependencies });
+  const candidateActions = createCandidateActionToolHandlers({ db, ...talentDependencies });
   const talent = createTalentToolHandlers({
     ...talentDependencies,
     jobGapHandler: jobs.brainx_gap_questions,
   });
-  return createToolRegistry({ handlers: { ...jobs, ...talent } });
+  return createToolRegistry({ handlers: { ...jobs, ...talent, ...actions, ...candidateActions } });
 }
-import { createJobToolHandlers } from './tools-jobs.js';
-import { createTalentToolHandlers } from './tools-talent.js';

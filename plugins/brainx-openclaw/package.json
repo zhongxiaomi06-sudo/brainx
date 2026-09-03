@@ -1,6 +1,6 @@
 {
   "name": "@brainx/openclaw-plugin",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "description": "Least-privilege OpenClaw tools for the BrainX recruiting workflow",
@@ -8,6 +8,7 @@
   "files": [
     "index.js",
     "onboarding.js",
+    "response-card.js",
     "runtime.js",
     "openclaw.plugin.json",
     "README.md"

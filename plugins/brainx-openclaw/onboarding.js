@@ -6,7 +6,7 @@ const ACTIONS = Object.freeze([
   },
   {
     label: '推荐值得做的职位',
-    command: '请从我有权限查看的职位中，推荐3个今天最值得投入的职位，用猎头能直接看懂的话说明为什么、主要风险和下一步。',
+    command: '请按我设置的数量，从有权限查看的职位中推荐今天最值得投入的职位。每项精炼呈现结论、关键依据、主要风险和可执行下一步。',
   },
   {
     label: '为职位找候选人',
@@ -23,6 +23,10 @@ const ACTIONS = Object.freeze([
   {
     label: '生成个人复盘',
     command: '请基于我有权限的数据生成本周个人复盘：目标、实际进展、数据差异、值得保留的做法和下周动作。',
+  },
+  {
+    label: '设置每日推荐',
+    command: '请先读取我的每日推荐设置，再问我想每天几点、每次推荐多少个职位；复述新设置并在我确认后保存。',
   },
 ]);
 
@@ -49,6 +53,7 @@ export function createBraintexHomePresentation({ publicBaseUrl } = {}) {
     { type: 'buttons', buttons: ACTIONS.slice(0, 2).map(toButton) },
     { type: 'buttons', buttons: ACTIONS.slice(2, 4).map(toButton) },
     { type: 'buttons', buttons: ACTIONS.slice(4, 6).map(toButton) },
+    { type: 'buttons', buttons: ACTIONS.slice(6).map(toButton) },
   ];
   if (workbenchUrl) {
     blocks.push({ type: 'divider' });
@@ -59,7 +64,7 @@ export function createBraintexHomePresentation({ publicBaseUrl } = {}) {
   }
   blocks.push({
     type: 'context',
-    text: '权限边界：只读你已授权的数据；不在卡片中展示联系方式或简历原文；发送、记录或改变业务状态前会再确认。随时输入 /brainx 回到这里。',
+    text: '机器人可读授权职位负责人；接单、启动找人、保存设置和记录进展会先确认。候选人联系方式与外发仍按单独授权控制。随时输入 /brainx 回到这里。',
   });
   return { title: 'BrainTex · 你的 AI 猎头助手', tone: 'info', blocks };
 }

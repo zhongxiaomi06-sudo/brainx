@@ -74,3 +74,16 @@ test('私聊和群聊投影均拒联系方式/原文，群聊额外拒私人信�
     { data: { private_note: '顾问私评' } }, { data: { candidate_salary: '50k' } },
   ]) assert.throws(() => assertSafeAgentProjection(unsafe, group), /PROJECTION_REJECTED/);
 });
+
+test('只有候选联系 purpose 的私聊投影可以返回联系方式', () => {
+  const principal = { chatType: 'p2p', purpose: 'candidate_contact' };
+  assert.doesNotThrow(() => assertSafeAgentProjection({ data: {
+    contact: { phone: '13800138000', email: 'candidate@example.com' },
+  } }, principal));
+  assert.throws(() => assertSafeAgentProjection({ data: {
+    note: '请联系 13800138000',
+  } }, principal), /PROJECTION_REJECTED/);
+  assert.throws(() => assertSafeAgentProjection({ data: {
+    contact: { phone: '13800138000' },
+  } }, { chatType: 'group', purpose: 'candidate_contact' }), /PROJECTION_REJECTED/);
+});

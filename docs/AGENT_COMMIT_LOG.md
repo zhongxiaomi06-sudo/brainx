@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-03｜merge(release): 合并服务器六人灰度修复
+
+- 合并：保留服务器已上线的六人职位草稿、OpenMai 与 Bridge/worker 稳定性修复，同时叠加顾问个人 Agent、个人模型和凭据隔离能力。
+- 发布：合并后先通过专项与完整门禁，再以可回退备份和固定 commit 部署；不覆盖服务器未纳入 Git 的备份及 sandbox 数据。
+- 验证：合并冲突、二十一工具契约、OpenClaw 配置升级和个人模型回归将在提交前完成。
+
 ## 2026-09-03｜test(migration): 同步个人模型迁移总账
 
 - 修复：完整门禁发现迁移总账仍固定在 0035/37 项，现纳入个人模型 0036 并把旧库迁移总数更新为 38。
@@ -60,6 +66,36 @@
 - 规格：新增个人模型配置用户故事、19 条可验收需求、凭据不落业务库/日志/聊天的安全边界、共享群不得借用个人密钥的规则，以及六人多模型真机验收指标。
 - 调研：OpenClaw 2026.7.1-2 官方能力和本地隔离实验均证明，飞书可动态创建个人 Agent，`models auth --agent` 可把 API Key 写入该 Agent 独立认证库。
 - 验证：规格质量清单 16/16 通过；`npm run verify:quick` 16/16 通过。
+## 2026-09-03｜fix(test): worker 保活测试等就绪日志消除负载竞态假失败
+
+- 根因：测试固定 sleep 2s 后发 SIGTERM，full 门禁连跑 493 个测试时机器负载高、worker 启动变慢，信号可能在 SIGTERM 处理器注册前送达，被默认行为杀死（exit code null），实测 `SIGTERM 应干净退出` 偶发失败（492/493）。
+- 修复：改为等待 `批处理进程已就绪` 日志（就绪日志打印后主块才注册信号处理器）再断言存活并发送 SIGTERM，超时 10s 明确报错；不改动 worker.js 业务代码。
+- 验证：单独运行 1/1 通过；完整门禁随后在本机复跑（宿主 safe-delete shim 以 `CODEBUDDY_SAFE_DELETE_ENABLED=0` 作用域放行 Storybook 构建清理，属环境工件，不涉及仓库代码）。
+
+## 2026-09-03｜fix(openclaw): 安装器加载生产环境文件修复插件安装中断
+
+- 根因：`deploy/openclaw/install.sh` 的 `install_plugin` 调用 OpenClaw CLI 时只传 HOME 与状态目录，未加载 `/etc/brainx/openclaw.env`；CLI 在安装期执行 SecretRef 校验，因 `STEPFUN_API_KEY` 缺失而报错中断，导致 1.1.6 打包成功但扩展目录仍停留 1.1.0（生产实证）。
+- 修复：`install_plugin` 改为以 brainx 身份 `set -a; . /etc/brainx/openclaw.env; set +a` 后再执行 `plugins install`（env 权限 0640 root:brainx，brainx 可读，密钥不落日志）。
+- 验证：`bash -n` 语法通过；`tests/openclaw-production-config.test.mjs` 新增 source 断言防回归，7/7 通过；`npm run verify:quick` 16/16 通过（quick 不作为 push 依据）。
+
+## 2026-09-03｜fix(bridge): 兼容飞书消息多种时间格式
+
+- 根因：飞书拉取层已把毫秒时间戳转换为上海本地时间字符串，职位提炼生产者却再次强制按毫秒数字解析，导致 Bridge 每轮 133 条 `Invalid time value` 并持续退避。
+- 修复：在消息入账边界统一兼容上海本地时间、ISO 时间、秒及毫秒时间戳；空值、零值与脏值安全回退到接收时间，不再拖垮整轮同步。
+- 验证：新增四类有效时间与两类异常输入回归断言；职位提炼专项通过，完整门禁将在提交后于干净 HEAD 复跑。
+
+## 2026-09-03｜test(gray): 对齐二十一工具黄金工作流
+
+- 根因：完整门禁发现黄金读取工作流仍写死旧的 19 工具数量，与本轮新增两个草稿工具后的 21 工具目录不一致。
+- 修复：更新测试标题和注册表数量断言；不改变业务实现，也不弱化任何既有工作流断言。
+- 验证：本轮完整门禁中的真实断言失败已定位；沙箱端口和 npm audit 网络限制将在沙箱外完整复跑。
+
+## 2026-09-03｜feat(gray): 接通六人职位草稿审核与 OpenMai 入口
+
+- 范围：按 York 业务主体、稳定技术账号、真实操作者三层身份收口六人灰度；Otto 离职撤权保留历史，历史 108 个群不自动扩权，首轮只登记明确授权群。
+- 工具：Agent Gateway 新增本人可见的 `brainx_pending_job_facts` 与显式确认/拒绝的 `brainx_review_job_fact`；OpenClaw 同时补上已存在但未暴露的 `brainx_openmai_search`，插件 1.1.6 的批准工具总数为 21。
+- 安全：草稿读取要求 active 顾问、已登记群和真实群成员关系；写操作仅私聊、强制 `confirm=true`，证据片段脱敏手机号/邮箱，OpenClaw 不接触数据库。
+- 验证：新增测试先失败后通过；草稿工具/OpenClaw/生产配置 15/15、Gateway HTTP 4/4、`npm run verify:quick` 16/16 通过。完整门禁将在提交后于干净 HEAD 执行。
 
 ## 2026-09-03｜fix(openclaw): 固定生产模型并开放会话切换
 

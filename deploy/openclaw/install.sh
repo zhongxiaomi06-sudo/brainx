@@ -113,10 +113,14 @@ BRAINX_PLUGIN_ARCHIVE="$BRAINX_PLUGIN_TMP/brainx-openclaw-plugin-${BRAINX_PLUGIN
 install_plugin() {
   local plugin_spec=$1
   shift
+  # OpenClaw CLI 在安装期执行 SecretRef 校验；必须以 brainx 身份加载
+  # /etc/brainx/openclaw.env（0640 root:brainx，brainx 可读），否则会因
+  # 飞书或 Gateway 的环境变量未解析而中断安装（2026-09-03 生产实证）。
   sudo -u brainx env \
     HOME=/var/lib/brainx \
     OPENCLAW_CONFIG_PATH="$BRAINX_OPENCLAW_STATE/openclaw.json" \
     OPENCLAW_STATE_DIR="$BRAINX_OPENCLAW_STATE" \
+    bash -c 'set -a; . /etc/brainx/openclaw.env; set +a; exec "$0" "$@"' \
     "$BRAINX_OPENCLAW_BIN" plugins install --force "$@" "$plugin_spec"
 }
 

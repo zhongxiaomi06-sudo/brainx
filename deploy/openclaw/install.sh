@@ -85,7 +85,9 @@ done
 
 BRAINX_PLUGIN_TMP=$(mktemp -d /tmp/brainx-openclaw.XXXXXX)
 trap 'rm -rf -- "$BRAINX_PLUGIN_TMP"' EXIT
-npm pack "$BRAINX_DEPLOY_ROOT/./plugins/brainx-openclaw" --pack-destination "$BRAINX_PLUGIN_TMP" >/dev/null
+chown brainx:brainx "$BRAINX_PLUGIN_TMP"
+sudo -u brainx env HOME=/var/lib/brainx \
+  npm pack "$BRAINX_DEPLOY_ROOT/./plugins/brainx-openclaw" --pack-destination "$BRAINX_PLUGIN_TMP" >/dev/null
 BRAINX_PLUGIN_VERSION=$(node -p \
   "JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8')).version" \
   "$BRAINX_DEPLOY_ROOT/plugins/brainx-openclaw/package.json")

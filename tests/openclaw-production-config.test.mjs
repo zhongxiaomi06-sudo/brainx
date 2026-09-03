@@ -79,6 +79,8 @@ test('systemd units keep internal services on one host and load secrets from pro
   assert.match(installer, /plugins\/brainx-openclaw\/package\.json/);
   assert.match(installer, /brainx-openclaw-plugin-\$\{BRAINX_PLUGIN_VERSION\}\.tgz/);
   assert.doesNotMatch(installer, /brainx-openclaw-plugin-1\.0\.0\.tgz/);
+  assert.match(installer, /chown brainx:brainx "\$BRAINX_PLUGIN_TMP"/);
+  assert.match(installer, /sudo -u brainx env HOME=\/var\/lib\/brainx\s+\\\s+npm pack/);
   for (const skill of [
     'brainx-today', 'brainx-job', 'brainx-talent', 'brainx-match',
     'brainx-engagement-draft', 'brainx-interview-prep', 'brainx-review',

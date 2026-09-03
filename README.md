@@ -95,7 +95,6 @@ migrations/           16 个迁移：init / push_log / consultants / bridge / pe
 frontend/btex-frontend/  单一前端（React 19 + Vinext + TS；server.js 代理非 API 请求到此）
   app/                页面路由 + BrainX API adapter（connected 模式调真实接口，含 showcase）
   DELIVERY.md         交付说明与原型边界（demo 表面显式标记）
-_archive/             归档：decision-workbench（早期 mock 原型，零引用）+ public（旧零依赖前端，2026-08-18 退役）+ 早期设计文档
 mcp/server.mjs        MCP stdio 服务器（11 工具，三端注册；与 HTTP 同一套领域函数与可见性；consultant_id 必填 + roster 校验）
 bin/                  CLI：sync/adapter/recommend/replay/roster/push/web + install-launchd.sh
                       + com.brainx.web.plist（macOS）+ brainx.service（systemd，含 HOME 修复）

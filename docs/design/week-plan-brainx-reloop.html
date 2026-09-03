@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="1tTQ7RDXJOI8CmJrxEgc2v">
+<head data-page-node-id="mewjOsHIcbyHNYZxpty9xM">
+<meta charset="UTF-8" data-page-node-id="khIvh5xm1xnfTVsHEnKN4P">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="4E3beaOHqZCyOfC3AvLCib">
+<title>双项目 14 天作战计划 · BrainX × reloop → 9/14 决赛</title>
+<style>
+  :root{
+    --brainx:#2563eb; --reloop:#059669; --joint:#7c3aed;
+    --bg:#f8fafc; --card:#fff; --ink:#0f172a; --muted:#64748b; --line:#e2e8f0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--ink);padding:24px}
+  .wrap{max-width:1360px;margin:0 auto}
+  h1{font-size:22px}
+  .badge-v1{display:inline-block;background:#dcfce7;color:#166534;font-size:12px;padding:2px 10px;border-radius:99px;margin-left:8px;vertical-align:middle}
+  .sub{color:var(--muted);font-size:13px;margin-top:6px;line-height:1.7}
+  .goal{margin:16px 0;background:linear-gradient(90deg,#eff6ff,#ecfdf5);border:1px solid var(--line);border-radius:12px;padding:14px 18px;font-size:14px;line-height:1.7}
+  .goal b{color:var(--joint)}
+  .week-title{margin:22px 0 4px;font-size:15px;font-weight:700}
+  .week-title small{color:var(--muted);font-weight:400;margin-left:8px}
+  table{width:100%;border-collapse:separate;border-spacing:6px;margin-top:8px}
+  th{font-size:12px;color:var(--muted);padding:6px;background:#f1f5f9;border-radius:8px}
+  th.lane{width:88px}
+  td.day{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px;min-width:170px;vertical-align:top}
+  td.launch{background:#f0fdf4;border:2px solid #059669}
+  td.lane-label{width:88px;font-size:13px;font-weight:700;text-align:center;border-radius:10px;color:#fff;vertical-align:middle}
+  .lane-joint{background:var(--joint)} .lane-brainx{background:var(--brainx)} .lane-reloop{background:var(--reloop)}
+  .task{border-radius:8px;padding:7px 9px;font-size:12px;margin-bottom:6px;line-height:1.5;border:1px solid var(--line);background:#f8fafc}
+  .task .who{display:block;font-size:10px;color:var(--muted);margin-top:3px}
+  .task.milestone{background:#fdf4ff;border-color:#e9d5ff;font-weight:600}
+  .task.launch{background:#dcfce7;border-color:#059669;font-weight:700}
+  .task.p0{background:#fef2f2;border-color:#fecaca}
+  .task.p0::before{content:"P0 ";color:#dc2626;font-weight:800}
+  .task.p1{background:#fff7ed;border-color:#fed7aa}
+  .task.p1::before{content:"P1 ";color:#c2410c;font-weight:800}
+  .final{margin-top:22px;background:linear-gradient(90deg,#7c3aed,#2563eb);color:#fff;border-radius:14px;padding:20px 24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+  .final .d{font-size:26px;font-weight:800}
+  .final .what{font-size:13px;line-height:1.8;opacity:.95}
+  section{margin-top:26px}
+  h2{font-size:15px;margin-bottom:10px}
+  .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;font-size:13px}
+  .panel h3{font-size:13px;margin-bottom:8px}
+  .panel ul{padding-left:18px;line-height:1.9;color:#334155}
+  footer{margin-top:24px;font-size:11px;color:var(--muted);line-height:1.8}
+</style>
+</head>
+<body data-page-node-id="C12MPW11uZ9LR28SQpNpxi">
+<div class="wrap" data-page-node-id="bBPn1w4gtKzemPa5PtwBIj">
+<h1 data-page-node-id="vOzD7AGQbtGVHq0PuBnQfU">双项目 14 天作战计划 · BrainX × reloop<span class="badge-v1" data-page-node-id="utmp7f4FT8GBECwmD5o1gJ">v1.1 · 2026-08-31(9/3 全员使用版)</span></h1>
+<div class="sub" data-page-node-id="LiEWT0MImh3M9W5vY0pk1c">9/1(二)→ 9/14(一),共 14 天 · 依据:8-31 会议纪要 + Mia 确认(业务循环 / 演示形式 / Felix 蒸馏 / 真实用户 / 9/3 全员使用)+ reloop gap-audit & 架构评审 + BrainX 交付蓝图</div>
+<div class="goal" data-page-node-id="l5Em0B9WcypoxnDend5vtq">🎯 <b data-page-node-id="rViNrK4sel0FYAMtMRHsfp">9/14 完全结尾。</b>演示 = 在真实用户面前把核心循环完整转一圈:<b data-page-node-id="EAMC8KMsHMvv6qlKrngbV2">接单(BrainX)→ 获取简历(OpenMai/reloop)→ 对话推人(reloop TopN+飞书)→ 不成功继续找人推人(结果回流再推)</b>。<b data-page-node-id="MPYN040TEcNTCDpzYXtepm">9/3 周四全员上手真实使用</b>——到决赛积累 11 天真实运行留痕,这就是演示最有说服力的素材。核心流程 &gt; 一切,未自动化环节人工补位+明确提示。</div>
+
+<div class="week-title" data-page-node-id="rhbBtmhT3E615QDzLj1ECc">第 1 周 · 对齐 + 上线使用(9/1 – 9/6)<small data-page-node-id="NGqqRtthEAfzwm2zwrSCUZ">目标:两版架构图对齐、Felix 蒸馏、9/3 全员用起来</small></div>
+<table data-page-node-id="VjCmLPBJRoY4FIo0b4JPHw">
+<tr data-page-node-id="8gfu264y8WstDaUEolDENk"><th class="lane" data-page-node-id="HVPYyrHIy41ZpEJrRPKERD">泳道</th><th data-page-node-id="2ysPWiGWiwb96wEe97RCL8">9/1 周二</th><th data-page-node-id="2U0FBckjJ73DP07DLJwS93">9/2 周三</th><th data-page-node-id="fpPb69Tnbx6AXBGQHQKDI2">9/3 周四 🚀</th><th data-page-node-id="cZvEjgZFyzcqXBG7LU7zmC">9/4 周五</th><th data-page-node-id="ACwkI9ooF5YU3ywoap3PtL">9/5 周六</th><th data-page-node-id="OTcqQdO26hRXfFPTI9lafh">9/6 周日</th></tr>
+<tr data-page-node-id="TC0AEHD8udBe3OwECtD0C3">
+<td class="lane-label lane-joint" data-page-node-id="GaSP4QODJ7B2SkBGwUjAqu">联合</td>
+<td class="day" data-page-node-id="VZi3GgCD2sRINP4JB2U2Wf"><div class="task milestone" data-page-node-id="HPXe3pu8V6r5unopc2i5Db">📐 Mia:架构图初稿 ×2——工作流架构图 + 技术架构图(含两产品+缺口)<span class="who" data-page-node-id="4nJcygXWfw1t1sbjZEkwkV">会议待办①拆分;两版初稿已出(docs/design/)</span></div>
+    <div class="task" data-page-node-id="VWFB4mHHOlnX4sywUI77Bc">👥 York 拉群:Dykes ↔ Frankie<span class="who" data-page-node-id="5IBGlBJYCfBuORuLm5HXsU">会议待办②</span></div></td>
+<td class="day" data-page-node-id="oRmkj3Iq7sbmYSlmPDdvHK"><div class="task milestone" data-page-node-id="VqJvm53EbVpGJ6s8DZNqRC">🤝 两版架构图 × York 对齐<span class="who" data-page-node-id="uuDeBtDJXtKfTC87rgrEAT">硬依赖:先对齐工作流,再确认技术架构</span></div>
+    <div class="task milestone" data-page-node-id="u4VRTdPMaL4YwMpv9zSlXZ">🧪 Felix 确认访谈 15-20 分钟:过 v0 稿 + 触达→offer 全段<span class="who" data-page-node-id="pARVlcUUQayrvpAwGqK6Fa">hunter-distillation 素材先行模式</span></div></td>
+<td class="day launch" data-page-node-id="YfcA3Mj2dyWmEWrvpnLkRq"><div class="task launch" data-page-node-id="9ZDWeKIaHvKTe5HAVg6TsD">🚀 全员使用日:全体顾问真实业务上手——BrainX 接单 + reloop 推人,飞书群留痕开始积累<span class="who" data-page-node-id="cYKZsWyd3mfmkHa5dTkzHs">Mia 定的上线日;SOP + 人工补位提示同步发布</span></div>
+    <div class="task" data-page-node-id="9WfAMrBXxRs4qkSYPDG83b">📝 Felix 蒸馏稿 v1 → 回填轨迹图 v1.1</div></td>
+<td class="day" data-page-node-id="pRo49pDtKjclHuIqJTH3G9"><div class="task" data-page-node-id="AkKxm2eVtJSbR0jGOZSwCK">🎬 演示脚本初稿:传统人工流水线(简历专员/评估专员/电话专员)× AI 替代对比,3-5 分钟抛亮点<span class="who" data-page-node-id="fF8Zr8yyRZj8BTM00F4kHk">Mia + 晗宇;素材=首日真实留痕</span></div></td>
+<td class="day" data-page-node-id="aR7fEKRHlK3CgFGsGzh1tO"><div class="task milestone" data-page-node-id="mGzf9w7NKDbGajUIUcQkUx">🔁 端到端走查:基于两天真实使用数据,从接单跑到推人,记录每个断点</div></td>
+<td class="day" data-page-node-id="167YZ3nkt2QqhsIfdLZc67"><div class="task" data-page-node-id="4d6TmpP5Jnf8rjrx16J7Vm">🧘 缓冲:断点清单排进第 2 周;补位方案定稿</div></td>
+</tr>
+<tr data-page-node-id="gqsdZJSEzJ3sRCQi8Vg8Bl">
+<td class="lane-label lane-brainx" data-page-node-id="N0hCbA0lbyHUlw96YyJEsg">BrainX</td>
+<td class="day" data-page-node-id="ByQVEfYGBpeYLqmlnBkbYy"><div class="task" data-page-node-id="9ACVW2szWmQKb7aW7F7kSG">📋 能力/接口清单交付 Mia(bin/ 15 CLI + MCP 按环节归类,标注可插件化项)<span class="who" data-page-node-id="aNoax6FDARGUwP0Y2swxc5">技术架构图输入</span></div></td>
+<td class="day" data-page-node-id="rUkdbMUnBwI46xe1yHz4Zc"><div class="task" data-page-node-id="K80ED0hU9nrPTQxaOIc8CC">🧪 支持 Felix 访谈:库内数据(反馈原话/三接三放/五连改)逐条过</div>
+    <div class="task" data-page-node-id="nVyLNS9g62XbDKJy9264PA">📖 使用 SOP + 人工补位提示语备稿(明日发布)</div></td>
+<td class="day launch" data-page-node-id="esdF91gw51FldUAJUeZx8r"><div class="task" data-page-node-id="QEBkPQtIVb2Zt6l5wDdqrP">👥 全天跟修:黄金路径(推荐→加入→跟进→记录)保 2 分钟稳定走完,刷新/重试零状态丢失</div></td>
+<td class="day" data-page-node-id="FFJgNvUj9apuLxiDIqQErk"><div class="task" data-page-node-id="iE7oknZuzLBVpCz8mOBTnx">🔌 桥 1 接口定义+联调:ACCEPT → reloop 建岗位(positions 上限 10 策略)<span class="who" data-page-node-id="rkVlmT3lchLA4BEJ9X0hO3">与 reloop 侧联合</span></div></td>
+<td class="day" data-page-node-id="mFbFAgRjneCwjZ5BX9XJpX"><div class="task" data-page-node-id="hcJslX8qorlPWPc0jI2Fzx">🔁 走查跟修;飞书机器人对话入口设计定稿</div></td>
+<td class="day" data-page-node-id="teCoboSVBENGKaKzLkCuHE"><div class="task" data-page-node-id="AVBBH56kCM4cAUx21b3I4N">🛠 断点修复</div></td>
+</tr>
+<tr data-page-node-id="XFHMZply9aX2zqrEzAlHjC">
+<td class="lane-label lane-reloop" data-page-node-id="6IvqhO2BXbcHCSHHD1sjh7">reloop</td>
+<td class="day" data-page-node-id="WAnALCOASdoJXdYY9MwO3d"><div class="task p0" data-page-node-id="mnahrpFeuIJneaFmHHsHa2">扩展生产实测:装载 TalentLens 点几个人选验证命中(R1 验收)<span class="who" data-page-node-id="pjAAsQUn7wA6Q0LDm02e8o">gap-audit</span></div>
+    <div class="task p0" data-page-node-id="dJJlxvbk2H8uNISaFdNDux">强刷确认简历文本卡片可见(R9 验收)<span class="who" data-page-node-id="CM6eYkSRH03xZFgvzAZJve">gap-audit</span></div></td>
+<td class="day" data-page-node-id="k9k00HR9DItNHgQq0JgvE6"><div class="task" data-page-node-id="sWtzv7qdJ2891fEK6Dj9pk">🎯 使用数据准备:各顾问真实岗位跑通 TopN + 逐人联系理由</div></td>
+<td class="day launch" data-page-node-id="0N7Jd2OceNgEFC0IFb4yaD"><div class="task" data-page-node-id="UCtA5FlSuge4UZPEYvjSiZ">👥 全天跟修:私域池同步/推荐/联系理由,保障首日使用不卡</div></td>
+<td class="day" data-page-node-id="F881RCJcXHHZj5NvbddFCs"><div class="task" data-page-node-id="Bmk3zzDZTWgzafPj6M6SeO">🔌 桥 1 侧:接收 BrainX ACCEPT 自动建岗联调</div>
+    <div class="task" data-page-node-id="fbU6ep2yKpZX9fB1yL5f6i">🎥 双因子推荐录屏备用(活跃度×匹配度同屏 + 排序滑块)</div></td>
+<td class="day" data-page-node-id="XX0yEbu9STnGUih1kAu6Tm"><div class="task" data-page-node-id="gQnLcPBtwSqstpojXamm9x">🔁 走查跟修:TopN → 推人段断点</div></td>
+<td class="day" data-page-node-id="VRDtpLHjWQDrn8PVgtPgH1"><div class="task" data-page-node-id="F1ljbyR8aNkhNomFFOBu1E">🛠 缓冲</div></td>
+</tr>
+</table>
+
+<div class="week-title" data-page-node-id="ipxJBLbeUONgkUt4V33G2D">第 2 周 · 对话化 + 推人循环 + 联排(9/7 – 9/13)<small data-page-node-id="1F1ODNY9p4RGLDuirs4IBe">目标:飞书对话里跑推人循环,使用持续留痕,两次联排+录视频</small></div>
+<table data-page-node-id="AAlKaGuOxqvZmHVQ3N5Rs2">
+<tr data-page-node-id="C0262jxUxvSkkL5IFfsx93">
+<th class="lane" data-page-node-id="6y4CMOp0icqbiWOgSCHzCN">泳道</th>
+<th data-page-node-id="rJFeuvUpGyJaeLIHpBuLL9">9/7 周一</th>
+<th data-page-node-id="9nRkqAQl28b5HUMcgGj6Yc">9/8 周二</th>
+<th data-page-node-id="xw1dmcGSSoLHJbEEAHAm4f">9/9 周三</th>
+<th data-page-node-id="CYNN7LQyCzJssZ0C4d3qXa">9/10 周四</th>
+<th data-page-node-id="DfRHvJrguTVlaac3EusNX2">9/11 周五</th>
+<th data-page-node-id="hBemJOuapvLioedMOaVUX2">9/12 周六</th>
+<th data-page-node-id="9dBiF9fc23lqDjith6faOE">9/13 周日</th>
+</tr>
+<tr data-page-node-id="5UVVaUhnDjS8nGyEi12gde">
+<td class="lane-label lane-joint" data-page-node-id="EtYXPBN1J6OkHfcBLCotNL">联合</td>
+<td class="day" data-page-node-id="HI1xTgqdGiQM1xWCOsRTW5"><div class="task" data-page-node-id="8N64a2g7MsE1qyzAwDvReB">🗓 第 1 周使用复盘,第 2 周任务确认<span class="who" data-page-node-id="qunQwfutPYXwXGl3R9SNzL">Mia/Dykes/晗宇(会议待办③)</span></div></td>
+<td class="day" data-page-node-id="eGajRuB16PgnFfK0LdKEUW"><div class="task milestone" data-page-node-id="Bf4jNFclTcKKLILD9vNgfN">🔁 推人循环打通:reloop TopN → 飞书对话推人 → 回复回流双写 → 不成功自动起下一轮<span class="who" data-page-node-id="M4sxnBaDbAeBAyQYQ1jJtW">本周核心里程碑</span></div></td>
+<td class="day" data-page-node-id="eTkjQLAHYMgFscKGwEZnNS"><div class="task" data-page-node-id="OCW1lTU952RcmdLkNoItrl">📊 使用数据复盘日:9/3 以来 6 天留痕——漏斗/话术/断点,挑演示案例<span class="who" data-page-node-id="6fGIhcOEz9vqICxBDilFYa">真实使用自 9/3 持续进行</span></div></td>
+<td class="day" data-page-node-id="XoJpVt3GkxihwdWTi4FIFd"><div class="task" data-page-node-id="E4Is3tnVv3D1MLtMnIgKbT">🎬 演示脚本定稿(嵌入真实留痕与案例)</div></td>
+<td class="day" data-page-node-id="Qmzct7q5A22FUogj69XGos"><div class="task milestone" data-page-node-id="GdC4JupOYLGY6rAM3wayZh">🎥 联排 ① + 完整 demo 视频录制</div></td>
+<td class="day" data-page-node-id="5VM29J1N0awjJ12rYWJo1B"><div class="task milestone" data-page-node-id="kgoGnWKJ0ZnOVERLAUnT2g">🎥 联排 ②(真实用户在场)+ 补录 + 物料打包(两版架构图/轨迹图/数据)</div></td>
+<td class="day" data-page-node-id="Wkp58TRzXX7fqEITcKn13Y"><div class="task" data-page-node-id="EAeB0LC5QKlOT9QkN3Kw1v">✅ 全员物料确认;补位预案演练;休整</div></td>
+</tr>
+<tr data-page-node-id="wJpByDMb8QxhOmBX9LApXK">
+<td class="lane-label lane-brainx" data-page-node-id="V8dYCkRVRpm6dbghBm83BC">BrainX</td>
+<td class="day" data-page-node-id="uxBWafmVbiJlCWeNBt6ETB"><div class="task" data-page-node-id="quEMtYrQsaXGFx14AoStgx">🤖 飞书机器人最小链路上线:对话查今日 Top3 / 接单 / 行动项</div></td>
+<td class="day" data-page-node-id="Hf0DvfzD7jR1U1iHexfBPV"><div class="task" data-page-node-id="plHZoIlhwI6VazoYuecnJp">🔁 回流侧:推人回复 → job_outcomes 落库,"继续找人"触发器</div></td>
+<td class="day" data-page-node-id="5IkPXBiSOoxFAac70DLmqn"><div class="task" data-page-node-id="Gk5gSH9wFF7ulsHmo0A0Gd">📖 话术库接推人起草(蒸馏产出首批应用)</div></td>
+<td class="day" data-page-node-id="Rz5COJMUvVxP8uoM9aaogw"><div class="task" data-page-node-id="mCKUKBzQ6A2vXHNEhxROkw">🛠 演示路径再加固;跟修使用反馈</div></td>
+<td class="day" data-page-node-id="ewjPP60YlHp2MOQCoB2vcf"><div class="task" data-page-node-id="6sDNodQ3gXmppw7i4YyCkd">🎥 联排 ① 前半段:职位决策/接单</div></td>
+<td class="day" data-page-node-id="bPekR0RNKLQFSXrFNrh9kb"><div class="task" data-page-node-id="R2pj6ni9KMFX0muqnN1oIJ">🎥 联排 ② + 修最后断点</div></td>
+<td class="day" data-page-node-id="iX2EXQwRcFsOPHwNhhs1ta"><div class="task" data-page-node-id="Nqpw9AMSEAFHGDc5xArkHZ">🧘 冻结代码,只收 P0</div></td>
+</tr>
+<tr data-page-node-id="GmQ9ckBfQjLdHA7RQUgTUq">
+<td class="lane-label lane-reloop" data-page-node-id="c1PrN6EpDmnDvbHwqKXdQO">reloop</td>
+<td class="day" data-page-node-id="eMGmFwDpwqcsV4UP8Rwcvh"><div class="task p1" data-page-node-id="B9T6eIgUGXDs5fMX1c85M8">修 BUG-101(点"去联系"刷新即丢)+ BUG-103(跨天反馈静默丢)<span class="who" data-page-node-id="o2PK18Jda65L5ghjAmrc9i">不修则推人循环现场露馅,架构评审:改动最小收益最大</span></div></td>
+<td class="day" data-page-node-id="tXsrZbETZBZkBGngMyVbE0"><div class="task" data-page-node-id="0KRNkb1e24B4FKJT2O9Brc">🔁 推人侧:TopN 输出接飞书对话;BUG-105(删除不级联)顺手修</div></td>
+<td class="day" data-page-node-id="r0LzF6Lq989l6iFlKFayf0"><div class="task" data-page-node-id="fu1zoH15GrZruAUlTs2Hrc">🎯 联系理由话术按真实使用反馈微调</div></td>
+<td class="day" data-page-node-id="CJOcCwyF5VAfpT7UrYHL5d"><div class="task" data-page-node-id="FNIEuveYbDCwyMjxHmmkEP">✅ P1 修复回归:65 测试全绿(pytest + node --test)</div></td>
+<td class="day" data-page-node-id="GWuuLYNAuHAkiVBTvHgQ3S"><div class="task" data-page-node-id="16Lo1HWSJ4tBzarZ6CYuGq">🎥 联排 ① 后半段:私域池双因子推荐</div></td>
+<td class="day" data-page-node-id="Sqt28VfHI798Ufle7z1slR"><div class="task" data-page-node-id="cLbJQiQd2cP8bInqCCz7yj">🎥 联排 ② + 修最后断点</div></td>
+<td class="day" data-page-node-id="TpjfxCfXxLwKqxJR5WJIiR"><div class="task" data-page-node-id="7reUa8AlAIgo2fqVr6ryHJ">🧘 冻结;R10/R13 等决赛后事项归档不启动</div></td>
+</tr>
+</table>
+
+<div class="final" data-page-node-id="2PtqTk9ZuIw7HoCHGU114e">
+  <div data-page-node-id="MtjHcmP5z3S6bBsK41iJpQ">
+    <div class="d" data-page-node-id="FcnWle5TYAXZRrJLfezELn">🏁 9/14 周一 · 决赛日</div>
+    <div class="what" data-page-node-id="kTk3FPKlmF3IuOocZkL6bc">组合上台:前半段 BrainX 职位决策/接单 → 后半段 reloop 私域池双因子推荐/推人<br data-page-node-id="voK0MdKjUvSPuBmpFBAdVF">素材:9/3 起 11 天真实使用留痕 + 预录 demo 视频兜底 · 3-5 分钟抛出核心亮点 · 全员北京线下</div>
+  </div>
+  <div class="d" data-page-node-id="fUu9LICycArlDSHb0O7tPD">D-14</div>
+</div>
+
+<section data-page-node-id="lrra0RZ0Rff0NABwjIJ3oz">
+<h2 data-page-node-id="YZFx3lyaauRTR5xqtqAB5l">⚠️ 风险与纪律</h2>
+<div class="cols" data-page-node-id="fI9f37xMYmSmFDrwYsBLRG">
+  <div class="panel" data-page-node-id="6EKcMk4lOpCBl3ELtBNMF2"><h3 data-page-node-id="reaobLiuI25zI3ylZuHNSq">关键路径(三条硬依赖)</h3><ul data-page-node-id="MwYXTt9M9IQvM7xPoTHArz">
+    <li data-page-node-id="oJJ0sh4LgrqQRxneZK7sUO"><b data-page-node-id="yY1BnXb3RJIpUBcKWsCK5n">9/2 两版架构图 × York 对齐</b>——对不齐,9/3 全员使用就是裸奔;York 时间是最大变量</li>
+    <li data-page-node-id="3pYD2YhlPa5f4rEjomV0bA"><b data-page-node-id="Vl49tq1SyxaJeCPslv8x4X">9/2 Felix 确认访谈</b>——拖延则阶段三(触达→offer)演示故事只能靠讲,没有蒸馏证据</li>
+    <li data-page-node-id="6kOHWau3zvzFxrOaZPR1dN"><b data-page-node-id="sHL2UTYDKWdl8tv4CUi13b">9/7-9/10 reloop P1 修复</b>——BUG-101/103 不修,推人循环在演示现场状态露馅</li>
+  </ul></div>
+  <div class="panel" data-page-node-id="EKjExx8WwsIPIi9UIvwoEN"><h3 data-page-node-id="0KCxsKtO0h49lx7QbnGMae">9/3 全员使用的底线条件</h3><ul data-page-node-id="cMY4ymVppqO1DIgDdwIhY0">
+    <li data-page-node-id="Tyd2aGqRTYE6hRe6s1xpxF">BrainX 黄金路径 2 分钟稳定走完(推荐→加入→跟进→记录)</li>
+    <li data-page-node-id="zFU2HyHDUpYbeOM8GUgufG">reloop 各顾问真实岗位 TopN 跑得出来 + 联系理由可读</li>
+    <li data-page-node-id="SDvYh1XWgbJoAwaOB1qC37">使用 SOP + 人工补位提示语 9/2 备稿完毕——<b data-page-node-id="r7tsbC2FWf5hBKYGNVYs1I">跑不通的环节给提示,不追求全自动</b></li>
+  </ul></div>
+  <div class="panel" data-page-node-id="t0aa2zvXxlRHroxn79DFHM"><h3 data-page-node-id="C7s1maOQHb6n2jLcG93DMk">不做什么(已拍板)</h3><ul data-page-node-id="gnZfH9IgKHoHV4YYXBAdIp">
+    <li data-page-node-id="lNhWSEw0I1qcGKAD9B2lWm">R7 PDF 简历:被 TTC 服务端卡死,报障后不等,演示不依赖</li>
+    <li data-page-node-id="Z5Sv0zdgRxNrIxK6LHIgfO">R10 粘贴撞库/R13 扩展↔Reloop:决赛后事项,两周内不启动</li>
+    <li data-page-node-id="HVevK0rGZh9lfyrQC2dtTu">前端美化、冗余功能、算法高级设置:全部后置,不抢黄金路径时间</li>
+  </ul></div>
+</div>
+</section>
+
+<footer data-page-node-id="nQu0eZUPRlaWwGxoNzJTpf">
+  变更记录:v0(8-31 素材稿)→ v1(8-31 定稿,五项确认)→ v1.1(8-31):真实使用从 9/9 提前至 <b data-page-node-id="Ek6OYwaq9Jh2CC13CdcIRB">9/3 周四全员使用</b>,9/9 改为使用数据复盘日;架构图拆分为工作流/技术两版(9/1 初稿、9/2 对齐)。<br data-page-node-id="iPCRJSAWy8tOIvnc7HA5yN">
+  配套文件:architecture-workflow.html(工作流架构图)· architecture-tech.html(技术架构图)· ai-native-headhunter-workflow.html(环节级轨迹/证据,蒸馏工作稿)· hunter-distillation.md + distilled/felix.md。
+</footer>
+</div>
+</body>
+</html>

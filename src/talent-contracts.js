@@ -208,7 +208,10 @@ export const candidateMatchBundleSchema = z.strictObject({
   }
 });
 
-const PHONE = /(?<!\d)1[3-9]\d{9}(?!\d)/;
+// 用 \w（字母/数字/下划线）边界而非 \d：SHA-256 哈希与 evidence_ref 是 hex+下划线，
+// 里面会出现「1[3-9] + 9 位数字」的连续数字段（如 ev_19459559905f…），用 \d 边界会误报
+// SENSITIVE_DATA。真实手机号前后是空格/中文/引号等非 \w 字符，仍会被正常拦截。
+const PHONE = /(?<![\w])1[3-9]\d{9}(?![\w])/;
 const EMAIL = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
 
 function assertNoSensitiveText(value) {

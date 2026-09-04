@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-04｜fix(talent): PHONE 正则误判 SHA-256 哈希为手机号
+
+- 根因：`candidate_fact_v1` 敏感信息契约的 PHONE 正则 `(?<!\d)1[3-9]\d{9}(?!\d)` 会误匹配 SHA-256 十六进制哈希 / evidence_ref 中的连续 11 位数字（如 `ev_19459559905f…`、`ca14313873295c…`），导致 383 份 reloop 人才事实中 29 份被误判 `SENSITIVE_DATA`、阻断入库。
+- 修复：边界从 `\d` 收紧为 `\w`（`(?<![\w])1[3-9]\d{9}(?![\w])`）。哈希/evidence_ref 是 hex+下划线字符，其内部连续数字前后仍是 `\w`，不再误命中；真实手机号前后是非 `\w` 字符（空格/标点/边界）仍被正确拦截。
+- 验证：新增回归用例「SHA-256 哈希中的连续数字不误判为手机号」；`tests/talent-contracts.test.mjs` 7/7 通过；生产诊断 `SENSITIVE_DATA` 29→0 份。
+
 ## 2026-09-04｜fix(deploy): 飞书 appSecret 改用环境变量引用绕过 SecretRef 解析 bug
 
 - 根因：OpenClaw 2026.7.1-2 外部化 feishu 插件无法解析 SecretRef（issue #76451），飞书私聊消息 dispatch 抛 `FeishuSecretRefUnavailableError: channels.feishu.appSecret: unresolved SecretRef`，表现为「机器人收到消息但不回复」。

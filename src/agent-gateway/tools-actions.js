@@ -50,7 +50,7 @@ function acceptJob(db, args, principal, startSearch) {
 function startSearchForJob(db, args, principal, startSearch) {
   requireConfirmation(args);
   requireVisible(db, principal, args.job_id);
-  if (currentState(db, principal.consultantId, args.job_id).state !== 'ACCEPTED') fail('INVALID_ARGUMENT');
+  if (currentState(db, principal.consultantId, args.job_id).state !== 'ACCEPTED') fail('JOB_NOT_ACCEPTED');
   const search = startSearch(db, principal.consultantId, args.job_id, { force: args.force === true });
   return {
     data: { job_ref: args.job_id, search }, facts: [{ job_ref: args.job_id, search_status: search.status }],

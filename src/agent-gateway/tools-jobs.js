@@ -185,7 +185,8 @@ function openmaiSearch(db, args, principal) {
   const row = db.prepare('SELECT * FROM job_facts WHERE project_id=?').get(args.job_id);
   if (!row || !jobVisibleTo(db, principal.consultantId, args.job_id)) fail('NOT_FOUND_OR_FORBIDDEN');
   const st = currentState(db, principal.consultantId, args.job_id)?.state;
-  if (!['ACCEPTED', 'COMPLETED'].includes(st)) fail('NOT_FOUND_OR_FORBIDDEN');
+  // 职位本人可见但未接单：明确提醒接单入口（不泄露任何额外信息——可见性已校验）
+  if (!['ACCEPTED', 'COMPLETED'].includes(st)) fail('JOB_NOT_ACCEPTED');
   const cur = getOpenmaiResult(db, principal.consultantId, args.job_id) || {};
   if (cur.status === 'done' || cur.status === 'running') {
     return {

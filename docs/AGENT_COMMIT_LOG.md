@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-04｜fix(agent-gateway): 未接单找人改为明确提醒接单入口
+
+- 背景：顾问对"职位可见但未接单"的职位发起找人（`brainx_openmai_search` / `brainx_start_candidate_search`）时，返回的文案是泛化的 NOT_FOUND_OR_FORBIDDEN「当前会话无法读取该对象」或 INVALID_ARGUMENT「请求参数不符合工具契约」——顾问不知道失败原因是没接单，更不知道去哪里接单。
+- 实现：① `envelopes.js` 新增错误码 `JOB_NOT_ACCEPTED`（409，文案明确两个接单入口：飞书里让机器人接单（brainx_accept_job），或工作台 base.yorkteam.cn 职位详情页点「接单」）；② `tools-jobs.js` openmaiSearch「可见但未 ACCEPTED/COMPLETED」分支改挂新码（不可见仍 NOT_FOUND_OR_FORBIDDEN，保持 fail-closed 不泄露存在性）；③ `tools-actions.js` startSearchForJob 未接单分支从 INVALID_ARGUMENT 改挂新码。可见性已通过校验后才提示接单，不新增信息泄露面。
+- 验证：agent 相关 5 个测试文件 36/36 通过；quick 门禁 14/16（2 项失败为与本改动无关的既有未跟踪文件 docs/2026-09-04-db-chain-check-report.html 超长行、scripts/grant-team-access.mjs 本机绝对路径）。
+
 ## 2026-09-04｜fix(sync): 行级脏数据不再判废整轮同步——解冻全员推荐链路
 
 - 背景：felix 刷新 TTC 后 daily_brief 两轮拉取完全一样。定位结论：TTC 端 8 个新职位缺「客户或职位名」（JY6LB5A 等），runSync 记 errors → 整批 complete=0 → recommend() fail-closed（!last.complete → blocked 不落轮）→ decision_runs 零 COMPLETED → daily_brief 永远读旧冻结快照。job_facts 照常增量（bridge 先写行再记 sync_runs），库是活的但推荐引擎不吃，呈现「数据很多、链路没读到」。

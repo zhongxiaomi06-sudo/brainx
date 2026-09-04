@@ -2,6 +2,7 @@ const ERRORS = Object.freeze({
   UNAUTHENTICATED: [401, '当前请求无法验证', false],
   UNBOUND_IDENTITY: [403, '当前身份尚未获得使用权限', false],
   NOT_FOUND_OR_FORBIDDEN: [404, '当前会话无法读取该对象', false],
+  JOB_NOT_ACCEPTED: [409, '该职位还未接单，暂时无法找人。请先接单：直接在飞书里让我帮你接单（例如回复"帮我接单这个职位"），或到工作台 base.yorkteam.cn 的职位详情页点「接单」，接单成功后再发起找人。', false],
   INVALID_ARGUMENT: [422, '请求参数不符合工具契约', false],
   STALE_DATA: [409, '数据已过期，请先同步', false],
   SOURCE_UNAVAILABLE: [503, '数据源暂时不可用', true],

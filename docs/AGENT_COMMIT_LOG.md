@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-04｜fix(supermai): SOURCE_UNAVAILABLE 拆分出 SUPERMAI_UNAVAILABLE——不再误导「OpenMai 也挂了」
+
+- 背景：wendy 会话里 supermai_scout 两次失败，模型回复「SuperMai/OpenMai 都挂了」——实际实测（本地+ECS+带 wendy 本人 JWT 三重验证）OpenMai 正常（wendy 当天 07:37 两单 done），只有 gateway.ttcadvisory.com/search/scout/match 与 /search/jobs 是阿里云 ALB 层 503（后端无健康实例）。根因：SuperMai 与 talent/shortlist/RDS 共用通用错误码 SOURCE_UNAVAILABLE，模型无法区分「哪个源挂了」，臆断成全链路故障。
+- 实现：① supermai-sourcing.js sourceUnavailable() 错误码改为专用 SUPERMAI_UNAVAILABLE；② agent-gateway/tools-jobs.js supermaiScout 无凭证/AUTH_EXPIRED/源不可用归一为 SUPERMAI_UNAVAILABLE（顺带修掉 AUTH_EXPIRED 此前落 INTERNAL 500 的问题）；③ agent-gateway/envelopes.js 注册 SUPERMAI_UNAVAILABLE=503 retryable，文案明示「仅 SuperMai 外部人才搜索（领英/GitHub/论文）不可用，内部推荐池与 OpenMai 找人不受影响」；④ 契约文档 specs/003-openclaw-production/contracts/agent-gateway.md 错误码表补行。
+- 验证：supermai-sourcing/agent-runtime-guards/agent-job-tools 15/15；quick 门禁 14/16（2 项失败为既有未跟踪文件 db-chain-report.html/grant-team-access.mjs，与本次无关）。
+
 ## 2026-09-04｜fix(agent-gateway): 未接单找人改为明确提醒接单入口
 
 - 背景：顾问对"职位可见但未接单"的职位发起找人（`brainx_openmai_search` / `brainx_start_candidate_search`）时，返回的文案是泛化的 NOT_FOUND_OR_FORBIDDEN「当前会话无法读取该对象」或 INVALID_ARGUMENT「请求参数不符合工具契约」——顾问不知道失败原因是没接单，更不知道去哪里接单。

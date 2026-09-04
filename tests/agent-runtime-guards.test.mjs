@@ -51,6 +51,21 @@ test('错误 envelope 使用稳定 HTTP 语义且不泄露异常正文、SQL 或
   assert.equal(limited.body.error.retryable, true);
 });
 
+test('SUPERMAI_UNAVAILABLE 独立映射：明示只挂 SuperMai，不波及 OpenMai/内部源', () => {
+  const resp = errorEnvelope(Object.assign(new Error('SuperMai sourcing is unavailable'), {
+    code: 'SUPERMAI_UNAVAILABLE',
+  }), { requestId: 'req-sm' });
+  assert.equal(resp.status, 503);
+  assert.equal(resp.body.error.code, 'SUPERMAI_UNAVAILABLE');
+  assert.equal(resp.body.error.retryable, true);
+  assert.match(resp.body.error.message, /SuperMai/);
+  assert.match(resp.body.error.message, /OpenMai 找人不受影响/);
+  // 通用 SOURCE_UNAVAILABLE（RDS/talent 等）保持原语义，不被误伤
+  const generic = errorEnvelope(Object.assign(new Error('x'), { code: 'SOURCE_UNAVAILABLE' }));
+  assert.equal(generic.body.error.code, 'SOURCE_UNAVAILABLE');
+  assert.match(generic.body.error.message, /数据源暂时不可用/);
+});
+
 test('审计只保存主体哈希、参数哈希和最小键摘要', () => {
   const db = openDb(':memory:');
   const payload = {

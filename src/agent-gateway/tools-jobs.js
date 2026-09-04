@@ -211,7 +211,7 @@ function openmaiSearch(db, args, principal) {
  * 凭证从 supermai_credentials 表读取（AES-GCM 加密，同 ttc_tokens 安全纪律）。 */
 async function supermaiScout(db, args, principal) {
   const creds = getSupermaiCredentials(db, principal.consultantId);
-  if (!creds) fail('SOURCE_UNAVAILABLE');
+  if (!creds) fail('SUPERMAI_UNAVAILABLE');
   try {
     const result = await supermaiScoutMatch({
       criteria: args.criteria,
@@ -231,8 +231,12 @@ async function supermaiScout(db, args, principal) {
       evidence_refs: [`supermai_scout:${args.criteria.slice(0, 40)}`],
     };
   } catch (error) {
+    // 凭证失效与源不可用都归一为 SUPERMAI_UNAVAILABLE：只影响「SuperMai 这一个外部源」，
+    // 引导模型如实告诉顾问（OpenMai/内部推荐池不受影响），不再臆断全链路挂。
     if (error.code === 'AUTH_EXPIRED') markSupermaiReauth(db, principal.consultantId);
-    if (error.code === 'SOURCE_UNAVAILABLE') fail('SOURCE_UNAVAILABLE');
+    if (['SUPERMAI_UNAVAILABLE', 'AUTH_EXPIRED', 'SOURCE_UNAVAILABLE'].includes(error.code)) {
+      fail('SUPERMAI_UNAVAILABLE');
+    }
     throw error;
   }
 }

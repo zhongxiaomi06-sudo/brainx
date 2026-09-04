@@ -117,9 +117,78 @@ test('端点：TTC 侧 401 → PUT 返回 401 且不落库', async () => {
   try {
     const put = await origFetch(`${base}/api/v1/ttc/connect`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json', Cookie: cookie },
-      body: JSON.stringify({ jwt: makeJwt({ exp: FUTURE }) }) });
+      body: JSON.stringify({ jwt: makeJwt({ exp: FUTURE, nick: 'Mia 钟笑咪' }) }) });
     assert.equal(put.status, 401);
     assert.equal(db.prepare(`SELECT COUNT(*) n FROM ttc_tokens WHERE consultant_id='mia'`).get().n, 0);
+  } finally {
+    globalThis.fetch = origFetch;
+    server.close();
+  }
+});
+
+/* —— 2026-09-04 账号隔离（强制本人登陆）：跨人代绑一律拒绝，fail-closed —— */
+test('账号隔离：PUT 粘贴他人 JWT → 422 JWT_OWNER_MISMATCH 且不落库', async () => {
+  const { createServer } = await import('../src/server.js');
+  const { signSession } = await import('../src/session.js');
+  const server = createServer(db);
+  await new Promise((r) => server.listen(0, r));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const cookie = `brainx_session=${encodeURIComponent(signSession('mia'))}`;
+  const origFetch = globalThis.fetch;
+  let probed = false;
+  globalThis.fetch = async (url, opts) => {
+    if (String(url).includes('ttcadvisory.com')) { probed = true; return new Response('{"code":0}', { status: 200 }); }
+    return origFetch(url, opts);
+  };
+  try {
+    // mia 的会话提交 wendy 名下的 JWT：归属不符必须在打 TTC 探针前拒绝
+    const put = await origFetch(`${base}/api/v1/ttc/connect`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({ jwt: makeJwt({ exp: FUTURE, nick: 'Wendy 郭雯' }) }) });
+    const out = await put.json();
+    assert.equal(put.status, 422);
+    assert.equal(out.error?.code, 'JWT_OWNER_MISMATCH');
+    assert.equal(probed, false, '归属不符时不得再消耗 TTC 活探针');
+    assert.equal(db.prepare(`SELECT COUNT(*) n FROM ttc_tokens WHERE consultant_id='mia'`).get().n, 0);
+  } finally {
+    globalThis.fetch = origFetch;
+    server.close();
+  }
+});
+
+test('账号隔离：ext-sync 缺 consultant_id 不再默认 felix；跨人 JWT 拒绝；ttc/status 收回需登录', async () => {
+  const { createServer } = await import('../src/server.js');
+  const server = createServer(db);
+  await new Promise((r) => server.listen(0, r));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const extHeaders = { 'Content-Type': 'application/json', Origin: 'chrome-extension://abcdef' };
+  const origFetch = globalThis.fetch;
+  globalThis.fetch = async (url, opts) => String(url).includes('ttcadvisory.com')
+    ? new Response('{"code":0}', { status: 200 })
+    : origFetch(url, opts);
+  try {
+    // 1) 缺 consultant_id → 422（原来默认 felix，属跨账号写入通道）
+    const noCid = await origFetch(`${base}/api/v1/ttc/ext-sync`, {
+      method: 'POST', headers: extHeaders,
+      body: JSON.stringify({ jwt: makeJwt({ exp: FUTURE, nick: 'Felix 黄鑫' }) }) });
+    assert.equal(noCid.status, 422);
+    // 2) 指定顾问但 JWT 归属不符 → 422 且不落库
+    const cross = await origFetch(`${base}/api/v1/ttc/ext-sync`, {
+      method: 'POST', headers: extHeaders,
+      body: JSON.stringify({ consultant_id: 'felix', jwt: makeJwt({ exp: FUTURE, nick: 'Mia 钟笑咪' }) }) });
+    const crossOut = await cross.json();
+    assert.equal(cross.status, 422);
+    assert.equal(crossOut.error?.code, 'JWT_OWNER_MISMATCH');
+    assert.equal(db.prepare(`SELECT COUNT(*) n FROM ttc_tokens WHERE consultant_id='felix'`).get().n, 0);
+    // 3) 本人 JWT + 本人顾问 → 正常落库
+    const own = await origFetch(`${base}/api/v1/ttc/ext-sync`, {
+      method: 'POST', headers: extHeaders,
+      body: JSON.stringify({ consultant_id: 'felix', jwt: makeJwt({ exp: FUTURE, nick: 'Felix 黄鑫' }) }) });
+    assert.equal(own.status, 200);
+    assert.equal(db.prepare(`SELECT COUNT(*) n FROM ttc_tokens WHERE consultant_id='felix'`).get().n, 1);
+    // 4) ttc/status 已从免登录名单收回：未登录 → 401，且不再接受 ?consultant_id= 跨人查询
+    const anon = await origFetch(`${base}/api/v1/ttc/status?consultant_id=mia`);
+    assert.equal(anon.status, 401);
   } finally {
     globalThis.fetch = origFetch;
     server.close();

@@ -62,7 +62,7 @@ async function loadSource(conn, sourceOwnerId, positionId, expectedBoundName, li
   return { owner, position, profiles, batch };
 }
 
-function prepare(source, processedAt) {
+function prepare(source, processedAt, tenantId) {
   const criteria = json(source.position.jd_analysis, {});
   const entries = source.profiles.map((profile) => {
     const fact = buildReloopCandidateFact(profile, { processedAt });
@@ -72,8 +72,11 @@ function prepare(source, processedAt) {
   const externalJobRef = `reloop-position:${source.position.id}`;
   const sourceHash = digest({ position_id: source.position.id, criteria,
     version: source.position.jd_analysis_version, created_at: source.position.created_at });
-  const jobVersionId = id('rjob', { externalJobRef, sourceHash });
-  const matchRunId = id('rrun', { jobVersionId, source_run: source.batch.run_id,
+  // job_version_id / match_run_id 必须纳入 tenantId：否则同一份源数据在多个 tenant 下
+  // 重跑时得到同一个 content-addressed ID，`INSERT IGNORE` 命中已存在的（首个 tenant 的）
+  // 主键后静默跳过，导致该 tenant 的 job_criteria_versions / match_runs 缺失、shortlist 查空。
+  const jobVersionId = id('rjob', { tenantId, externalJobRef, sourceHash });
+  const matchRunId = id('rrun', { tenantId, jobVersionId, source_run: source.batch.run_id,
     source_date: source.batch.recommend_date, algorithm_version: ALGORITHM_VERSION,
     facts: entries.map(({ fact }) => fact.fact_version_id) });
   return { criteria, entries, externalJobRef, sourceHash, jobVersionId, matchRunId };
@@ -221,7 +224,7 @@ export async function syncReloopShortlist(rawInput, dependencies = {}) {
     const source = await loadSource(conn, input.sourceOwnerId, input.positionId,
       input.expectedBoundName, input.limit);
     const createdAt = new Date();
-    const prepared = prepare(source, createdAt);
+    const prepared = prepare(source, createdAt, input.tenantId);
     const summary = { dry_run: input.dryRun, source_candidates: source.profiles.length,
       ready_candidates: prepared.entries.length, external_job_ref: prepared.externalJobRef,
       match_run_id: prepared.matchRunId };

@@ -31,9 +31,9 @@ test('production config isolates sessions, sandboxes all runs, and exposes no pl
     'step-3.5-flash', 'step-3.7-flash',
   ]);
   const mia = config.channels.feishu.accounts.mia;
-  assert.deepEqual(mia.appSecret, {
-    source: 'env', provider: 'default', id: 'BRAINX_FEISHU_APP_SECRET',
-  });
+  // OpenClaw 外部化 feishu 插件（≥2026.5.2）无法解析 SecretRef，消息 dispatch 抛
+  // FeishuSecretRefUnavailableError（issue #76451）。改用与 appId 一致的 ${VAR} 环境变量引用。
+  assert.equal(mia.appSecret, '${BRAINX_FEISHU_APP_SECRET}');
   const serialized = JSON.stringify(config);
   assert.doesNotMatch(serialized, /cli_[a-f0-9]{12,}|sk-[A-Za-z0-9]|Bearer\s+/);
 });

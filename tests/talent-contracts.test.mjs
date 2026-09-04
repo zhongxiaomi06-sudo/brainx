@@ -105,6 +105,13 @@ test('candidate_fact_v1：拒绝手机号、邮箱和简历原文等越界字段
   }
 });
 
+test('candidate_fact_v1：SHA-256 哈希中的连续数字不误判为手机号', () => {
+  const hashWithDigits = 'a'.repeat(20) + '19459559905' + 'f'.repeat(33);
+  assert.doesNotThrow(() => parseCandidateFact(candidateFact({
+    document: { ...candidateFact().document, content_hash: hashWithDigits },
+  })));
+});
+
 test('candidate_match_bundle_v1：候选人实力与职位匹配分开', () => {
   const parsed = parseCandidateMatchBundle(matchBundle());
   assert.equal(parsed.items[0].strength.score, 83);

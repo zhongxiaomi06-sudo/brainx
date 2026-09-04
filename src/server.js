@@ -575,8 +575,8 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       const open = ['GET /api/v1/consultants', 'POST /api/v1/session', 'DELETE /api/v1/session',
                     'GET /api/v1/oauth/status', 'GET /api/v1/oauth/authorize', 'GET /api/v1/oauth/callback',
                     'GET /login',
-                    // 扩展自动同步 TTC JWT：免登录（扩展无 brainx session），凭来源校验 + JWT 活验证兜底
-                    'POST /api/v1/ttc/ext-sync', 'GET /api/v1/ttc/status',
+                    // 扩展自动同步 TTC JWT：免登录，凭来源校验+JWT 活验证+归属一致校验兜底；ttc/status 已收回需登录
+                    'POST /api/v1/ttc/ext-sync',
                     // 人才库健康探测：纯状态（后端类型/连通性/建表），不含任何用户数据或密码，
                     // 允许未登录访问，以便数据源页无论登录与否都能显示真库连接状态。
                     'GET /api/v1/talent/health', 'GET /api/v1/talent/status',

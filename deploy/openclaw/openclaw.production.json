@@ -135,7 +135,7 @@
         "mia": {
           "name": "Mia / BrainX",
           "appId": "${BRAINX_FEISHU_APP_ID}",
-          "appSecret": { "source": "env", "provider": "default", "id": "BRAINX_FEISHU_APP_SECRET" }
+          "appSecret": "${BRAINX_FEISHU_APP_SECRET}"
         }
       }
     }

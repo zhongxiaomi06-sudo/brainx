@@ -1,10 +1,47 @@
 # Agent Commit 记录
 
+## 2026-09-04｜merge(update): 合并 9 月 4 日五项生产修复
+
+- 合并：把 `origin/codex/york-gray-release` 从 `2368613` 到 `a8f8cde` 的五个新提交并入当前集成分支，同时保留本地 PR #55 的生产修复历史。
+- 改动：纳入飞书 appSecret 兼容修复、手机号与哈希误判修复、reloop 增量游标时区修复、match run 租户隔离，以及 TTC JWT 强制本人绑定与状态接口收口。
+- 验证：受影响的生产配置、reloop、SuperMai、人才契约、同步游标和 TTC 鉴权专项 34/34 通过；首次沙箱运行的 4 项仅因禁止临时端口而失败，允许本地端口后原样复跑全绿；提交后快速门禁 16/16 通过。
+
+## 2026-09-04｜fix(auth): 强制本人登陆——TTC 凭据跨人代绑全链路封堵
+
+- 背景：用户要求账号隔离检查（"其他人现在使用的是我的账号，强制登陆要求"）。生产审计先给出底数：6 条 ttc_tokens 逐一解密核对，JWT 内嵌身份均与顾问本人一致，**当前无冒用存量**；但通道上存在 4 个可被冒用的洞。
+- 封堵的洞：① `POST /api/v1/ttc/ext-sync`（免登录）凭可伪造的 Origin 即可把任意 JWT 写进任意顾问槽位，且缺参默认 felix；② `PUT /api/v1/ttc/connect` 不校验 JWT 归属，贴谁的 token 都收；③ `GET /api/v1/ttc/status` 免登录且可 `?consultant_id=` 跨人查询；④ `getSupermaiCredentials` 的 `BRAINX_SUPERMAI_TOKEN` 共享环境变量会让全员用同一账号搜索。
+- 修复：`verifyAndSave` 新增归属校验——JWT 内嵌 `nick_name` 必须与目标顾问花名册 `display_name` 一致（fail-closed，422 `JWT_OWNER_MISMATCH`，且在打 TTC 活探针前拒绝）；ext-sync 移除默认顾问、必须显式指定本人；`ttc/status` 收回需登录、只回本人；SuperMai 移除共享 token 回退，未绑定本人 JWT 即不可用。
+- 验证：`tests/ttcsdk.test.mjs` 9/9、`tests/supermai-sourcing.test.mjs` 4/4（新增跨人拒绝/ext-sync 无默认/ttc/status 401/共享 token 不回退用例）；quick 门禁 16/16。
+
 ## 2026-09-04｜merge(openclaw): 合并 PR #55 生产修复
 
 - 合并：把 `origin/prod/gray-openclaw` 的两项生产修复历史并入当前集成分支；安装器加载受保护环境文件与 worker 等待就绪日志的最终实现已被当前分支后续提交覆盖，因此冲突按当前更完整实现解决，不重复或回退代码。
 - 边界：PR #47 已包含在当前分支；PR #20 为 8 月旧 Storybook 分支，GitHub 判定存在冲突且其功能已由后续前端实现演进，不把过期分支整体混入生产集成。
-- 验证：安装脚本语法通过；生产配置与 worker 专项 9/9 通过；合并态快速门禁 15/16，唯一失败为门禁按设计拒绝 `MERGE_HEAD`，提交后在干净 HEAD 复跑。
+- 验证：安装脚本语法通过；生产配置与 worker 专项 9/9 通过；提交后快速门禁 16/16 通过。
+
+## 2026-09-04｜fix(talent): 匹配运行 ID 纳入 tenant 隔离，修复跨租户 shortlist 查空
+
+- 根因：`reloop-shortlist-sync.js` 的 `jobVersionId` / `matchRunId` 是 content-addressed 且不含 tenantId，同一份源数据（如 reloop position 31 的 10 条推荐）在多个 tenant 下重跑得到同一 ID，`INSERT IGNORE` 命中已存在（PoC `ttc-york-team` 的）主键后静默跳过 → 新 tenant 的 `job_criteria_versions` / `match_runs` / `candidate_job_matches` 缺失，`candidateShortlist` 查空。
+- 修复：`prepare()` 把 tenantId 纳入 `jobVersionId` / `matchRunId` 的 digest 输入（`job_access_grants` / `talent_access_grants` 的 grant_id 本就含 tenantId，此前不一致）。
+- 验证：新增回归用例「同一源数据在不同 tenant 生成不同 match_run_id」；`tests/reloop-shortlist-sync.test.mjs` 3/3 通过；生产 yorkteam 重跑 position 31/26 各 10 候选人，`candidateShortlist` 端到端返回脱敏候选人（郭*/肖*/马*）。
+
+## 2026-09-04｜fix(talent): reloop 增量同步游标 UTC 偏移导致停滞
+
+- 根因：`scripts/sync-reloop-incremental.mjs` 的 fetchPage 用 `new Date(last.updated_at).toISOString()` 构造游标，把 CST(+08:00) 墙钟转成 UTC 时刻（早 8 小时）。回写 SQL `updated_at > ?` 时仍命中已处理批次，游标永不推进，`runCursorSync` 抛 `SOURCE_CURSOR_STALLED`。
+- 修复：新增 `src/db.js#mysqlLocalDatetime`，只取 Date 本地字段格式化回 MySQL 墙钟字符串（`2026-08-29 04:46:38`），与 mysql2 默认「DATETIME 按本地墙钟解析」语义一致；游标改用它，初始游标改用 `1970-01-01 00:00:00`。
+- 验证：生产实测 ISO 游标剩余=383（重命中）、本地字符串游标剩余=283（正确）；重跑同步 383 份/4 页全部入库（yorkteam），游标存 `{"updatedAt":"2026-08-31 03:37:36","id":8020}`。新增回归用例 `tests/talent-pipeline.test.mjs`；全量 508 测试通过。
+
+## 2026-09-04｜fix(talent): PHONE 正则误判 SHA-256 哈希为手机号
+
+- 根因：`candidate_fact_v1` 敏感信息契约的 PHONE 正则 `(?<!\d)1[3-9]\d{9}(?!\d)` 会误匹配 SHA-256 十六进制哈希 / evidence_ref 中的连续 11 位数字（如 `ev_19459559905f…`、`ca14313873295c…`），导致 383 份 reloop 人才事实中 29 份被误判 `SENSITIVE_DATA`、阻断入库。
+- 修复：边界从 `\d` 收紧为 `\w`（`(?<![\w])1[3-9]\d{9}(?![\w])`）。哈希/evidence_ref 是 hex+下划线字符，其内部连续数字前后仍是 `\w`，不再误命中；真实手机号前后是非 `\w` 字符（空格/标点/边界）仍被正确拦截。
+- 验证：新增回归用例「SHA-256 哈希中的连续数字不误判为手机号」；`tests/talent-contracts.test.mjs` 7/7 通过；生产诊断 `SENSITIVE_DATA` 29→0 份。
+
+## 2026-09-04｜fix(deploy): 飞书 appSecret 改用环境变量引用绕过 SecretRef 解析 bug
+
+- 根因：OpenClaw 2026.7.1-2 外部化 feishu 插件无法解析 SecretRef（issue #76451），飞书私聊消息 dispatch 抛 `FeishuSecretRefUnavailableError: channels.feishu.appSecret: unresolved SecretRef`，表现为「机器人收到消息但不回复」。
+- 修复：`channels.feishu.accounts.mia.appSecret` 从 SecretRef 对象改为与 `appId` 一致的 `${BRAINX_FEISHU_APP_SECRET}` 环境变量引用（生产 `/var/lib/brainx/.openclaw/openclaw.json` 已同步 hot-reload 并重启 openclaw-brainx）。同步更新 `tests/openclaw-production-config.test.mjs` 断言。
+- 验证：`tests/openclaw-production-config.test.mjs` 8/8 通过；quick 门禁 16/16 通过；生产重启后 ws client ready、bot open_id 解析成功、无 SecretRef 错误。
 
 ## 2026-09-04｜feat(sourcing): SuperMai 凭证复用顾问本人 TTC JWT
 

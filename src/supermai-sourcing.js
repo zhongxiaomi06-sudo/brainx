@@ -30,8 +30,10 @@ const SOURCE_CN = { linkedin: '领英', github: 'GitHub', paper: '论文' };
 
 /** 获取 SuperMai 凭证（cloud_base_url + token），优先级：
  *  1. 独立 SuperMai 凭证表（顾问级 cloud_base_url + token，若曾单独保存）；
- *  2. 复用 TTC JWT 作为 Bearer token（token=JWT）：cloud_base_url 用环境变量或默认
- *     TTC gateway，token 优先环境变量 BRAINX_SUPERMAI_TOKEN，其次顾问本人有效 JWT。 */
+ *  2. 复用顾问本人有效 TTC JWT 作为 Bearer token（token=JWT），cloud_base_url 用
+ *     环境变量或默认 TTC gateway。
+ * 2026-09-04 账号隔离加固：移除 BRAINX_SUPERMAI_TOKEN 共享环境变量回退——
+ * 那会让所有顾问共用同一个账号搜索；现在强制人人用本人 TTC JWT（未绑定=不可用）。 */
 export function getSupermaiCredentials(db, consultantId) {
   const r = db.prepare(
     'SELECT cloud_base_url_enc, token_enc, needs_reauth FROM supermai_credentials WHERE consultant_id=?',
@@ -39,7 +41,7 @@ export function getSupermaiCredentials(db, consultantId) {
   if (r && !r.needs_reauth) {
     try { return { cloudBaseUrl: dec(r.cloud_base_url_enc), token: dec(r.token_enc) }; } catch { /* 回退 JWT 复用 */ }
   }
-  const token = process.env.BRAINX_SUPERMAI_TOKEN || getValidTtcJwt(db, consultantId);
+  const token = getValidTtcJwt(db, consultantId);
   if (token) return { cloudBaseUrl: DEFAULT_CLOUD_BASE_URL, token };
   return null;
 }

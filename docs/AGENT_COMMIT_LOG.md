@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-04｜build(gate): 依赖审计超时 120s→240s——代理抖动导致 push 门禁连续假失败
+
+- 背景：push 前 full 门禁连续三轮在「npm audit」上超时假失败（第 1 轮后端、第 2/3 轮前端，互换出现），单独实测前端 audit 35s 通过、0 vulnerabilities——走代理时 registry 延迟尖峰偶发超过 120s 上限，属环境抖动而非依赖问题。
+- 实现：.quality-gate/config.json 中 full/ci 两个 profile 的后端与前端 audit timeoutMs 120000→240000。
+- 验证：前端 audit 单独跑通过（0 vulnerabilities，35s）；门禁重跑结论见后续记录。
+
 ## 2026-09-04｜fix(agent-gateway): 闭环交付修复——空 shortlist 溯源 + 接单/找人结果取回指引
 
 - 背景：wendy 会话诊断发现「数据/闭环不对」的核心断点——模型向顾问交付候选人时查了 `brainx_candidate_shortlist`（RDS reloop 旁路，只覆盖部分合作岗位），而不是取 OpenMai 找人落库的 `openmai_results`；两个已 done 的结果（JKKKYFQ/JGMLKYW，result_text 6.3KB，公域 Tier3 命中 67 人）躺在表里没人交付。模型在 3 个环节都缺「去哪取真值」的指引：① 空 shortlist 被解读成「找不到人/源挂了」；② 接单触发找人后不知道要轮询取结果；③ 结果 done 后只回「已就绪」不呈现候选人。

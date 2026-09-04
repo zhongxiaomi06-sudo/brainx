@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-04｜test(sync): 补齐 8ae295b 漏改的数据质量安全闸回归——行级脏数据新纪律
+
+- 背景：commit 8ae295b「行级脏数据不再判废整轮同步」只改了 src/sync.js，漏改了锁定旧行为的 tests/data-quality.test.mjs「不完整同步(complete=0)时 recommend 被 blocked」，full 门禁失败（脏行断言 complete=false，实际新行为为 true）。
+- 实现：① 替换为三条新回归——纯脏行输入 complete=1、warnings 记录行级原因、脏行不入库、推荐链路不冻结；混入脏行时有效职位仍入库（rows_read 只计有效行）；直接插 sync_runs complete=0 行验证批级故障仍 fail-closed blocked。② 同步修订文件头纪律说明（②行级跳过/③批级故障 blocked）。
+- 验证：data-quality.test.mjs 7/7 通过。
+
 ## 2026-09-04｜fix(supermai): SOURCE_UNAVAILABLE 拆分出 SUPERMAI_UNAVAILABLE——不再误导「OpenMai 也挂了」
 
 - 背景：wendy 会话里 supermai_scout 两次失败，模型回复「SuperMai/OpenMai 都挂了」——实际实测（本地+ECS+带 wendy 本人 JWT 三重验证）OpenMai 正常（wendy 当天 07:37 两单 done），只有 gateway.ttcadvisory.com/search/scout/match 与 /search/jobs 是阿里云 ALB 层 503（后端无健康实例）。根因：SuperMai 与 talent/shortlist/RDS 共用通用错误码 SOURCE_UNAVAILABLE，模型无法区分「哪个源挂了」，臆断成全链路故障。

@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-04｜fix(auth): 强制本人登陆——TTC 凭据跨人代绑全链路封堵
+
+- 背景：用户要求账号隔离检查（"其他人现在使用的是我的账号，强制登陆要求"）。生产审计先给出底数：6 条 ttc_tokens 逐一解密核对，JWT 内嵌身份均与顾问本人一致，**当前无冒用存量**；但通道上存在 4 个可被冒用的洞。
+- 封堵的洞：① `POST /api/v1/ttc/ext-sync`（免登录）凭可伪造的 Origin 即可把任意 JWT 写进任意顾问槽位，且缺参默认 felix；② `PUT /api/v1/ttc/connect` 不校验 JWT 归属，贴谁的 token 都收；③ `GET /api/v1/ttc/status` 免登录且可 `?consultant_id=` 跨人查询；④ `getSupermaiCredentials` 的 `BRAINX_SUPERMAI_TOKEN` 共享环境变量会让全员用同一账号搜索。
+- 修复：`verifyAndSave` 新增归属校验——JWT 内嵌 `nick_name` 必须与目标顾问花名册 `display_name` 一致（fail-closed，422 `JWT_OWNER_MISMATCH`，且在打 TTC 活探针前拒绝）；ext-sync 移除默认顾问、必须显式指定本人；`ttc/status` 收回需登录、只回本人；SuperMai 移除共享 token 回退，未绑定本人 JWT 即不可用。
+- 验证：`tests/ttcsdk.test.mjs` 9/9、`tests/supermai-sourcing.test.mjs` 4/4（新增跨人拒绝/ext-sync 无默认/ttc/status 401/共享 token 不回退用例）；quick 门禁 16/16。
+
 ## 2026-09-04｜fix(talent): 匹配运行 ID 纳入 tenant 隔离，修复跨租户 shortlist 查空
 
 - 根因：`reloop-shortlist-sync.js` 的 `jobVersionId` / `matchRunId` 是 content-addressed 且不含 tenantId，同一份源数据（如 reloop position 31 的 10 条推荐）在多个 tenant 下重跑得到同一 ID，`INSERT IGNORE` 命中已存在（PoC `ttc-york-team` 的）主键后静默跳过 → 新 tenant 的 `job_criteria_versions` / `match_runs` / `candidate_job_matches` 缺失，`candidateShortlist` 查空。

@@ -32,3 +32,21 @@ test('无任何凭证时返回 null（fail-closed，不抛异常）', () => {
   const db = openDb(':memory:');
   assert.equal(getSupermaiCredentials(db, 'felix'), null);
 });
+
+test('账号隔离：共享环境变量 token 不再作为全员回退（2026-09-04 加固）', () => {
+  const db = openDb(':memory:');
+  const orig = process.env.BRAINX_SUPERMAI_TOKEN;
+  process.env.BRAINX_SUPERMAI_TOKEN = 'shared-account-token';
+  try {
+    // 未绑定本人 JWT → 必须不可用，绝不能借共享 token 搜（那就是拿别人的账号）
+    assert.equal(getSupermaiCredentials(db, 'felix'), null);
+    // 绑定了本人 JWT → 只用本人的
+    saveTtcToken(db, 'felix', JWT, {
+      userName: 'Felix', personId: 'person-felix', expiresAt: '2099-01-01T00:00:00.000Z',
+    });
+    assert.equal(getSupermaiCredentials(db, 'felix')?.token, JWT);
+  } finally {
+    if (orig === undefined) delete process.env.BRAINX_SUPERMAI_TOKEN;
+    else process.env.BRAINX_SUPERMAI_TOKEN = orig;
+  }
+});

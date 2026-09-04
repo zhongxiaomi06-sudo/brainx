@@ -80,9 +80,15 @@ ${String(text).slice(0, 4000)}
 ---
 输出 JSON（null 或字符串）：{"company":{"text":"…","evidence":"…"}|null,"role":{…}|null,"city":{…}|null,"pipeline":{"text":"推荐/面试/Offer/入职等阶段描述","evidence":"…"}|null,"hc":{"text":"数字","evidence":"…"}|null,"active_state":{"text":"OPEN或CLOSED","evidence":"…"}|null}`;
   const out = await chatJson(system, user);
-  // 与规则层统一形态（{text, evidence, confidence}）：hc/active_state 是结构化字段，
-  // pipeline 用 {stage}，confidence 按 evidence 与原文重合度给（重合=high，否则 medium）。
-  const src = String(text);
+  // 与规则层统一形态（{text, evidence, confidence}）：映射逻辑单独导出，
+  // 供 JD 私聊抽取（jd-extract.js）复用同一契约（specs/005）。
+  return mapLlmFields(out, String(text));
+}
+
+/** LLM 输出 → 草稿字段统一映射。out 形如 {company:{text,evidence}|null,...}；
+ * hc/active_state 是结构化字段，pipeline 用 {stage}，confidence 按 evidence 与原文重合度给
+ * （重合=high，否则 medium）。违规字段一律丢弃（宁缺勿错），调用方 schema 校验兜底。 */
+export function mapLlmFields(out, src) {
   const field = (v, key = 'text') => {
     if (!v || typeof v !== 'object') return null;
     const val = typeof v.text === 'string' ? v.text.trim() : '';

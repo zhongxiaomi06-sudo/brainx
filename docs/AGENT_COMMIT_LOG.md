@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-04｜feat(job-facts): 顾问私聊直接发 JD 提交建岗草稿（specs/005）
+
+- 背景：群链路建岗已通，但顾问私聊直接发整段 JD 走不通——私聊消息不入账本、草稿可见性只认登记群、规则层抽不动长 JD。本提交补齐「私聊 JD → 带证据草稿 → 一键确认建岗」链路（AI 只提议，建岗仍由人确认）。
+- 实现：① 新工具 `brainx_submit_job_jd`（p2p-only，jd_text 50–8000 字符，confirm 必填）贯通 openclaw 插件 → agent-gateway；② `src/job-extract/p2p-submit.js`——JD 原文入 `lark_messages` 作证据 + 事件入账本，`message_id = sha256(consultant_id+JD)` 派生实现三层幂等（原文表 OR IGNORE / 账本 idem_key / 迁移 0038 部分唯一索引），LLM 提炼（AI_JOB_EXTRACT_ENABLED=1 且 llm 已配置，8s 超时对齐插件 10s 上限）失败静默降级规则层，无有效字段不产空草稿；③ `jd-extract.js` JD 专用 prompt，`classify.js` 的字段映射提为导出 `mapLlmFields` 供两条链路复用；④ 迁移 0038 加 `origin='p2p_jd'`/`submitted_by` 列与部分唯一索引；⑤ 草稿可见性扩展「登记群成员 OR 提交人本人」，确认/拒绝复用 confirmDraft/rejectDraft；⑥ 薪资/任职要求无权威列，随 raw_json 存档回显；⑦ 插件契约三处（manifest/fixture/生产配置 tools.allow）同步至 23 个工具，插件版本 1.2.0。
+- 验证：新增 `tests/job-extract-p2p-submit.test.mjs` 10/10（规则层提交/幂等短路/跨人隔离/可见性与越权拒绝/确认转正/JD_TOO_SHORT/confirm 守门/空字段）；全量 522 测试 522/522 通过；quick 门禁 16/16。
+
 ## 2026-09-04｜fix(auth): 强制本人登陆——TTC 凭据跨人代绑全链路封堵
 
 - 背景：用户要求账号隔离检查（"其他人现在使用的是我的账号，强制登陆要求"）。生产审计先给出底数：6 条 ttc_tokens 逐一解密核对，JWT 内嵌身份均与顾问本人一致，**当前无冒用存量**；但通道上存在 4 个可被冒用的洞。

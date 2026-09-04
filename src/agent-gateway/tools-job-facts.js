@@ -2,11 +2,20 @@ import { createHash } from 'node:crypto';
 
 import { confirmDraft, rejectDraft } from '../job-extract/confirm.js';
 
+/** 可见性（specs/005 扩展）：登记群成员可见群草稿（原语义不变），
+ * 或 origin='p2p_jd' 且 submitted_by=本人（私聊 JD 提交草稿仅提交人可见）。
+ * EXISTS 不命中即 0 行，保持「无权不泄露存在性」语义。占位符：consultantId 出现两次。 */
 const VISIBLE_DRAFT = `
   SELECT d.* FROM job_facts_drafts d
-  JOIN chat_contexts c ON c.chat_id=d.chat_id AND c.enabled=1
-  JOIN consultant_chats cc ON cc.chat_id=d.chat_id AND cc.consultant_id=?
-  JOIN consultants u ON u.consultant_id=cc.consultant_id AND u.active=1`;
+  WHERE (
+    EXISTS (
+      SELECT 1 FROM chat_contexts c
+      JOIN consultant_chats cc ON cc.chat_id = d.chat_id AND cc.consultant_id = ?
+      JOIN consultants u ON u.consultant_id = cc.consultant_id AND u.active = 1
+      WHERE c.chat_id = d.chat_id AND c.enabled = 1
+    )
+    OR (d.origin = 'p2p_jd' AND d.submitted_by = ?)
+  )`;
 
 function fail(code) {
   throw Object.assign(new Error(code), { code });
@@ -47,7 +56,7 @@ function projection(row) {
   };
 }
 function visibleDraft(db, consultantId, draftId) {
-  return db.prepare(`${VISIBLE_DRAFT} WHERE d.draft_id=? LIMIT 1`).get(consultantId, draftId);
+  return db.prepare(`${VISIBLE_DRAFT} AND d.draft_id=? LIMIT 1`).get(consultantId, consultantId, draftId);
 }
 
 function requireSuccess(result) {
@@ -61,9 +70,8 @@ export function createJobFactsToolHandlers({ db }) {
   return {
     brainx_pending_job_facts: (args, context) => {
       const limit = args.limit || 10;
-      const rows = db.prepare(`${VISIBLE_DRAFT}
-        WHERE d.status='pending' ORDER BY d.extracted_at DESC LIMIT ?`)
-        .all(context.principal.consultantId, limit);
+      const rows = db.prepare(`${VISIBLE_DRAFT} AND d.status='pending' ORDER BY d.extracted_at DESC LIMIT ?`)
+        .all(context.principal.consultantId, context.principal.consultantId, limit);
       return {
         data: { items: rows.map(projection), count: rows.length },
         facts: [], inferences: [], recommendations: [], unknowns: [],

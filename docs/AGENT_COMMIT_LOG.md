@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-04｜fix(sync): 行级脏数据不再判废整轮同步——解冻全员推荐链路
+
+- 背景：felix 刷新 TTC 后 daily_brief 两轮拉取完全一样。定位结论：TTC 端 8 个新职位缺「客户或职位名」（JY6LB5A 等），runSync 记 errors → 整批 complete=0 → recommend() fail-closed（!last.complete → blocked 不落轮）→ decision_runs 零 COMPLETED → daily_brief 永远读旧冻结快照。job_facts 照常增量（bridge 先写行再记 sync_runs），库是活的但推荐引擎不吃，呈现「数据很多、链路没读到」。
+- 实现：sync.js runSync 中「缺 project_id / 缺客户或职位名」由 errors 降级为 warnings（行照旧跳过不入库，但不判废整轮 complete），与既有「输入内重复 project_id」行级降级对齐（此前注释已声明要避免脏行拖垮整批，唯独漏了这两处）。
+- 生产处置（同 commit 不可见，记录备查）：① sync.js 热更到 /opt/brainx + 重启 brainx-worker；② 发现 brainx.service 未设 BRAINX_EMBED_WORKER=0 → API 进程嵌入跑旧版批处理持续写 complete=0，已补 Environment=BRAINX_EMBED_WORKER=0 并重启（消除双跑）；③ 15:46 nohup 手动起的一次性全量回填脚本 bin/ttc-multi-pull.mjs 残留进程（内存加载旧 sync.js，每轮把 6 人 sync_runs 写成 complete=0 且打爆 TTC 限流）已 kill；④ 以 job_facts 现存 12,616 条 TTC 事实为 payload 手动重跑 runSync（complete=1）+ 强制重算推荐（throttle=false），6 顾问全部落新 COMPLETED 轮（candidates 12,776），daily_brief 恢复新鲜数据。
+- 验证：ttcsync/bridge/core/ttc-field-catalog/feedback-loop/visibility/facts/agent-job-tools/weights 相关 69 项测试全过；quick 门禁 14/16（2 项失败为既有未跟踪文件 docs/2026-09-04-db-chain-check-report.html 与 scripts/grant-team-access.mjs 的超长行/绝对路径，与本次改动无关）。
+
 ## 2026-09-04｜feat(job-facts): 顾问私聊直接发 JD 提交建岗草稿（specs/005）
 
 - 背景：群链路建岗已通，但顾问私聊直接发整段 JD 走不通——私聊消息不入账本、草稿可见性只认登记群、规则层抽不动长 JD。本提交补齐「私聊 JD → 带证据草稿 → 一键确认建岗」链路（AI 只提议，建岗仍由人确认）。

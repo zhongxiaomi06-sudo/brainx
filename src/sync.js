@@ -65,7 +65,8 @@ const hashInput = (jobs) => {
 
 /**
  * 跑一次同步。返回 sync_runs 行。
- * 硬约束落实：缺 project_id / 缺客户或职位名 → 记 errors 且不入库。
+ * 硬约束落实：缺 project_id / 缺客户或职位名 → 行级跳过（记 warnings 且不入库，
+ * 不判废整轮）。
  * payload：桥接器直接喂规范化职位（source='bridge'），跳过文件/CLI 读取。
  * 关系落位守卫：payload 声明了 consultant_owner 时，只有属主本人同步才写关系行。
  */
@@ -80,8 +81,12 @@ export function runSync(db, { source = 'fixture', consultant_id = 'felix', dry_r
   const valid = [];
   const seen = new Set();
   for (const j of jobs) {
-    if (!j.project_id) { errors.push(`缺 project_id：${j.company}/${j.role}`); continue; }
-    if (!j.company || !j.role) { errors.push(`缺客户或职位名：${j.project_id}`); continue; }
+    // 行级校验失败只跳过该行（不入库），不判废整轮 complete。此前「缺客户或
+    // 职位名」计入 errors → 整批 complete=0 → recommend() fail-closed 不落轮，
+    // 个别脏行即可冻结全员 daily_brief（2026-09-04 事故：8 条脏行让 07:00 后
+    // 零 COMPLETED 轮次）。与下方重复 project_id 的行级降级对齐。
+    if (!j.project_id) { warnings.push(`缺 project_id（跳过该行）：${j.company}/${j.role}`); continue; }
+    if (!j.company || !j.role) { warnings.push(`缺客户或职位名（跳过该行）：${j.project_id}`); continue; }
     // 输入内重复 project_id：同一职位被源端重复投递（TTC 云有时同一职位返回两次，
     // 或桥接跨顾问团队池合并时偶发碰撞）。UPSERT 本就会按 project_id 主键合并，
     // 故这里「保留首条、丢弃冗余副本」而非整体判废——避免个别脏行拖垮整批同步、

@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-04｜fix(talent): reloop 增量同步游标 UTC 偏移导致停滞
+
+- 根因：`scripts/sync-reloop-incremental.mjs` 的 fetchPage 用 `new Date(last.updated_at).toISOString()` 构造游标，把 CST(+08:00) 墙钟转成 UTC 时刻（早 8 小时）。回写 SQL `updated_at > ?` 时仍命中已处理批次，游标永不推进，`runCursorSync` 抛 `SOURCE_CURSOR_STALLED`。
+- 修复：新增 `src/db.js#mysqlLocalDatetime`，只取 Date 本地字段格式化回 MySQL 墙钟字符串（`2026-08-29 04:46:38`），与 mysql2 默认「DATETIME 按本地墙钟解析」语义一致；游标改用它，初始游标改用 `1970-01-01 00:00:00`。
+- 验证：生产实测 ISO 游标剩余=383（重命中）、本地字符串游标剩余=283（正确）；重跑同步 383 份/4 页全部入库（yorkteam），游标存 `{"updatedAt":"2026-08-31 03:37:36","id":8020}`。新增回归用例 `tests/talent-pipeline.test.mjs`；全量 508 测试通过。
+
 ## 2026-09-04｜fix(talent): PHONE 正则误判 SHA-256 哈希为手机号
 
 - 根因：`candidate_fact_v1` 敏感信息契约的 PHONE 正则 `(?<!\d)1[3-9]\d{9}(?!\d)` 会误匹配 SHA-256 十六进制哈希 / evidence_ref 中的连续 11 位数字（如 `ev_19459559905f…`、`ca14313873295c…`），导致 383 份 reloop 人才事实中 29 份被误判 `SENSITIVE_DATA`、阻断入库。

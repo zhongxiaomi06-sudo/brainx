@@ -171,6 +171,23 @@ export async function closeMysql() {
   }
 }
 
+const _pad2 = (n) => String(n).padStart(2, '0');
+
+/**
+ * 把 mysql2 读出的 DATETIME 列（默认解析成本地时区 Date）格式化为 MySQL 本地墙钟
+ * 字符串，供游标回写 SQL `updated_at > ?` 比较。
+ *
+ * ⚠️ 不能用 `date.toISOString()`：那会把 CST(UTC+8) 墙钟转成 UTC 时刻（早 8 小时），
+ * 回写比较 `updated_at > '2026-08-28T20:46:38.000Z'` 仍命中已处理批次，导致游标永
+ * 不推进（SOURCE_CURSOR_STALLED）。本函数只取本地字段，与 mysql2 默认「DATETIME 按
+ * 本地墙钟」的解析语义一致，确保 `2026-08-29 04:46:38` 原样往返。
+ */
+export function mysqlLocalDatetime(value) {
+  const d = value instanceof Date ? value : new Date(value);
+  return `${d.getFullYear()}-${_pad2(d.getMonth() + 1)}-${_pad2(d.getDate())} `
+    + `${_pad2(d.getHours())}:${_pad2(d.getMinutes())}:${_pad2(d.getSeconds())}`;
+}
+
 // ---- 建表：7 张表，幂等（IF NOT EXISTS）。等价 Java demo 的 createTable()。----
 // 外键依赖顺序：user → talent → tag → talent_tag / resume → position → match_record。
 export async function initTalentSchema() {

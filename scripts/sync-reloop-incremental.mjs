@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import '../src/env.js';
-import { initTalentSchema, withMysql } from '../src/db.js';
+import { initTalentSchema, withMysql, mysqlLocalDatetime } from '../src/db.js';
 import { writeStructuredCandidateFacts } from '../src/talent-pipeline/facts.js';
 import { runCursorSync } from '../src/talent-pipeline/sync-cursor.js';
 
@@ -50,7 +50,7 @@ const summary = await withMysql(async (conn) => {
       const last = page.at(-1);
       return {
         items: page,
-        nextCursor: last ? JSON.stringify({ updatedAt: new Date(last.updated_at).toISOString(), id: Number(last.id) }) : cursor,
+        nextCursor: last ? JSON.stringify({ updatedAt: mysqlLocalDatetime(last.updated_at), id: Number(last.id) }) : cursor,
         hasMore: items.length > limit,
       };
     },

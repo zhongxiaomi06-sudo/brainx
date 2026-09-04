@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { runCursorSync } from '../src/talent-pipeline/sync-cursor.js';
+import { mysqlLocalDatetime } from '../src/db.js';
 
 test('383 structured profiles are fetched in bounded pages and cursor advances once', async () => {
   const source = Array.from({ length: 383 }, (_, index) => ({ id: index + 1 }));
@@ -51,4 +52,13 @@ test('invalid and non-progressing source pages fail closed', async () => {
     initialCursor: 'same', fetchPage: async () => ({ items: [{}], nextCursor: 'same', hasMore: true }),
     writePage: async () => {}, saveCursor: async () => {},
   }), /SOURCE_CURSOR_STALLED/);
+});
+
+test('mysqlLocalDatetime keeps the MySQL wall-clock instead of shifting to UTC', () => {
+  // mysql2 把 DATETIME 解析成本地时区 Date。用本地构造器构造，断言与时区无关
+  // （本地字段由构造参数固定）：2026-08-29 04:46:38 本地墙钟必须原样往返。
+  const local = new Date(2026, 7, 29, 4, 46, 38);
+  assert.equal(mysqlLocalDatetime(local), '2026-08-29 04:46:38');
+  // 曾导致游标停滞的写法：toISOString 把 +08:00 墙钟转成 UTC 时刻（早 8 小时）。
+  assert.notEqual(local.toISOString(), '2026-08-29T04:46:38.000Z');
 });

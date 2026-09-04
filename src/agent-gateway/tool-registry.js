@@ -167,6 +167,7 @@ export function createProductionToolRegistry({ db, talentDependencies = {}, acti
   const jobFacts = createJobFactsToolHandlers({ db });
   const jdSubmit = createJdSubmitToolHandlers({ db });
   const talent = createTalentToolHandlers({
+    db, // 供 shortlist 空结果溯源（区分「OpenMai 找人岗」与「未授权岗」，2026-09-04 wendy 案例）
     ...talentDependencies,
     jobGapHandler: jobs.brainx_gap_questions,
   });

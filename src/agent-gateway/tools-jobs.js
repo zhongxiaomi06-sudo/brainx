@@ -193,7 +193,11 @@ function openmaiSearch(db, args, principal) {
       data: { job_ref: args.job_id, status: cur.status, result_text: cur.result_text || null,
               started_at: cur.started_at || null, finished_at: cur.finished_at || null },
       facts: [], inferences: [], recommendations: [],
-      unknowns: cur.status === 'running' ? ['找人任务进行中'] : [],
+      unknowns: cur.status === 'running' ? ['找人任务进行中，稍后再查'] : [],
+      // done：结果就在 result_text（markdown 候选人清单），必须完整呈现给顾问，
+      // 不能只回「已就绪」三个字（2026-09-04 wendy 案例：结果躺在表里 3 小时没人交付）。
+      ...(cur.status === 'done' ? { recommendations: [{ action: 'present_result',
+        note: '结果已就绪——请把 data.result_text 里的候选人列表完整、结构化地呈现给顾问，并询问下一步（约面/推荐）。' }] } : {}),
       evidence_refs: [`openmai:${cur.task_id || args.job_id}`],
     };
   }

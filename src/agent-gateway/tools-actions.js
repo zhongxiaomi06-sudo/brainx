@@ -38,12 +38,22 @@ function acceptJob(db, args, principal, startSearch) {
   if (!result.already || result.state === 'ACCEPTED') {
     search = startSearch(db, principal.consultantId, args.job_id);
   }
+  const unknowns = [];
+  // 找人任务已触发：明确指引模型用 openmai_search 轮询取结果并交付（2026-09-04
+  // wendy 案例：模型去查 candidate_shortlist(RDS 旁路) 导致 20 位候选无人交付）。
+  if (search?.status === 'triggered') {
+    unknowns.push('候选人搜索已异步启动，稍后用 brainx_openmai_search(job_id) 查询结果，完成后把候选人完整呈现给顾问。');
+  } else if (search?.status === 'already_done') {
+    unknowns.push('该岗位已有完成结果，用 brainx_openmai_search(job_id) 取回并呈现给顾问。');
+  } else if (search?.status === 'error') {
+    unknowns.push(`候选人搜索暂未启动：${search.message || '请稍后重试'}。`);
+  }
   return {
     data: { job_ref: args.job_id, state: result.state, active_action: safeAction(result.active_action), search },
     facts: [{ job_ref: args.job_id, state: result.state }],
-    inferences: [], recommendations: [], unknowns: [],
+    inferences: [], recommendations: [], unknowns,
     evidence_refs: [`engagement:${args.job_id}`, `action:${result.active_action?.action_id || 'none'}`],
-    next_allowed_actions: ['brainx_run_status', 'brainx_record_job_progress'],
+    next_allowed_actions: ['brainx_openmai_search', 'brainx_run_status', 'brainx_record_job_progress'],
   };
 }
 

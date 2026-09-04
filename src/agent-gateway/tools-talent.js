@@ -10,6 +10,25 @@ function unique(values) {
   return [...new Set(values.filter(Boolean))];
 }
 
+/** 空 shortlist 溯源（2026-09-04 wendy 案例）：模型把「内部短名单空」说成
+ * 「找不到人/数据源挂了」——实际该岗位候选人由 OpenMai 找人异步产生，存于
+ * openmai_results（RDS 短名单只覆盖部分合作岗位，不是全量候选人真值）。 */
+function emptyShortlistGuidance(db, consultantId, jobId) {
+  if (!db || !jobId) return null;
+  try {
+    const openmai = db.prepare('SELECT status FROM openmai_results WHERE project_id=? AND consultant_id=?')
+      .get(jobId, consultantId);
+    const engaged = db.prepare(`SELECT 1 FROM decision_events WHERE project_id=? AND actor=?
+      AND event_type IN ('ACCEPTED','COMPLETED') LIMIT 1`).get(jobId, consultantId);
+    if (openmai || engaged) {
+      return openmai?.status === 'done'
+        ? `该岗位的候选人结果已由 OpenMai 找人完成（openmai_results 有 done 记录），请调用 brainx_openmai_search(job_id) 获取完整候选人列表并呈现给顾问；本内部短名单（RDS）只覆盖部分合作岗位，为空不代表没有候选人，更不是数据源故障。`
+        : `该岗位已进入 OpenMai 找人流程（状态：${openmai?.status || '进行中'}），请调用 brainx_openmai_search(job_id) 查询/刷新结果并呈现给顾问；本内部短名单（RDS）只覆盖部分合作岗位，为空不代表没有候选人。`;
+    }
+    return '当前岗位暂无授权的人才短名单数据（内部短名单仅覆盖部分合作岗位）。如需找候选人：先接单触发 OpenMai 找人，完成后用 brainx_openmai_search(job_id) 获取结果。';
+  } catch { return null; }
+}
+
 async function loadAuthorizedCandidateFact(input, dependencies = {}) {
   const withConnection = dependencies.withConnection || withMysql;
   const sql = `SELECT cfv.facts_json
@@ -178,7 +197,15 @@ export function createTalentToolHandlers(options = {}) {
         evidence_refs: [`candidate_contact:${args.candidate_ref}`],
         next_allowed_actions: ['brainx_candidate_fit'] };
     },
-    brainx_candidate_shortlist: async (args, context) => shortlistResult(await getShortlist(args, context)),
+    brainx_candidate_shortlist: async (args, context) => {
+      const bundle = await getShortlist(args, context);
+      const envelope = shortlistResult(bundle);
+      if (!bundle.items?.length) {
+        const guidance = emptyShortlistGuidance(options.db, context.principal.consultantId, args.job_id);
+        if (guidance) envelope.unknowns.push(guidance);
+      }
+      return envelope;
+    },
     brainx_candidate_facts: async (args, context) => {
       const fact = await getFact(args.candidate_ref, context, args.purpose);
       const projected = publicFact(fact);

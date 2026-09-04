@@ -4,6 +4,7 @@ import { openDb } from '../src/db.js';
 import { runSync } from '../src/sync.js';
 import { recommend } from '../src/recommend.js';
 import { createJobToolHandlers } from '../src/agent-gateway/tools-jobs.js';
+import { createActionToolHandlers } from '../src/agent-gateway/tools-actions.js';
 
 function fixture() {
   const db = openDb(':memory:');
@@ -71,4 +72,24 @@ test('run status 只能读取本人 Agent run 或持久任务', async () => {
   const own = await handlers.brainx_run_status({ run_id: 'job-run' }, context('felix', 'run_status'));
   assert.equal(own.data.status, 'PENDING');
   assert.throws(() => handlers.brainx_run_status({ run_id: 'job-run' }, context('mia', 'run_status')), /NOT_FOUND_OR_FORBIDDEN/);
+});
+
+test('OpenMai done 结果返回带 present_result 呈现指引，不能只回「已就绪」', async () => {
+  const { db, projectId, handlers } = fixture();
+  // 接单写 ACCEPTED 事件（stub 启动函数，避免真网络），随后手工落一条 done 结果
+  const action = createActionToolHandlers({ db, startSearchFn: () => ({ status: 'triggered', task_id: 'stub' }) });
+  action.brainx_accept_job({ job_id: projectId, goal: '找到候选人', action_title: '启动找人',
+    due_at: new Date(Date.now() + 2 * 86400000).toISOString(),
+    idempotency_key: 'agent:om:accept', confirm: true }, context('felix', 'job_review'));
+  const at = new Date().toISOString();
+  db.prepare(`INSERT INTO openmai_results (project_id, consultant_id, status, result_text, task_id, started_at, finished_at)
+    VALUES (?,?,?,?,?,?,?)`)
+    .run(projectId, 'felix', 'done', '# 候选人\n1. 张三｜上海｜5年招聘经验\n2. 李四｜北京｜3年', 'om_omtest', at, at);
+
+  const out = await handlers.brainx_openmai_search({ job_id: projectId }, context('felix', 'job_review'));
+  assert.equal(out.data.status, 'done');
+  assert.ok(out.data.result_text.includes('张三'), 'done 结果必须把 result_text 原样带出');
+  assert.ok(out.recommendations.some((r) => r.action === 'present_result' && r.note.includes('完整')),
+    'done 分支必须带 present_result 指引，防止模型只回“已就绪”不交付候选人');
+  assert.equal(out.unknowns.length, 0);
 });

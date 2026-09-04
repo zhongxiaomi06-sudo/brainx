@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-04｜fix(agent-gateway): 闭环交付修复——空 shortlist 溯源 + 接单/找人结果取回指引
+
+- 背景：wendy 会话诊断发现「数据/闭环不对」的核心断点——模型向顾问交付候选人时查了 `brainx_candidate_shortlist`（RDS reloop 旁路，只覆盖部分合作岗位），而不是取 OpenMai 找人落库的 `openmai_results`；两个已 done 的结果（JKKKYFQ/JGMLKYW，result_text 6.3KB，公域 Tier3 命中 67 人）躺在表里没人交付。模型在 3 个环节都缺「去哪取真值」的指引：① 空 shortlist 被解读成「找不到人/源挂了」；② 接单触发找人后不知道要轮询取结果；③ 结果 done 后只回「已就绪」不呈现候选人。
+- 实现：① `tool-registry.js` 把 db 注入 talent 工具（溯源需要）；② `tools-talent.js` 新增 `emptyShortlistGuidance`——空短名单时查 `openmai_results`/`decision_events`，按「done→去 openmai_search 取回呈现 / 进行中→提示轮询 / 无记录→提示先接单」三种情况注入 unknowns，杜绝「无候选人/数据源故障」臆断；③ `tools-actions.js` acceptJob 按 startOpenmaiTask 返回的 triggered/already_done/error 注入取回指引，并把 `brainx_openmai_search` 加进 next_allowed_actions；④ `tools-jobs.js` openmaiSearch done 分支带 `present_result` recommendation，强制模型把 result_text 候选人清单完整结构化呈现。
+- 回归测试：agent-talent-tools +4（done/进行中/无记录/无 db 不崩溃）、agent-action-tools 扩展接单断言 + 新增 already_done/error 分支、agent-job-tools +1（done 带 present_result）。三文件 21/21 通过；quick 门禁 16/16。
+
 ## 2026-09-04｜test(sync): 补齐 8ae295b 漏改的数据质量安全闸回归——行级脏数据新纪律
 
 - 背景：commit 8ae295b「行级脏数据不再判废整轮同步」只改了 src/sync.js，漏改了锁定旧行为的 tests/data-quality.test.mjs「不完整同步(complete=0)时 recommend 被 blocked」，full 门禁失败（脏行断言 complete=false，实际新行为为 true）。

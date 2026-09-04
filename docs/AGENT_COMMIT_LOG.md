@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-04｜merge(openclaw): 合并 PR #55 生产修复
+
+- 合并：把 `origin/prod/gray-openclaw` 的两项生产修复历史并入当前集成分支；安装器加载受保护环境文件与 worker 等待就绪日志的最终实现已被当前分支后续提交覆盖，因此冲突按当前更完整实现解决，不重复或回退代码。
+- 边界：PR #47 已包含在当前分支；PR #20 为 8 月旧 Storybook 分支，GitHub 判定存在冲突且其功能已由后续前端实现演进，不把过期分支整体混入生产集成。
+- 验证：安装脚本语法通过；生产配置与 worker 专项 9/9 通过；合并态快速门禁 15/16，唯一失败为门禁按设计拒绝 `MERGE_HEAD`，提交后在干净 HEAD 复跑。
+
 ## 2026-09-04｜feat(sourcing): SuperMai 凭证复用顾问本人 TTC JWT
 
 - 目标：接续 `ee33805` 的 SuperMai 集成——用户确认 SuperMai 云端 sourcing 的 Bearer token 即顾问本人登录的 TTC JWT（凭证鉴权"就是大家登录的"），无需另建独立凭证体系。

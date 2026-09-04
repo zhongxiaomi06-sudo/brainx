@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-04｜fix(talent): 匹配运行 ID 纳入 tenant 隔离，修复跨租户 shortlist 查空
+
+- 根因：`reloop-shortlist-sync.js` 的 `jobVersionId` / `matchRunId` 是 content-addressed 且不含 tenantId，同一份源数据（如 reloop position 31 的 10 条推荐）在多个 tenant 下重跑得到同一 ID，`INSERT IGNORE` 命中已存在（PoC `ttc-york-team` 的）主键后静默跳过 → 新 tenant 的 `job_criteria_versions` / `match_runs` / `candidate_job_matches` 缺失，`candidateShortlist` 查空。
+- 修复：`prepare()` 把 tenantId 纳入 `jobVersionId` / `matchRunId` 的 digest 输入（`job_access_grants` / `talent_access_grants` 的 grant_id 本就含 tenantId，此前不一致）。
+- 验证：新增回归用例「同一源数据在不同 tenant 生成不同 match_run_id」；`tests/reloop-shortlist-sync.test.mjs` 3/3 通过；生产 yorkteam 重跑 position 31/26 各 10 候选人，`candidateShortlist` 端到端返回脱敏候选人（郭*/肖*/马*）。
+
 ## 2026-09-04｜fix(talent): reloop 增量同步游标 UTC 偏移导致停滞
 
 - 根因：`scripts/sync-reloop-incremental.mjs` 的 fetchPage 用 `new Date(last.updated_at).toISOString()` 构造游标，把 CST(+08:00) 墙钟转成 UTC 时刻（早 8 小时）。回写 SQL `updated_at > ?` 时仍命中已处理批次，游标永不推进，`runCursorSync` 抛 `SOURCE_CURSOR_STALLED`。

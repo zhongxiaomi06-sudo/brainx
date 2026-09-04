@@ -49,3 +49,10 @@ test('reloop 同步：数据账号未绑定目标顾问时失败关闭', async (
     /SOURCE_ACCOUNT_BINDING_MISMATCH/);
   assert.deepEqual(conn.writes, []);
 });
+
+test('reloop 同步：同一源数据在不同 tenant 下生成不同 match_run_id（tenant 隔离）', async () => {
+  const outA = await syncReloopShortlist(input, { withConnection: (fn) => fn(sourceConnection()) });
+  const outB = await syncReloopShortlist({ ...input, tenantId: 'tenant_b' },
+    { withConnection: (fn) => fn(sourceConnection()) });
+  assert.notEqual(outA.match_run_id, outB.match_run_id);
+});

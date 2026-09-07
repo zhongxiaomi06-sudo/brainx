@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, ChevronRight, Clock3, Search } from "lucide-react";
+import { AlertTriangle, Bot, CheckCircle2, ChevronRight, Clock3, Search } from "lucide-react";
 import type { ProjectStatus, ProjectSummary } from "./brainx-projects-api";
 import { canIgnoreProject } from "./project-ignore-action";
 import { Heading } from "./workbench-controls";
@@ -53,14 +53,20 @@ function dueText(project: ProjectSummary) {
 }
 
 function nextStep(project: ProjectSummary) {
-  if (project.project_status === "PENDING_START") return "确认目标、第一行动和截止时间";
+  if (project.launch?.search_status === "RUNNING") return "机器人正在搜索并评估首轮候选人";
+  if (project.launch?.search_status === "DONE") return "候选人结果已回传飞书项目群";
+  if (project.launch?.search_status === "FAILED") return project.launch.error_message || "寻访失败，可重试";
+  if (project.project_status === "PENDING_START") return "自动建群、投放职位并启动 OpenMai";
   if (project.project_status === "NEEDS_ACTION") return project.active_action?.status === "BLOCKED" ? "处理阻塞并更新下一行动" : "更新当前行动";
   if (project.project_status === "IN_PROGRESS") return "记录进展并建立下一行动";
   return "查看项目记录";
 }
 
 function actionLabel(project: ProjectSummary) {
-  if (project.project_status === "PENDING_START") return "开始跟进";
+  if (project.launch?.search_status === "RUNNING") return "OpenMai 找人中";
+  if (project.launch?.search_status === "DONE") return "查看候选人";
+  if (project.launch?.search_status === "FAILED" || project.launch?.status === "FAILED") return "重试飞书寻访";
+  if (project.project_status === "PENDING_START") return "在飞书启动寻访";
   if (project.project_status === "NEEDS_ACTION") return "立即处理";
   if (project.project_status === "IN_PROGRESS") return "更新进展";
   return "查看记录";
@@ -74,16 +80,19 @@ function matches(project: ProjectSummary, query: string) {
     .filter(Boolean).join(" ").toLocaleLowerCase().includes(keyword);
 }
 
-export function ProjectsView({ projects, query, setQuery, focusedProjectId, open, onIgnore }: {
+export function ProjectsView({ projects, query, setQuery, focusedProjectId, open, onIgnore, onLaunch }: {
   projects: ProjectSummary[];
   query: string;
   setQuery: (value: string) => void;
   focusedProjectId: string | null;
   open: (project: ProjectSummary) => void;
   onIgnore: (project: ProjectSummary) => Promise<void>;
+  onLaunch: (project: ProjectSummary) => Promise<void>;
 }) {
   const [filter, setFilter] = useState<ProjectFilter>("ALL");
   const [ignoringId, setIgnoringId] = useState<string | null>(null);
+  const [launchingId, setLaunchingId] = useState<string | null>(null);
+  const [launchErrors, setLaunchErrors] = useState<Record<string, string>>({});
   const counts = useMemo(() => Object.fromEntries(filters.map(({ id }) => [id,
     id === "ALL" ? projects.length : projects.filter(project => project.project_status === id).length,
   ])) as Record<ProjectFilter, number>, [projects]);
@@ -119,6 +128,9 @@ export function ProjectsView({ projects, query, setQuery, focusedProjectId, open
         const due = dueText(project);
         const urgent = project.project_status === "NEEDS_ACTION";
         const canIgnore = canIgnoreProject(project);
+        const canLaunch = project.project_status === "PENDING_START"
+          || project.launch?.status === "FAILED" || project.launch?.search_status === "FAILED";
+        const launching = launchingId === project.project_id;
         return <article id={`project-${project.project_id}`} className={`project-action-card status-${project.project_status.toLocaleLowerCase()}${focusedProjectId === project.project_id ? " is-focused" : ""}`} key={project.project_id} aria-label={`${project.role} · ${project.company}`}>
           <div className="project-identity">
             <div><span className="project-status">{urgent ? <AlertTriangle /> : project.project_status === "COMPLETED" ? <CheckCircle2 /> : <Clock3 />}{statusLabels[project.project_status]}</span><small>{project.relation === "MY_JOB" ? "我的职位" : "团队共享"}</small></div>
@@ -126,8 +138,11 @@ export function ProjectsView({ projects, query, setQuery, focusedProjectId, open
           </div>
           <div className="project-action-copy">
             <span>{project.active_action ? "当前行动" : project.project_status === "PENDING_START" ? "下一步" : "项目状态"}</span>
-            <b>{project.active_action?.title || project.next_action || (project.project_status === "PENDING_START" ? "建立第一条跟进行动" : statusLabels[project.project_status])}</b>
+            <b>{project.launch?.search_status === "RUNNING" ? "OpenMai 正在搜索和评估候选人"
+              : project.launch?.search_status === "DONE" ? "候选人已投递到飞书项目群"
+              : project.active_action?.title || project.next_action || (project.project_status === "PENDING_START" ? "创建飞书项目群并自动找人" : statusLabels[project.project_status])}</b>
             <small>{project.active_action?.goal ? `目标：${project.active_action.goal}` : nextStep(project)}</small>
+            {launchErrors[project.project_id] && <small className="project-launch-error" role="alert">{launchErrors[project.project_id]}</small>}
           </div>
           <div className="project-action-side">
             <span className={urgent ? "urgent" : ""}>{due || `更新于 ${dateText(project.state_since || project.joined_at)}`}</span>
@@ -137,7 +152,18 @@ export function ProjectsView({ projects, query, setQuery, focusedProjectId, open
                 onClick={() => { setIgnoringId(project.project_id); void onIgnore(project).finally(() => setIgnoringId(null)); }}>
                 {ignoringId === project.project_id ? "忽略中…" : "忽略"}
               </button>}
-              <button type="button" className="is-primary" onClick={() => open(project)}>{actionLabel(project)}<ChevronRight /></button>
+              <button type="button" className="is-primary" disabled={launching || project.launch?.search_status === "RUNNING"}
+                onClick={() => {
+                  if (!canLaunch) { open(project); return; }
+                  setLaunchingId(project.project_id);
+                  setLaunchErrors(current => ({ ...current, [project.project_id]: "" }));
+                  void onLaunch(project)
+                    .catch(error => setLaunchErrors(current => ({ ...current,
+                      [project.project_id]: error instanceof Error ? error.message : "启动失败，请重试" })))
+                    .finally(() => setLaunchingId(null));
+                }}>
+                {canLaunch && <Bot />}{launching ? "正在创建项目群…" : actionLabel(project)}{!canLaunch && <ChevronRight />}
+              </button>
             </div>
           </div>
         </article>;

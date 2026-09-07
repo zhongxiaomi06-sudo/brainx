@@ -5,6 +5,7 @@ import { ProjectsView } from "../projects-view";
 
 const open = fn();
 const ignore = fn(async () => undefined);
+const launch = fn(async () => undefined);
 
 function project(projectId: string, status: ProjectStatus, overrides: Partial<ProjectSummary> = {}): ProjectSummary {
   const following = status === "IN_PROGRESS" || status === "NEEDS_ACTION";
@@ -53,7 +54,7 @@ const meta = {
   title: "业务组件/我的项目行动工作台",
   component: ProjectsView,
   parameters: { bare: true },
-  args: { projects, query: "", setQuery: fn(), focusedProjectId: null, open, onIgnore: ignore },
+  args: { projects, query: "", setQuery: fn(), focusedProjectId: null, open, onIgnore: ignore, onLaunch: launch },
 } satisfies Meta<typeof ProjectsView>;
 
 export default meta;
@@ -79,6 +80,29 @@ export const FocusedNewProject: Story = {
     await expect(canvas.getAllByRole("button", { name: "忽略" })).toHaveLength(1);
     await userEvent.click(canvas.getByRole("button", { name: "忽略" }));
     await expect(ignore).toHaveBeenCalledWith(expect.objectContaining({ project_id: "P-PENDING" }));
+  },
+};
+
+export const LaunchFromPending: Story = {
+  args: { projects: [project("P-LAUNCH", "PENDING_START", { company: "海马云", role: "产品经理" })] },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const button = canvas.getByRole("button", { name: /在飞书启动寻访/ });
+    await expect(button).toBeEnabled();
+    await userEvent.click(button);
+    await expect(launch).toHaveBeenCalledWith(expect.objectContaining({ project_id: "P-LAUNCH" }));
+  },
+};
+
+export const SearchingInFeishu: Story = {
+  args: { projects: [project("P-SEARCH", "IN_PROGRESS", { launch: {
+    status: "READY", current_step: "READY", chat_id: "oc_masked", chat_name: "项目群",
+    search_status: "RUNNING", search_task_id: "om_masked", error_code: null,
+    error_message: null, updated_at: "2026-09-07T10:00:00.000Z",
+  } })] },
+  play: async ({ canvasElement }) => {
+    const button = within(canvasElement).getByRole("button", { name: /OpenMai 找人中/ });
+    await expect(button).toBeDisabled();
   },
 };
 

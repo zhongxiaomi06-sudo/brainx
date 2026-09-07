@@ -17,7 +17,7 @@ import {
   type BackendSessionStatus, type BrainxReplay, type BrainxSnapshot, type OpenmaiResult,
   type BackendClientRow, type RadarPayload,
 } from "./brainx-api";
-import { getProjects, projectToDecisionJob, updateOpportunityMembership, type ProjectSummary } from "./brainx-projects-api";
+import { getProjects, launchProjectWorkflow, projectToDecisionJob, updateOpportunityMembership, type ProjectSummary } from "./brainx-projects-api";
 import { streamAssistant, type AssistantMessage, type AssistantToolEvent } from "./brainx-assistant-api";
 import { actionSeed, clients, decisionGroupMeta, decisionJobs, DEFAULT_FOLDERS, engagementPrerequisite, events, initialEngagement, initialEvents, initialOutcomes, INITIAL_TRAY_IDS, legalActions, nextState, readSavedWorkbenchState, stateEvent, verificationJobs, type DecisionAction, type DecisionGroup, type DecisionJob, type MembershipRelation, type Page, type Panel, type PickFolder, type SourceMode } from "./workbench-model";
 import { DrawerSection, FilterSelect, Heading, StatusTag, type FilterSelectOption } from "./workbench-controls";
@@ -218,6 +218,7 @@ export default function DecisionWorkbench({demo=false}:{demo?:boolean}={}){
   const response=await getProjects();setBrainxProjects(response.items);
   setMembershipRelations(Object.fromEntries(response.items.map(project=>[project.project_id,project.relation])));
  };
+ const launchProjectInFeishu=async(project:ProjectSummary)=>{if(brainxMode!=="connected")throw new Error("BrainTex 服务当前不可用，请恢复连接后重试");const response=await launchProjectWorkflow(project.project_id,makeIdempotencyKey(`project-launch:${project.project_id}`));await Promise.all([refreshProjects(),refreshBrainxJob(project.project_id)]);notify(`${project.company} · 飞书项目群已就绪，${response.search.status==="already_done"?"候选人结果已存在":"OpenMai 已开始找人"}`)};
  const mergeProject=(project:ProjectSummary|null)=>{if(!project)return;setBrainxProjects(current=>[project,...current.filter(item=>item.project_id!==project.project_id)]);setMembershipRelations(current=>({...current,[project.project_id]:project.relation}))};
  const addToMyProjects=async(jobId:string,label="该职位")=>{
   if(joiningProjects.current.has(jobId))return;
@@ -283,7 +284,7 @@ export default function DecisionWorkbench({demo=false}:{demo?:boolean}={}){
    {["today","accepted","jobs","clients"].includes(page)&&(brainxMode==="connecting"||workspaceIssue)?
     <WorkspaceEntry kind={brainxMode==="connecting"?"connecting":workspaceIssue!} onRetry={()=>setConnectAttempt(value=>value+1)} onCheckConnection={async()=>{await brainxFetch<BackendSessionStatus>("/api/v1/oauth/status");await loadBrainxSnapshot.current();await loadBrainxSide.current()}} onOpenSources={()=>go("sources")} />:<>
     {page==="today"&&<TodayDecisionQueue activeJobId={panel?.kind==="job"&&panelMotion!=="closing"?panel.jobId:null} completed={decisionActions} jobs={activeDecisionJobs} projects={brainxProjects} engagement={engagement} sync={sync} open={openDecision} onAction={runDecisionAction} onAddToProjects={job=>addToMyProjects(job.id,job.company)} onGoToProject={goToProject} onFeedback={feedbackJob} showVerification={demo} tray={tray} onToggleTray={toggleTray} onRemoveTray={removeTray} folders={folders} folderMode={folderMode} onFolderMode={()=>setFolderMode(value=>!value)} onAssignFolder={assignFolder} onCreateFolder={createFolder} mode={brainxMode} onOpenSources={()=>go("sources")} pagination={recommendationPagination?{...recommendationPagination,searchQuery:recommendationQueue.searchQuery,onSearch:recommendationQueue.search,sort:recommendationQueue.sort,onSort:recommendationQueue.changeSort}:undefined} />}
-    {page==="accepted"&&<ProjectsView projects={brainxProjects} query={query} setQuery={setQuery} focusedProjectId={focusedProjectId} open={project=>openDecision(projectToDecisionJob(project),"engagement")} onIgnore={ignoreProject} />}
+    {page==="accepted"&&<ProjectsView projects={brainxProjects} query={query} setQuery={setQuery} focusedProjectId={focusedProjectId} open={project=>openDecision(projectToDecisionJob(project),"engagement")} onIgnore={ignoreProject} onLaunch={launchProjectInFeishu} />}
     {page==="jobs"&&<WorkbenchJobsPage items={brainxRadar?.items??[]} capabilities={brainxRadar?.fieldCapabilities??[]} projects={brainxProjects} company={jobCompanyFilter} onAddToProjects={addRadarJobToProjects} onIgnoreProject={ignoreProject} />}
    {page==="clients"&&<WorkbenchClientsPage items={brainxClients??[]} onOpenJobs={company=>{setJobCompanyFilter(company);go("jobs")}} />}
    </>}
@@ -496,5 +497,4 @@ function TalentSupplySection({job,mode}:{job:DecisionJob;mode:"connecting"|"conn
  </p>}
  </DrawerSection>;
 }
-
 function Alerts({setExtraTasks,notify,setDrawer}:any){const alerts=["云帆智能连续7天未反馈","商业化增长经理转化率下降12%","海外增长负责人面试池已拥挤","星河科技进入招聘窗口期","Creator Partnership负责人新增2个HC","棱镜互动近14天需求变更3次","AI解决方案销售参与顾问增至6人","用户增长负责人产生Offer"];const [handled,setHandled]=useState<number[]>([]);const [riskFilter,setRiskFilter]=useState("全部风险等级");const [clientFilter,setClientFilter]=useState("全部客户");return <><Heading code="DYNAMIC ALERTS" title="动态预警" desc="聚合需要人工确认的机会、变化和失活信号。"/><div className="toolbar"><FilterSelect value={riskFilter} onChange={setRiskFilter} ariaLabel="预警风险等级" options={["全部风险等级","高风险","机会"].map(value=>({value,label:value}))}/><FilterSelect value={clientFilter} onChange={setClientFilter} ariaLabel="预警客户筛选" options={[{value:"全部客户",label:"全部客户"},...clients.map(client=>({value:client.name,label:client.name}))]}/></div><section className="card"><div className="actions">{alerts.map((x,i)=><div className="action-row" key={x} style={{opacity:handled.includes(i)?.5:1}}><StatusTag s={i%3===0?"高风险":i%3===1?"关注":"机会"}/><div className="action-main"><b>{x}</b><small>{i%2?"基于近7天业务事件变化":"超过预设阈值，建议今天确认"}</small></div><div className="impact"><strong>{i%3===2?"机会升温":"需人工确认"}</strong>置信度 {88+i}%</div><div className="row-actions"><button className="btn" onClick={()=>setDrawer(x)}>依据</button><button className="btn" onClick={()=>{setExtraTasks((v:string[])=>v.includes(x)?v:[...v,x]);notify("已转为今日任务")}}>转任务</button><button className="icon-btn" onClick={()=>{setHandled([...handled,i]);notify("预警已处理")}}><Check/></button></div></div>)}</div></section></>}

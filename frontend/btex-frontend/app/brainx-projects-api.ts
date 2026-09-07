@@ -14,6 +14,18 @@ export type ProjectActionSummary = {
   updated_at: string;
 };
 
+export type ProjectLaunchSummary = {
+  status: "CREATING_CHAT" | "POSTING_JOB" | "READY" | "FAILED";
+  current_step: string;
+  chat_id: string | null;
+  chat_name: string | null;
+  search_status: "RUNNING" | "DONE" | "FAILED" | null;
+  search_task_id: string | null;
+  error_code: string | null;
+  error_message: string | null;
+  updated_at: string;
+};
+
 export type ProjectSummary = {
   project_id: string;
   relation: "MY_JOB" | "TEAM_SHARED";
@@ -35,7 +47,21 @@ export type ProjectSummary = {
   state_since: string | null;
   project_status: ProjectStatus;
   active_action: ProjectActionSummary | null;
+  launch?: ProjectLaunchSummary | null;
   legal_actions: EngagementCommand[];
+};
+
+export type ProjectLaunchBlocker = { code: string; message: string };
+export type ProjectLaunchStatusResponse = {
+  ready: boolean;
+  blockers: ProjectLaunchBlocker[];
+  launch: ProjectLaunchSummary | null;
+};
+export type ProjectLaunchResponse = {
+  ok: boolean;
+  launch: ProjectLaunchSummary;
+  group: ProjectLaunchSummary;
+  search: { status: string; task_id?: string; started_at?: string };
 };
 
 export type ProjectsResponse = { items: ProjectSummary[]; total_count: number };
@@ -72,6 +98,23 @@ export function removeOpportunityMembership(
     method: "DELETE",
     body: { idempotency_key: idempotencyKey },
   });
+}
+
+export function getProjectLaunchStatus(id: string): Promise<ProjectLaunchStatusResponse> {
+  return brainxFetch(`/api/v1/opportunities/${encodeURIComponent(id)}/launch`);
+}
+
+export function startProjectLaunch(id: string, idempotencyKey: string): Promise<ProjectLaunchResponse> {
+  return brainxFetch(`/api/v1/opportunities/${encodeURIComponent(id)}/launch`, {
+    method: "POST",
+    body: { confirm: true, idempotency_key: idempotencyKey },
+  });
+}
+
+export async function launchProjectWorkflow(id: string, idempotencyKey: string): Promise<ProjectLaunchResponse> {
+  const preflight = await getProjectLaunchStatus(id);
+  if (!preflight.ready) throw new Error(preflight.blockers.map((item) => item.message).join("；"));
+  return startProjectLaunch(id, idempotencyKey);
 }
 
 function directionOf(role: string): DecisionDirection {

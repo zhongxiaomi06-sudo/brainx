@@ -21,7 +21,11 @@ export function listProjects(db, consultant_id, { projectId = null } = {}) {
       c.current_stage, c.pipeline_snapshot, c.next_action, j.owner_name, j.captured_at,
       e.state AS engagement_state, e.state_since,
       a.action_id, a.title AS action_title, a.goal, a.due_at, a.status AS action_status,
-      a.source AS action_source, a.updated_at AS action_updated_at
+      a.source AS action_source, a.updated_at AS action_updated_at,
+      l.status AS launch_status, l.current_step AS launch_step, l.chat_id AS launch_chat_id,
+      l.chat_name AS launch_chat_name, l.search_status, l.search_task_id,
+      l.error_code AS launch_error_code, l.error_message AS launch_error_message,
+      l.updated_at AS launch_updated_at
     FROM job_memberships m
     JOIN job_facts j ON j.project_id=m.project_id
     LEFT JOIN cockpit_facts c ON c.project_id=m.project_id
@@ -30,6 +34,8 @@ export function listProjects(db, consultant_id, { projectId = null } = {}) {
     LEFT JOIN commitment_actions a
       ON a.project_id=m.project_id AND a.consultant_id=m.consultant_id
       AND a.status IN ('OPEN','BLOCKED')
+    LEFT JOIN project_launches l
+      ON l.project_id=m.project_id AND l.consultant_id=m.consultant_id
     WHERE m.consultant_id=? AND m.valid_to IS NULL
       AND m.relation IN ('MY_JOB','TEAM_SHARED')
       AND NOT EXISTS (SELECT 1 FROM opportunity_ignores i
@@ -71,6 +77,17 @@ export function listProjects(db, consultant_id, { projectId = null } = {}) {
       state_since: row.state_since || null,
       project_status: projectStatus(state, action),
       active_action: action,
+      launch: row.launch_status ? {
+        status: row.launch_status,
+        current_step: row.launch_step,
+        chat_id: row.launch_chat_id || null,
+        chat_name: row.launch_chat_name || null,
+        search_status: row.search_status || null,
+        search_task_id: row.search_task_id || null,
+        error_code: row.launch_error_code || null,
+        error_message: row.launch_error_message || null,
+        updated_at: row.launch_updated_at,
+      } : null,
       legal_actions: legalActions(db, consultant_id, row.project_id),
     };
   });

@@ -230,7 +230,7 @@ test("keeps the unified job detail large enough for working content", async () =
   assert.match(detailCss, /\.job-detail-review-scroll \{[^}]*overflow: auto/);
 });
 
-test("uses 加入项目、关注 and 开始跟进 as separate user-facing concepts", async () => {
+test("keeps membership separate and gives pending projects one Feishu recruiting action", async () => {
   const [workbench, demo, editor, api] = await Promise.all([
     workbenchSource(),
     source("app/decision-demo.ts"),
@@ -242,6 +242,11 @@ test("uses 加入项目、关注 and 开始跟进 as separate user-facing concep
   assert.match(demo, /ACCEPT:"开始跟进"/);
   assert.match(editor, /确认开始跟进/);
   assert.match(api, /ACCEPTED: "已开始跟进"/);
+  assert.match(workbench, /在飞书启动寻访/);
+  assert.match(workbench, /getProjectLaunchStatus/);
+  assert.match(workbench, /startProjectLaunch/);
+  assert.match(workbench, /正在创建项目群…/);
+  assert.match(workbench, /OpenMai 找人中/);
   assert.doesNotMatch(visibleCopy, /确认接单|已接单|交付列表|接单后|再接单/);
 });
 

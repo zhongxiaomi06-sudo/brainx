@@ -149,6 +149,7 @@
 - [删除今日决策概览区审核记录（2026-08-28）](frontend-reviews/2026-08-28-remove-today-overview.md)
 - [删除批量接单审核记录（2026-08-28）](frontend-reviews/2026-08-28-remove-batch-accept.md)
 - [加入我的项目闭环正式接入记录（2026-08-29）](frontend-reviews/2026-08-29-add-to-projects-closure.md)
+- [飞书寻访启动入口正式接入记录（2026-09-07）](frontend-reviews/2026-09-07-feishu-project-launch.md)
 - [加入项目动作反馈与真实数据复核（2026-08-30）](frontend-reviews/2026-08-30-project-action-feedback.md)
 - [跟进操作区与暂不考虑确认层复核（2026-08-30）](frontend-reviews/2026-08-30-engagement-action-layout.md)
 - [完整推荐队列搜索修复复核（2026-08-30）](frontend-reviews/2026-08-30-recommendation-search.md)

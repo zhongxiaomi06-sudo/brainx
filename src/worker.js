@@ -19,6 +19,7 @@ import { makeAutoPush } from './autopush.js';
 import { recommend, loadConsultants } from './recommend.js';
 import { relayBus } from './worker-relay.js';
 import { intakeAllConsultants } from './resume-intake.js';
+import { startOpenmaiDeliveryWorker } from './openmai-delivery.js';
 
 /** 启动全部批处理任务。bus 由调用方给（嵌入=server.bus；独立=relayBus）。 */
 export function startWorkerTasks(db, bus) {
@@ -35,6 +36,11 @@ export function startWorkerTasks(db, bus) {
   // 定时推送：每天 07:00 / 19:00（CST）；BRAINX_PUSH_SCHEDULE=0 关闭
   handles.push(startScheduler(db));
   console.log('[worker] 定时推送已启动（07:00 / 19:00 CST）');
+
+  if (process.env.BRAINX_OPENMAI_DELIVERY_OFF !== '1') {
+    handles.push(startOpenmaiDeliveryWorker(db));
+    console.log('[worker] OpenMai 项目群投递已启动');
+  }
 
   // 简历文件入口：飞书群/私聊的 PDF/DOCX → 解析入库（BRAINX_RESUME_INTAKE_OFF=1 关闭）
   if (process.env.BRAINX_RESUME_INTAKE_OFF !== '1') {

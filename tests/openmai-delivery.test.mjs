@@ -55,6 +55,20 @@ test('OpenMai 群投递：候选结果脱敏后只发送一次并更新项目状
   db.close();
 });
 
+test('OpenMai 群投递：搜索执行人不是建群人时仍回到职位唯一项目群', async () => {
+  const db = seededDb();
+  db.prepare("UPDATE openmai_results SET consultant_id='mia' WHERE task_id='om_delivery'").run();
+  const targets = [];
+  const result = await deliverOpenmaiResultsOnce(db, {
+    at: now(), publicBaseUrl: 'https://base.yorkteam.cn/',
+    sendInteractiveCard: async ({ target }) => { targets.push(target); return { message_id: 'om_shared' }; },
+  });
+  assert.equal(result.sent, 1);
+  assert.deepEqual(targets, ['oc_delivery']);
+  assert.equal(db.prepare('SELECT search_status FROM project_launches').get().search_status, 'DONE');
+  db.close();
+});
+
 test('OpenMai 群投递：发送失败进入有限重试而不是丢结果', async () => {
   const db = seededDb('failed');
   const at = now();

@@ -4,6 +4,7 @@ import { openDb, now } from '../src/db.js';
 import { runSync } from '../src/sync.js';
 import { confirmMembership } from '../src/membership.js';
 import { launchProject, launchRecruitingWorkflow, ProjectLaunchError } from '../src/project-launch.js';
+import { listProjects } from '../src/projects.js';
 
 const PID = 'P-LAUNCH-1';
 
@@ -66,16 +67,66 @@ test('项目启动：同职位已绑定协作者一起入群并可在群内使�
     VALUES ('binding-mia','tenant-a','brainx-prod',?,?, 'mia','ACTIVE',?,'system',?,?)`)
     .run('a'.repeat(64), miaOpenId, now(), now(), now());
   const calls = [];
-  await launchProject(db, 'felix', PID, { idempotency_key: 'team-launch' }, {
+  const dependencies = {
     appConfigured: true, publicBaseUrl: 'https://base.yorkteam.cn/',
     createProjectChat: async (input) => { calls.push(input); return { chat_id: 'oc_team', name: input.name }; },
     ensureOpenClawGroupAllowed: async () => {},
     sendInteractiveCard: async () => ({ message_id: 'om_team' }),
-  });
+  };
+  await launchProject(db, 'felix', PID, { idempotency_key: 'team-launch' }, dependencies);
   const ownerOpenId = db.prepare("SELECT open_id FROM consultants WHERE consultant_id='felix'").get().open_id;
   assert.deepEqual(new Set(calls[0].memberOpenIds), new Set([ownerOpenId, miaOpenId]));
   const scope = db.prepare("SELECT allowed_senders_json FROM agent_group_scopes WHERE chat_id='oc_team'").get();
   assert.deepEqual(new Set(JSON.parse(scope.allowed_senders_json)), new Set([ownerOpenId, miaOpenId]));
+  const shared = await launchProject(db, 'mia', PID, { idempotency_key: 'mia-team-launch' }, dependencies);
+  assert.equal(shared.already, true);
+  assert.equal(shared.launch.consultant_id, 'felix');
+  assert.equal(calls.length, 1, '第二位协作者不得重复建群');
+  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM project_launches WHERE project_id=?')
+    .get(PID).count, 1);
+  assert.equal(listProjects(db, 'mia', { projectId: PID })[0].launch.chat_id, 'oc_team');
+  db.close();
+});
+
+test('寻访启动：协作者复用职位共享搜索，不要求自己的 TTC 且不重复扣费', async () => {
+  const db = readyDb();
+  confirmMembership(db, 'mia', PID, { relation: 'TEAM_SHARED', idempotency_key: 'share-search' });
+  const miaOpenId = db.prepare("SELECT open_id FROM consultants WHERE consultant_id='mia'").get().open_id;
+  db.prepare(`INSERT INTO feishu_identity_bindings
+    (binding_id,tenant_id,channel_account_id,feishu_app_key_hash,open_id,consultant_id,
+     binding_status,verified_at,verified_by,created_at,updated_at)
+    VALUES ('binding-mia-shared','tenant-a','brainx-prod',?,?,'mia','ACTIVE',?,'system',?,?)`)
+    .run('a'.repeat(64), miaOpenId, now(), now(), now());
+  const dependencies = {
+    appConfigured: true, publicBaseUrl: 'https://base.yorkteam.cn/',
+    createProjectChat: async () => ({ chat_id: 'oc_shared_search', name: '共享项目群' }),
+    ensureOpenClawGroupAllowed: async () => {},
+    sendInteractiveCard: async () => ({ message_id: 'om_shared_search' }),
+  };
+  await launchProject(db, 'felix', PID, { idempotency_key: 'owner-launch' }, dependencies);
+  db.prepare(`UPDATE project_launches SET search_status='RUNNING',search_task_id='task-owner'
+    WHERE project_id=?`).run(PID);
+  let searchCalls = 0;
+  const out = await launchRecruitingWorkflow(db, null, 'mia', PID, {
+    confirm: true, idempotency_key: 'collaborator-launch',
+  }, { ...dependencies, ttcConnected: false, startOpenmaiTask: () => { searchCalls++; } });
+  assert.deepEqual(out.search, { status: 'running', task_id: 'task-owner', shared: true });
+  assert.equal(searchCalls, 0);
+  assert.equal(db.prepare(`SELECT COUNT(*) AS count FROM current_engagement
+    WHERE consultant_id='mia' AND project_id=?`).get(PID).count, 0);
+  db.close();
+});
+
+test('项目启动：数据库阻止同一职位写入第二个项目群记录', () => {
+  const db = readyDb();
+  const at = now();
+  db.prepare(`INSERT INTO project_launches
+    (launch_id,consultant_id,project_id,idempotency_key,status,current_step,created_at,updated_at)
+    VALUES ('launch-one','felix',?,'one','CREATING_CHAT','CREATE_CHAT',?,?)`).run(PID, at, at);
+  assert.throws(() => db.prepare(`INSERT INTO project_launches
+    (launch_id,consultant_id,project_id,idempotency_key,status,current_step,created_at,updated_at)
+    VALUES ('launch-two','mia',?,'two','CREATING_CHAT','CREATE_CHAT',?,?)`).run(PID, at, at),
+  /PROJECT_LAUNCH_ALREADY_EXISTS/);
   db.close();
 });
 

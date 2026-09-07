@@ -35,7 +35,10 @@ export function listProjects(db, consultant_id, { projectId = null } = {}) {
       ON a.project_id=m.project_id AND a.consultant_id=m.consultant_id
       AND a.status IN ('OPEN','BLOCKED')
     LEFT JOIN project_launches l
-      ON l.project_id=m.project_id AND l.consultant_id=m.consultant_id
+      ON l.launch_id=(SELECT pl.launch_id FROM project_launches pl
+        WHERE pl.project_id=m.project_id
+        ORDER BY CASE pl.status WHEN 'READY' THEN 0 WHEN 'POSTING_JOB' THEN 1
+          WHEN 'CREATING_CHAT' THEN 2 ELSE 3 END, pl.created_at, pl.launch_id LIMIT 1)
     WHERE m.consultant_id=? AND m.valid_to IS NULL
       AND m.relation IN ('MY_JOB','TEAM_SHARED')
       AND NOT EXISTS (SELECT 1 FROM opportunity_ignores i

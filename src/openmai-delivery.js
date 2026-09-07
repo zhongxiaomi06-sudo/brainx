@@ -177,9 +177,13 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
 }
 
 export function enqueueOpenmaiDeliveries(db, at = now()) {
-  const rows = db.prepare(`SELECT r.task_id, r.consultant_id, r.project_id, r.status, r.result_text, l.chat_id
+  const rows = db.prepare(`SELECT r.task_id, r.consultant_id, r.project_id, r.status, r.result_text,
+      l.launch_id, l.chat_id
     FROM openmai_results r JOIN project_launches l
-      ON l.consultant_id=r.consultant_id AND l.project_id=r.project_id
+      ON l.launch_id=(SELECT pl.launch_id FROM project_launches pl
+        WHERE pl.project_id=r.project_id
+        ORDER BY CASE pl.status WHEN 'READY' THEN 0 WHEN 'POSTING_JOB' THEN 1
+          WHEN 'CREATING_CHAT' THEN 2 ELSE 3 END, pl.created_at, pl.launch_id LIMIT 1)
     WHERE l.status='READY' AND l.chat_id IS NOT NULL AND r.task_id IS NOT NULL
       AND r.status IN ('done','failed')`).all();
   const insert = db.prepare(`INSERT OR IGNORE INTO openmai_deliveries
@@ -195,11 +199,11 @@ export function enqueueOpenmaiDeliveries(db, at = now()) {
       created += inserted;
       if (inserted) db.prepare(`UPDATE project_launches SET search_status=?,
         search_task_id=?,error_code=?,error_message=?,updated_at=?
-        WHERE consultant_id=? AND project_id=?`).run(
+        WHERE launch_id=?`).run(
         row.status === 'failed' ? 'FAILED' : 'RUNNING', row.task_id,
         row.status === 'failed' ? 'OPENMAI_SEARCH_FAILED' : null,
         row.status === 'failed' ? 'OpenMai 搜索失败，详细原因将投递到项目群。' : null,
-        at, row.consultant_id, row.project_id,
+        at, row.launch_id,
       );
     }
     db.exec('COMMIT');
@@ -212,12 +216,14 @@ function finishProjectDelivery(db, row, at) {
   const incomplete = quality && !quality.complete;
   const failed = row.result_status === 'failed';
   db.prepare(`UPDATE project_launches SET search_status=?, search_task_id=?, error_code=?,
-    error_message=?, updated_at=? WHERE consultant_id=? AND project_id=?`).run(
+    error_message=?, updated_at=? WHERE launch_id=(SELECT launch_id FROM project_launches
+      WHERE project_id=? ORDER BY CASE status WHEN 'READY' THEN 0 WHEN 'POSTING_JOB' THEN 1
+        WHEN 'CREATING_CHAT' THEN 2 ELSE 3 END, created_at, launch_id LIMIT 1)`).run(
     failed || incomplete ? 'FAILED' : 'DONE', row.task_id,
     failed ? 'OPENMAI_SEARCH_FAILED' : incomplete ? 'OPENMAI_CANDIDATES_INCOMPLETE' : null,
     failed ? String(row.error || 'OpenMai 搜索失败').slice(0, 240)
       : incomplete ? quality.message : null,
-    at, row.consultant_id, row.project_id,
+    at, row.project_id,
   );
 }
 
@@ -290,7 +296,9 @@ export async function deliverOpenmaiResultsOnce(db, dependencies = {}) {
       if (attempts >= 5) db.prepare(`UPDATE project_launches SET search_status='FAILED',
         error_code='FEISHU_OPENMAI_DELIVERY_FAILED',
         error_message='候选结果已生成，但连续 5 次未能送达飞书项目群；请明确重试投递。',updated_at=?
-        WHERE consultant_id=? AND project_id=?`).run(at, row.consultant_id, row.project_id);
+        WHERE launch_id=(SELECT launch_id FROM project_launches WHERE project_id=?
+          ORDER BY CASE status WHEN 'READY' THEN 0 WHEN 'POSTING_JOB' THEN 1
+            WHEN 'CREATING_CHAT' THEN 2 ELSE 3 END, created_at, launch_id LIMIT 1)`).run(at, row.project_id);
       failed += 1;
     }
   }

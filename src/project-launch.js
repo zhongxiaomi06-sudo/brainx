@@ -70,8 +70,11 @@ export function projectLaunchPreflight(db, consultantId, projectId, {
   try { productionBaseUrl(publicBaseUrl); } catch {
     blockers.push({ code: 'BRAINX_BASE_URL_REQUIRED', message: 'BrainTex 生产 HTTPS 地址未配置' });
   }
+  const sharedLaunch = getProjectLaunch(db, consultantId, projectId);
+  const reusesActiveSearch = sharedLaunch?.status === 'READY'
+    && ['RUNNING', 'DONE'].includes(sharedLaunch.search_status);
   const searchReady = ttcConnected ?? ttcAuthStatus(db, consultantId).connected;
-  if (requireSearch && !searchReady) {
+  if (requireSearch && !reusesActiveSearch && !searchReady) {
     blockers.push({ code: 'TTC_CREDENTIALS_REQUIRED', message: '请先用本人 TTC 账号连接 OpenMai' });
   }
   return { ready: blockers.length === 0, blockers, job, membership: membership?.relation || null, binding };
@@ -96,9 +99,9 @@ export function buildProjectLaunchCard(job, { publicBaseUrl } = {}) {
   };
 }
 
-function saveFailure(db, consultantId, projectId, code, message) {
+function saveFailure(db, launchId, code, message) {
   db.prepare(`UPDATE project_launches SET status='FAILED', error_code=?, error_message=?, updated_at=?
-    WHERE consultant_id=? AND project_id=?`).run(code, message, now(), consultantId, projectId);
+    WHERE launch_id=?`).run(code, message, now(), launchId);
 }
 
 function activateGroup(db, { consultantId, projectId, chatId, openIds, binding }) {
@@ -122,11 +125,19 @@ function activateGroup(db, { consultantId, projectId, chatId, openIds, binding }
   }
 }
 
-export function getProjectLaunch(db, consultantId, projectId) {
-  return db.prepare(`SELECT launch_id, project_id, status, current_step, chat_id, chat_name,
+export function getProjectLaunch(db, _consultantId, projectId) {
+  return db.prepare(`SELECT launch_id, consultant_id, project_id, status, current_step, chat_id, chat_name,
     message_id, search_status, search_task_id, search_started_at,
     error_code, error_message, created_at, updated_at
-    FROM project_launches WHERE consultant_id=? AND project_id=?`).get(consultantId, projectId) || null;
+    FROM project_launches WHERE project_id=?
+    ORDER BY CASE status WHEN 'READY' THEN 0 WHEN 'POSTING_JOB' THEN 1
+      WHEN 'CREATING_CHAT' THEN 2 ELSE 3 END, created_at, launch_id LIMIT 1`).get(projectId) || null;
+}
+
+function ensureSingleProjectLaunch(db, projectId) {
+  const count = db.prepare('SELECT COUNT(*) AS count FROM project_launches WHERE project_id=?')
+    .get(projectId).count;
+  if (count > 1) fail(409, 'PROJECT_CHAT_CONFLICT', '该职位存在多个历史项目群，请管理员核对后再继续');
 }
 
 function workflowDueAt() {
@@ -150,6 +161,16 @@ export async function launchRecruitingWorkflow(db, bus, consultantId, projectId,
   }
   const group = await launchProject(db, consultantId, projectId, input, dependencies);
   const launchId = group.launch.launch_id;
+  if (group.launch.consultant_id !== consultantId) {
+    if (group.launch.status === 'READY' && ['RUNNING', 'DONE'].includes(group.launch.search_status)) {
+      return { ok: true, group: group.launch, search: {
+        status: group.launch.search_status === 'DONE' ? 'already_done' : 'running',
+        task_id: group.launch.search_task_id,
+        shared: true,
+      }, launch: group.launch };
+    }
+    fail(409, 'PROJECT_SEARCH_OWNER_REQUIRED', '项目群已由其他协作者启动，请由首轮寻访发起人重试');
+  }
   const state = currentState(db, consultantId, projectId).state;
   if (['COMPLETED', 'RELEASED'].includes(state)) {
     fail(409, 'PROJECT_NOT_ACTIVE', '该项目当前状态不能启动寻访');
@@ -169,7 +190,7 @@ export async function launchRecruitingWorkflow(db, bus, consultantId, projectId,
     const search = retryDelivery(db, consultantId, projectId);
     if (search) {
       db.prepare(`UPDATE project_launches SET search_status='RUNNING',error_code=NULL,error_message=NULL,
-        updated_at=? WHERE consultant_id=? AND project_id=?`).run(now(), consultantId, projectId);
+        updated_at=? WHERE launch_id=?`).run(now(), launchId);
       return { ok: true, group: group.launch, search,
         launch: getProjectLaunch(db, consultantId, projectId) };
     }
@@ -183,9 +204,9 @@ export async function launchRecruitingWorkflow(db, bus, consultantId, projectId,
   db.prepare(`UPDATE project_launches SET search_status=?, search_task_id=?, search_started_at=?,
     error_code=CASE WHEN ?='FAILED' THEN 'OPENMAI_START_FAILED' ELSE NULL END,
     error_message=CASE WHEN ?='FAILED' THEN ? ELSE NULL END, updated_at=?
-    WHERE consultant_id=? AND project_id=?`).run(
+    WHERE launch_id=?`).run(
     status, search.task_id || null, search.started_at || now(), status, status,
-    status === 'FAILED' ? safeError(search.message) : null, now(), consultantId, projectId,
+    status === 'FAILED' ? safeError(search.message) : null, now(), launchId,
   );
   if (status === 'FAILED') fail(502, 'OPENMAI_START_FAILED', search.message || 'OpenMai 启动失败');
   return { ok: true, group: group.launch, search, launch: getProjectLaunch(db, consultantId, projectId) };
@@ -204,15 +225,26 @@ export async function launchProject(db, consultantId, projectId, input = {}, dep
     const first = preflight.blockers[0];
     fail(409, first.code, first.message);
   }
+  ensureSingleProjectLaunch(db, projectId);
   let launch = getProjectLaunch(db, consultantId, projectId);
   if (launch?.status === 'READY') return { ok: true, already: true, launch };
+  if (launch && launch.consultant_id !== consultantId) {
+    fail(409, 'PROJECT_LAUNCH_IN_PROGRESS', '该职位的项目群正由其他协作者创建，请稍后重试');
+  }
   if (!launch) {
     const at = now();
-    db.prepare(`INSERT INTO project_launches
-      (launch_id, consultant_id, project_id, idempotency_key, status, current_step, created_at, updated_at)
-      VALUES (?, ?, ?, ?, 'CREATING_CHAT', 'CREATE_CHAT', ?, ?)`).run(
-      randomUUID(), consultantId, projectId, idempotencyKey, at, at,
-    );
+    try {
+      db.prepare(`INSERT INTO project_launches
+        (launch_id, consultant_id, project_id, idempotency_key, status, current_step, created_at, updated_at)
+        VALUES (?, ?, ?, ?, 'CREATING_CHAT', 'CREATE_CHAT', ?, ?)`).run(
+        randomUUID(), consultantId, projectId, idempotencyKey, at, at,
+      );
+    } catch (error) {
+      if (String(error?.message || error).includes('PROJECT_LAUNCH_ALREADY_EXISTS')) {
+        fail(409, 'PROJECT_LAUNCH_IN_PROGRESS', '该职位的项目群正由其他协作者创建，请稍后重试');
+      }
+      throw error;
+    }
     launch = getProjectLaunch(db, consultantId, projectId);
   }
 
@@ -235,8 +267,8 @@ export async function launchProject(db, consultantId, projectId, input = {}, dep
       chatId = created.chat_id;
       db.prepare(`UPDATE project_launches SET status='POSTING_JOB', current_step='POST_JOB',
         chat_id=?, chat_name=?, error_code=NULL, error_message=NULL, updated_at=?
-        WHERE consultant_id=? AND project_id=?`).run(
-        chatId, created.name, now(), consultantId, projectId,
+        WHERE launch_id=?`).run(
+        chatId, created.name, now(), launch.launch_id,
       );
     }
     await allowOpenClawGroup(chatId, collaboratorOpenIds);
@@ -252,15 +284,15 @@ export async function launchProject(db, consultantId, projectId, input = {}, dep
       db.prepare('UPDATE job_facts SET chat_id=?, updated_at=? WHERE project_id=?')
         .run(chatId, now(), projectId);
       db.prepare(`UPDATE project_launches SET status='READY', current_step='READY', message_id=?,
-        error_code=NULL, error_message=NULL, updated_at=? WHERE consultant_id=? AND project_id=?`).run(
-        sent.message_id || null, now(), consultantId, projectId,
+        error_code=NULL, error_message=NULL, updated_at=? WHERE launch_id=?`).run(
+        sent.message_id || null, now(), launch.launch_id,
       );
       db.exec('COMMIT');
     } catch (error) { db.exec('ROLLBACK'); throw error; }
     return { ok: true, already: false, launch: getProjectLaunch(db, consultantId, projectId) };
   } catch (error) {
     const code = error.code || (chatId ? 'FEISHU_JOB_POST_FAILED' : 'FEISHU_CHAT_CREATE_FAILED');
-    saveFailure(db, consultantId, projectId, code, safeError(error));
+    saveFailure(db, launch.launch_id, code, safeError(error));
     fail(502, code, chatId
       ? '项目群已创建，但机器人群准入、职位投放或本地登记失败；请重试'
       : '飞书项目群创建失败；请重试');

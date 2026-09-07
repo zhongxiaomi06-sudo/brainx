@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { openDb, now } from '../src/db.js';
-import { settleOpenmaiTask } from '../src/openmai-task.js';
+import { applyOpenmaiSseFrame, settleOpenmaiTask } from '../src/openmai-task.js';
 
 function runningTask() {
   const db = openDb(':memory:');
@@ -40,4 +40,22 @@ test('OpenMai 只有当前运行任务可以落成功或失败终态', () => {
     status: 'failed', error: '迟到错误',
   }), false, '已完成任务也不得被迟到回调改写');
   db.close();
+});
+
+test('OpenMai SSE 最后一帧没有空行也完整读取正文与异步定位', () => {
+  const state = { sessionId: '', messageId: '', result: '', deferred: false };
+  assert.equal(applyOpenmaiSseFrame(state,
+    'data: {"type":"session_created","session_id":"session-1"}'), true);
+  applyOpenmaiSseFrame(state,
+    'data: {"done":true,"deferred":true,"message_id":"message-1","canonical_content":"最终候选结果"}');
+  assert.deepEqual(state, {
+    sessionId: 'session-1', messageId: 'message-1', result: '最终候选结果', deferred: true,
+  });
+});
+
+test('OpenMai SSE 最后一帧错误不能被静默吞掉', () => {
+  const state = { sessionId: '', messageId: '', result: '', deferred: false };
+  assert.throws(() => applyOpenmaiSseFrame(state,
+    'data: {"error":"UPSTREAM_FAILED","message":"上游执行失败"}'), /上游执行失败/);
+  assert.equal(applyOpenmaiSseFrame(state, 'data: not-json'), false);
 });

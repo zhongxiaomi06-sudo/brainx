@@ -34,6 +34,24 @@ export function settleOpenmaiTask(db, {
   return output.changes === 1;
 }
 
+export function applyOpenmaiSseFrame(state, frame) {
+  const data = String(frame || '').split('\n').filter((line) => line.startsWith('data:'))
+    .map((line) => line.slice(5).trimStart()).join('\n');
+  if (!data) return false;
+  let payload;
+  try { payload = JSON.parse(data); } catch { return false; }
+  if (payload?.type === 'session_created') state.sessionId = payload.session_id || state.sessionId;
+  if (payload?.type === 'assistant_content_replaced') state.result = payload.content || '';
+  if (payload?.role === 'assistant' && payload?.done === false && payload.content) state.result += payload.content;
+  if (payload?.done === true) {
+    state.messageId = payload.message_id || state.messageId;
+    state.deferred = payload.deferred === true;
+    if (typeof payload.canonical_content === 'string') state.result = payload.canonical_content;
+  }
+  if (payload?.error) throw new Error(payload.message || payload.error || 'OpenMai 执行失败');
+  return true;
+}
+
 async function ttcFetch(path, jwt, method = 'POST', body = undefined, timeoutMs = CRM_TIMEOUT_MS) {
   // 绝对 URL 原样使用（pollAsyncResult/loadPersisted 传完整 OPENMAI_BASE 地址），相对路径才拼
   const resp = await fetch(path.startsWith('http') ? path : `${API_BASE}${path}`, {
@@ -104,25 +122,11 @@ async function callOpenmai(jwt, job) {
       const frame = buffer.slice(0, boundary);
       buffer = buffer.slice(boundary + 2);
       boundary = buffer.indexOf('\n\n');
-      const data = frame.split('\n').filter((l) => l.startsWith('data:'))
-        .map((l) => l.slice(5).trimStart()).join('\n');
-      if (!data) continue;
-      let payload; try { payload = JSON.parse(data); } catch { continue; }
-      if (payload?.type === 'session_created') state.sessionId = payload.session_id;
-      if (payload?.type === 'assistant_content_replaced') state.result = payload.content || '';
-      if (payload?.role === 'assistant' && payload?.done === false && payload.content) state.result += payload.content;
-      if (payload?.done === true) {
-        state.messageId = payload.message_id || state.messageId;
-        state.deferred = payload.deferred === true;
-        if (typeof payload.canonical_content === 'string') state.result = payload.canonical_content;
-      }
-      if (payload?.error) throw new Error(payload.message || payload.error || 'OpenMai 执行失败');
+      applyOpenmaiSseFrame(state, frame);
     }
   }
   buffer += decoder.decode();
-  const tail = buffer.split('\n').filter((l) => l.startsWith('data:'))
-    .map((l) => l.slice(5).trimStart()).join('\n');
-  if (tail) { try { const p = JSON.parse(tail); if (p?.done === true) state.deferred = p.deferred === true; } catch { /* ignore */ } }
+  applyOpenmaiSseFrame(state, buffer.replaceAll('\r\n', '\n'));
   if (state.deferred) state.result = await pollAsyncResult(jwt, state);
   if (!state.result) state.result = await loadPersisted(jwt, state);
   if (!state.result) throw new Error('OpenMai 已结束但没有读取到会话结果');

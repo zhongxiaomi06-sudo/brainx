@@ -20,6 +20,20 @@ const POLL_TIMEOUT_MS = 35 * 60_000;
 
 const running = new Set(); // `${project_id}|${consultant_id}`
 
+export function settleOpenmaiTask(db, {
+  projectId, consultantId, taskId, status, resultText = null, error = null, finishedAt = now(),
+}) {
+  if (!['done', 'failed'].includes(status)) throw new Error('OPENMAI_SETTLE_STATUS_INVALID');
+  const output = db.prepare(`UPDATE openmai_results SET status=?, result_text=?, error=?, finished_at=?
+    WHERE project_id=? AND consultant_id=? AND task_id=? AND status='running'`).run(
+    status,
+    status === 'done' ? resultText : null,
+    status === 'failed' ? String(error || 'OpenMai 执行失败').slice(0, 500) : null,
+    finishedAt, projectId, consultantId, taskId,
+  );
+  return output.changes === 1;
+}
+
 async function ttcFetch(path, jwt, method = 'POST', body = undefined, timeoutMs = CRM_TIMEOUT_MS) {
   // 绝对 URL 原样使用（pollAsyncResult/loadPersisted 传完整 OPENMAI_BASE 地址），相对路径才拼
   const resp = await fetch(path.startsWith('http') ? path : `${API_BASE}${path}`, {
@@ -172,6 +186,7 @@ export function startOpenmaiTask(db, bus, consultant_id, project_id, { force = f
 
   (async () => {
     let status = 'failed';
+    let settled = false;
     try {
       // P-FIX 占位职位（CSV/Bitable 源）：source_url 记录了 TTC 真身（ttc://job/<unique_id>）→ 用真身查 CRM；
       // 无真身的纯占位（feishu://base 源）TTC 查无 → 报"职位不存在"属预期（历史数据无 ATS 映射）
@@ -180,15 +195,15 @@ export function startOpenmaiTask(db, bus, consultant_id, project_id, { force = f
         ? String(row.source_url).slice('ttc://job/'.length).trim() : project_id;
       const job = await fetchCrmJob(jwt, realId);
       const result = await callOpenmai(jwt, job);
-      db.prepare(`UPDATE openmai_results SET status='done', result_text=?, finished_at=? WHERE project_id=? AND consultant_id=?`)
-        .run(result, now(), project_id, consultant_id);
+      settled = settleOpenmaiTask(db, { projectId: project_id, consultantId: consultant_id,
+        taskId: task_id, status: 'done', resultText: result });
       status = 'done';
     } catch (e) {
-      db.prepare(`UPDATE openmai_results SET status='failed', error=?, finished_at=? WHERE project_id=? AND consultant_id=?`)
-        .run(String(e.message).slice(0, 500), now(), project_id, consultant_id);
+      settled = settleOpenmaiTask(db, { projectId: project_id, consultantId: consultant_id,
+        taskId: task_id, status: 'failed', error: e.message });
     } finally {
       running.delete(key);
-      bus?.emit?.({ type: 'openmai_result', consultant_id, project_id, status });
+      if (settled) bus?.emit?.({ type: 'openmai_result', consultant_id, project_id, status });
     }
   })();
 

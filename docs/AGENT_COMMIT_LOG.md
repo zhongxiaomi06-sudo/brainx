@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-07｜fix(visibility): 职位挂载群 ∈ 顾问所在群 → 可见可接单——修复接单入口过窄
+
+- 背景：用户报「有些人一直没有办法接单」。生产审计确诊：同步链路健康（TTC 6 人×94 轮/24h 全 complete，推荐轮全部 COMPLETED），真正断点是 jobVisibleTo 只认 memberships/recommendations/decision_events 三来源，而职位库 14,494 个职位中仅 1,315 个进过推荐池——顾问在项目群亲眼看到的真实岗位（如 Dyna Robotics JXMKXTE）不在其 200 条推荐快照内，accept_job/job_assessment/openmai_search 全被 fail-closed 拒绝（felix 9-06 连续 25 次 NOT_FOUND_OR_FORBIDDEN 实锤）。
+- 实现：visibility.js jobVisibleTo 增加第四可见来源——job_facts.chat_id ∈ consultant_chats(consultant_id)。fail-closed 语义保持：顾问所在群挂载的职位是其已见事实，不新增泄露面；群成员撤销立即回到不可见。实测收益：york +1,265 / wendy +1,089 / shanon +794 / felix +323 / linda +232（可见职位数）。
+- 回归测试：visibility.test.mjs 新增群关联用例（在群可见/不在群不可见/撤群即失效），7/7 通过；agent-talent/action/job/gateway-http 25/25 通过。
+
 ## 2026-09-07｜fix(ttcsdk): searchAll 数字 cursor 保留原生类型——与 searchSince 对齐
 
 - 背景：生产对齐部署前的脏文件核对发现，生产 /opt/brainx 上有一个未回本地分支的关键热修——TTC 分页 cursor 是 JSON number，searchAll 里 `String(d?.cursor || '').trim()` 转成 string 后服务端报 code=-111「参数有误」。searchSince 已有正确修法（原生类型透传），但 searchAll 漏修；若直接按远端提交对齐生产，职位全量拉取分页会挂。

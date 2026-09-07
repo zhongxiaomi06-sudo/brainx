@@ -7,6 +7,7 @@ import {
   buildResumeUnavailableCard,
   assessOpenmaiCandidateBatch,
   retryOpenmaiDelivery,
+  failStaleOpenmaiTasks,
 } from '../src/openmai-delivery.js';
 import { buildPrompt } from '../src/openmai-task.js';
 import { saveTtcToken } from '../src/ttcsdk/auth.js';
@@ -90,6 +91,30 @@ test('OpenMai 结果只有真实送达飞书后才标完成', async () => {
   assert.equal(retried.status, 'delivery_retry');
   assert.deepEqual({ ...db.prepare(`SELECT delivery_status,attempts,last_error
     FROM openmai_deliveries`).get() }, { delivery_status: 'PENDING', attempts: 0, last_error: null });
+  db.close();
+});
+
+test('OpenMai 服务中断遗留的超时运行任务失败关闭，不自动重复计费', async () => {
+  const db = seededDb();
+  db.prepare("DELETE FROM openmai_deliveries").run();
+  db.prepare(`UPDATE openmai_results SET status='running',result_text=NULL,error=NULL,
+    started_at='2026-09-07T10:00:00.000Z',finished_at=NULL WHERE task_id='om_delivery'`).run();
+  assert.equal(failStaleOpenmaiTasks(db, '2026-09-07T11:00:01.000Z'), 1);
+  const row = db.prepare(`SELECT status,error,finished_at,task_id FROM openmai_results`).get();
+  assert.equal(row.status, 'failed');
+  assert.equal(row.task_id, 'om_delivery');
+  assert.match(row.error, /避免重复费用.*明确重试/);
+  assert.equal(row.finished_at, '2026-09-07T11:00:01.000Z');
+  assert.equal(failStaleOpenmaiTasks(db, '2026-09-07T12:00:01.000Z'), 0);
+  db.close();
+});
+
+test('OpenMai 仍在最大执行窗口内的任务不会被 worker 误判', () => {
+  const db = seededDb();
+  db.prepare(`UPDATE openmai_results SET status='running',result_text=NULL,
+    started_at='2026-09-07T10:00:00.000Z',finished_at=NULL WHERE task_id='om_delivery'`).run();
+  assert.equal(failStaleOpenmaiTasks(db, '2026-09-07T10:59:59.000Z'), 0);
+  assert.equal(db.prepare('SELECT status FROM openmai_results').get().status, 'running');
   db.close();
 });
 

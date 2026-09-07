@@ -62,6 +62,7 @@ Gateway、OpenClaw、业务 worker 和可选 integration worker 都在 systemd `
 - 发飞书前重新校验授权；撤权同时取消未发送 outbox 并失效缓存/索引。
 - 自动项目群必须同时存在于 OpenClaw `channels.feishu.groupAllowFrom` 和 BrainX `agent_group_scopes`；前者负责入口准入，后者负责 sender、purpose、project 的数据权限。只登记其中一层都不算可用。
 - OpenMai 回群依赖 `brainx-worker.service` 中的持久投递消费者；`brainx-integration-worker.service` 不运行这段代码。项目长期停在 RUNNING 时先核对前者，不得用启动后者作为替代修复。
+- API 重启遗留的 OpenMai RUNNING 记录超过一小时后由业务 worker 自动转为可恢复失败并回群提示；这是防重复计费边界。不得把阈值改成自动重跑，也不得直接把数据库状态手工改成 DONE。
 - 人才同步只在所有分页成功后推进游标；文档 schema 不合格进入 NEEDS_REVIEW，扫描件进入 OCR_REQUIRED。
 - 新匹配只输出 SHADOW 的 Recall@20/NDCG@10 报告，未经负责人签署不改变正式顺序。
 

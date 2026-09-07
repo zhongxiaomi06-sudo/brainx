@@ -9,6 +9,7 @@ const PHONE = /(?<!\d)(?:\+?86[-\s]?)?1[3-9]\d{9}(?!\d)/g;
 const EMAIL = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
 const CANDIDATE_BLOCK = /<!--\s*BRAINX_CANDIDATES_V1\s*([\s\S]*?)-->/;
 const MAX_RESUME_BYTES = 12 * 1024 * 1024;
+const STALE_SEARCH_MS = 60 * 60 * 1000;
 
 export function extractOpenmaiCandidates(value) {
   const match = String(value || '').match(CANDIDATE_BLOCK);
@@ -230,6 +231,23 @@ export function retryOpenmaiDelivery(db, consultantId, projectId, at = now()) {
   return { status: 'delivery_retry', task_id: row.task_id, started_at: at };
 }
 
+export function failStaleOpenmaiTasks(db, at = now(), maxAgeMs = STALE_SEARCH_MS) {
+  const cutoff = new Date(Date.parse(at) - maxAgeMs).toISOString();
+  const rows = db.prepare(`SELECT project_id,consultant_id,task_id FROM openmai_results
+    WHERE status='running' AND started_at<=?`).all(cutoff);
+  const update = db.prepare(`UPDATE openmai_results SET status='failed',
+    error='OpenMai 任务因服务中断或超时未完成；为避免重复费用，请由顾问明确重试。',finished_at=?
+    WHERE project_id=? AND consultant_id=? AND task_id=? AND status='running'`);
+  let recovered = 0;
+  db.exec('BEGIN');
+  try {
+    for (const row of rows) recovered += update.run(at, row.project_id,
+      row.consultant_id, row.task_id).changes;
+    db.exec('COMMIT');
+  } catch (error) { db.exec('ROLLBACK'); throw error; }
+  return recovered;
+}
+
 function retryAt(at, attempts) {
   const delaySeconds = Math.min(300, 5 * (2 ** Math.max(0, attempts - 1)));
   return new Date(Date.parse(at) + delaySeconds * 1000).toISOString();
@@ -237,6 +255,7 @@ function retryAt(at, attempts) {
 
 export async function deliverOpenmaiResultsOnce(db, dependencies = {}) {
   const at = dependencies.at || now();
+  failStaleOpenmaiTasks(db, at, dependencies.staleSearchMs || STALE_SEARCH_MS);
   const enqueued = enqueueOpenmaiDeliveries(db, at);
   const rows = db.prepare(`SELECT d.*, r.result_text, r.error, j.company, j.role
     FROM openmai_deliveries d

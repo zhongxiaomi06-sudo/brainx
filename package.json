@@ -29,6 +29,7 @@
     "gateway": "node bin/brainx-lark-gateway.mjs",
     "agent:gateway": "node bin/brainx-agent-gateway.mjs",
     "agent:admin": "node bin/brainx-agent-admin.mjs",
+    "runtime:preflight": "node bin/brainx-runtime-preflight.mjs",
     "integration:worker": "node bin/brainx-integration-worker.mjs",
     "match:evaluate": "node scripts/eval-candidate-matching.mjs",
     "gateway:start": "node --env-file=.env bin/brainx-lark-gateway.mjs start",

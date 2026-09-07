@@ -176,6 +176,8 @@ sudo deploy/openclaw/install.sh --apply
 | 变量 | 规则 |
 |---|---|
 | `BRAINX_DB` | 与 Gateway 使用同一决策账本路径 |
+| `BRAINX_BASE_URL` | 与 `openclaw.env` 使用同一正式 HTTPS 根地址，供回群卡片生成工作台深链 |
+| `BRAINX_FEISHU_APP_ID/SECRET` | 与 `openclaw.env` 使用同一已发布应用，确保 worker 能把结果发回该机器人所在项目群 |
 | 三个 `*_ENABLED` | 首批按模板开启；文档 LLM 开关默认保持 0 |
 | `BRAINX_DOCUMENT_STAGING_ROOT` | `/opt/brainx/data/document-staging`，不得指向任意用户目录 |
 | `BRAINX_TENANT_ID` 与 reloop 四项绑定 | 由数据责任人逐项核实，不从聊天猜 |
@@ -196,14 +198,14 @@ sudo deploy/openclaw/install.sh --apply
 
 生产默认模型为 `stepfun/step-3.5-flash`，失败时回退到 `stepfun/step-3.7-flash`。私聊会话按飞书用户隔离，顾问可发送 `/model`，或点击 `/brainx` 首页的“切换我的模型”，在管理员已批准的模型目录内改变本人当前会话模型；该操作不修改其他顾问会话，也不需要编辑服务器文件。个人自带 API Key/OAuth 属于后续独立 Agent 认证能力，不得通过飞书消息收集密钥。
 
-校验所有占位符已经替换，但不要输出值：
+填完后先运行失败关闭的交叉校验；它只输出变量名和错误码，不输出任何值：
 
 ```bash
-grep -En 'replace-|must-equal-|cli_replace|ou_replace|oc_replace' /etc/brainx/*.env
+sudo deploy/openclaw/install.sh --validate
 stat -c '%a %U %G %n' /etc/brainx/*.env
 ```
 
-第一条必须零输出；第二条必须显示 `640 root brainx`。不要使用 `set -x`，不要把环境文件整体打印到终端录屏。
+第一条必须返回 `ok=true`；它会同时检查占位符、密钥长度与复用、Gateway token/签名密钥跨文件一致、worker 与 OpenClaw 使用同一飞书 App 和 HTTPS 地址、Gateway/worker 使用同一 SQLite，以及六名员工白名单格式和管理员 allowlist。第二条必须显示 `640 root brainx`。不要使用 `set -x`，不要把环境文件整体打印到终端录屏。
 
 ### 7.4 主 BrainX 应用
 

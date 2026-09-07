@@ -15,8 +15,9 @@ BRAINX_PRODUCTION_SKILLS=(
   brainx-review
 )
 
-if [[ "$BRAINX_INSTALL_MODE" != "--check" && "$BRAINX_INSTALL_MODE" != "--apply" ]]; then
-  echo "usage: sudo deploy/openclaw/install.sh [--check|--apply]" >&2
+if [[ "$BRAINX_INSTALL_MODE" != "--check" && "$BRAINX_INSTALL_MODE" != "--apply" \
+    && "$BRAINX_INSTALL_MODE" != "--validate" ]]; then
+  echo "usage: sudo deploy/openclaw/install.sh [--check|--apply|--validate]" >&2
   exit 64
 fi
 
@@ -49,6 +50,10 @@ for required_file in \
   "$BRAINX_DEPLOY_ROOT/deploy/systemd/openclaw-brainx.service"; do
   [[ -f "$required_file" ]] || { echo "missing file: $required_file" >&2; exit 66; }
 done
+
+if [[ "$BRAINX_INSTALL_MODE" == "--validate" ]]; then
+  exec node "$BRAINX_DEPLOY_ROOT/bin/brainx-runtime-preflight.mjs"
+fi
 
 if [[ "$BRAINX_INSTALL_MODE" == "--check" ]]; then
   echo "preflight passed; rerun with --apply, then fill /etc/brainx/*.env before starting services"

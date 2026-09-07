@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-07｜feat(deploy): 增加员工机器人运行配置交叉预检
+
+- 根因：原部署步骤只用 grep 查显眼占位符，无法发现 Agent Gateway 与 OpenClaw 的 token/签名不一致、worker 和机器人使用不同飞书 App、SQLite 路径分叉或 HTTPS 深链缺失；这些错误都会表现为“部分员工机器人不可用”或“结果不回群”。
+- 改动：新增无密钥回显的三文件运行预检和安装器 `--validate` 模式，一次校验必填项、占位符、密钥长度/复用、App/DB/HTTPS 跨进程一致性、六人白名单、管理员 allowlist 与 App 绑定键 JSON；运行手册改为启动前强制通过。
+- 验证：运行预检与生产配置专项 10/10、`npm run verify:quick` 16/16、`git diff --check` 通过。
+
 ## 2026-09-07｜fix(deploy): 启动真正负责 OpenMai 回群的业务 worker
 
 - 根因：OpenMai 持久投递消费者位于 `src/worker.js`，但 OpenClaw 安装器只校验并安装 `brainx-integration-worker`；后者只消费 `integration_jobs`，不会执行候选结果回群。部署手册还把两个服务交叉描述，按文档上线会让项目长期停在 RUNNING。

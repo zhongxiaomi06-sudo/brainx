@@ -4,32 +4,41 @@ import { createOpenClawGroupAccess } from '../src/openclaw-group-access.js';
 
 test('动态项目群按读改写追加到 OpenClaw allowlist，重复执行幂等', async () => {
   let groups = ['oc_existing'];
+  let senders = ['ou_existing'];
   const calls = [];
   const access = createOpenClawGroupAccess({ cli: { call: async (args) => {
     calls.push(args);
-    if (args[1] === 'get') return { stdout: JSON.stringify(groups) };
-    groups = JSON.parse(args[3]);
+    if (args[1] === 'get') return { stdout: JSON.stringify(args[2].includes('Sender') ? senders : groups) };
+    if (args[2].includes('Sender')) senders = JSON.parse(args[3]);
+    else groups = JSON.parse(args[3]);
     return { stdout: '' };
   } } });
-  const first = await access.ensure('oc_project');
-  const second = await access.ensure('oc_project');
-  assert.deepEqual(first, { chat_id: 'oc_project', added: true, count: 2 });
-  assert.deepEqual(second, { chat_id: 'oc_project', added: false, count: 2 });
+  const first = await access.ensure('oc_project', ['ou_owner', 'ou_partner']);
+  const second = await access.ensure('oc_project', ['ou_owner', 'ou_partner']);
+  assert.deepEqual(first, { chat_id: 'oc_project', added: true, count: 2,
+    sender_added: 2, sender_count: 3 });
+  assert.deepEqual(second, { chat_id: 'oc_project', added: false, count: 2,
+    sender_added: 0, sender_count: 3 });
   assert.deepEqual(groups, ['oc_existing', 'oc_project']);
+  assert.deepEqual(senders, ['ou_existing', 'ou_owner', 'ou_partner']);
   assert.deepEqual(calls[1].slice(0, 3), ['config', 'set', 'channels.feishu.groupAllowFrom']);
   assert.ok(calls[1].includes('--strict-json'));
 });
 
 test('并发追加串行化，不丢任何项目群；非法群和坏配置失败关闭', async () => {
   let groups = [];
+  let senders = [];
   const access = createOpenClawGroupAccess({ cli: { call: async (args) => {
-    if (args[1] === 'get') return { stdout: JSON.stringify(groups) };
-    groups = JSON.parse(args[3]);
+    if (args[1] === 'get') return { stdout: JSON.stringify(args[2].includes('Sender') ? senders : groups) };
+    if (args[2].includes('Sender')) senders = JSON.parse(args[3]);
+    else groups = JSON.parse(args[3]);
     return { stdout: '' };
   } } });
-  await Promise.all([access.ensure('oc_a'), access.ensure('oc_b')]);
+  await Promise.all([access.ensure('oc_a', ['ou_a']), access.ensure('oc_b', ['ou_b'])]);
   assert.deepEqual(groups, ['oc_a', 'oc_b']);
+  assert.deepEqual(senders, ['ou_a', 'ou_b']);
   await assert.rejects(access.ensure('bad'), /OPENCLAW_GROUP_ID_INVALID/);
+  await assert.rejects(access.ensure('oc_ok', ['bad']), /OPENCLAW_GROUP_SENDER_INVALID/);
   const broken = createOpenClawGroupAccess({ cli: { call: async () => ({ stdout: '{}' }) } });
   await assert.rejects(broken.ensure('oc_ok'), /OPENCLAW_GROUP_CONFIG_INVALID/);
 });

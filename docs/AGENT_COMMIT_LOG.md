@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-07｜fix(openclaw): 同步项目协作者群发送白名单
+
+- 根因：动态建群只把 chat_id 加进 OpenClaw `groupAllowFrom`；即使协作者已进入飞书群并被 BrainX 群 scope 授权，只要不在 OpenClaw `groupSenderAllowFrom`，消息仍会在到达 Gateway 前被丢弃。
+- 改动：项目群准入同时接收已核验协作者 open_id，串行、幂等更新群 allowlist 与群 sender allowlist；并发创建多个项目群不丢群或人员。
+- 权限：只增加项目启动阶段已通过同租户、同 account、同 App key 与 ACTIVE 绑定校验的协作者；不改私聊 `allowFrom`，BrainX 后续仍执行 sender、purpose、project 三重群范围校验。
+- 验证：OpenClaw 群准入、项目启动与 Agent 权限专项 16/16、`npm run verify:quick` 16/16、`git diff --check` 通过。
+
 ## 2026-09-07｜fix(openmai): 隔离单份候选简历投递失败
 
 - 根因：旧 worker 在任一 PDF 确定性安全校验失败时中断整批候选人，后续人选无法回群，整批还会围绕同一坏附件反复重试。

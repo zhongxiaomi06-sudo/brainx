@@ -225,7 +225,7 @@ export async function launchProject(db, consultantId, projectId, input = {}, dep
         chatId, created.name, now(), consultantId, projectId,
       );
     }
-    await allowOpenClawGroup(chatId);
+    await allowOpenClawGroup(chatId, collaboratorOpenIds);
     const sent = await sendCard({
       target: chatId,
       card: buildProjectLaunchCard(preflight.job, { publicBaseUrl: dependencies.publicBaseUrl }),

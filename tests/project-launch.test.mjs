@@ -33,7 +33,7 @@ test('项目启动：建群、投放职位、绑定项目并激活群 Agent 范�
     appConfigured: true,
     publicBaseUrl: 'https://base.yorkteam.cn/',
     createProjectChat: async (input) => { calls.push(['create', input]); return { chat_id: 'oc_launch', name: input.name }; },
-    ensureOpenClawGroupAllowed: async (chatId) => { calls.push(['allow', chatId]); },
+    ensureOpenClawGroupAllowed: async (chatId, senders) => { calls.push(['allow', chatId, senders]); },
     sendInteractiveCard: async (input) => { calls.push(['send', input]); return { message_id: 'om_job' }; },
   };
   const result = await launchProject(db, 'felix', PID, { idempotency_key: 'launch-click-1' }, deps);
@@ -41,7 +41,7 @@ test('项目启动：建群、投放职位、绑定项目并激活群 Agent 范�
   assert.equal(result.launch.chat_id, 'oc_launch');
   assert.equal(calls[0][1].ownerOpenId.startsWith('ou_'), true);
   assert.deepEqual(calls[0][1].memberOpenIds, [calls[0][1].ownerOpenId]);
-  assert.deepEqual(calls[1], ['allow', 'oc_launch']);
+  assert.deepEqual(calls[1], ['allow', 'oc_launch', [calls[0][1].ownerOpenId]]);
   assert.equal(calls[2][1].target, 'oc_launch');
   assert.equal(db.prepare('SELECT chat_id FROM job_facts WHERE project_id=?').get(PID).chat_id, 'oc_launch');
   assert.equal(db.prepare('SELECT enabled FROM chat_contexts WHERE chat_id=?').get('oc_launch').enabled, 1);

@@ -135,6 +135,7 @@ export async function sendPdfFile({
   fileName,
   data,
   idempotencyKey,
+  replyToMessageId,
   appId = process.env.BRAINX_FEISHU_APP_ID || process.env.LARK_APP_ID,
   appSecret = process.env.BRAINX_FEISHU_APP_SECRET || process.env.LARK_APP_SECRET,
   fetchImpl = globalThis.fetch,
@@ -142,6 +143,9 @@ export async function sendPdfFile({
 }) {
   if (!/^oc_[A-Za-z0-9_-]+$/.test(String(target || ''))) throw new Error('FEISHU_FILE_TARGET_INVALID');
   if (!idempotencyKey) throw new Error('FEISHU_FILE_IDEMPOTENCY_KEY_REQUIRED');
+  if (replyToMessageId && !/^om_[A-Za-z0-9_-]+$/.test(String(replyToMessageId))) {
+    throw new Error('FEISHU_REPLY_MESSAGE_ID_INVALID');
+  }
   const bytes = Buffer.isBuffer(data) ? data : Buffer.from(data || []);
   if (bytes.length === 0 || bytes.length > 12 * 1024 * 1024) throw new Error('FEISHU_FILE_SIZE_INVALID');
   const safeName = String(fileName || '候选人简历.pdf').replace(/[\\/:*?"<>|\r\n]/g, '_').slice(0, 120);
@@ -159,12 +163,18 @@ export async function sendPdfFile({
   if (uploadResponse.ok === false || uploadBody.code !== 0 || !uploadBody.data?.file_key) {
     throw new Error(`FEISHU_FILE_UPLOAD_FAILED: ${safeMessage(uploadBody, uploadBody.code ?? 'unknown')}`);
   }
+  const fileContent = JSON.stringify({ file_key: uploadBody.data.file_key });
+  const replyMode = Boolean(replyToMessageId);
+  const sendUrl = replyMode
+    ? `${FEISHU_BASE}/open-apis/im/v1/messages/${encodeURIComponent(replyToMessageId)}/reply`
+    : `${FEISHU_BASE}/open-apis/im/v1/messages?receive_id_type=chat_id&uuid=${encodeURIComponent(idempotencyKey)}`;
   const sendResponse = await fetchImpl(
-    `${FEISHU_BASE}/open-apis/im/v1/messages?receive_id_type=chat_id&uuid=${encodeURIComponent(idempotencyKey)}`,
+    sendUrl,
     {
       method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ receive_id: target, msg_type: 'file',
-        content: JSON.stringify({ file_key: uploadBody.data.file_key }) }),
+      body: JSON.stringify(replyMode
+        ? { msg_type: 'file', content: fileContent, reply_in_thread: true, uuid: idempotencyKey }
+        : { receive_id: target, msg_type: 'file', content: fileContent }),
       signal: AbortSignal.timeout(timeoutMs),
     },
   );

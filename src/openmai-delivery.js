@@ -50,19 +50,50 @@ export async function downloadResumePdf(url, jwt, options = {}) {
   return bytes;
 }
 
-async function deliverCandidatePdfs(db, row, dependencies) {
-  const candidates = extractOpenmaiCandidates(row.result_text).filter((candidate) => candidate.resumeUrl);
+export function buildCandidateTopicCard({ candidate, job, publicBaseUrl }) {
+  const baseUrl = productionBaseUrl(publicBaseUrl).href;
+  const target = buildBrainxDeepLink({ baseUrl, objectType: 'opportunity',
+    objectRef: job.project_id, candidateRef: candidate.candidateRef });
+  const name = groupSafeOpenmaiText(candidate.name, 60);
+  const evaluation = groupSafeOpenmaiText(candidate.evaluation, 1000);
+  return {
+    config: { wide_screen_mode: true },
+    header: { template: 'blue', title: { tag: 'plain_text', content: `候选人 · ${name}` } },
+    elements: [
+      { tag: 'markdown', content: `**AI 初评**\n${evaluation}` },
+      { tag: 'action', actions: [{ tag: 'button', type: 'primary',
+        text: { tag: 'plain_text', content: '打开候选人评估' },
+        multi_url: { url: target, pc_url: target, android_url: target, ios_url: target } }] },
+      { tag: 'note', elements: [{ tag: 'plain_text', content: candidate.resumeUrl
+        ? 'PDF 简历将回复在本话题 · 联系与推进记录请继续写在本话题'
+        : '本轮未取得真实 PDF · 联系与推进记录请继续写在本话题' }] },
+    ],
+  };
+}
+
+async function deliverCandidateTopics(db, row, dependencies) {
+  const candidates = extractOpenmaiCandidates(row.result_text);
   if (candidates.length === 0) return 0;
-  const jwt = getValidTtcJwt(db, row.consultant_id);
-  if (!jwt) throw new Error('TTC_CREDENTIALS_REQUIRED_FOR_RESUME');
+  const send = dependencies.sendInteractiveCard || sendInteractiveCard;
+  const withResume = candidates.some((candidate) => candidate.resumeUrl);
+  const jwt = withResume ? getValidTtcJwt(db, row.consultant_id) : null;
+  if (withResume && !jwt) throw new Error('TTC_CREDENTIALS_REQUIRED_FOR_RESUME');
   let sent = 0;
   for (const [index, candidate] of candidates.entries()) {
+    const topic = await send({
+      target: row.chat_id,
+      card: buildCandidateTopicCard({ candidate, job: row, publicBaseUrl: dependencies.publicBaseUrl }),
+      idempotencyKey: `${row.delivery_id}-candidate-${index + 1}`,
+    });
+    sent++;
+    if (!candidate.resumeUrl) continue;
+    if (!topic.message_id) throw new Error('FEISHU_CANDIDATE_TOPIC_MESSAGE_ID_MISSING');
     const bytes = await downloadResumePdf(candidate.resumeUrl, jwt, dependencies);
     await (dependencies.sendPdfFile || sendPdfFile)({
       target: row.chat_id, data: bytes, fileName: `${candidate.name}-简历.pdf`,
       idempotencyKey: `${row.delivery_id}-resume-${index + 1}`,
+      replyToMessageId: topic.message_id,
     });
-    sent++;
   }
   return sent;
 }
@@ -152,7 +183,7 @@ export async function deliverOpenmaiResultsOnce(db, dependencies = {}) {
           resultText: row.result_text, error: row.error, publicBaseUrl: dependencies.publicBaseUrl }),
         idempotencyKey: row.delivery_id,
       });
-      if (row.result_status === 'done') await deliverCandidatePdfs(db, row, dependencies);
+      if (row.result_status === 'done') await deliverCandidateTopics(db, row, dependencies);
       db.prepare(`UPDATE openmai_deliveries SET delivery_status='SENT', message_id=?, last_error=NULL,
         sent_at=?, updated_at=? WHERE delivery_id=?`).run(output.message_id || null, at, at, row.delivery_id);
       sent += 1;

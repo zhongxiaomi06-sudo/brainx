@@ -112,3 +112,22 @@ test('飞书机器人把 PDF 上传后以幂等文件消息发到项目群', asy
   assert.equal(sent.msg_type, 'file');
   assert.deepEqual(JSON.parse(sent.content), { file_key: 'file-key-1' });
 });
+
+test('飞书机器人把 PDF 作为幂等回复放进候选人话题', async () => {
+  const calls = [];
+  await sendPdfFile({
+    target: 'oc_project', fileName: '李四-简历.pdf', data: Buffer.from('%PDF-1.7 test'),
+    idempotencyKey: 'delivery-2-resume-1', replyToMessageId: 'om_candidate_topic',
+    appId: 'cli_test', appSecret: 'secret',
+    fetchImpl: async (url, options) => {
+      calls.push({ url: String(url), options });
+      if (calls.length === 1) return response({ code: 0, tenant_access_token: 'token' });
+      if (calls.length === 2) return response({ code: 0, data: { file_key: 'file-key-2' } });
+      return response({ code: 0, data: { message_id: 'om_file_reply' } });
+    },
+  });
+  assert.match(calls[2].url, /\/messages\/om_candidate_topic\/reply$/);
+  const sent = JSON.parse(calls[2].options.body);
+  assert.deepEqual(sent, { msg_type: 'file', content: JSON.stringify({ file_key: 'file-key-2' }),
+    reply_in_thread: true, uuid: 'delivery-2-resume-1' });
+});

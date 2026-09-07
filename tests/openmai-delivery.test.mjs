@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { openDb, now } from '../src/db.js';
 import {
   groupSafeOpenmaiText, deliverOpenmaiResultsOnce, extractOpenmaiCandidates, downloadResumePdf,
+  buildCandidateTopicCard,
 } from '../src/openmai-delivery.js';
 import { buildPrompt } from '../src/openmai-task.js';
 import { saveTtcToken } from '../src/ttcsdk/auth.js';
@@ -86,6 +87,19 @@ test('OpenMai 提示要求 6-10 人、逐人评估和真实 PDF，机器块可�
   assert.doesNotMatch(groupSafeOpenmaiText(text), /BRAINX_CANDIDATES|resume\/c-1/);
 });
 
+test('候选人话题卡把评估、工作台入口和附件状态放在同一协作单元', () => {
+  const card = buildCandidateTopicCard({
+    candidate: { candidateRef: 'c-1', name: '张三', evaluation: '匹配 86%，邮箱 a@example.com',
+      resumeUrl: 'https://gateway.ttcadvisory.com/resume/c-1.pdf' },
+    job: { project_id: 'P-DELIVERY' }, publicBaseUrl: 'https://base.yorkteam.cn/',
+  });
+  assert.match(card.header.title.content, /张三/);
+  assert.doesNotMatch(card.elements[0].content, /a@example\.com/);
+  assert.match(card.elements[2].elements[0].content, /PDF 简历将回复在本话题/);
+  const target = new URL(card.elements[1].actions[0].multi_url.url);
+  assert.equal(target.searchParams.get('candidate'), 'c-1');
+});
+
 test('简历下载只接受受信 HTTPS 域、限制大小并验证 PDF 内容', async () => {
   const pdf = await downloadResumePdf('https://gateway.ttcadvisory.com/resume/1.pdf', 'jwt-test', {
     fetchImpl: async (_url, options) => {
@@ -101,7 +115,7 @@ test('简历下载只接受受信 HTTPS 域、限制大小并验证 PDF 内容',
     /RESUME_URL_NOT_TRUSTED/);
 });
 
-test('OpenMai 成功投递会把结构化候选人的真实 PDF 逐份发到原项目群', async () => {
+test('OpenMai 成功投递为每名候选人建独立话题并把真实 PDF 回复进对应话题', async () => {
   const db = seededDb();
   const resultText = `候选人张三：匹配\n<!-- BRAINX_CANDIDATES_V1\n${JSON.stringify({ candidates: [
     { candidate_ref: 'c-1', name: '张三', evaluation: '匹配', resume_url: 'https://gateway.ttcadvisory.com/resumes/c-1.pdf' },
@@ -110,18 +124,26 @@ test('OpenMai 成功投递会把结构化候选人的真实 PDF 逐份发到原�
   saveTtcToken(db, 'felix', 'header.payload.signature', {
     userName: 'Felix', personId: 'p-1', expiresAt: '2099-01-01T00:00:00.000Z',
   });
+  const cards = [];
   const files = [];
   const result = await deliverOpenmaiResultsOnce(db, {
     at: now(), publicBaseUrl: 'https://base.yorkteam.cn/',
-    sendInteractiveCard: async () => ({ message_id: 'om_card' }),
+    sendInteractiveCard: async (input) => {
+      cards.push(input);
+      return { message_id: cards.length === 1 ? 'om_summary' : 'om_candidate' };
+    },
     fetchImpl: async () => new Response(Buffer.from('%PDF-1.7 resume'), { status: 200 }),
     sendPdfFile: async (input) => { files.push(input); return { message_id: 'om_pdf' }; },
   });
   assert.equal(result.sent, 1);
+  assert.equal(cards.length, 2);
+  assert.match(cards[1].idempotencyKey, /candidate-1$/);
+  assert.match(cards[1].card.elements[0].content, /匹配/);
   assert.equal(files.length, 1);
   assert.equal(files[0].target, 'oc_delivery');
   assert.equal(files[0].fileName, '张三-简历.pdf');
   assert.match(files[0].data.toString(), /^%PDF-/);
   assert.match(files[0].idempotencyKey, /resume-1$/);
+  assert.equal(files[0].replyToMessageId, 'om_candidate');
   db.close();
 });

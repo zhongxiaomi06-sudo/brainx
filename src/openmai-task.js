@@ -45,7 +45,7 @@ async function fetchCrmJob(jwt, jobId) {
   return job;
 }
 
-function buildPrompt(job) {
+export function buildPrompt(job) {
   return [
     '请根据下面的职位描述找人：',
     '[',
@@ -56,7 +56,13 @@ function buildPrompt(job) {
     `人选画像：${job.analytics_summary || ''}`,
     `职位描述：${job.description_summary || ''}`,
     ']',
-    '请使用 OpenMai 现有的找人能力搜索匹配候选人，并返回本次会话结果。',
+    '请使用 OpenMai 现有的找人能力搜索 6-10 名匹配候选人。',
+    '每人必须给出姓名、当前公司/职位、匹配判断、推荐理由、风险或待核实项；没有证据的字段写“待核实”。',
+    '如果系统能取得候选人的真实 PDF，请提供可直接下载的 HTTPS 地址；不能取得时 resume_url 必须为 null，不得编造链接。',
+    '在面向人的结果末尾追加下面格式的机器块，JSON 必须合法，且不要把电话或邮箱放入机器块：',
+    '<!-- BRAINX_CANDIDATES_V1',
+    '{"candidates":[{"candidate_ref":"稳定候选编号","name":"姓名","evaluation":"一句话评估","resume_url":"https://受信地址/真实简历.pdf或null"}]}',
+    '-->',
   ].join('\n');
 }
 

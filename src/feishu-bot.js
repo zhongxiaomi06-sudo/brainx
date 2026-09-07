@@ -128,3 +128,49 @@ export async function sendInteractiveCard({
   }
   return { message_id: sendBody.data?.message_id || null };
 }
+
+/** 上传 PDF 并以文件消息发送到私有项目群；文件消息 uuid 由业务层保证可见投递幂等。 */
+export async function sendPdfFile({
+  target,
+  fileName,
+  data,
+  idempotencyKey,
+  appId = process.env.BRAINX_FEISHU_APP_ID || process.env.LARK_APP_ID,
+  appSecret = process.env.BRAINX_FEISHU_APP_SECRET || process.env.LARK_APP_SECRET,
+  fetchImpl = globalThis.fetch,
+  timeoutMs = 30_000,
+}) {
+  if (!/^oc_[A-Za-z0-9_-]+$/.test(String(target || ''))) throw new Error('FEISHU_FILE_TARGET_INVALID');
+  if (!idempotencyKey) throw new Error('FEISHU_FILE_IDEMPOTENCY_KEY_REQUIRED');
+  const bytes = Buffer.isBuffer(data) ? data : Buffer.from(data || []);
+  if (bytes.length === 0 || bytes.length > 12 * 1024 * 1024) throw new Error('FEISHU_FILE_SIZE_INVALID');
+  const safeName = String(fileName || '候选人简历.pdf').replace(/[\\/:*?"<>|\r\n]/g, '_').slice(0, 120);
+  if (!safeName.toLowerCase().endsWith('.pdf')) throw new Error('FEISHU_FILE_TYPE_INVALID');
+  const token = await getTenantAccessToken({ appId, appSecret, fetchImpl, timeoutMs });
+  const form = new FormData();
+  form.append('file_type', 'stream');
+  form.append('file_name', safeName);
+  form.append('file', new Blob([bytes], { type: 'application/pdf' }), safeName);
+  const uploadResponse = await fetchImpl(`${FEISHU_BASE}/open-apis/im/v1/files`, {
+    method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form,
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  const uploadBody = await readJson(uploadResponse, 'FEISHU_FILE_UPLOAD_RESPONSE_INVALID');
+  if (uploadResponse.ok === false || uploadBody.code !== 0 || !uploadBody.data?.file_key) {
+    throw new Error(`FEISHU_FILE_UPLOAD_FAILED: ${safeMessage(uploadBody, uploadBody.code ?? 'unknown')}`);
+  }
+  const sendResponse = await fetchImpl(
+    `${FEISHU_BASE}/open-apis/im/v1/messages?receive_id_type=chat_id&uuid=${encodeURIComponent(idempotencyKey)}`,
+    {
+      method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ receive_id: target, msg_type: 'file',
+        content: JSON.stringify({ file_key: uploadBody.data.file_key }) }),
+      signal: AbortSignal.timeout(timeoutMs),
+    },
+  );
+  const sendBody = await readJson(sendResponse, 'FEISHU_FILE_SEND_RESPONSE_INVALID');
+  if (sendResponse.ok === false || sendBody.code !== 0) {
+    throw new Error(`FEISHU_FILE_SEND_FAILED: ${safeMessage(sendBody, sendBody.code ?? 'unknown')}`);
+  }
+  return { file_key: uploadBody.data.file_key, message_id: sendBody.data?.message_id || null };
+}

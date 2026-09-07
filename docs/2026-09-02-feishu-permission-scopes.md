@@ -80,7 +80,7 @@
 | `im:message:send_as_bot` | 以机器人身份发消息 | 推不了岗位、报备不了人数 |
 | `im:chat` | 获取群信息 / 群成员 | 拿不到 chat_id，无法登记上下文 |
 | `contact:user.base:readonly` | 获取用户基本信息 | 报 `99991672`，**无法识别说话人是谁** |
-| `im:resource` | 上传下载图片、文件 | 发不了图片附件 |
+| `im:resource` | 上传下载图片、文件 | 发不了图片附件或 OpenMai 候选人 PDF |
 
 ### 4.2 用户身份（user）— 群消息全量读取（高敏感）
 

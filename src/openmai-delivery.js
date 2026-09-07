@@ -1,11 +1,71 @@
 /** OpenMai 最新结果 → 原飞书项目群；持久队列、脱敏卡片、有限重试。 */
 import { randomUUID } from 'node:crypto';
 import { now } from './db.js';
-import { sendInteractiveCard } from './feishu-bot.js';
+import { sendInteractiveCard, sendPdfFile } from './feishu-bot.js';
 import { buildBrainxDeepLink, productionBaseUrl } from './brainx-deep-links.js';
+import { getValidTtcJwt } from './ttcsdk/auth.js';
 
 const PHONE = /(?<!\d)(?:\+?86[-\s]?)?1[3-9]\d{9}(?!\d)/g;
 const EMAIL = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
+const CANDIDATE_BLOCK = /<!--\s*BRAINX_CANDIDATES_V1\s*([\s\S]*?)-->/;
+const MAX_RESUME_BYTES = 12 * 1024 * 1024;
+
+export function extractOpenmaiCandidates(value) {
+  const match = String(value || '').match(CANDIDATE_BLOCK);
+  if (!match) return [];
+  try {
+    const parsed = JSON.parse(match[1].trim());
+    if (!Array.isArray(parsed?.candidates)) return [];
+    return parsed.candidates.slice(0, 10).map((item, index) => ({
+      candidateRef: String(item?.candidate_ref || `candidate-${index + 1}`).slice(0, 100),
+      name: String(item?.name || `候选人${index + 1}`).slice(0, 60),
+      evaluation: String(item?.evaluation || '待顾问核验').slice(0, 300),
+      resumeUrl: typeof item?.resume_url === 'string' ? item.resume_url : null,
+    }));
+  } catch { return []; }
+}
+
+function trustedResumeHosts(value = process.env.BRAINX_RESUME_DOWNLOAD_HOSTS) {
+  return new Set(String(value || 'api.ttcadvisory.com,gateway.ttcadvisory.com,app.ttcadvisory.com')
+    .split(',').map((host) => host.trim().toLowerCase()).filter(Boolean));
+}
+
+export async function downloadResumePdf(url, jwt, options = {}) {
+  let target;
+  try { target = new URL(url); } catch { throw new Error('RESUME_URL_INVALID'); }
+  if (target.protocol !== 'https:' || !trustedResumeHosts(options.allowedHosts).has(target.hostname.toLowerCase())) {
+    throw new Error('RESUME_URL_NOT_TRUSTED');
+  }
+  const response = await (options.fetchImpl || globalThis.fetch)(target, {
+    headers: { Authorization: `Bearer ${jwt}`, Accept: 'application/pdf' },
+    signal: AbortSignal.timeout(options.timeoutMs || 30_000), redirect: 'error',
+  });
+  const announced = Number(response.headers?.get?.('content-length') || 0);
+  if (response.ok === false || announced > MAX_RESUME_BYTES) throw new Error('RESUME_DOWNLOAD_FAILED');
+  const bytes = Buffer.from(await response.arrayBuffer());
+  if (bytes.length === 0 || bytes.length > MAX_RESUME_BYTES
+      || !bytes.subarray(0, Math.min(1024, bytes.length)).includes(Buffer.from('%PDF-'))) {
+    throw new Error('RESUME_PDF_INVALID');
+  }
+  return bytes;
+}
+
+async function deliverCandidatePdfs(db, row, dependencies) {
+  const candidates = extractOpenmaiCandidates(row.result_text).filter((candidate) => candidate.resumeUrl);
+  if (candidates.length === 0) return 0;
+  const jwt = getValidTtcJwt(db, row.consultant_id);
+  if (!jwt) throw new Error('TTC_CREDENTIALS_REQUIRED_FOR_RESUME');
+  let sent = 0;
+  for (const [index, candidate] of candidates.entries()) {
+    const bytes = await downloadResumePdf(candidate.resumeUrl, jwt, dependencies);
+    await (dependencies.sendPdfFile || sendPdfFile)({
+      target: row.chat_id, data: bytes, fileName: `${candidate.name}-简历.pdf`,
+      idempotencyKey: `${row.delivery_id}-resume-${index + 1}`,
+    });
+    sent++;
+  }
+  return sent;
+}
 
 export function groupSafeOpenmaiText(value, max = 6500) {
   const cleaned = String(value || '')
@@ -92,6 +152,7 @@ export async function deliverOpenmaiResultsOnce(db, dependencies = {}) {
           resultText: row.result_text, error: row.error, publicBaseUrl: dependencies.publicBaseUrl }),
         idempotencyKey: row.delivery_id,
       });
+      if (row.result_status === 'done') await deliverCandidatePdfs(db, row, dependencies);
       db.prepare(`UPDATE openmai_deliveries SET delivery_status='SENT', message_id=?, last_error=NULL,
         sent_at=?, updated_at=? WHERE delivery_id=?`).run(output.message_id || null, at, at, row.delivery_id);
       sent += 1;

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createProjectChat, sendInteractiveCard } from '../src/feishu-bot.js';
+import { createProjectChat, sendInteractiveCard, sendPdfFile } from '../src/feishu-bot.js';
 
 const response = (body) => ({ ok: true, json: async () => body });
 
@@ -89,4 +89,26 @@ test('飞书机器人直连接口：建群输入和飞书失败都显式报错',
     }),
     /FEISHU_CHAT_CREATE_FAILED: no permission/,
   );
+});
+
+test('飞书机器人把 PDF 上传后以幂等文件消息发到项目群', async () => {
+  const calls = [];
+  const out = await sendPdfFile({
+    target: 'oc_project', fileName: '张三-简历.pdf', data: Buffer.from('%PDF-1.7 test'),
+    idempotencyKey: 'delivery-1-resume-1', appId: 'cli_test', appSecret: 'secret',
+    fetchImpl: async (url, options) => {
+      calls.push({ url: String(url), options });
+      if (calls.length === 1) return response({ code: 0, tenant_access_token: 'token' });
+      if (calls.length === 2) return response({ code: 0, data: { file_key: 'file-key-1' } });
+      return response({ code: 0, data: { message_id: 'om_file' } });
+    },
+  });
+  assert.deepEqual(out, { file_key: 'file-key-1', message_id: 'om_file' });
+  assert.match(calls[1].url, /\/open-apis\/im\/v1\/files$/);
+  assert.equal(calls[1].options.body.get('file_type'), 'stream');
+  assert.equal(calls[1].options.body.get('file_name'), '张三-简历.pdf');
+  assert.match(calls[2].url, /receive_id_type=chat_id&uuid=delivery-1-resume-1/);
+  const sent = JSON.parse(calls[2].options.body);
+  assert.equal(sent.msg_type, 'file');
+  assert.deepEqual(JSON.parse(sent.content), { file_key: 'file-key-1' });
 });

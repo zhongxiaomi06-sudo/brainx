@@ -108,6 +108,28 @@ test('群聊同时校验白名单群、sender、purpose 与项目范围', () => 
   }, { feishuAppKeyHash: APP_HASH, requireProjectScope: true }), /NOT_FOUND_OR_FORBIDDEN/);
 });
 
+test('已登记项目群允许候选推进，但仍受 sender、项目与明确 purpose 限制', () => {
+  const db = openDb(':memory:');
+  seedBinding(db);
+  seedGroup(db, { allowed_purposes_json: JSON.stringify(['candidate_action']) });
+  const action = payload({
+    chat_type: 'group', chat_id: 'oc_project_a', purpose: 'candidate_action',
+    tool_name: 'brainx_candidate_workflow',
+  });
+  const allowed = authorizePrincipal(db, action, {
+    feishuAppKeyHash: APP_HASH, projectRef: 'job-a', requireProjectScope: true,
+  });
+  assert.equal(allowed.consultantId, 'mia');
+  for (const changed of [{ requester_sender_id: 'ou_other' }, { purpose: 'candidate_review' }]) {
+    assert.throws(() => authorizePrincipal(db, { ...action, ...changed }, {
+      feishuAppKeyHash: APP_HASH, projectRef: 'job-a', requireProjectScope: true,
+    }), /NOT_FOUND_OR_FORBIDDEN|UNBOUND_IDENTITY/);
+  }
+  assert.throws(() => authorizePrincipal(db, action, {
+    feishuAppKeyHash: APP_HASH, projectRef: 'job-b', requireProjectScope: true,
+  }), /NOT_FOUND_OR_FORBIDDEN/);
+});
+
 test('损坏的群 scope JSON 和缺失 App 配置不能降级放行', () => {
   const db = openDb(':memory:');
   seedBinding(db);

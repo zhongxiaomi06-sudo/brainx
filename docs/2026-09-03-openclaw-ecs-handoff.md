@@ -146,7 +146,7 @@ node bin/brainx-agent-admin.mjs grant-group \
   --tenant <TENANT_ID> \
   --account mia \
   --chat-id <FEISHU_CHAT_ID> \
-  --purposes daily_brief,job_review,candidate_review,interview_prep,personal_review,run_status,self_context \
+  --purposes daily_brief,job_review,candidate_review,candidate_action,interview_prep,personal_review,run_status,self_context \
   --senders <FEISHU_OPEN_ID> \
   --projects <AUTHORIZED_PROJECT_ID>
 ```

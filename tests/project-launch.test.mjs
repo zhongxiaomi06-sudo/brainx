@@ -46,6 +46,7 @@ test('项目启动：建群、投放职位、绑定项目并激活群 Agent 范�
   assert.equal(db.prepare('SELECT enabled FROM chat_contexts WHERE chat_id=?').get('oc_launch').enabled, 1);
   const scope = db.prepare('SELECT * FROM agent_group_scopes WHERE chat_id=?').get('oc_launch');
   assert.deepEqual(JSON.parse(scope.project_refs_json), [PID]);
+  assert.ok(JSON.parse(scope.allowed_purposes_json).includes('candidate_action'));
   assert.equal(JSON.parse(scope.allowed_senders_json).length, 1);
 
   const duplicate = await launchProject(db, 'felix', PID, { idempotency_key: 'another-click' }, deps);

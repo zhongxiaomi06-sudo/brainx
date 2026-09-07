@@ -83,7 +83,7 @@ export const AGENT_TOOL_ROWS = Object.freeze([
     stage: string({ maxLength: 40 }), summary: string({ maxLength: 1000 }),
     next_action_title: string({ maxLength: 240 }), next_due_at: string(), idempotency_key: string(), confirm: boolean(),
   }, ['job_id', 'action_id', 'kind', 'summary', 'next_action_title', 'next_due_at', 'idempotency_key', 'confirm']), projectKey: 'job_id' },
-  { name: 'brainx_candidate_workflow', purpose: ['candidate_action'], p2pOnly: true, parameters: object({
+  { name: 'brainx_candidate_workflow', purpose: ['candidate_action'], parameters: object({
     job_id: string(), candidate_ref: string(), action: string({ enum: ['ADD_TO_PROJECT', 'MARK_PREPARING',
       'RECORD_OUTREACH_SENT', 'RECORD_REPLIED', 'SUBMIT_TO_CLIENT', 'MOVE_TO_INTERVIEW'] }),
     note: string({ maxLength: 1000 }), confirm: boolean(),

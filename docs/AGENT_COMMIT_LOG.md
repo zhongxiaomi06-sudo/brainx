@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-07｜fix(agent): 允许项目群确认候选推进状态
+
+- 根因：候选推进工具被统一标成仅私聊，自动项目群的 scope 也缺少 `candidate_action`；即使候选话题和 Case 都存在，在群里记录“已联系、已回复、提交客户、面试”仍必然被 Gateway 拒绝。
+- 改动：只把 `brainx_candidate_workflow` 放开到已登记项目群，并让自动建群和手工授权模板纳入 `candidate_action`；候选人联系方式、接单、重跑找人和职位进展继续保持仅私聊。
+- 权限：群动作仍强制 App 身份、ACTIVE 顾问绑定、chat、sender、purpose、project 六层匹配，且工具状态机要求本次明确 `confirm=true`；未知群、跨项目、未知发送人或错误 purpose 均失败关闭。
+- 验证：Agent 权限、候选状态机、项目启动、工具与插件专项 37/37、`npm run verify:quick` 16/16、`git diff --check` 通过。
+
 ## 2026-09-07｜feat(agent): 允许原职位推进 OpenMai 候选人
 
 - 根因：OpenMai 找到的人虽已能回项目群，但候选流程只认人才 shortlist；在候选人话题里记录“准备联系、已回复或进入面试”会因候选编号不在 shortlist 被拒绝，真实工作流仍断在回群之后。

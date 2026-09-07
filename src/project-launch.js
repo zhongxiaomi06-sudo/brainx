@@ -10,7 +10,7 @@ import { startOpenmaiTask } from './openmai-task.js';
 import { ttcAuthStatus } from './ttcsdk/auth.js';
 import { ensureOpenClawProjectGroup } from './openclaw-group-access.js';
 
-const GROUP_PURPOSES = ['job_review', 'candidate_review', 'interview_prep'];
+const GROUP_PURPOSES = ['job_review', 'candidate_review', 'candidate_action', 'interview_prep'];
 
 export class ProjectLaunchError extends Error {
   constructor(status, code, message) {

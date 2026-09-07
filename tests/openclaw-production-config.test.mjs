@@ -87,6 +87,7 @@ test('systemd units keep internal services on one host and load secrets from pro
     assert.match(unit, /^User=brainx$/m);
     assert.match(unit, /^NoNewPrivileges=true$/m);
     assert.match(unit, /^EnvironmentFile=\/etc\/brainx\//m);
+    assert.match(unit, /^ExecStartPre=\/usr\/bin\/node \/opt\/brainx\/bin\/brainx-runtime-preflight\.mjs$/m);
     assert.doesNotMatch(unit, /(SECRET|TOKEN|PASSWORD)=\S+/);
   }
   const gateway = await readFile(new URL('deploy/systemd/brainx-agent-gateway.service', root), 'utf8');

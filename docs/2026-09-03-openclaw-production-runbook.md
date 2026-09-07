@@ -41,6 +41,8 @@ curl -fsS https://base.yorkteam.cn/api/v1/meta/guard
 
 Gateway 健康响应必须同时满足 `status=ready`、`authorization.status=ready`、`configured_accounts>=1` 和 `bound_identities>=1`。缺 App 映射时进程拒绝启动；只有数据库和工具目录正常、但没有匹配当前 App key 的 ACTIVE 身份时返回 503 `not_ready`，不得把它当成可服务状态。
 
+Gateway、OpenClaw、业务 worker 和可选 integration worker 都在 systemd `ExecStartPre` 运行同一份三文件交叉预检。配置存在占位符、共享密钥不一致、飞书 App/SQLite/HTTPS 地址跨进程漂移或员工白名单损坏时，服务必须启动失败；不得删除该前置检查来追求 `active` 状态。
+
 ## York 业务主体与审计身份
 
 - York 是机器人面向团队的业务主体；稳定技术账号只负责飞书长连接和工具投递。

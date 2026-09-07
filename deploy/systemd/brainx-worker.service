@@ -10,6 +10,7 @@ Group=brainx
 WorkingDirectory=/opt/brainx
 EnvironmentFile=/etc/brainx/worker.env
 Environment=BRAINX_EMBED_WORKER=0
+ExecStartPre=/usr/bin/node /opt/brainx/bin/brainx-runtime-preflight.mjs
 ExecStart=/usr/bin/node /opt/brainx/src/worker.js
 Restart=always
 RestartSec=5

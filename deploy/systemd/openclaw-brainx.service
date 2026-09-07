@@ -12,6 +12,7 @@ WorkingDirectory=/var/lib/brainx
 EnvironmentFile=/etc/brainx/openclaw.env
 Environment=OPENCLAW_CONFIG_PATH=/var/lib/brainx/.openclaw/openclaw.json
 Environment=OPENCLAW_STATE_DIR=/var/lib/brainx/.openclaw
+ExecStartPre=/usr/bin/node /opt/brainx/bin/brainx-runtime-preflight.mjs
 ExecStart=/usr/local/bin/openclaw gateway --port 18789
 Restart=always
 RestartSec=5

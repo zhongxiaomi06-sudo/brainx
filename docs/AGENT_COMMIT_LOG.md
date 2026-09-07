@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-07｜fix(deploy): 服务启动前强制校验员工机器人配置
+
+- 根因：运行配置预检若只写在手册里，运维仍可能跳过并启动三套配置互相漂移的服务，systemd 显示 active 但员工调用、Agent 鉴权或候选回群实际失败。
+- 改动：Agent Gateway、OpenClaw、业务 worker 与可选 integration worker 全部增加同一个 `ExecStartPre`；占位符、密钥/App/DB/HTTPS 不一致或白名单损坏时由 systemd 失败关闭，且错误只包含变量名和错误码。
+- 验证：生产 systemd/config 与运行预检专项通过，`npm run verify:quick` 16/16、`git diff --check` 通过。
+
 ## 2026-09-07｜feat(deploy): 增加员工机器人运行配置交叉预检
 
 - 根因：原部署步骤只用 grep 查显眼占位符，无法发现 Agent Gateway 与 OpenClaw 的 token/签名不一致、worker 和机器人使用不同飞书 App、SQLite 路径分叉或 HTTPS 深链缺失；这些错误都会表现为“部分员工机器人不可用”或“结果不回群”。

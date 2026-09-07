@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-07｜fix(openmai): 晨检改为无副作用可达性探测
+
+- 根因：旧晨检向 `/completions` POST `ping`，可能真实创建找人任务或产生费用；同时只取花名册第一人的 JWT，第一人未连接时会忽略其他人的有效凭证并误报 `no_jwt`。
+- 改动：遍历顾问时保存任一有效 JWT，逐人 quota 检查后仅以 GET 探测 completions 路由；统一优先使用真实任务的 `BRAINX_OPENMAI_API_BASE` 配置名，保留旧名兼容。
+- 边界：GET 2xx/4xx 只证明路由可达，5xx/网络失败仍报错；没有任何有效凭证时不发网络请求，诊断不会启动或取消真实找人任务。
+- 验证：OpenMai 晨检与投递专项 12/12、`npm run verify:quick` 16/16、`git diff --check` 通过。
+
 ## 2026-09-07｜fix(openclaw): 同步项目协作者群发送白名单
 
 - 根因：动态建群只把 chat_id 加进 OpenClaw `groupAllowFrom`；即使协作者已进入飞书群并被 BrainX 群 scope 授权，只要不在 OpenClaw `groupSenderAllowFrom`，消息仍会在到达 Gateway 前被丢弃。

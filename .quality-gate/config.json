@@ -128,14 +128,14 @@
           "name": "后端生产依赖漏洞",
           "command": "npm",
           "args": ["audit", "--omit=dev", "--audit-level=high"],
-          "timeoutMs": 120000
+          "timeoutMs": 240000
         },
         {
           "stage": "依赖",
           "name": "前端生产依赖漏洞",
           "command": "npm",
           "args": ["--prefix", "frontend/btex-frontend", "audit", "--omit=dev", "--audit-level=high"],
-          "timeoutMs": 120000
+          "timeoutMs": 240000
         },
         {
           "stage": "静态质量",
@@ -210,14 +210,14 @@
           "name": "后端生产依赖漏洞",
           "command": "npm",
           "args": ["audit", "--omit=dev", "--audit-level=high"],
-          "timeoutMs": 120000
+          "timeoutMs": 240000
         },
         {
           "stage": "依赖",
           "name": "前端生产依赖漏洞",
           "command": "npm",
           "args": ["--prefix", "frontend/btex-frontend", "audit", "--omit=dev", "--audit-level=high"],
-          "timeoutMs": 120000
+          "timeoutMs": 240000
         },
         {
           "stage": "静态质量",

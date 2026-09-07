@@ -1,10 +1,60 @@
 # Agent Commit 记录
 
+## 2026-09-07｜merge(update): 合并远端最新生产改动
+
+- 合并：将 `origin/codex/york-gray-release` 在 `a8f8cde` 之后的 8 个提交并入当前集成分支，保留本地个人模型、OpenClaw 与 9 月 4 日生产修复历史。
+- 主要变化：新增顾问私聊 JD 建岗草稿；修复行级脏数据冻结整轮推荐、未接单找人提示、SuperMai 专用错误码、空 shortlist 溯源和依赖审计超时误报。
+- 冲突：仅 `docs/AGENT_COMMIT_LOG.md` 因双方顶部追加记录产生文本冲突，按时间保留两边完整记录；业务代码自动合并。
+- 验证：合并完成后运行快速质量门禁；完整门禁留到准备 push 前执行。
+
 ## 2026-09-04｜merge(update): 合并 9 月 4 日五项生产修复
 
 - 合并：把 `origin/codex/york-gray-release` 从 `2368613` 到 `a8f8cde` 的五个新提交并入当前集成分支，同时保留本地 PR #55 的生产修复历史。
 - 改动：纳入飞书 appSecret 兼容修复、手机号与哈希误判修复、reloop 增量游标时区修复、match run 租户隔离，以及 TTC JWT 强制本人绑定与状态接口收口。
 - 验证：受影响的生产配置、reloop、SuperMai、人才契约、同步游标和 TTC 鉴权专项 34/34 通过；首次沙箱运行的 4 项仅因禁止临时端口而失败，允许本地端口后原样复跑全绿；提交后快速门禁 16/16 通过。
+
+## 2026-09-04｜build(gate): 依赖审计超时 120s→240s——代理抖动导致 push 门禁连续假失败
+
+- 背景：push 前 full 门禁连续三轮在「npm audit」上超时假失败（第 1 轮后端、第 2/3 轮前端，互换出现），单独实测前端 audit 35s 通过、0 vulnerabilities——走代理时 registry 延迟尖峰偶发超过 120s 上限，属环境抖动而非依赖问题。
+- 实现：.quality-gate/config.json 中 full/ci 两个 profile 的后端与前端 audit timeoutMs 120000→240000。
+- 验证：前端 audit 单独跑通过（0 vulnerabilities，35s）；门禁重跑结论见后续记录。
+
+## 2026-09-04｜fix(agent-gateway): 闭环交付修复——空 shortlist 溯源 + 接单/找人结果取回指引
+
+- 背景：wendy 会话诊断发现「数据/闭环不对」的核心断点——模型向顾问交付候选人时查了 `brainx_candidate_shortlist`（RDS reloop 旁路，只覆盖部分合作岗位），而不是取 OpenMai 找人落库的 `openmai_results`；两个已 done 的结果（JKKKYFQ/JGMLKYW，result_text 6.3KB，公域 Tier3 命中 67 人）躺在表里没人交付。模型在 3 个环节都缺「去哪取真值」的指引：① 空 shortlist 被解读成「找不到人/源挂了」；② 接单触发找人后不知道要轮询取结果；③ 结果 done 后只回「已就绪」不呈现候选人。
+- 实现：① `tool-registry.js` 把 db 注入 talent 工具（溯源需要）；② `tools-talent.js` 新增 `emptyShortlistGuidance`——空短名单时查 `openmai_results`/`decision_events`，按「done→去 openmai_search 取回呈现 / 进行中→提示轮询 / 无记录→提示先接单」三种情况注入 unknowns，杜绝「无候选人/数据源故障」臆断；③ `tools-actions.js` acceptJob 按 startOpenmaiTask 返回的 triggered/already_done/error 注入取回指引，并把 `brainx_openmai_search` 加进 next_allowed_actions；④ `tools-jobs.js` openmaiSearch done 分支带 `present_result` recommendation，强制模型把 result_text 候选人清单完整结构化呈现。
+- 回归测试：agent-talent-tools +4（done/进行中/无记录/无 db 不崩溃）、agent-action-tools 扩展接单断言 + 新增 already_done/error 分支、agent-job-tools +1（done 带 present_result）。三文件 21/21 通过；quick 门禁 16/16。
+
+## 2026-09-04｜test(sync): 补齐 8ae295b 漏改的数据质量安全闸回归——行级脏数据新纪律
+
+- 背景：commit 8ae295b「行级脏数据不再判废整轮同步」只改了 src/sync.js，漏改了锁定旧行为的 tests/data-quality.test.mjs「不完整同步(complete=0)时 recommend 被 blocked」，full 门禁失败（脏行断言 complete=false，实际新行为为 true）。
+- 实现：① 替换为三条新回归——纯脏行输入 complete=1、warnings 记录行级原因、脏行不入库、推荐链路不冻结；混入脏行时有效职位仍入库（rows_read 只计有效行）；直接插 sync_runs complete=0 行验证批级故障仍 fail-closed blocked。② 同步修订文件头纪律说明（②行级跳过/③批级故障 blocked）。
+- 验证：data-quality.test.mjs 7/7 通过。
+
+## 2026-09-04｜fix(supermai): SOURCE_UNAVAILABLE 拆分出 SUPERMAI_UNAVAILABLE——不再误导「OpenMai 也挂了」
+
+- 背景：wendy 会话里 supermai_scout 两次失败，模型回复「SuperMai/OpenMai 都挂了」——实际实测（本地+ECS+带 wendy 本人 JWT 三重验证）OpenMai 正常（wendy 当天 07:37 两单 done），只有 gateway.ttcadvisory.com/search/scout/match 与 /search/jobs 是阿里云 ALB 层 503（后端无健康实例）。根因：SuperMai 与 talent/shortlist/RDS 共用通用错误码 SOURCE_UNAVAILABLE，模型无法区分「哪个源挂了」，臆断成全链路故障。
+- 实现：① supermai-sourcing.js sourceUnavailable() 错误码改为专用 SUPERMAI_UNAVAILABLE；② agent-gateway/tools-jobs.js supermaiScout 无凭证/AUTH_EXPIRED/源不可用归一为 SUPERMAI_UNAVAILABLE（顺带修掉 AUTH_EXPIRED 此前落 INTERNAL 500 的问题）；③ agent-gateway/envelopes.js 注册 SUPERMAI_UNAVAILABLE=503 retryable，文案明示「仅 SuperMai 外部人才搜索（领英/GitHub/论文）不可用，内部推荐池与 OpenMai 找人不受影响」；④ 契约文档 specs/003-openclaw-production/contracts/agent-gateway.md 错误码表补行。
+- 验证：supermai-sourcing/agent-runtime-guards/agent-job-tools 15/15；quick 门禁 14/16（2 项失败为既有未跟踪文件 db-chain-report.html/grant-team-access.mjs，与本次无关）。
+
+## 2026-09-04｜fix(agent-gateway): 未接单找人改为明确提醒接单入口
+
+- 背景：顾问对"职位可见但未接单"的职位发起找人（`brainx_openmai_search` / `brainx_start_candidate_search`）时，返回的文案是泛化的 NOT_FOUND_OR_FORBIDDEN「当前会话无法读取该对象」或 INVALID_ARGUMENT「请求参数不符合工具契约」——顾问不知道失败原因是没接单，更不知道去哪里接单。
+- 实现：① `envelopes.js` 新增错误码 `JOB_NOT_ACCEPTED`（409，文案明确两个接单入口：飞书里让机器人接单（brainx_accept_job），或工作台 base.yorkteam.cn 职位详情页点「接单」）；② `tools-jobs.js` openmaiSearch「可见但未 ACCEPTED/COMPLETED」分支改挂新码（不可见仍 NOT_FOUND_OR_FORBIDDEN，保持 fail-closed 不泄露存在性）；③ `tools-actions.js` startSearchForJob 未接单分支从 INVALID_ARGUMENT 改挂新码。可见性已通过校验后才提示接单，不新增信息泄露面。
+- 验证：agent 相关 5 个测试文件 36/36 通过；quick 门禁 14/16（2 项失败为与本改动无关的既有未跟踪文件 docs/2026-09-04-db-chain-check-report.html 超长行、scripts/grant-team-access.mjs 本机绝对路径）。
+
+## 2026-09-04｜fix(sync): 行级脏数据不再判废整轮同步——解冻全员推荐链路
+
+- 背景：felix 刷新 TTC 后 daily_brief 两轮拉取完全一样。定位结论：TTC 端 8 个新职位缺「客户或职位名」（JY6LB5A 等），runSync 记 errors → 整批 complete=0 → recommend() fail-closed（!last.complete → blocked 不落轮）→ decision_runs 零 COMPLETED → daily_brief 永远读旧冻结快照。job_facts 照常增量（bridge 先写行再记 sync_runs），库是活的但推荐引擎不吃，呈现「数据很多、链路没读到」。
+- 实现：sync.js runSync 中「缺 project_id / 缺客户或职位名」由 errors 降级为 warnings（行照旧跳过不入库，但不判废整轮 complete），与既有「输入内重复 project_id」行级降级对齐（此前注释已声明要避免脏行拖垮整批，唯独漏了这两处）。
+- 生产处置（同 commit 不可见，记录备查）：① sync.js 热更到 /opt/brainx + 重启 brainx-worker；② 发现 brainx.service 未设 BRAINX_EMBED_WORKER=0 → API 进程嵌入跑旧版批处理持续写 complete=0，已补 Environment=BRAINX_EMBED_WORKER=0 并重启（消除双跑）；③ 15:46 nohup 手动起的一次性全量回填脚本 bin/ttc-multi-pull.mjs 残留进程（内存加载旧 sync.js，每轮把 6 人 sync_runs 写成 complete=0 且打爆 TTC 限流）已 kill；④ 以 job_facts 现存 12,616 条 TTC 事实为 payload 手动重跑 runSync（complete=1）+ 强制重算推荐（throttle=false），6 顾问全部落新 COMPLETED 轮（candidates 12,776），daily_brief 恢复新鲜数据。
+- 验证：ttcsync/bridge/core/ttc-field-catalog/feedback-loop/visibility/facts/agent-job-tools/weights 相关 69 项测试全过；quick 门禁 14/16（2 项失败为既有未跟踪文件 docs/2026-09-04-db-chain-check-report.html 与 scripts/grant-team-access.mjs 的超长行/绝对路径，与本次改动无关）。
+
+## 2026-09-04｜feat(job-facts): 顾问私聊直接发 JD 提交建岗草稿（specs/005）
+
+- 背景：群链路建岗已通，但顾问私聊直接发整段 JD 走不通——私聊消息不入账本、草稿可见性只认登记群、规则层抽不动长 JD。本提交补齐「私聊 JD → 带证据草稿 → 一键确认建岗」链路（AI 只提议，建岗仍由人确认）。
+- 实现：① 新工具 `brainx_submit_job_jd`（p2p-only，jd_text 50–8000 字符，confirm 必填）贯通 openclaw 插件 → agent-gateway；② `src/job-extract/p2p-submit.js`——JD 原文入 `lark_messages` 作证据 + 事件入账本，`message_id = sha256(consultant_id+JD)` 派生实现三层幂等（原文表 OR IGNORE / 账本 idem_key / 迁移 0038 部分唯一索引），LLM 提炼（AI_JOB_EXTRACT_ENABLED=1 且 llm 已配置，8s 超时对齐插件 10s 上限）失败静默降级规则层，无有效字段不产空草稿；③ `jd-extract.js` JD 专用 prompt，`classify.js` 的字段映射提为导出 `mapLlmFields` 供两条链路复用；④ 迁移 0038 加 `origin='p2p_jd'`/`submitted_by` 列与部分唯一索引；⑤ 草稿可见性扩展「登记群成员 OR 提交人本人」，确认/拒绝复用 confirmDraft/rejectDraft；⑥ 薪资/任职要求无权威列，随 raw_json 存档回显；⑦ 插件契约三处（manifest/fixture/生产配置 tools.allow）同步至 23 个工具，插件版本 1.2.0。
+- 验证：新增 `tests/job-extract-p2p-submit.test.mjs` 10/10（规则层提交/幂等短路/跨人隔离/可见性与越权拒绝/确认转正/JD_TOO_SHORT/confirm 守门/空字段）；全量 522 测试 522/522 通过；quick 门禁 16/16。
 
 ## 2026-09-04｜fix(auth): 强制本人登陆——TTC 凭据跨人代绑全链路封堵
 

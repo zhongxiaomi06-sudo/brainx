@@ -56,9 +56,32 @@ test('确认接单会建立行动并自动启动找人，重复键保持幂等',
   const first = handlers.brainx_accept_job(args, context);
   assert.equal(first.data.state, 'ACCEPTED');
   assert.equal(searches.length, 1);
+  assert.ok(first.unknowns.some((u) => u.includes('brainx_openmai_search') && u.includes('异步启动')),
+    '找人启动后必须指引模型用 openmai_search 取回结果交付');
+  assert.ok(first.next_allowed_actions.includes('brainx_openmai_search'),
+    '接单后应把 openmai_search 列为下一步允许动作');
   const again = handlers.brainx_accept_job(args, context);
   assert.equal(again.data.state, 'ACCEPTED');
   assert.equal(db.prepare(`SELECT COUNT(*) n FROM decision_events WHERE idempotency_key='agent:accept:1'`).get().n, 1);
+});
+
+test('接单触发的找人状态分支注入对应取回指引（already_done/error）', () => {
+  const due = new Date(Date.now() + 2 * 86400000).toISOString();
+  const args = (jobId, key) => ({ job_id: jobId, goal: '找到首批候选人',
+    action_title: '启动找人', due_at: due, idempotency_key: key, confirm: true });
+
+  const done = fixture();
+  const dOut = createActionToolHandlers({ db: done.db, startSearchFn: () => ({ status: 'already_done' }) })
+    .brainx_accept_job(args(done.jobId, 'agent:accept:done'), done.context);
+  assert.equal(dOut.data.state, 'ACCEPTED');
+  assert.ok(dOut.unknowns.some((u) => u.includes('brainx_openmai_search') && u.includes('完成结果')),
+    '已有人选结果时应指引取回而非重新触发费用');
+
+  const failed = fixture();
+  const fOut = createActionToolHandlers({ db: failed.db, startSearchFn: () => ({ status: 'error', message: '凭证失效，请重扫' }) })
+    .brainx_accept_job(args(failed.jobId, 'agent:accept:failed'), failed.context);
+  assert.ok(fOut.unknowns.some((u) => u.includes('凭证失效，请重扫')),
+    '启动失败要透传具体原因，不能静默装作成功');
 });
 
 test('机器人可记录进展并建立下一行动', () => {

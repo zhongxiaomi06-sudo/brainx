@@ -1,7 +1,7 @@
 import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
 
 const GATEWAY_URL = 'http://127.0.0.1:3102/internal/v1/agent/tools';
-const PLUGIN_VERSION = '1.1.6';
+const PLUGIN_VERSION = '1.2.0';
 const OPENCLAW_VERSION = '2026.7.1-2';
 const string = (extra = {}) => ({ type: 'string', minLength: 1, maxLength: 512, ...extra });
 const integer = (minimum, maximum) => ({ type: 'integer', minimum, maximum });
@@ -26,6 +26,7 @@ export const BRAINX_OPENCLAW_TOOLS = Object.freeze([
   { name: 'brainx_supermai_scout', purpose: () => 'candidate_review', parameters: object({ criteria: string({ minLength: 5, maxLength: 2000 }), sources: array(string({ enum: ['linkedin', 'github', 'paper'] }), 1, 3), limit: integer(1, 50) }, ['criteria']), description: '通过 SuperMai 云端 sourcing 在领英/GitHub/论文渠道多源搜索候选人，补充 OpenMai 的 BOSS/脉脉/猎聘渠道。' },
   { name: 'brainx_pending_job_facts', purpose: () => 'job_fact_review', parameters: object({ limit: integer(1, 20) }), description: '在私聊中列出当前顾问所在已登记群的待确认职位事实。' },
   { name: 'brainx_review_job_fact', purpose: () => 'job_fact_review', parameters: object({ draft_id: string(), action: string({ enum: ['confirm', 'reject'] }), job_id: string(), confirm: boolean() }, ['draft_id', 'action', 'confirm']), description: '在私聊中经用户明确确认后确认或拒绝一条本人可见的职位事实草稿。' },
+  { name: 'brainx_submit_job_jd', purpose: () => 'job_fact_review', parameters: object({ jd_text: string({ minLength: 50, maxLength: 8000 }), confirm: boolean() }, ['jd_text', 'confirm']), description: '在私聊中提交整段 JD 原文，AI 提炼为待确认职位事实草稿；执行前向用户复述该操作并取得确认，建岗仍需本人显式确认草稿。' },
   { name: 'brainx_push_preferences', purpose: () => 'preferences', parameters: object({}), description: '读取本人每天的职位推荐时间和数量设置。' },
   { name: 'brainx_update_push_preferences', purpose: () => 'preferences', parameters: object({ times: array(string({ pattern: '^(?:[01]\\d|2[0-3]):[0-5]\\d$' })), job_count: integer(1, 10), enabled: boolean(), confirm: boolean() }, ['confirm']), description: '按用户自然语言要求更新每天推荐时间和职位数量；执行前复述设置并取得确认。' },
   { name: 'brainx_job_contacts', purpose: () => 'job_contact', parameters: object({ job_id: string() }, ['job_id']), description: '读取授权职位的负责人姓名和可联系状态。' },

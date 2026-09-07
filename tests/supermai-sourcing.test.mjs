@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { openDb } from '../src/db.js';
 import { saveTtcToken } from '../src/ttcsdk/auth.js';
-import { getSupermaiCredentials, saveSupermaiCredentials } from '../src/supermai-sourcing.js';
+import { getSupermaiCredentials, saveSupermaiCredentials, supermaiScoutMatch } from '../src/supermai-sourcing.js';
 
 const JWT = 'eyJhbGciOiJIUzI1NiJ9.eyJleHAiOjk5OTk5OTk5OTl9.signature';
 
@@ -31,6 +31,25 @@ test('SuperMai 独立凭证表优先于 TTC JWT 复用', () => {
 test('无任何凭证时返回 null（fail-closed，不抛异常）', () => {
   const db = openDb(':memory:');
   assert.equal(getSupermaiCredentials(db, 'felix'), null);
+});
+
+test('不可用错误用 SUPERMAI_UNAVAILABLE 专用码（不污染通用 SOURCE_UNAVAILABLE）', async () => {
+  const db = openDb(':memory:');
+  saveTtcToken(db, 'felix', JWT, {
+    userName: 'Felix', personId: 'person-felix', expiresAt: '2099-01-01T00:00:00.000Z',
+  });
+  const creds = getSupermaiCredentials(db, 'felix');
+  // 上游 503（resp.ok=false）→ SUPERMAI_UNAVAILABLE
+  const origFetch = global.fetch;
+  global.fetch = async () => new Response('<html>503 alb</html>', { status: 503 });
+  try {
+    await assert.rejects(
+      () => supermaiScoutMatch({ criteria: 'software engineer', _credentials: creds }),
+      (error) => { assert.equal(error.code, 'SUPERMAI_UNAVAILABLE'); return true; },
+    );
+  } finally {
+    global.fetch = origFetch;
+  }
 });
 
 test('账号隔离：共享环境变量 token 不再作为全员回退（2026-09-04 加固）', () => {

@@ -106,3 +106,61 @@ test('授权源失败原样返回稳定错误码，不把空数据伪装为无�
     return true;
   });
 });
+
+// —— 空 shortlist 溯源引导（2026-09-04 wendy 案例回归）——
+// 内部短名单（RDS reloop 旁路）只覆盖部分合作岗位；该岗位候选人可能由 OpenMai
+// 找人异步产生并存于 openmai_results。空结果必须引导模型走 openmai_search 取回，
+// 不能回成「找不到人 / 数据源挂了」。
+
+function emptyGuidanceDb(openmaiRow, engagedRow) {
+  return {
+    prepare: (sql) => ({
+      get: () => {
+        if (sql.includes('openmai_results')) return openmaiRow;
+        if (sql.includes('decision_events')) return engagedRow;
+        return undefined;
+      },
+    }),
+  };
+}
+
+function emptyShortlistApi(db) {
+  return createTalentToolHandlers({
+    db,
+    candidateShortlistFn: async (input) => ({
+      schema_version: 'candidate_match_bundle_v1', job_ref: 'job-a',
+      job_context: { title: 'HR 经理', summary: null, experience_requirement: '5年', education_requirement: null,
+        location: '上海', required_skills: [], preferred_skills: [], responsibilities: [], unknowns: [] },
+      match_run: null, page: { limit: 5, next_page_token: null }, items: [],
+      data_scope: { scope: 'authorized_shortlist', purpose: input.purpose }, generated_at: ISO,
+    }),
+  });
+}
+
+test('空 shortlist + openmai done：指引用 openmai_search 取回呈现，不宣称无候选人', async () => {
+  const api = emptyShortlistApi(emptyGuidanceDb({ status: 'done' }, undefined));
+  const out = await api.brainx_candidate_shortlist({ job_id: 'job-a' }, principal());
+  assert.equal(out.data.items.length, 0);
+  assert.ok(out.unknowns.some((u) => u.includes('brainx_openmai_search') && u.includes('done')));
+});
+
+test('空 shortlist + 找人进行中：给出进行中提示与取回入口', async () => {
+  const api = emptyShortlistApi(emptyGuidanceDb({ status: 'running' }, { 1: 1 }));
+  const out = await api.brainx_candidate_shortlist({ job_id: 'job-a' }, principal());
+  assert.ok(out.unknowns.some((u) => u.includes('brainx_openmai_search')));
+  assert.ok(out.unknowns.some((u) => u.includes('running')));
+});
+
+test('空 shortlist + 无找人记录：提示先接单触发，而非臆断数据源故障', async () => {
+  const api = emptyShortlistApi(emptyGuidanceDb(undefined, undefined));
+  const out = await api.brainx_candidate_shortlist({ job_id: 'job-a' }, principal());
+  assert.ok(out.unknowns.some((u) => u.includes('接单')));
+  assert.equal(out.unknowns.some((u) => u.includes('稍后重试')), false);
+});
+
+test('空 shortlist + 网关未注入 db：不崩溃、不新增臆断', async () => {
+  const api = emptyShortlistApi(undefined);
+  const out = await api.brainx_candidate_shortlist({ job_id: 'job-a' }, principal());
+  assert.equal(out.data.items.length, 0);
+  assert.equal(out.unknowns.length, 0);
+});

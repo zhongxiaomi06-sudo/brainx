@@ -185,14 +185,19 @@ function openmaiSearch(db, args, principal) {
   const row = db.prepare('SELECT * FROM job_facts WHERE project_id=?').get(args.job_id);
   if (!row || !jobVisibleTo(db, principal.consultantId, args.job_id)) fail('NOT_FOUND_OR_FORBIDDEN');
   const st = currentState(db, principal.consultantId, args.job_id)?.state;
-  if (!['ACCEPTED', 'COMPLETED'].includes(st)) fail('NOT_FOUND_OR_FORBIDDEN');
+  // 职位本人可见但未接单：明确提醒接单入口（不泄露任何额外信息——可见性已校验）
+  if (!['ACCEPTED', 'COMPLETED'].includes(st)) fail('JOB_NOT_ACCEPTED');
   const cur = getOpenmaiResult(db, principal.consultantId, args.job_id) || {};
   if (cur.status === 'done' || cur.status === 'running') {
     return {
       data: { job_ref: args.job_id, status: cur.status, result_text: cur.result_text || null,
               started_at: cur.started_at || null, finished_at: cur.finished_at || null },
       facts: [], inferences: [], recommendations: [],
-      unknowns: cur.status === 'running' ? ['找人任务进行中'] : [],
+      unknowns: cur.status === 'running' ? ['找人任务进行中，稍后再查'] : [],
+      // done：结果就在 result_text（markdown 候选人清单），必须完整呈现给顾问，
+      // 不能只回「已就绪」三个字（2026-09-04 wendy 案例：结果躺在表里 3 小时没人交付）。
+      ...(cur.status === 'done' ? { recommendations: [{ action: 'present_result',
+        note: '结果已就绪——请把 data.result_text 里的候选人列表完整、结构化地呈现给顾问，并询问下一步（约面/推荐）。' }] } : {}),
       evidence_refs: [`openmai:${cur.task_id || args.job_id}`],
     };
   }
@@ -210,7 +215,7 @@ function openmaiSearch(db, args, principal) {
  * 凭证从 supermai_credentials 表读取（AES-GCM 加密，同 ttc_tokens 安全纪律）。 */
 async function supermaiScout(db, args, principal) {
   const creds = getSupermaiCredentials(db, principal.consultantId);
-  if (!creds) fail('SOURCE_UNAVAILABLE');
+  if (!creds) fail('SUPERMAI_UNAVAILABLE');
   try {
     const result = await supermaiScoutMatch({
       criteria: args.criteria,
@@ -230,8 +235,12 @@ async function supermaiScout(db, args, principal) {
       evidence_refs: [`supermai_scout:${args.criteria.slice(0, 40)}`],
     };
   } catch (error) {
+    // 凭证失效与源不可用都归一为 SUPERMAI_UNAVAILABLE：只影响「SuperMai 这一个外部源」，
+    // 引导模型如实告诉顾问（OpenMai/内部推荐池不受影响），不再臆断全链路挂。
     if (error.code === 'AUTH_EXPIRED') markSupermaiReauth(db, principal.consultantId);
-    if (error.code === 'SOURCE_UNAVAILABLE') fail('SOURCE_UNAVAILABLE');
+    if (['SUPERMAI_UNAVAILABLE', 'AUTH_EXPIRED', 'SOURCE_UNAVAILABLE'].includes(error.code)) {
+      fail('SUPERMAI_UNAVAILABLE');
+    }
     throw error;
   }
 }

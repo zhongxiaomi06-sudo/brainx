@@ -118,6 +118,7 @@ HTTP 200 表示工具成功执行，即使业务结果为空；空结果必须�
 | INVALID_ARGUMENT | 422 | no |
 | STALE_DATA | 409 | no |
 | SOURCE_UNAVAILABLE | 503 | bounded |
+| SUPERMAI_UNAVAILABLE | 503 | bounded |
 | QUALITY_INSUFFICIENT | 409 | no |
 | RATE_LIMITED | 429 | after retry-after |
 | TOOL_DISABLED | 404 | no |

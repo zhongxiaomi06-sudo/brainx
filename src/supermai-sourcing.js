@@ -67,8 +67,11 @@ export function supermaiAuthStatus(db, consultantId) {
 }
 
 function sourceUnavailable() {
+  // 专用码而非通用 SOURCE_UNAVAILABLE：SuperMai（领英/GitHub/论文）是独立外部源，
+  // 与 OpenMai 找人、内部推荐池、RDS shortlist 无关——通用码会让模型把
+  // 「SuperMai 挂了」臆断成「OpenMai/整个数据源都挂了」（2026-09-04 wendy 案例）。
   const error = new Error('SuperMai sourcing is unavailable');
-  error.code = 'SOURCE_UNAVAILABLE';
+  error.code = 'SUPERMAI_UNAVAILABLE';
   return error;
 }
 

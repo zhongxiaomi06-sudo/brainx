@@ -59,12 +59,12 @@ after(() => {
   server?.close();
 });
 
-test('健康检查只返回状态、版本与固定 22 个工具', async () => {
+test('健康检查只返回状态、版本与固定 23 个工具', async () => {
   const response = await fetch(`${base}/internal/v1/agent/health`);
   assert.equal(response.status, 200);
   const data = await response.json();
   assert.equal(data.status, 'ready');
-  assert.equal(data.tools.length, 22);
+  assert.equal(data.tools.length, 23);
   assert.equal(data.tool_catalog_version, 'agent-tools.v2');
   assert.doesNotMatch(JSON.stringify(data), /token|secret|open_id|consultant/i);
 });

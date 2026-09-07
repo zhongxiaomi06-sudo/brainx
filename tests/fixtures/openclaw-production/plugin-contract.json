@@ -31,6 +31,7 @@
     "brainx_supermai_scout",
     "brainx_pending_job_facts",
     "brainx_review_job_fact",
+    "brainx_submit_job_jd",
     "brainx_push_preferences",
     "brainx_update_push_preferences",
     "brainx_job_contacts",

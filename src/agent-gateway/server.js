@@ -75,15 +75,36 @@ export function createAgentGatewayServer(config) {
     if (Buffer.byteLength(String(value || ''), 'utf8') < 32) throw coded('GATEWAY_CONFIG_INVALID');
   }
   const appHashes = config.feishuAppKeyHashes || {};
+  const configuredApps = Object.entries(appHashes);
+  if (configuredApps.length === 0
+      || configuredApps.some(([account, hash]) => !account || !/^[a-f0-9]{64}$/.test(String(hash)))) {
+    throw coded('GATEWAY_CONFIG_INVALID');
+  }
   return http.createServer(async (req, res) => {
     const pathname = new URL(req.url || '/', 'http://127.0.0.1').pathname;
     if (pathname === '/internal/v1/agent/health') {
       if (req.method !== 'GET') return send(res, 405, { error: { code: 'METHOD_NOT_ALLOWED' } });
       try {
         config.db.prepare('SELECT 1').get();
-        return send(res, 200, { status: 'ready', sqlite: 'ready', tool_catalog_version: config.registry.version, tools: config.registry.names() });
+        const activeBindings = config.db.prepare(`SELECT channel_account_id,feishu_app_key_hash
+          FROM feishu_identity_bindings WHERE binding_status='ACTIVE'`).all()
+          .filter((row) => appHashes[row.channel_account_id] === row.feishu_app_key_hash).length;
+        const authorization = {
+          status: activeBindings > 0 ? 'ready' : 'not_ready',
+          configured_accounts: configuredApps.length,
+          bound_identities: activeBindings,
+        };
+        const ready = authorization.status === 'ready';
+        return send(res, ready ? 200 : 503, {
+          status: ready ? 'ready' : 'not_ready', sqlite: 'ready', authorization,
+          tool_catalog_version: config.registry.version, tools: config.registry.names(),
+        });
       } catch {
-        return send(res, 503, { status: 'unavailable', sqlite: 'unavailable', tool_catalog_version: config.registry.version, tools: config.registry.names() });
+        return send(res, 503, {
+          status: 'unavailable', sqlite: 'unavailable',
+          authorization: { status: 'unknown', configured_accounts: configuredApps.length, bound_identities: null },
+          tool_catalog_version: config.registry.version, tools: config.registry.names(),
+        });
       }
     }
     const match = pathname.match(TOOL_PATH);

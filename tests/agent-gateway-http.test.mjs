@@ -59,14 +59,44 @@ after(() => {
   server?.close();
 });
 
-test('健康检查只返回状态、版本与固定 23 个工具', async () => {
+test('健康检查返回状态、授权就绪度、版本与固定 23 个工具', async () => {
   const response = await fetch(`${base}/internal/v1/agent/health`);
   assert.equal(response.status, 200);
   const data = await response.json();
   assert.equal(data.status, 'ready');
+  assert.deepEqual(data.authorization, {
+    status: 'ready', configured_accounts: 1, bound_identities: 1,
+  });
   assert.equal(data.tools.length, 23);
   assert.equal(data.tool_catalog_version, 'agent-tools.v2');
   assert.doesNotMatch(JSON.stringify(data), /token|secret|open_id|consultant/i);
+});
+
+test('缺飞书 App 映射时拒绝启动，零有效身份时健康检查不再假报 ready', async () => {
+  const db = openDb(':memory:');
+  const registry = createToolRegistry({ handlers: {} });
+  const baseConfig = {
+    db, registry, gatewayToken: TOKEN, assertionSecret: SECRET, auditKey: AUDIT_KEY,
+  };
+  assert.throws(() => createAgentGatewayServer({ ...baseConfig, feishuAppKeyHashes: {} }),
+    /GATEWAY_CONFIG_INVALID/);
+  const emptyServer = createAgentGatewayServer({
+    ...baseConfig, feishuAppKeyHashes: { 'brainx-prod': APP_HASH },
+  });
+  await new Promise((resolve) => emptyServer.listen(0, '127.0.0.1', resolve));
+  try {
+    const address = emptyServer.address();
+    const response = await fetch(`http://127.0.0.1:${address.port}/internal/v1/agent/health`);
+    assert.equal(response.status, 503);
+    const data = await response.json();
+    assert.equal(data.status, 'not_ready');
+    assert.deepEqual(data.authorization, {
+      status: 'not_ready', configured_accounts: 1, bound_identities: 0,
+    });
+  } finally {
+    await new Promise((resolve) => emptyServer.close(resolve));
+    db.close();
+  }
 });
 
 test('工具端点只接受 POST、Bearer 和 JSON 且限制 64 KiB', async () => {

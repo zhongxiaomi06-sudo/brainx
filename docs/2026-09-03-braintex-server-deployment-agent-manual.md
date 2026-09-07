@@ -311,7 +311,7 @@ exit
 必须满足：
 
 - 四个服务均为 `active (running)`；
-- Agent Gateway 返回 `status=ready`，工具恰好是批准的 10 个；
+- Agent Gateway 返回 `status=ready` 且 `authorization.status=ready`、`configured_accounts>=1`、`bound_identities>=1`，工具数与当前批准目录一致；
 - 插件 runtime 为 `loaded`，`commands` 含 `brainx`，工具恰好 10 个；
 - Skill 列表包含上述七个生产 Skill，且均为可用状态；
 - Feishu channel 为 ON/OK；

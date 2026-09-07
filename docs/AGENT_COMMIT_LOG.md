@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-07｜fix(gateway): 阻止未配置身份时假报健康
+
+- 根因：旧健康检查只探测 SQLite 和工具目录；即使未配置任何飞书 App 映射或没有一条匹配当前 App key 的 ACTIVE 员工身份，也会返回 200 `ready`，而真实工具调用全部被 `UNBOUND_IDENTITY` 拒绝。
+- 改动：Gateway 启动时强制至少一个合法 App 映射；健康检查新增脱敏授权就绪度，仅在存在匹配 App 的 ACTIVE 身份时返回 200，零身份返回 503 `not_ready`。
+- 安全：响应只包含 App 和有效身份数量，不返回 account 详情、open_id、consultant、token 或 secret；App key 漂移会使旧绑定不计入有效数量。
+- 验证：Gateway HTTP 专项（含启动失败与零身份负向用例）通过；`npm run verify:quick` 与 `git diff --check` 通过。
+
 ## 2026-09-07｜feat(agent): 增加员工机器人就绪诊断与花名册批量绑定
 
 - 根因：员工可用性并非单一“Agent API 是否配置”，而是花名册身份、OpenClaw 白名单、Gateway ACTIVE 绑定和本人 TTC 凭证四层必须同时就绪；原工具只能逐人手工绑定且无法快速定位缺层。

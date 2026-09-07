@@ -39,6 +39,8 @@ curl -fsS https://base.yorkteam.cn/api/v1/meta/guard
 
 然后由六名在职灰度顾问完成私聊、白名单群 @、跨人负向读取、候选敏感字段扫描和手机/异机 HTTPS 深链。当前批准 21 个窄工具，包含 OpenMai 直接搜索、本人待确认草稿列表和显式草稿裁决；未知群、撤权用户、跨项目和重复 nonce 必须失败。
 
+Gateway 健康响应必须同时满足 `status=ready`、`authorization.status=ready`、`configured_accounts>=1` 和 `bound_identities>=1`。缺 App 映射时进程拒绝启动；只有数据库和工具目录正常、但没有匹配当前 App key 的 ACTIVE 身份时返回 503 `not_ready`，不得把它当成可服务状态。
+
 ## York 业务主体与审计身份
 
 - York 是机器人面向团队的业务主体；稳定技术账号只负责飞书长连接和工具投递。

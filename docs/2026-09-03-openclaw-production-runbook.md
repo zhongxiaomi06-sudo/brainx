@@ -12,7 +12,7 @@
 2. 安装并锁定 OpenClaw `2026.7.1-2`，执行 `sudo deploy/openclaw/install.sh --check`。`--apply` 会锁定安装官方飞书插件 `@openclaw/feishu@2026.7.1` 和仓库内 BrainX 插件。
 3. 执行 `--apply`，然后在 `/etc/brainx/agent.env`、`worker.env` 与 `openclaw.env` 替换全部占位值；文件保持 `0640 root:brainx`。Gateway 使用人才库只读账号，确定性 worker 使用独立最小 DML 账号。
 4. 运行 SQLite/RDS additive migration；先做 RDS 备份和只读健康检查，再执行写迁移。
-5. 用 `brainx-agent-admin` 逐一绑定六名在职灰度顾问，并显式登记测试群、sender、purpose 与项目范围。Otto 已离职：保留历史审计，但 `consultants.active=0` 且不得存在 ACTIVE 身份绑定。
+5. 先用 `brainx-agent-admin readiness --account mia` 查看逐人就绪层，再用 `bind-roster` 从已核验花名册批量建立六名在职灰度顾问的 Gateway 身份；群、sender、purpose 与项目范围仍需显式登记。Otto 已离职：保留历史审计，但 `consultants.active=0` 且不得存在 ACTIVE 身份绑定。
 6. 当前一体化生产部署使用 `brainx-worker` 承担 bridge、简历和推送；`brainx-integration-worker` 保持 disabled，禁止两者同时消费。依次启动 `brainx-agent-gateway`、`brainx-worker`、`openclaw-brainx`，最后重启现有 `brainx.service`。
 7. 用已绑定顾问的飞书私聊输入 `/brainx`，确认返回六入口功能首页；再点击一条职位入口和一条人才入口。
 
@@ -52,6 +52,7 @@ curl -fsS https://base.yorkteam.cn/api/v1/meta/guard
 ## 日常运维
 
 - 每日看四个服务状态、最近错误码、草稿积压、任务和 outbox；日志不得出现 prompt、简历正文、联系方式或密钥。
+- 遇到“某员工能看到机器人但工具不可用”时，先运行 `readiness`。它分别检查花名册 open_id、OpenClaw 白名单、Gateway ACTIVE 身份和本人 TTC 凭证，输出不含 open_id、token 或 app key；不要把所有缺项笼统归因于 Gateway。
 - 任务租约过期会被同类 handler 重新领取；费用或尝试次数到上限后进入 FAILED，不无限消耗模型额度。
 - 发飞书前重新校验授权；撤权同时取消未发送 outbox 并失效缓存/索引。
 - 人才同步只在所有分页成功后推进游标；文档 schema 不合格进入 NEEDS_REVIEW，扫描件进入 OCR_REQUIRED。

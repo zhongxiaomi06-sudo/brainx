@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-07｜feat(agent): 增加员工机器人就绪诊断与花名册批量绑定
+
+- 根因：员工可用性并非单一“Agent API 是否配置”，而是花名册身份、OpenClaw 白名单、Gateway ACTIVE 绑定和本人 TTC 凭证四层必须同时就绪；原工具只能逐人手工绑定且无法快速定位缺层。
+- 改动：新增脱敏 `readiness` 管理命令，逐人返回四层状态及明确 blocker；新增需 `--confirm true` 的 `bind-roster`，可从 active 已核验花名册批量建立 Gateway 身份，重复执行幂等，任一冲突整批回滚。
+- 安全：报告不返回 open_id、token 或 app key；批量绑定仍要求管理员 allowlist 和 32 字节审计密钥，不从聊天昵称推断身份，所有新绑定继续写脱敏审计事件。
+- 验证：Agent 管理专项 7/7、`npm run verify:quick` 16/16、`git diff --check` 通过。
+
 ## 2026-09-07｜feat(frontend): 接入飞书寻访启动按钮与真实状态
 
 - 改动：正式“我的项目”待开始卡片接入“在飞书启动寻访”；点击先做后端预检，再以明确确认启动建群、职位投放和 OpenMai，不再停留在无真实动作的占位按钮。

@@ -2,7 +2,10 @@
 import '../src/env.js';
 import { openDb } from '../src/db.js';
 import { hashFeishuAppKey } from '../src/agent-gateway/authorization.js';
-import { bindIdentity, revokeIdentity, grantGroupScope, revokeGroupScope } from '../src/agent-gateway/admin.js';
+import {
+  bindIdentity, revokeIdentity, grantGroupScope, revokeGroupScope,
+  bindRosterIdentities, getRecruitingReadiness,
+} from '../src/agent-gateway/admin.js';
 
 function flags(argv) {
   const result = {};
@@ -22,6 +25,13 @@ function appHash(accountId) {
   const appKeys = JSON.parse(process.env.BRAINX_AGENT_FEISHU_APP_KEYS_JSON || '{}');
   if (!appKeys[accountId]) throw new Error('该 account 未在 BRAINX_AGENT_FEISHU_APP_KEYS_JSON 配置');
   return hashFeishuAppKey(appKeys[accountId]);
+}
+
+function allowedOpenIds() {
+  return Object.entries(process.env)
+    .filter(([key]) => /^BRAINX_FEISHU_ALLOWED_OPEN_ID_\d+$/.test(key))
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([, value]) => value).filter(Boolean);
 }
 
 const command = process.argv[2];
@@ -50,8 +60,19 @@ if (command === 'bind-identity') {
   }, admin);
 } else if (command === 'revoke-group') {
   result = revokeGroupScope(db, { accountId: input.account, chatId: input['chat-id'] }, admin);
+} else if (command === 'readiness') {
+  result = getRecruitingReadiness(db, {
+    accountId: input.account, feishuAppKeyHash: appHash(input.account),
+    allowedOpenIds: allowedOpenIds(),
+  }, admin);
+} else if (command === 'bind-roster') {
+  result = bindRosterIdentities(db, {
+    tenantId: input.tenant, accountId: input.account,
+    feishuAppKeyHash: appHash(input.account),
+    consultantIds: list(input.consultants), confirm: input.confirm === 'true',
+  }, admin);
 } else {
-  throw new Error('命令：bind-identity | revoke-identity | grant-group | revoke-group');
+  throw new Error('命令：readiness | bind-roster | bind-identity | revoke-identity | grant-group | revoke-group');
 }
 
 console.log(JSON.stringify(result));

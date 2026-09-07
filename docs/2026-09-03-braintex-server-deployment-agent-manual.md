@@ -243,7 +243,16 @@ exit
 cd /opt/brainx
 set -a
 source /etc/brainx/agent.env
+source /etc/brainx/openclaw.env
 set +a
+
+node bin/brainx-agent-admin.mjs readiness --account mia
+
+node bin/brainx-agent-admin.mjs bind-roster \
+  --tenant <TENANT_ID> \
+  --account mia \
+  --consultants mia,felix,york,wendy,linda,shanon \
+  --confirm true
 
 node bin/brainx-agent-admin.mjs bind-identity \
   --tenant <TENANT_ID> \
@@ -262,6 +271,8 @@ node bin/brainx-agent-admin.mjs grant-group \
 ```
 
 一个 `(account_id, open_id)` 只能绑定一个顾问。能看到机器人、在同一个群或名字叫 Mia 都不能替代绑定。撤权使用 `revoke-identity` / `revoke-group`，撤权后立即做负向查询。
+
+`readiness` 只显示内部顾问名和每层布尔状态，不显示 open_id、密钥或 TTC token。`bind-roster` 只接受 active 且已有已核验 open_id 的花名册成员，必须传 `--confirm true`；任一身份冲突会让整批原子回滚。单人异常修复仍使用 `bind-identity`，不得从聊天昵称推断绑定。
 
 ## 10. 启动顺序
 

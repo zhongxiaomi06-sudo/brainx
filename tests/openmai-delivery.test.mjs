@@ -4,6 +4,7 @@ import { openDb, now } from '../src/db.js';
 import {
   groupSafeOpenmaiText, deliverOpenmaiResultsOnce, extractOpenmaiCandidates, downloadResumePdf,
   buildCandidateTopicCard,
+  buildResumeUnavailableCard,
 } from '../src/openmai-delivery.js';
 import { buildPrompt } from '../src/openmai-task.js';
 import { saveTtcToken } from '../src/ttcsdk/auth.js';
@@ -101,6 +102,12 @@ test('候选人话题卡把评估、工作台入口和附件状态放在同一�
   assert.equal(target.searchParams.get('candidate'), 'c-1');
 });
 
+test('单份简历异常卡不暴露底层错误并保留候选人评估', () => {
+  const card = buildResumeUnavailableCard({ name: '李四 13900139000' });
+  assert.doesNotMatch(JSON.stringify(card), /13900139000|RESUME_|HTTP/);
+  assert.match(JSON.stringify(card), /不会阻断其他候选人投递/);
+});
+
 test('简历下载只接受受信 HTTPS 域、限制大小并验证 PDF 内容', async () => {
   const pdf = await downloadResumePdf('https://gateway.ttcadvisory.com/resume/1.pdf', 'jwt-test', {
     fetchImpl: async (_url, options) => {
@@ -146,5 +153,59 @@ test('OpenMai 成功投递为每名候选人建独立话题并把真实 PDF 回�
   assert.match(files[0].data.toString(), /^%PDF-/);
   assert.match(files[0].idempotencyKey, /resume-1$/);
   assert.equal(files[0].replyToMessageId, 'om_candidate');
+  db.close();
+});
+
+test('一名候选人 PDF 校验失败只在本话题告警，后续候选仍正常投递', async () => {
+  const db = seededDb();
+  const resultText = `候选结果\n<!-- BRAINX_CANDIDATES_V1\n${JSON.stringify({ candidates: [
+    { candidate_ref: 'c-bad', name: '甲', evaluation: '待核实', resume_url: 'https://gateway.ttcadvisory.com/resumes/bad.pdf' },
+    { candidate_ref: 'c-good', name: '乙', evaluation: '匹配', resume_url: 'https://gateway.ttcadvisory.com/resumes/good.pdf' },
+  ] })}\n-->`;
+  db.prepare("UPDATE openmai_results SET result_text=? WHERE task_id='om_delivery'").run(resultText);
+  saveTtcToken(db, 'felix', 'header.payload.signature', {
+    userName: 'Felix', personId: 'p-1', expiresAt: '2099-01-01T00:00:00.000Z',
+  });
+  let cardCount = 0;
+  const files = [];
+  const warnings = [];
+  const out = await deliverOpenmaiResultsOnce(db, {
+    at: now(), publicBaseUrl: 'https://base.yorkteam.cn/',
+    sendInteractiveCard: async () => ({ message_id: `om_card_${++cardCount}` }),
+    fetchImpl: async (url) => new Response(url.toString().includes('/bad.pdf')
+      ? Buffer.from('not a pdf') : Buffer.from('%PDF-1.7 good'), { status: 200 }),
+    sendPdfFile: async (input) => { files.push(input); return { message_id: 'om_pdf' }; },
+    replyInteractiveCard: async (input) => { warnings.push(input); return { message_id: 'om_warning' }; },
+  });
+  assert.equal(out.sent, 1);
+  assert.equal(cardCount, 3, '一张整批卡加两张候选卡');
+  assert.equal(warnings.length, 1);
+  assert.equal(warnings[0].messageId, 'om_card_2');
+  assert.match(warnings[0].idempotencyKey, /resume-warning-1$/);
+  assert.equal(files.length, 1);
+  assert.equal(files[0].fileName, '乙-简历.pdf');
+  assert.equal(files[0].replyToMessageId, 'om_card_3');
+  db.close();
+});
+
+test('简历网络故障不伪装成永久缺失，整批保留恢复性重试', async () => {
+  const db = seededDb();
+  const resultText = `候选结果\n<!-- BRAINX_CANDIDATES_V1\n${JSON.stringify({ candidates: [
+    { candidate_ref: 'c-retry', name: '丙', evaluation: '匹配', resume_url: 'https://gateway.ttcadvisory.com/resumes/retry.pdf' },
+  ] })}\n-->`;
+  db.prepare("UPDATE openmai_results SET result_text=? WHERE task_id='om_delivery'").run(resultText);
+  saveTtcToken(db, 'felix', 'header.payload.signature', {
+    userName: 'Felix', personId: 'p-1', expiresAt: '2099-01-01T00:00:00.000Z',
+  });
+  let warned = false;
+  const out = await deliverOpenmaiResultsOnce(db, {
+    at: now(), publicBaseUrl: 'https://base.yorkteam.cn/',
+    sendInteractiveCard: async () => ({ message_id: 'om_retry_topic' }),
+    fetchImpl: async () => new Response('upstream unavailable', { status: 503 }),
+    replyInteractiveCard: async () => { warned = true; },
+  });
+  assert.equal(out.failed, 1);
+  assert.equal(warned, false);
+  assert.equal(db.prepare('SELECT delivery_status FROM openmai_deliveries').get().delivery_status, 'FAILED');
   db.close();
 });

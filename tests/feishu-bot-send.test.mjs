@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createProjectChat, sendInteractiveCard, sendPdfFile } from '../src/feishu-bot.js';
+import { createProjectChat, sendInteractiveCard, sendPdfFile, replyInteractiveCard } from '../src/feishu-bot.js';
 
 const response = (body) => ({ ok: true, json: async () => body });
 
@@ -130,4 +130,24 @@ test('飞书机器人把 PDF 作为幂等回复放进候选人话题', async () 
   const sent = JSON.parse(calls[2].options.body);
   assert.deepEqual(sent, { msg_type: 'file', content: JSON.stringify({ file_key: 'file-key-2' }),
     reply_in_thread: true, uuid: 'delivery-2-resume-1' });
+});
+
+test('飞书机器人把局部异常卡作为幂等话题回复', async () => {
+  const calls = [];
+  const out = await replyInteractiveCard({
+    messageId: 'om_candidate_topic', card: { elements: [{ tag: 'markdown', content: '附件待核验' }] },
+    idempotencyKey: 'delivery-warning-1', appId: 'cli_test', appSecret: 'secret',
+    fetchImpl: async (url, options) => {
+      calls.push({ url: String(url), options });
+      return calls.length === 1
+        ? response({ code: 0, tenant_access_token: 'token' })
+        : response({ code: 0, data: { message_id: 'om_warning', thread_id: 'omt_topic' } });
+    },
+  });
+  assert.deepEqual(out, { message_id: 'om_warning', thread_id: 'omt_topic' });
+  assert.match(calls[1].url, /\/messages\/om_candidate_topic\/reply$/);
+  const body = JSON.parse(calls[1].options.body);
+  assert.equal(body.msg_type, 'interactive');
+  assert.equal(body.reply_in_thread, true);
+  assert.equal(body.uuid, 'delivery-warning-1');
 });

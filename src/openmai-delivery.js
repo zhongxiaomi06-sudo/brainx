@@ -1,7 +1,7 @@
 /** OpenMai 最新结果 → 原飞书项目群；持久队列、脱敏卡片、有限重试。 */
 import { randomUUID } from 'node:crypto';
 import { now } from './db.js';
-import { sendInteractiveCard, sendPdfFile } from './feishu-bot.js';
+import { sendInteractiveCard, sendPdfFile, replyInteractiveCard } from './feishu-bot.js';
 import { buildBrainxDeepLink, productionBaseUrl } from './brainx-deep-links.js';
 import { getValidTtcJwt } from './ttcsdk/auth.js';
 
@@ -41,13 +41,20 @@ export async function downloadResumePdf(url, jwt, options = {}) {
     signal: AbortSignal.timeout(options.timeoutMs || 30_000), redirect: 'error',
   });
   const announced = Number(response.headers?.get?.('content-length') || 0);
-  if (response.ok === false || announced > MAX_RESUME_BYTES) throw new Error('RESUME_DOWNLOAD_FAILED');
+  if (response.ok === false) throw new Error('RESUME_DOWNLOAD_FAILED');
+  if (announced > MAX_RESUME_BYTES) throw new Error('RESUME_PDF_TOO_LARGE');
   const bytes = Buffer.from(await response.arrayBuffer());
-  if (bytes.length === 0 || bytes.length > MAX_RESUME_BYTES
+  if (bytes.length > MAX_RESUME_BYTES) throw new Error('RESUME_PDF_TOO_LARGE');
+  if (bytes.length === 0
       || !bytes.subarray(0, Math.min(1024, bytes.length)).includes(Buffer.from('%PDF-'))) {
     throw new Error('RESUME_PDF_INVALID');
   }
   return bytes;
+}
+
+function isPermanentResumeError(error) {
+  return ['RESUME_URL_INVALID', 'RESUME_URL_NOT_TRUSTED', 'RESUME_PDF_INVALID', 'RESUME_PDF_TOO_LARGE']
+    .includes(error?.message);
 }
 
 export function buildCandidateTopicCard({ candidate, job, publicBaseUrl }) {
@@ -71,6 +78,18 @@ export function buildCandidateTopicCard({ candidate, job, publicBaseUrl }) {
   };
 }
 
+export function buildResumeUnavailableCard(candidate) {
+  return {
+    config: { wide_screen_mode: true },
+    header: { template: 'orange', title: { tag: 'plain_text', content: '简历附件待核验' } },
+    elements: [
+      { tag: 'markdown', content: `**${groupSafeOpenmaiText(candidate.name, 60)}** 的真实 PDF 未能通过安全下载或文件校验。` },
+      { tag: 'note', elements: [{ tag: 'plain_text',
+        content: '本候选人的评估已保留；请在工作台核对来源附件，不会阻断其他候选人投递。' }] },
+    ],
+  };
+}
+
 async function deliverCandidateTopics(db, row, dependencies) {
   const candidates = extractOpenmaiCandidates(row.result_text);
   if (candidates.length === 0) return 0;
@@ -88,12 +107,21 @@ async function deliverCandidateTopics(db, row, dependencies) {
     sent++;
     if (!candidate.resumeUrl) continue;
     if (!topic.message_id) throw new Error('FEISHU_CANDIDATE_TOPIC_MESSAGE_ID_MISSING');
-    const bytes = await downloadResumePdf(candidate.resumeUrl, jwt, dependencies);
-    await (dependencies.sendPdfFile || sendPdfFile)({
-      target: row.chat_id, data: bytes, fileName: `${candidate.name}-简历.pdf`,
-      idempotencyKey: `${row.delivery_id}-resume-${index + 1}`,
-      replyToMessageId: topic.message_id,
-    });
+    try {
+      const bytes = await downloadResumePdf(candidate.resumeUrl, jwt, dependencies);
+      await (dependencies.sendPdfFile || sendPdfFile)({
+        target: row.chat_id, data: bytes, fileName: `${candidate.name}-简历.pdf`,
+        idempotencyKey: `${row.delivery_id}-resume-${index + 1}`,
+        replyToMessageId: topic.message_id,
+      });
+    } catch (error) {
+      if (!isPermanentResumeError(error)) throw error;
+      await (dependencies.replyInteractiveCard || replyInteractiveCard)({
+        messageId: topic.message_id,
+        card: buildResumeUnavailableCard(candidate),
+        idempotencyKey: `${row.delivery_id}-resume-warning-${index + 1}`,
+      });
+    }
   }
   return sent;
 }

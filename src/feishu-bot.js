@@ -129,6 +129,34 @@ export async function sendInteractiveCard({
   return { message_id: sendBody.data?.message_id || null };
 }
 
+/** 把互动卡片作为幂等话题回复；用于候选人附件异常等局部状态，不污染群主时间线。 */
+export async function replyInteractiveCard({
+  messageId,
+  card,
+  idempotencyKey,
+  appId = process.env.BRAINX_FEISHU_APP_ID || process.env.LARK_APP_ID,
+  appSecret = process.env.BRAINX_FEISHU_APP_SECRET || process.env.LARK_APP_SECRET,
+  fetchImpl = globalThis.fetch,
+  timeoutMs = 15_000,
+}) {
+  if (!/^om_[A-Za-z0-9_-]+$/.test(String(messageId || ''))) throw new Error('FEISHU_REPLY_MESSAGE_ID_INVALID');
+  if (!idempotencyKey) throw new Error('FEISHU_REPLY_IDEMPOTENCY_KEY_REQUIRED');
+  const token = await getTenantAccessToken({ appId, appSecret, fetchImpl, timeoutMs });
+  const response = await fetchImpl(
+    `${FEISHU_BASE}/open-apis/im/v1/messages/${encodeURIComponent(messageId)}/reply`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ msg_type: 'interactive', content: JSON.stringify(card),
+        reply_in_thread: true, uuid: idempotencyKey }),
+      signal: AbortSignal.timeout(timeoutMs),
+    },
+  );
+  const body = await readJson(response, 'FEISHU_REPLY_RESPONSE_INVALID');
+  if (response.ok === false || body.code !== 0) {
+    throw new Error(`FEISHU_REPLY_FAILED: ${safeMessage(body, body.code ?? 'unknown')}`);
+  }
+  return { message_id: body.data?.message_id || null, thread_id: body.data?.thread_id || null };
+}
+
 /** 上传 PDF 并以文件消息发送到私有项目群；文件消息 uuid 由业务层保证可见投递幂等。 */
 export async function sendPdfFile({
   target,

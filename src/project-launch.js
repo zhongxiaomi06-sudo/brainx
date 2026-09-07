@@ -4,6 +4,10 @@ import { now } from './db.js';
 import { createProjectChat, sendInteractiveCard } from './feishu-bot.js';
 import { registerChatContext } from './gateway/chat-contexts.js';
 import { buildBrainxDeepLink, productionBaseUrl } from './brainx-deep-links.js';
+import { acceptCommitment } from './commitment.js';
+import { currentState } from './engagement.js';
+import { startOpenmaiTask } from './openmai-task.js';
+import { ttcAuthStatus } from './ttcsdk/auth.js';
 
 const GROUP_PURPOSES = ['job_review', 'candidate_review', 'interview_prep'];
 
@@ -26,7 +30,9 @@ function findBinding(db, consultantId, openId) {
     ORDER BY updated_at DESC LIMIT 1`).get(consultantId, openId);
 }
 
-export function projectLaunchPreflight(db, consultantId, projectId, { appConfigured, publicBaseUrl } = {}) {
+export function projectLaunchPreflight(db, consultantId, projectId, {
+  appConfigured, publicBaseUrl, requireSearch = false, ttcConnected,
+} = {}) {
   const job = db.prepare(`SELECT j.*, c.display_name AS consultant_name, c.open_id AS consultant_open_id
     FROM job_facts j JOIN consultants c ON c.consultant_id=? AND c.active=1
     WHERE j.project_id=?`).get(consultantId, projectId);
@@ -48,6 +54,10 @@ export function projectLaunchPreflight(db, consultantId, projectId, { appConfigu
   if (!configured) blockers.push({ code: 'FEISHU_BOT_CREDENTIALS_MISSING', message: '飞书应用凭证未配置' });
   try { productionBaseUrl(publicBaseUrl); } catch {
     blockers.push({ code: 'BRAINX_BASE_URL_REQUIRED', message: 'BrainTex 生产 HTTPS 地址未配置' });
+  }
+  const searchReady = ttcConnected ?? ttcAuthStatus(db, consultantId).connected;
+  if (requireSearch && !searchReady) {
+    blockers.push({ code: 'TTC_CREDENTIALS_REQUIRED', message: '请先用本人 TTC 账号连接 OpenMai' });
   }
   return { ready: blockers.length === 0, blockers, job, membership: membership?.relation || null, binding };
 }
@@ -99,8 +109,58 @@ function activateGroup(db, { consultantId, projectId, chatId, openId, binding })
 
 export function getProjectLaunch(db, consultantId, projectId) {
   return db.prepare(`SELECT launch_id, project_id, status, current_step, chat_id, chat_name,
-    message_id, error_code, error_message, created_at, updated_at
+    message_id, search_status, search_task_id, search_started_at,
+    error_code, error_message, created_at, updated_at
     FROM project_launches WHERE consultant_id=? AND project_id=?`).get(consultantId, projectId) || null;
+}
+
+function workflowDueAt() {
+  const value = new Date(Date.now() + 2 * 86400000);
+  value.setHours(18, 0, 0, 0);
+  return value.toISOString();
+}
+
+/** 一次明确确认完成：项目群 → 接单行动 → OpenMai。 */
+export async function launchRecruitingWorkflow(db, bus, consultantId, projectId, input = {}, dependencies = {}) {
+  if (input.confirm !== true) fail(422, 'CONFIRM_REQUIRED', '启动飞书寻访需要本次明确确认');
+  const preflight = projectLaunchPreflight(db, consultantId, projectId, {
+    appConfigured: dependencies.appConfigured,
+    publicBaseUrl: dependencies.publicBaseUrl,
+    requireSearch: true,
+    ttcConnected: dependencies.ttcConnected,
+  });
+  if (!preflight.ready) {
+    const first = preflight.blockers[0];
+    fail(409, first.code, first.message);
+  }
+  const group = await launchProject(db, consultantId, projectId, input, dependencies);
+  const launchId = group.launch.launch_id;
+  const state = currentState(db, consultantId, projectId).state;
+  if (['COMPLETED', 'RELEASED'].includes(state)) {
+    fail(409, 'PROJECT_NOT_ACTIVE', '该项目当前状态不能启动寻访');
+  }
+  if (state !== 'ACCEPTED') {
+    const accepted = acceptCommitment(db, consultantId, projectId, {
+      goal: '完成首轮候选人搜索与匹配评估',
+      action_title: '查看首轮候选人并决定联系或继续搜索',
+      due_at: workflowDueAt(),
+      idempotency_key: `project-launch:${launchId}:accept`,
+    });
+    if (!accepted.ok) fail(accepted.status || 409, 'PROJECT_ACCEPT_FAILED', accepted.error);
+  }
+  const startSearch = dependencies.startOpenmaiTask || startOpenmaiTask;
+  const search = startSearch(db, bus, consultantId, projectId);
+  const status = search.status === 'error' ? 'FAILED'
+    : search.status === 'already_done' ? 'DONE' : 'RUNNING';
+  db.prepare(`UPDATE project_launches SET search_status=?, search_task_id=?, search_started_at=?,
+    error_code=CASE WHEN ?='FAILED' THEN 'OPENMAI_START_FAILED' ELSE NULL END,
+    error_message=CASE WHEN ?='FAILED' THEN ? ELSE NULL END, updated_at=?
+    WHERE consultant_id=? AND project_id=?`).run(
+    status, search.task_id || null, search.started_at || now(), status, status,
+    status === 'FAILED' ? safeError(search.message) : null, now(), consultantId, projectId,
+  );
+  if (status === 'FAILED') fail(502, 'OPENMAI_START_FAILED', search.message || 'OpenMai 启动失败');
+  return { ok: true, group: group.launch, search, launch: getProjectLaunch(db, consultantId, projectId) };
 }
 
 export async function launchProject(db, consultantId, projectId, input = {}, dependencies = {}) {

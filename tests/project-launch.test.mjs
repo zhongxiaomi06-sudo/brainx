@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { openDb, now } from '../src/db.js';
 import { runSync } from '../src/sync.js';
 import { confirmMembership } from '../src/membership.js';
-import { launchProject, ProjectLaunchError } from '../src/project-launch.js';
+import { launchProject, launchRecruitingWorkflow, ProjectLaunchError } from '../src/project-launch.js';
 
 const PID = 'P-LAUNCH-1';
 
@@ -95,5 +95,58 @@ test('项目启动：Agent 身份未绑定时在外部写入前阻断', async ()
   );
   assert.equal(externalCalls, 0);
   assert.equal(db.prepare('SELECT COUNT(*) count FROM project_launches').get().count, 0);
+  db.close();
+});
+
+test('寻访启动：一次确认完成建群、接单行动和 OpenMai 触发', async () => {
+  const db = readyDb();
+  const events = [];
+  const bus = { emit: (event) => events.push(event) };
+  const dependencies = {
+    appConfigured: true,
+    ttcConnected: true,
+    publicBaseUrl: 'https://base.yorkteam.cn/',
+    createProjectChat: async () => ({ chat_id: 'oc_workflow', name: '项目群' }),
+    sendInteractiveCard: async () => ({ message_id: 'om_workflow' }),
+    startOpenmaiTask: (store, passedBus, consultantId, projectId) => {
+      assert.equal(store, db);
+      assert.equal(passedBus, bus);
+      assert.equal(consultantId, 'felix');
+      assert.equal(projectId, PID);
+      return { status: 'triggered', task_id: 'om_task', started_at: now() };
+    },
+  };
+  const out = await launchRecruitingWorkflow(db, bus, 'felix', PID, {
+    confirm: true, idempotency_key: 'workflow-1',
+  }, dependencies);
+  assert.equal(out.launch.search_status, 'RUNNING');
+  assert.equal(out.launch.search_task_id, 'om_task');
+  assert.equal(db.prepare(`SELECT state FROM current_engagement
+    WHERE consultant_id='felix' AND project_id=?`).get(PID).state, 'ACCEPTED');
+  const action = db.prepare(`SELECT title, goal FROM commitment_actions
+    WHERE consultant_id='felix' AND project_id=? AND status='OPEN'`).get(PID);
+  assert.match(action.title, /首轮候选人/);
+  assert.match(action.goal, /搜索与匹配评估/);
+  db.close();
+});
+
+test('寻访启动：缺确认或 TTC 凭证时不创建飞书群', async () => {
+  const db = readyDb();
+  let externalCalls = 0;
+  const dependencies = {
+    appConfigured: true, publicBaseUrl: 'https://base.yorkteam.cn/',
+    createProjectChat: async () => { externalCalls += 1; },
+  };
+  await assert.rejects(
+    launchRecruitingWorkflow(db, null, 'felix', PID, { idempotency_key: 'no-confirm' }, dependencies),
+    (error) => error.code === 'CONFIRM_REQUIRED',
+  );
+  await assert.rejects(
+    launchRecruitingWorkflow(db, null, 'felix', PID, {
+      confirm: true, idempotency_key: 'no-ttc',
+    }, { ...dependencies, ttcConnected: false }),
+    (error) => error.code === 'TTC_CREDENTIALS_REQUIRED',
+  );
+  assert.equal(externalCalls, 0);
   db.close();
 });

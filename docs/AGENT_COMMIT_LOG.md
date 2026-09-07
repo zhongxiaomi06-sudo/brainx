@@ -1,5 +1,13 @@
 # Agent Commit 记录
 
+## 2026-09-07｜fix(openclaw): 自动放行新建职位项目群
+
+- 根因：BrainTex 已能动态建群并登记 BrainX 群 scope，但 OpenClaw 生产入口仍是固定 `groupAllowFrom`；新群消息在到达 BrainX 权限层前就被丢弃，表现为“机器人已在群里但 @ 没反应”。
+- 改动：建群后先通过受控 CLI 把新 chat_id 追加到 OpenClaw 飞书群 allowlist，成功后才投放职位；读改写在进程内串行，多个并发项目不会互相覆盖，已有群幂等跳过。
+- 恢复：OpenClaw 准入失败会保留已建群、阻止提前发卡并返回稳定错误；再次点击复用原群补准入，不重复拉群。
+- 安全：继续保持 `groupPolicy=allowlist`、六人 sender allowlist和强制 @；OpenClaw 入口准入后还必须通过 BrainX 的 sender、purpose、project 三重群 scope。
+- 验证：动态群准入、项目启动和 OpenClaw 生产配置专项 17/17、`npm run verify:quick` 16/16、`git diff --check` 通过。
+
 ## 2026-09-07｜feat(openmai): 将候选人真实 PDF 与评估直接投递项目群
 
 - 根因：会议明确真实猎头习惯是直接在群里收 PDF，旧链路只在摘要卡保留简历链接，仍要求顾问跳转，不能算真实业务闭环。

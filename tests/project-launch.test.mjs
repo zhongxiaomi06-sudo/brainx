@@ -33,13 +33,15 @@ test('项目启动：建群、投放职位、绑定项目并激活群 Agent 范�
     appConfigured: true,
     publicBaseUrl: 'https://base.yorkteam.cn/',
     createProjectChat: async (input) => { calls.push(['create', input]); return { chat_id: 'oc_launch', name: input.name }; },
+    ensureOpenClawGroupAllowed: async (chatId) => { calls.push(['allow', chatId]); },
     sendInteractiveCard: async (input) => { calls.push(['send', input]); return { message_id: 'om_job' }; },
   };
   const result = await launchProject(db, 'felix', PID, { idempotency_key: 'launch-click-1' }, deps);
   assert.equal(result.launch.status, 'READY');
   assert.equal(result.launch.chat_id, 'oc_launch');
   assert.equal(calls[0][1].ownerOpenId.startsWith('ou_'), true);
-  assert.equal(calls[1][1].target, 'oc_launch');
+  assert.deepEqual(calls[1], ['allow', 'oc_launch']);
+  assert.equal(calls[2][1].target, 'oc_launch');
   assert.equal(db.prepare('SELECT chat_id FROM job_facts WHERE project_id=?').get(PID).chat_id, 'oc_launch');
   assert.equal(db.prepare('SELECT enabled FROM chat_contexts WHERE chat_id=?').get('oc_launch').enabled, 1);
   const scope = db.prepare('SELECT * FROM agent_group_scopes WHERE chat_id=?').get('oc_launch');
@@ -48,7 +50,7 @@ test('项目启动：建群、投放职位、绑定项目并激活群 Agent 范�
 
   const duplicate = await launchProject(db, 'felix', PID, { idempotency_key: 'another-click' }, deps);
   assert.equal(duplicate.already, true);
-  assert.equal(calls.length, 2, '重复启动不得再次建群或发卡');
+  assert.equal(calls.length, 3, '重复启动不得再次改白名单、建群或发卡');
   db.close();
 });
 
@@ -60,6 +62,7 @@ test('项目启动：群已创建但投放失败时重试复用原群', async ()
     appConfigured: true,
     publicBaseUrl: 'https://base.yorkteam.cn/',
     createProjectChat: async () => { creates += 1; return { chat_id: 'oc_retry', name: '重试群' }; },
+    ensureOpenClawGroupAllowed: async () => {},
     sendInteractiveCard: async () => {
       sends += 1;
       if (sends === 1) throw new Error('temporary');
@@ -80,6 +83,33 @@ test('项目启动：群已创建但投放失败时重试复用原群', async ()
   assert.equal(retried.launch.status, 'READY');
   assert.equal(creates, 1);
   assert.equal(sends, 2);
+  db.close();
+});
+
+test('项目启动：OpenClaw 群准入失败时不发职位卡，重试复用原群并补齐准入', async () => {
+  const db = readyDb();
+  let creates = 0;
+  let allows = 0;
+  let sends = 0;
+  const deps = {
+    appConfigured: true, publicBaseUrl: 'https://base.yorkteam.cn/',
+    createProjectChat: async () => { creates++; return { chat_id: 'oc_allow_retry', name: '准入重试群' }; },
+    ensureOpenClawGroupAllowed: async () => {
+      allows++;
+      if (allows === 1) throw Object.assign(new Error('hidden output'), { code: 'OPENCLAW_GROUP_ALLOWLIST_FAILED' });
+    },
+    sendInteractiveCard: async () => { sends++; return { message_id: 'om_allowed' }; },
+  };
+  await assert.rejects(launchProject(db, 'felix', PID, { idempotency_key: 'allow-1' }, deps),
+    (error) => error.code === 'OPENCLAW_GROUP_ALLOWLIST_FAILED');
+  assert.equal(creates, 1);
+  assert.equal(sends, 0);
+  assert.equal(db.prepare('SELECT chat_id FROM project_launches').get().chat_id, 'oc_allow_retry');
+  const retried = await launchProject(db, 'felix', PID, { idempotency_key: 'allow-2' }, deps);
+  assert.equal(retried.launch.status, 'READY');
+  assert.equal(creates, 1);
+  assert.equal(allows, 2);
+  assert.equal(sends, 1);
   db.close();
 });
 
@@ -107,6 +137,7 @@ test('寻访启动：一次确认完成建群、接单行动和 OpenMai 触发',
     ttcConnected: true,
     publicBaseUrl: 'https://base.yorkteam.cn/',
     createProjectChat: async () => ({ chat_id: 'oc_workflow', name: '项目群' }),
+    ensureOpenClawGroupAllowed: async () => {},
     sendInteractiveCard: async () => ({ message_id: 'om_workflow' }),
     startOpenmaiTask: (store, passedBus, consultantId, projectId) => {
       assert.equal(store, db);

@@ -57,6 +57,7 @@ Gateway 健康响应必须同时满足 `status=ready`、`authorization.status=re
 - 遇到“某员工能看到机器人但工具不可用”时，先运行 `readiness`。它分别检查花名册 open_id、OpenClaw 白名单、Gateway ACTIVE 身份和本人 TTC 凭证，输出不含 open_id、token 或 app key；不要把所有缺项笼统归因于 Gateway。
 - 任务租约过期会被同类 handler 重新领取；费用或尝试次数到上限后进入 FAILED，不无限消耗模型额度。
 - 发飞书前重新校验授权；撤权同时取消未发送 outbox 并失效缓存/索引。
+- 自动项目群必须同时存在于 OpenClaw `channels.feishu.groupAllowFrom` 和 BrainX `agent_group_scopes`；前者负责入口准入，后者负责 sender、purpose、project 的数据权限。只登记其中一层都不算可用。
 - 人才同步只在所有分页成功后推进游标；文档 schema 不合格进入 NEEDS_REVIEW，扫描件进入 OCR_REQUIRED。
 - 新匹配只输出 SHADOW 的 Recall@20/NDCG@10 报告，未经负责人签署不改变正式顺序。
 

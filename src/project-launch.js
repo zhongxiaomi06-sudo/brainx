@@ -8,6 +8,7 @@ import { acceptCommitment } from './commitment.js';
 import { currentState } from './engagement.js';
 import { startOpenmaiTask } from './openmai-task.js';
 import { ttcAuthStatus } from './ttcsdk/auth.js';
+import { ensureOpenClawProjectGroup } from './openclaw-group-access.js';
 
 const GROUP_PURPOSES = ['job_review', 'candidate_review', 'interview_prep'];
 
@@ -190,6 +191,7 @@ export async function launchProject(db, consultantId, projectId, input = {}, dep
 
   const createChat = dependencies.createProjectChat || createProjectChat;
   const sendCard = dependencies.sendInteractiveCard || sendInteractiveCard;
+  const allowOpenClawGroup = dependencies.ensureOpenClawGroupAllowed || ensureOpenClawProjectGroup;
   let chatId = launch.chat_id;
   try {
     if (!chatId) {
@@ -206,6 +208,7 @@ export async function launchProject(db, consultantId, projectId, input = {}, dep
         chatId, created.name, now(), consultantId, projectId,
       );
     }
+    await allowOpenClawGroup(chatId);
     const sent = await sendCard({
       target: chatId,
       card: buildProjectLaunchCard(preflight.job, { publicBaseUrl: dependencies.publicBaseUrl }),
@@ -227,6 +230,8 @@ export async function launchProject(db, consultantId, projectId, input = {}, dep
   } catch (error) {
     const code = error.code || (chatId ? 'FEISHU_JOB_POST_FAILED' : 'FEISHU_CHAT_CREATE_FAILED');
     saveFailure(db, consultantId, projectId, code, safeError(error));
-    fail(502, code, chatId ? '项目群已创建，但职位投放或本地登记失败；请重试' : '飞书项目群创建失败；请重试');
+    fail(502, code, chatId
+      ? '项目群已创建，但机器人群准入、职位投放或本地登记失败；请重试'
+      : '飞书项目群创建失败；请重试');
   }
 }

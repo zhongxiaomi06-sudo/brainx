@@ -60,13 +60,13 @@ export function buildCandidateTopicCard({ candidate, job, publicBaseUrl }) {
     config: { wide_screen_mode: true },
     header: { template: 'blue', title: { tag: 'plain_text', content: `候选人 · ${name}` } },
     elements: [
-      { tag: 'markdown', content: `**AI 初评**\n${evaluation}` },
+      { tag: 'markdown', content: `候选编号：${candidate.candidateRef}\n\n**AI 初评**\n${evaluation}` },
       { tag: 'action', actions: [{ tag: 'button', type: 'primary',
         text: { tag: 'plain_text', content: '打开候选人评估' },
         multi_url: { url: target, pc_url: target, android_url: target, ios_url: target } }] },
       { tag: 'note', elements: [{ tag: 'plain_text', content: candidate.resumeUrl
-        ? 'PDF 简历将回复在本话题 · 联系与推进记录请继续写在本话题'
-        : '本轮未取得真实 PDF · 联系与推进记录请继续写在本话题' }] },
+        ? 'PDF 简历将回复在本话题 · 可在此让机器人记录联系与推进状态'
+        : '本轮未取得真实 PDF · 可在此让机器人记录联系与推进状态' }] },
     ],
   };
 }

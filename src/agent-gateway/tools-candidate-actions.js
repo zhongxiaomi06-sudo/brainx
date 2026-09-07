@@ -1,6 +1,7 @@
 import { now, uuid } from '../db.js';
 import { candidateShortlist } from '../candidate-shortlist.js';
 import { jobVisibleTo } from '../visibility.js';
+import { extractOpenmaiCandidates } from '../openmai-delivery.js';
 
 function fail(code) { throw Object.assign(new Error(code), { code }); }
 
@@ -15,6 +16,14 @@ async function authorized(shortlistFn, principal, jobId, candidateRef) {
     if (!pageToken) break;
   }
   return false;
+}
+
+function discoveredByOpenmai(db, principal, jobId, candidateRef) {
+  const row = db.prepare(`SELECT result_text FROM openmai_results
+    WHERE consultant_id=? AND project_id=? AND status='done' LIMIT 1`)
+    .get(principal.consultantId, jobId);
+  return extractOpenmaiCandidates(row?.result_text)
+    .some((candidate) => candidate.candidateRef === candidateRef);
 }
 
 function current(db, principal, args) {
@@ -62,7 +71,11 @@ export function createCandidateActionToolHandlers({ db, candidateShortlistFn = c
       if (args.confirm !== true || !jobVisibleTo(db, context.principal.consultantId, args.job_id)) {
         fail(args.confirm === true ? 'NOT_FOUND_OR_FORBIDDEN' : 'INVALID_ARGUMENT');
       }
-      if (!(await authorized(candidateShortlistFn, context.principal, args.job_id, args.candidate_ref))) {
+      const existing = current(db, context.principal, args);
+      const permitted = existing
+        || await authorized(candidateShortlistFn, context.principal, args.job_id, args.candidate_ref)
+        || discoveredByOpenmai(db, context.principal, args.job_id, args.candidate_ref);
+      if (!permitted) {
         fail('NOT_FOUND_OR_FORBIDDEN');
       }
       const row = transition(db, context.principal, args);

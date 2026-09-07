@@ -94,6 +94,7 @@ test('候选人话题卡把评估、工作台入口和附件状态放在同一�
     job: { project_id: 'P-DELIVERY' }, publicBaseUrl: 'https://base.yorkteam.cn/',
   });
   assert.match(card.header.title.content, /张三/);
+  assert.match(card.elements[0].content, /候选编号：c-1/);
   assert.doesNotMatch(card.elements[0].content, /a@example\.com/);
   assert.match(card.elements[2].elements[0].content, /PDF 简历将回复在本话题/);
   const target = new URL(card.elements[1].actions[0].multi_url.url);

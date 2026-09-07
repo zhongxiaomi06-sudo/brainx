@@ -20,6 +20,23 @@ const POLL_TIMEOUT_MS = 35 * 60_000;
 
 const running = new Set(); // `${project_id}|${consultant_id}`
 
+/** 凭证兜底链（2026-09-07）：接单人无有效 TTC JWT 时，按序借用名单内有效凭证代执行。
+ * 结果仍按接单人落库展示，但 result_text 头部标注凭证来源——不冒充本人凭证、不留暗账。
+ * 名单可用 BRAINX_OPENMAI_FALLBACK_CONSULTANTS 覆盖；默认灰度名单减 Otto（已撤权）。 */
+const FALLBACK_CONSULTANTS = (process.env.BRAINX_OPENMAI_FALLBACK_CONSULTANTS
+  || 'felix,mia,linda,wendy,shanon').split(',').map((s) => s.trim()).filter(Boolean);
+
+export function resolveTtcJwtWithFallback(db, consultant_id, { resolver = getValidTtcJwt, fallbackList = FALLBACK_CONSULTANTS } = {}) {
+  const own = resolver(db, consultant_id);
+  if (own) return { jwt: own, delegate: null };
+  for (const cid of fallbackList) {
+    if (cid === consultant_id) continue;
+    const jwt = resolver(db, cid);
+    if (jwt) return { jwt, delegate: cid };
+  }
+  return { jwt: null, delegate: null };
+}
+
 async function ttcFetch(path, jwt, method = 'POST', body = undefined, timeoutMs = CRM_TIMEOUT_MS) {
   // 绝对 URL 原样使用（pollAsyncResult/loadPersisted 传完整 OPENMAI_BASE 地址），相对路径才拼
   const resp = await fetch(path.startsWith('http') ? path : `${API_BASE}${path}`, {
@@ -143,7 +160,7 @@ export function startOpenmaiTask(db, bus, consultant_id, project_id, { force = f
   if (!force && existing?.status === 'failed' && Date.now() - Date.parse(existing.started_at || 0) < 60_000)
     return { status: 'error', message: '最近一次失败未超过 1 分钟，稍后再试或显式重新找人' };
 
-  const jwt = getValidTtcJwt(db, consultant_id);
+  const { jwt, delegate } = resolveTtcJwtWithFallback(db, consultant_id);
   if (!jwt) {
     const t = now();
     db.prepare(`INSERT INTO openmai_results (project_id, consultant_id, status, error, started_at, finished_at)
@@ -174,19 +191,20 @@ export function startOpenmaiTask(db, bus, consultant_id, project_id, { force = f
         ? String(row.source_url).slice('ttc://job/'.length).trim() : project_id;
       const job = await fetchCrmJob(jwt, realId);
       const result = await callOpenmai(jwt, job);
+      const finalText = delegate ? `【凭证代执行：${delegate}】\n${result}` : result;
       db.prepare(`UPDATE openmai_results SET status='done', result_text=?, finished_at=? WHERE project_id=? AND consultant_id=?`)
-        .run(result, now(), project_id, consultant_id);
+        .run(finalText, now(), project_id, consultant_id);
       status = 'done';
     } catch (e) {
       db.prepare(`UPDATE openmai_results SET status='failed', error=?, finished_at=? WHERE project_id=? AND consultant_id=?`)
         .run(String(e.message).slice(0, 500), now(), project_id, consultant_id);
     } finally {
       running.delete(key);
-      bus?.emit?.({ type: 'openmai_result', consultant_id, project_id, status });
+      bus?.emit?.({ type: 'openmai_result', consultant_id, project_id, status, delegated_from: delegate || undefined });
     }
   })();
 
-  return { status: 'triggered', task_id, started_at };
+  return { status: 'triggered', task_id, started_at, delegate: delegate || undefined };
 }
 
 /** 查找人状态/结果（只读安全视图）。 */

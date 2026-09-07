@@ -19,8 +19,8 @@ const INSERT_SYNC = `
 
 const INSERT_JOB = `
   INSERT INTO job_facts (project_id, company, role, city, pipeline, hc, active_state,
-    captured_at, sync_id, raw_json, updated_at)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    captured_at, sync_id, raw_json, updated_at, chat_id)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
 const UPDATE_JOB = `
   UPDATE job_facts SET
@@ -75,11 +75,17 @@ export function confirmDraft(db, { draft_id, consultant_id, project_id = null })
   try {
     db.prepare(INSERT_SYNC).run(syncId, consultant_id, ts, draft.draft_id, ts, ts);
     if (created) {
+      // 来源群挂载（2026-09-07）：登记群产生的职位记 chat_id——项目群消息采集/群成员可见性
+      // 自动生效（驾驶舱 round-robin 会拉该群）；私聊来源不挂（bot p2p 不是项目群）。
+      const chatIsRegisteredGroup = draft.chat_id
+        ? !!db.prepare('SELECT 1 FROM chat_contexts WHERE chat_id=? AND enabled=1').get(draft.chat_id)
+        : false;
       db.prepare(INSERT_JOB).run(
         targetPid, draft.company, draft.role, draft.city,
         draft.pipeline_stage, draft.hc,
         draft.active_state === 'UNKNOWN' ? 'UNKNOWN' : draft.active_state,
         ts, syncId, draft.raw_json, ts,
+        chatIsRegisteredGroup ? draft.chat_id : null,
       );
       db.prepare(INSERT_MEMBERSHIP).run(consultant_id, targetPid, ts);
     } else {

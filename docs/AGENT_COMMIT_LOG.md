@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-07｜feat(agent-gateway): 群内 JD 建岗一步授权 + openmai 凭证兜底链
+
+- 背景：① 用户要求群内 JD 建岗自动化、授权即可接单（六场景①前置）；② 生产确诊 openmai 自动找人失败根因=york 无有效 TTC 凭证（9-07 实锤），9 次失败中 2 次无凭证、7 次职位无权查看。
+- 实现：① brainx_submit_job_jd 解除 p2pOnly（登记群可提交，origin='group_jd'，群成员经 chat_contexts+consultant_chats 共见草稿）；新增 confirm_create 参数——提交人当场授权时草稿立即 confirmDraft 转正并可接单（next_allowed_actions 直达 accept/search）；confirm.js 建岗写入来源群 chat_id（仅登记群），群成员经可见性第四来源直接可见、驾驶舱采集自动挂载。② openmai-task.js 新增 resolveTtcJwtWithFallback 兜底链（BRAINX_OPENMAI_FALLBACK_CONSULTANTS，默认 felix→mia→linda→wendy→shanon）：接单人无有效凭证时按序借用，结果落库仍按接单人，result_text 头部标注【凭证代执行：xxx】不冒充本人凭证；全员无凭证保持原失败语义。插件 1.2.1（runtime+package.json）。
+- 回归测试：openmai-fallback 5/5（选择逻辑+E2E 借用+无凭证语义不变）；job-extract-p2p-submit 12/12（群内授权建岗 E2E、两步路径、群成员可见性、群外人 fail-closed）；openclaw-plugin 等相关 33 项回归通过。
+
 ## 2026-09-07｜fix(visibility): 职位挂载群 ∈ 顾问所在群 → 可见可接单——修复接单入口过窄
 
 - 背景：用户报「有些人一直没有办法接单」。生产审计确诊：同步链路健康（TTC 6 人×94 轮/24h 全 complete，推荐轮全部 COMPLETED），真正断点是 jobVisibleTo 只认 memberships/recommendations/decision_events 三来源，而职位库 14,494 个职位中仅 1,315 个进过推荐池——顾问在项目群亲眼看到的真实岗位（如 Dyna Robotics JXMKXTE）不在其 200 条推荐快照内，accept_job/job_assessment/openmai_search 全被 fail-closed 拒绝（felix 9-06 连续 25 次 NOT_FOUND_OR_FORBIDDEN 实锤）。

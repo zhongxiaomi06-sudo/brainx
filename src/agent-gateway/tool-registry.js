@@ -59,8 +59,9 @@ export const AGENT_TOOL_ROWS = Object.freeze([
   { name: 'brainx_review_job_fact', purpose: ['job_fact_review'], p2pOnly: true, parameters: object({
     draft_id: string(), action: string({ enum: ['confirm', 'reject'] }), job_id: string(), confirm: boolean(),
   }, ['draft_id', 'action', 'confirm']) },
-  { name: 'brainx_submit_job_jd', purpose: ['job_fact_review'], p2pOnly: true, parameters: object({
+  { name: 'brainx_submit_job_jd', purpose: ['job_fact_review'], parameters: object({
     jd_text: string({ minLength: 50, maxLength: 8000 }), confirm: boolean(),
+    confirm_create: boolean(),
   }, ['jd_text', 'confirm']) },
   { name: 'brainx_push_preferences', purpose: ['preferences'], p2pOnly: true, parameters: object({}) },
   { name: 'brainx_update_push_preferences', purpose: ['preferences'], p2pOnly: true, parameters: object({

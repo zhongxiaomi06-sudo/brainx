@@ -31,7 +31,7 @@ const INSERT_DRAFT_SQL = `
      pipeline_stage, pipeline_evidence, hc, hc_evidence,
      active_state, state_evidence, source, status, raw_json, extracted_at,
      origin, submitted_by)
-  VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, 'p2p_jd', ?)`;
+  VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`;
 
 const MIN_JD_CHARS = 50;
 
@@ -92,13 +92,14 @@ function pickForSchema(draft) {
 }
 
 /**
- * 私聊提交整段 JD。返回
+ * 提交整段 JD 建岗草稿（私聊 origin='p2p_jd'；登记群提交 origin='group_jd'，群成员共见）。
+ * 返回
  *   {duplicate:true, draft, message_id, layer} 幂等短路 |
  *   {action:'no_fields', message_id, layer} 无有效字段不产草稿 |
  *   {duplicate:false, action:'extracted', draft_id, message_id, fields, layer, extra}
  * @throws {code:'JD_TOO_SHORT'} 文本不足 50 字
  */
-export async function submitPrivateJd(db, { consultant_id, chat_id, text, create_time = null }) {
+export async function submitPrivateJd(db, { consultant_id, chat_id, text, create_time = null, origin = 'p2p_jd' }) {
   if (!consultant_id || !chat_id) fail('MISSING_IDENTITY');
   const norm = String(text ?? '').trim();
   if (norm.length < MIN_JD_CHARS) fail('JD_TOO_SHORT');
@@ -164,6 +165,7 @@ export async function submitPrivateJd(db, { consultant_id, chat_id, text, create
     layer,
     draft.raw_json,
     ts,
+    origin,
     consultant_id,
   );
   return { duplicate: false, action: 'extracted', draft_id: draft.draft_id,

@@ -18,12 +18,13 @@ function principal(consultantId) {
   return { consultantId, tenantId: 'tenant-a', accountId: 'braintex-prod', chatType: 'p2p', chatId: `ou_${consultantId}` };
 }
 
-test('registry 声明 brainx_submit_job_jd：p2p-only、jd_text 上限 8000、confirm 必填', () => {
+test('registry 声明 brainx_submit_job_jd：p2p+登记群可用、jd_text 上限 8000、confirm 必填', () => {
   const row = AGENT_TOOL_ROWS.find((r) => r.name === 'brainx_submit_job_jd');
   assert.ok(row, 'registry 缺少 brainx_submit_job_jd');
-  assert.equal(row.p2pOnly, true);
+  assert.equal(row.p2pOnly, undefined, '群内建岗扩展后不再限定 p2p');
   assert.deepEqual(row.purpose, ['job_fact_review']);
   assert.equal(row.parameters.properties.jd_text.maxLength, 8000);
+  assert.equal(row.parameters.properties.confirm_create.type, 'boolean');
   assert.deepEqual(row.parameters.required, ['jd_text', 'confirm']);
 });
 
@@ -153,4 +154,54 @@ test('规则层提不出任何有效字段：不产空草稿，返回可区分�
   const r = await submitPrivateJd(db, { consultant_id: 'mia', chat_id: 'ou_mia', text });
   assert.equal(r.action, 'no_fields');
   assert.equal(db.prepare('SELECT COUNT(*) n FROM job_facts_drafts').get().n, 0);
+});
+
+test('群内建岗：group_jd 草稿 + confirm_create 授权一步转正，群成员可见可接单', async () => {
+  const db = openDb(':memory:');
+  // 登记 3 人群：mia 提交、felix/shanon 是群成员
+  db.prepare("INSERT INTO chat_contexts (chat_id, enabled, bot_mode, registered_at, updated_at) VALUES ('oc_grp', 1, 'ALL', datetime('now'), datetime('now'))").run();
+  for (const cid of ['mia', 'felix', 'shanon']) {
+    db.prepare("INSERT INTO consultant_chats (consultant_id, chat_id, name, seen_at) VALUES (?, 'oc_grp', '项目群', datetime('now'))").run(cid);
+    db.prepare("INSERT OR IGNORE INTO consultants (consultant_id, display_name, active, created_at) VALUES (?, ?, 1, datetime('now'))").run(cid, cid);
+  }
+  const tools = createJdSubmitToolHandlers({ db });
+  const groupPrincipal = { consultantId: 'mia', tenantId: 'tenant-a', chatType: 'group', chatId: 'oc_grp' };
+
+  // 授权建岗：一步转正
+  const r = await tools.brainx_submit_job_jd({ jd_text: JD_TEXT, confirm: true, confirm_create: true }, { principal: groupPrincipal });
+  assert.equal(r.data.status, 'confirmed');
+  assert.ok(r.data.job_ref, '授权后应直接产出权威职位');
+  assert.deepEqual(r.next_allowed_actions, ['brainx_accept_job', 'brainx_start_candidate_search']);
+  const job = db.prepare('SELECT * FROM job_facts WHERE project_id=?').get(r.data.job_ref);
+  assert.equal(job.company, '星曜科技有限公司');
+  assert.equal(job.chat_id, 'oc_grp', '登记群来源职位应挂载来源群（群成员可见性/驾驶舱采集生效）');
+  // 确认人立即可接（membership）
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM job_memberships WHERE consultant_id='mia' AND project_id=?").get(r.data.job_ref).n, 1);
+  // 群内其他成员经群关联可见（jobVisibleTo 第四来源）
+  const { jobVisibleTo } = await import('../src/visibility.js');
+  assert.equal(jobVisibleTo(db, 'felix', r.data.job_ref), true);
+  assert.equal(jobVisibleTo(db, 'shanon', r.data.job_ref), true);
+  // 群外人不可见
+  const db2 = db; // 同库：linda 不在群里
+  db.prepare("INSERT OR IGNORE INTO consultants (consultant_id, display_name, active, created_at) VALUES ('linda', 'linda', 1, datetime('now'))").run();
+  assert.equal(jobVisibleTo(db2, 'linda', r.data.job_ref), false);
+});
+
+test('群内建岗：不带 confirm_create 时保持两步（pending 草稿，群成员可经 review 确认）', async () => {
+  const db = openDb(':memory:');
+  db.prepare("INSERT INTO chat_contexts (chat_id, enabled, bot_mode, registered_at, updated_at) VALUES ('oc_grp2', 1, 'ALL', datetime('now'), datetime('now'))").run();
+  db.prepare("INSERT INTO consultant_chats (consultant_id, chat_id, name, seen_at) VALUES ('wendy', 'oc_grp2', '项目群', datetime('now'))").run();
+  db.prepare("INSERT OR IGNORE INTO consultants (consultant_id, display_name, active, created_at) VALUES ('wendy', 'wendy', 1, datetime('now'))").run();
+  const tools = createJdSubmitToolHandlers({ db });
+  const groupPrincipal = { consultantId: 'wendy', tenantId: 'tenant-a', chatType: 'group', chatId: 'oc_grp2' };
+  const r = await tools.brainx_submit_job_jd({ jd_text: JD_TEXT, confirm: true }, { principal: groupPrincipal });
+  assert.equal(r.data.status, 'pending');
+  assert.equal(r.data.job_ref, null);
+  assert.deepEqual(r.next_allowed_actions, ['brainx_review_job_fact']);
+  const draft = db.prepare("SELECT origin, chat_id FROM job_facts_drafts WHERE draft_id=?").get(r.data.draft_ref);
+  assert.equal(draft.origin, 'group_jd');
+  // 群成员经 pending 列表可见（VISIBLE_DRAFT 群分支）
+  const factsTools = createJobFactsToolHandlers({ db });
+  const list = factsTools.brainx_pending_job_facts({ limit: 10 }, { principal: { consultantId: 'wendy', tenantId: 'tenant-a', chatType: 'group', chatId: 'oc_grp2' } });
+  assert.equal(list.data.count, 1);
 });

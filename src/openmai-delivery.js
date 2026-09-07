@@ -189,22 +189,45 @@ export function enqueueOpenmaiDeliveries(db, at = now()) {
   db.exec('BEGIN');
   try {
     for (const row of rows) {
-      created += insert.run(randomUUID(), row.task_id, row.consultant_id, row.project_id,
+      const inserted = insert.run(randomUUID(), row.task_id, row.consultant_id, row.project_id,
         row.chat_id, row.status, at, at, at).changes;
-      const quality = row.status === 'done' ? assessOpenmaiCandidateBatch(row.result_text) : null;
-      const incomplete = quality && !quality.complete;
-      db.prepare(`UPDATE project_launches SET search_status=?, search_task_id=?, error_code=?,
-        error_message=?, updated_at=?
+      created += inserted;
+      if (inserted) db.prepare(`UPDATE project_launches SET search_status=?,
+        search_task_id=?,error_code=?,error_message=?,updated_at=?
         WHERE consultant_id=? AND project_id=?`).run(
-        row.status === 'done' && !incomplete ? 'DONE' : 'FAILED', row.task_id,
-        incomplete ? 'OPENMAI_CANDIDATES_INCOMPLETE' : null,
-        incomplete ? quality.message : null,
+        row.status === 'failed' ? 'FAILED' : 'RUNNING', row.task_id,
+        row.status === 'failed' ? 'OPENMAI_SEARCH_FAILED' : null,
+        row.status === 'failed' ? 'OpenMai 搜索失败，详细原因将投递到项目群。' : null,
         at, row.consultant_id, row.project_id,
       );
     }
     db.exec('COMMIT');
   } catch (error) { db.exec('ROLLBACK'); throw error; }
   return created;
+}
+
+function finishProjectDelivery(db, row, at) {
+  const quality = row.result_status === 'done' ? assessOpenmaiCandidateBatch(row.result_text) : null;
+  const incomplete = quality && !quality.complete;
+  const failed = row.result_status === 'failed';
+  db.prepare(`UPDATE project_launches SET search_status=?, search_task_id=?, error_code=?,
+    error_message=?, updated_at=? WHERE consultant_id=? AND project_id=?`).run(
+    failed || incomplete ? 'FAILED' : 'DONE', row.task_id,
+    failed ? 'OPENMAI_SEARCH_FAILED' : incomplete ? 'OPENMAI_CANDIDATES_INCOMPLETE' : null,
+    failed ? String(row.error || 'OpenMai 搜索失败').slice(0, 240)
+      : incomplete ? quality.message : null,
+    at, row.consultant_id, row.project_id,
+  );
+}
+
+export function retryOpenmaiDelivery(db, consultantId, projectId, at = now()) {
+  const row = db.prepare(`SELECT delivery_id,task_id FROM openmai_deliveries
+    WHERE consultant_id=? AND project_id=? AND delivery_status='FAILED' AND attempts>=5
+    ORDER BY created_at DESC LIMIT 1`).get(consultantId, projectId);
+  if (!row) return null;
+  db.prepare(`UPDATE openmai_deliveries SET delivery_status='PENDING',attempts=0,last_error=NULL,
+    next_attempt_at=?,updated_at=? WHERE delivery_id=?`).run(at, at, row.delivery_id);
+  return { status: 'delivery_retry', task_id: row.task_id, started_at: at };
 }
 
 function retryAt(at, attempts) {
@@ -237,6 +260,7 @@ export async function deliverOpenmaiResultsOnce(db, dependencies = {}) {
       if (row.result_status === 'done') await deliverCandidateTopics(db, row, dependencies);
       db.prepare(`UPDATE openmai_deliveries SET delivery_status='SENT', message_id=?, last_error=NULL,
         sent_at=?, updated_at=? WHERE delivery_id=?`).run(output.message_id || null, at, at, row.delivery_id);
+      finishProjectDelivery(db, row, at);
       sent += 1;
     } catch (error) {
       const attempts = row.attempts + 1;
@@ -244,6 +268,10 @@ export async function deliverOpenmaiResultsOnce(db, dependencies = {}) {
         last_error=?, updated_at=? WHERE delivery_id=?`).run(
         retryAt(at, attempts), String(error?.message || error).slice(0, 240), at, row.delivery_id,
       );
+      if (attempts >= 5) db.prepare(`UPDATE project_launches SET search_status='FAILED',
+        error_code='FEISHU_OPENMAI_DELIVERY_FAILED',
+        error_message='候选结果已生成，但连续 5 次未能送达飞书项目群；请明确重试投递。',updated_at=?
+        WHERE consultant_id=? AND project_id=?`).run(at, row.consultant_id, row.project_id);
       failed += 1;
     }
   }

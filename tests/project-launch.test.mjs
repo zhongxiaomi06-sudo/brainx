@@ -230,3 +230,30 @@ test('寻访启动：候选不足后的明确重试才强制发起新一轮搜�
   assert.equal(out.launch.error_code, null);
   db.close();
 });
+
+test('寻访启动：飞书投递耗尽后只重试投递，不重复运行 OpenMai', async () => {
+  const db = readyDb();
+  const at = now();
+  db.prepare(`INSERT INTO project_launches
+    (launch_id,consultant_id,project_id,idempotency_key,status,current_step,chat_id,message_id,
+     search_status,error_code,error_message,created_at,updated_at)
+    VALUES ('launch-delivery-failed','felix',?,'first-click','READY','READY','oc_failed','om_job',
+      'FAILED','FEISHU_OPENMAI_DELIVERY_FAILED','投递失败',?,?)`).run(PID, at, at);
+  let searchCalls = 0;
+  let deliveryCalls = 0;
+  const out = await launchRecruitingWorkflow(db, null, 'felix', PID, {
+    confirm: true, idempotency_key: 'retry-delivery',
+  }, {
+    appConfigured: true, ttcConnected: true, publicBaseUrl: 'https://base.yorkteam.cn/',
+    retryOpenmaiDelivery: () => {
+      deliveryCalls++;
+      return { status: 'delivery_retry', task_id: 'om_existing', started_at: at };
+    },
+    startOpenmaiTask: () => { searchCalls++; },
+  });
+  assert.equal(deliveryCalls, 1);
+  assert.equal(searchCalls, 0);
+  assert.equal(out.search.status, 'delivery_retry');
+  assert.equal(out.launch.search_status, 'RUNNING');
+  db.close();
+});

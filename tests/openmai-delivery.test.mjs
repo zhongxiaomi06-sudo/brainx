@@ -6,6 +6,7 @@ import {
   buildCandidateTopicCard,
   buildResumeUnavailableCard,
   assessOpenmaiCandidateBatch,
+  retryOpenmaiDelivery,
 } from '../src/openmai-delivery.js';
 import { buildPrompt } from '../src/openmai-task.js';
 import { saveTtcToken } from '../src/ttcsdk/auth.js';
@@ -66,6 +67,29 @@ test('OpenMai 群投递：发送失败进入有限重试而不是丢结果', asy
   assert.equal(row.attempts, 1);
   assert.equal(Date.parse(row.next_attempt_at) > Date.parse(at), true);
   assert.equal(db.prepare('SELECT search_status FROM project_launches').get().search_status, 'FAILED');
+  db.close();
+});
+
+test('OpenMai 结果只有真实送达飞书后才标完成', async () => {
+  const db = seededDb();
+  const at = now();
+  let attempts = 0;
+  for (let index = 0; index < 5; index++) {
+    db.prepare("UPDATE openmai_deliveries SET next_attempt_at=? WHERE delivery_status='FAILED'").run(at);
+    await deliverOpenmaiResultsOnce(db, {
+      at, publicBaseUrl: 'https://base.yorkteam.cn/',
+      sendInteractiveCard: async () => { attempts++; throw new Error('feishu unavailable'); },
+    });
+  }
+  assert.equal(attempts, 5);
+  const launch = db.prepare('SELECT search_status,error_code,error_message FROM project_launches').get();
+  assert.equal(launch.search_status, 'FAILED');
+  assert.equal(launch.error_code, 'FEISHU_OPENMAI_DELIVERY_FAILED');
+  assert.match(launch.error_message, /结果已生成/);
+  const retried = retryOpenmaiDelivery(db, 'felix', 'P-DELIVERY', at);
+  assert.equal(retried.status, 'delivery_retry');
+  assert.deepEqual({ ...db.prepare(`SELECT delivery_status,attempts,last_error
+    FROM openmai_deliveries`).get() }, { delivery_status: 'PENDING', attempts: 0, last_error: null });
   db.close();
 });
 

@@ -9,6 +9,7 @@ import { currentState } from './engagement.js';
 import { startOpenmaiTask } from './openmai-task.js';
 import { ttcAuthStatus } from './ttcsdk/auth.js';
 import { ensureOpenClawProjectGroup } from './openclaw-group-access.js';
+import { retryOpenmaiDelivery } from './openmai-delivery.js';
 
 const GROUP_PURPOSES = ['job_review', 'candidate_review', 'candidate_action', 'interview_prep'];
 
@@ -161,6 +162,17 @@ export async function launchRecruitingWorkflow(db, bus, consultantId, projectId,
       idempotency_key: `project-launch:${launchId}:accept`,
     });
     if (!accepted.ok) fail(accepted.status || 409, 'PROJECT_ACCEPT_FAILED', accepted.error);
+  }
+  if (group.launch.search_status === 'FAILED'
+      && group.launch.error_code === 'FEISHU_OPENMAI_DELIVERY_FAILED') {
+    const retryDelivery = dependencies.retryOpenmaiDelivery || retryOpenmaiDelivery;
+    const search = retryDelivery(db, consultantId, projectId);
+    if (search) {
+      db.prepare(`UPDATE project_launches SET search_status='RUNNING',error_code=NULL,error_message=NULL,
+        updated_at=? WHERE consultant_id=? AND project_id=?`).run(now(), consultantId, projectId);
+      return { ok: true, group: group.launch, search,
+        launch: getProjectLaunch(db, consultantId, projectId) };
+    }
   }
   const startSearch = dependencies.startOpenmaiTask || startOpenmaiTask;
   const retryIncomplete = group.launch.search_status === 'FAILED'

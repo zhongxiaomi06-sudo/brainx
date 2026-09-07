@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-07｜feat(feishu): 增加幂等创建职位项目群能力
+
+- 改动：抽出飞书 tenant token 获取函数，新增应用身份创建职位项目群能力；创建时使用 open_id 邀请负责人和协作者、把当前应用机器人加入群，并把业务幂等键传给飞书避免网络重试重复建群。
+- 安全：缺应用凭证、空群名、缺幂等键、非法成员身份和飞书非成功响应均显式失败，不产生本地假成功状态。
+- 文档：更新飞书权限清单，明确项目建群客户端已实现，但真实租户仍需审批 `im:chat:create` 并完成真机验收。
+- 验证：`node --test tests/feishu-bot-send.test.mjs` 4/4 通过；`npm run verify:quick` 16/16 通过；`git diff --check` 通过。
+
 ## 2026-09-07｜merge(update): 合并远端最新生产改动
 
 - 合并：将 `origin/codex/york-gray-release` 在 `a8f8cde` 之后的 8 个提交并入当前集成分支，保留本地个人模型、OpenClaw 与 9 月 4 日生产修复历史。

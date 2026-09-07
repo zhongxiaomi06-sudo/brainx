@@ -12,6 +12,78 @@ async function readJson(response, fallback) {
   }
 }
 
+export async function getTenantAccessToken({
+  appId = process.env.BRAINX_FEISHU_APP_ID || process.env.LARK_APP_ID,
+  appSecret = process.env.BRAINX_FEISHU_APP_SECRET || process.env.LARK_APP_SECRET,
+  fetchImpl = globalThis.fetch,
+  timeoutMs = 15_000,
+} = {}) {
+  if (!appId || !appSecret) throw new Error('FEISHU_BOT_CREDENTIALS_MISSING');
+  const response = await fetchImpl(`${FEISHU_BASE}/open-apis/auth/v3/tenant_access_token/internal`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ app_id: appId, app_secret: appSecret }),
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  const body = await readJson(response, 'FEISHU_TOKEN_RESPONSE_INVALID');
+  if (response.ok === false || body.code !== 0 || !body.tenant_access_token) {
+    throw new Error(`FEISHU_TOKEN_FAILED: ${safeMessage(body, body.code ?? 'unknown')}`);
+  }
+  return body.tenant_access_token;
+}
+
+/**
+ * 使用应用身份创建职位项目群。uuid 由业务层提供，飞书据此避免网络重试重复建群。
+ * 创建时显式把当前应用机器人加入群，成员统一使用 open_id。
+ */
+export async function createProjectChat({
+  name,
+  description = '',
+  ownerOpenId,
+  memberOpenIds = [],
+  botAppIds,
+  idempotencyKey,
+  appId = process.env.BRAINX_FEISHU_APP_ID || process.env.LARK_APP_ID,
+  appSecret = process.env.BRAINX_FEISHU_APP_SECRET || process.env.LARK_APP_SECRET,
+  fetchImpl = globalThis.fetch,
+  timeoutMs = 15_000,
+}) {
+  const title = String(name || '').trim();
+  if (!title) throw new Error('FEISHU_CHAT_NAME_REQUIRED');
+  if (!idempotencyKey || typeof idempotencyKey !== 'string') {
+    throw new Error('FEISHU_CHAT_IDEMPOTENCY_KEY_REQUIRED');
+  }
+  const members = [...new Set([ownerOpenId, ...memberOpenIds].filter(Boolean))];
+  if (members.some((id) => !/^ou_[A-Za-z0-9_-]+$/.test(String(id)))) {
+    throw new Error('FEISHU_CHAT_MEMBER_INVALID');
+  }
+  const bots = [...new Set((botAppIds || [appId]).filter(Boolean))];
+  const token = await getTenantAccessToken({ appId, appSecret, fetchImpl, timeoutMs });
+  const response = await fetchImpl(
+    `${FEISHU_BASE}/open-apis/im/v1/chats?user_id_type=open_id&set_bot_manager=true&uuid=${encodeURIComponent(idempotencyKey)}`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: title.slice(0, 100),
+        description: String(description || '').slice(0, 100),
+        owner_id: ownerOpenId || undefined,
+        user_id_list: members,
+        bot_id_list: bots,
+        group_message_type: 'chat',
+        chat_mode: 'group',
+        chat_type: 'private',
+      }),
+      signal: AbortSignal.timeout(timeoutMs),
+    },
+  );
+  const body = await readJson(response, 'FEISHU_CHAT_CREATE_RESPONSE_INVALID');
+  if (response.ok === false || body.code !== 0 || !body.data?.chat_id) {
+    throw new Error(`FEISHU_CHAT_CREATE_FAILED: ${safeMessage(body, body.code ?? 'unknown')}`);
+  }
+  return { chat_id: body.data.chat_id, name: body.data.name || title };
+}
+
 /**
  * 直接使用飞书开放接口发卡，不依赖本机 lark-cli。
  * target 只接受 open_id（ou_）或 chat_id（oc_）；自动推送调用方只传顾问 open_id。
@@ -29,16 +101,7 @@ export async function sendInteractiveCard({
     throw new Error('FEISHU_TARGET_INVALID');
   }
 
-  const tokenResponse = await fetchImpl(`${FEISHU_BASE}/open-apis/auth/v3/tenant_access_token/internal`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ app_id: appId, app_secret: appSecret }),
-    signal: AbortSignal.timeout(timeoutMs),
-  });
-  const tokenBody = await readJson(tokenResponse, 'FEISHU_TOKEN_RESPONSE_INVALID');
-  if (tokenResponse.ok === false || tokenBody.code !== 0 || !tokenBody.tenant_access_token) {
-    throw new Error(`FEISHU_TOKEN_FAILED: ${safeMessage(tokenBody, tokenBody.code ?? 'unknown')}`);
-  }
+  const token = await getTenantAccessToken({ appId, appSecret, fetchImpl, timeoutMs });
 
   const receiveIdType = String(target).startsWith('oc_') ? 'chat_id' : 'open_id';
   const sendResponse = await fetchImpl(
@@ -46,7 +109,7 @@ export async function sendInteractiveCard({
     {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${tokenBody.tenant_access_token}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { sendInteractiveCard } from '../src/feishu-bot.js';
+import { createProjectChat, sendInteractiveCard } from '../src/feishu-bot.js';
 
 const response = (body) => ({ ok: true, json: async () => body });
 
@@ -37,5 +37,56 @@ test('飞书机器人直连接口：缺凭证或非法目标时 fail-closed', as
   await assert.rejects(
     sendInteractiveCard({ target: 'someone@example.com', card: {}, appId: 'cli_test', appSecret: 'secret' }),
     /FEISHU_TARGET_INVALID/,
+  );
+});
+
+test('飞书机器人直连接口：用 open_id 成员和当前机器人创建幂等项目群', async () => {
+  const calls = [];
+  const out = await createProjectChat({
+    name: '海马云-PM',
+    description: 'BrainTex 项目 J-1',
+    ownerOpenId: 'ou_owner',
+    memberOpenIds: ['ou_owner', 'ou_partner'],
+    idempotencyKey: 'launch-j1-mia',
+    appId: 'cli_test',
+    appSecret: 'test-secret',
+    fetchImpl: async (url, options) => {
+      calls.push({ url, options });
+      return calls.length === 1
+        ? response({ code: 0, tenant_access_token: 'tenant-test-token' })
+        : response({ code: 0, data: { chat_id: 'oc_project', name: '海马云-PM' } });
+    },
+  });
+
+  assert.deepEqual(out, { chat_id: 'oc_project', name: '海马云-PM' });
+  assert.match(calls[1].url, /\/open-apis\/im\/v1\/chats\?user_id_type=open_id/);
+  assert.match(calls[1].url, /uuid=launch-j1-mia/);
+  const body = JSON.parse(calls[1].options.body);
+  assert.equal(body.owner_id, 'ou_owner');
+  assert.deepEqual(body.user_id_list, ['ou_owner', 'ou_partner']);
+  assert.deepEqual(body.bot_id_list, ['cli_test']);
+  assert.equal(body.chat_type, 'private');
+});
+
+test('飞书机器人直连接口：建群输入和飞书失败都显式报错', async () => {
+  await assert.rejects(
+    createProjectChat({ name: '', idempotencyKey: 'x', appId: 'a', appSecret: 'b' }),
+    /FEISHU_CHAT_NAME_REQUIRED/,
+  );
+  await assert.rejects(
+    createProjectChat({
+      name: '职位群', ownerOpenId: 'bad-id', idempotencyKey: 'x', appId: 'a', appSecret: 'b',
+    }),
+    /FEISHU_CHAT_MEMBER_INVALID/,
+  );
+  let count = 0;
+  await assert.rejects(
+    createProjectChat({
+      name: '职位群', ownerOpenId: 'ou_owner', idempotencyKey: 'x', appId: 'a', appSecret: 'b',
+      fetchImpl: async () => (++count === 1
+        ? response({ code: 0, tenant_access_token: 'token' })
+        : response({ code: 230001, msg: 'no permission' })),
+    }),
+    /FEISHU_CHAT_CREATE_FAILED: no permission/,
   );
 });

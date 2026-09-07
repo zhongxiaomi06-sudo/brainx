@@ -44,6 +44,7 @@ for required_file in \
   "$BRAINX_DEPLOY_ROOT/deploy/openclaw/openclaw.env.example" \
   "$BRAINX_DEPLOY_ROOT/plugins/brainx-openclaw/package.json" \
   "$BRAINX_DEPLOY_ROOT/deploy/systemd/brainx-agent-gateway.service" \
+  "$BRAINX_DEPLOY_ROOT/deploy/systemd/brainx-worker.service" \
   "$BRAINX_DEPLOY_ROOT/deploy/systemd/brainx-integration-worker.service" \
   "$BRAINX_DEPLOY_ROOT/deploy/systemd/openclaw-brainx.service"; do
   [[ -f "$required_file" ]] || { echo "missing file: $required_file" >&2; exit 66; }

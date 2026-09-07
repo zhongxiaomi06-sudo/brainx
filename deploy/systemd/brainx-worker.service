@@ -1,0 +1,23 @@
+[Unit]
+Description=BrainX business batch worker (bridge, scheduling, resume intake, OpenMai delivery)
+After=network-online.target brainx.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=brainx
+Group=brainx
+WorkingDirectory=/opt/brainx
+EnvironmentFile=/etc/brainx/worker.env
+Environment=BRAINX_EMBED_WORKER=0
+ExecStart=/usr/bin/node /opt/brainx/src/worker.js
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/brainx/data
+
+[Install]
+WantedBy=multi-user.target

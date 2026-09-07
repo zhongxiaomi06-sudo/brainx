@@ -17,7 +17,7 @@
 - 官方飞书渠道插件：安装器固定安装已核实存在且兼容宿主的 `@openclaw/feishu@2026.7.1`。
 - OpenClaw 固定生产配置：`deploy/openclaw/openclaw.production.json`。
 - 无密钥环境模板：`deploy/openclaw/brainx-agent.env.example`、`deploy/openclaw/brainx-worker.env.example`、`deploy/openclaw/openclaw.env.example`。
-- 三个常驻服务：`deploy/systemd/brainx-agent-gateway.service`、`brainx-integration-worker.service`、`openclaw-brainx.service`。
+- 第一主链常驻服务：`deploy/systemd/brainx-agent-gateway.service`、`brainx-worker.service`、`openclaw-brainx.service`。`brainx-integration-worker.service` 只在启用 `integration_jobs` 异步处理时额外启动，不能替代 OpenMai 回群 worker。
 - 幂等安装器：`deploy/openclaw/install.sh`。
 
 不要通过飞书、GitHub issue、PR 评论或压缩包传真实密码。真实值由服务器同事直接写入 `/etc/brainx/*.env`。
@@ -158,7 +158,7 @@ node bin/brainx-agent-admin.mjs grant-group \
 ```bash
 systemctl daemon-reload
 systemctl enable --now brainx-agent-gateway
-systemctl enable --now brainx-integration-worker
+systemctl enable --now brainx-worker
 systemctl enable --now openclaw-brainx
 systemctl restart brainx
 ```
@@ -168,7 +168,7 @@ systemctl restart brainx
 ## 八、机器验收
 
 ```bash
-systemctl status brainx brainx-agent-gateway brainx-integration-worker openclaw-brainx --no-pager
+systemctl status brainx brainx-agent-gateway brainx-worker openclaw-brainx --no-pager
 curl -fsS http://127.0.0.1:3102/internal/v1/agent/health
 curl -fsS https://base.yorkteam.cn/api/v1/meta/guard
 ss -lntp

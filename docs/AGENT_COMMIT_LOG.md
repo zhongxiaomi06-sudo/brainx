@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-07｜fix(deploy): 启动真正负责 OpenMai 回群的业务 worker
+
+- 根因：OpenMai 持久投递消费者位于 `src/worker.js`，但 OpenClaw 安装器只校验并安装 `brainx-integration-worker`；后者只消费 `integration_jobs`，不会执行候选结果回群。部署手册还把两个服务交叉描述，按文档上线会让项目长期停在 RUNNING。
+- 改动：新增最小权限 `brainx-worker.service` 并纳入安装校验，显式加载 worker 环境、生产 HTTPS 基址和同一飞书应用凭证；统一三份运行文档，第一主链必须启动业务 worker，集成任务 worker按需独立启用且不能替代。
+- 验证：生产配置、worker 存活和 OpenMai 投递专项 22/22、`npm run verify:quick` 16/16、`git diff --check` 通过。
+
 ## 2026-09-07｜docs(feishu): 将自动建项目群权限改为上线必需
 
 - 根因：9 月 3 日部署手册仍写“首期不申请建群”，与 9 月 7 日用户将自动项目群提升为第一主链的最新决策冲突；照旧手册配置会让生产按钮必然被飞书拒绝。

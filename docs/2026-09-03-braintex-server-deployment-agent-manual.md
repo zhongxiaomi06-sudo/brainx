@@ -279,7 +279,9 @@ node bin/brainx-agent-admin.mjs grant-group \
 ```bash
 systemctl daemon-reload
 systemctl enable --now brainx-agent-gateway
-systemctl enable --now brainx-integration-worker
+systemctl enable --now brainx-worker
+# 只有部署了 integration_jobs 异步处理器时才另行启用：
+# systemctl enable --now brainx-integration-worker
 systemctl enable --now openclaw-brainx
 systemctl restart brainx
 ```
@@ -289,7 +291,7 @@ systemctl restart brainx
 ## 11. 机器级验收
 
 ```bash
-systemctl status brainx brainx-agent-gateway brainx-integration-worker openclaw-brainx --no-pager
+systemctl status brainx brainx-agent-gateway brainx-worker openclaw-brainx --no-pager
 curl -fsS http://127.0.0.1:3102/internal/v1/agent/health
 curl -fsS https://<BRAINX_PUBLIC_HOST>/api/v1/meta/guard
 ss -lntp

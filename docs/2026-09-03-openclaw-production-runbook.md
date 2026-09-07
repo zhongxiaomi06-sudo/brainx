@@ -13,7 +13,7 @@
 3. 执行 `--apply`，然后在 `/etc/brainx/agent.env`、`worker.env` 与 `openclaw.env` 替换全部占位值；文件保持 `0640 root:brainx`。Gateway 使用人才库只读账号，确定性 worker 使用独立最小 DML 账号。
 4. 运行 SQLite/RDS additive migration；先做 RDS 备份和只读健康检查，再执行写迁移。
 5. 先用 `brainx-agent-admin readiness --account mia` 查看逐人就绪层，再用 `bind-roster` 从已核验花名册批量建立六名在职灰度顾问的 Gateway 身份；群、sender、purpose 与项目范围仍需显式登记。Otto 已离职：保留历史审计，但 `consultants.active=0` 且不得存在 ACTIVE 身份绑定。
-6. 当前一体化生产部署使用 `brainx-worker` 承担 bridge、简历和推送；`brainx-integration-worker` 保持 disabled，禁止两者同时消费。依次启动 `brainx-agent-gateway`、`brainx-worker`、`openclaw-brainx`，最后重启现有 `brainx.service`。
+6. 当前生产主链必须启用 `brainx-worker`，由它承担 bridge、简历、推送和 OpenMai 结果回群；`brainx-integration-worker` 只消费带租约的 `integration_jobs`，没有启用相应异步集成任务时保持 disabled。两者职责不同，不得用后者替代前者。依次启动 `brainx-agent-gateway`、`brainx-worker`、`openclaw-brainx`，最后重启现有 `brainx.service`。
 7. 用已绑定顾问的飞书私聊输入 `/brainx`，确认返回六入口功能首页；再点击一条职位入口和一条人才入口。
 
 不得把 Gateway、OpenClaw 控制面、RDS 或 SQLite 暴露公网；不得从聊天文本推断 consultant_id；不得复制 Mia 的授权给其他顾问。
@@ -59,6 +59,7 @@ Gateway 健康响应必须同时满足 `status=ready`、`authorization.status=re
 - 任务租约过期会被同类 handler 重新领取；费用或尝试次数到上限后进入 FAILED，不无限消耗模型额度。
 - 发飞书前重新校验授权；撤权同时取消未发送 outbox 并失效缓存/索引。
 - 自动项目群必须同时存在于 OpenClaw `channels.feishu.groupAllowFrom` 和 BrainX `agent_group_scopes`；前者负责入口准入，后者负责 sender、purpose、project 的数据权限。只登记其中一层都不算可用。
+- OpenMai 回群依赖 `brainx-worker.service` 中的持久投递消费者；`brainx-integration-worker.service` 不运行这段代码。项目长期停在 RUNNING 时先核对前者，不得用启动后者作为替代修复。
 - 人才同步只在所有分页成功后推进游标；文档 schema 不合格进入 NEEDS_REVIEW，扫描件进入 OCR_REQUIRED。
 - 新匹配只输出 SHADOW 的 Recall@20/NDCG@10 报告，未经负责人签署不改变正式顺序。
 

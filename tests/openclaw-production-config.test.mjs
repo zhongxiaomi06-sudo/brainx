@@ -81,7 +81,7 @@ test('Feishu is websocket-only, allowlisted, and mention-gated in groups', () =>
 });
 
 test('systemd units keep internal services on one host and load secrets from protected files', async () => {
-  const names = ['brainx-agent-gateway', 'brainx-integration-worker', 'openclaw-brainx'];
+  const names = ['brainx-agent-gateway', 'brainx-worker', 'brainx-integration-worker', 'openclaw-brainx'];
   for (const name of names) {
     const unit = await readFile(new URL(`deploy/systemd/${name}.service`, root), 'utf8');
     assert.match(unit, /^User=brainx$/m);
@@ -151,6 +151,7 @@ test('Agent env template uses the exact variable names consumed by runtime', asy
 test('worker has a separate least-DML environment and systemd does not reuse Agent credentials', async () => {
   const template = await readFile(new URL('deploy/openclaw/brainx-worker.env.example', root), 'utf8');
   assert.match(template, /^BRAINX_DB=\/opt\/brainx\/data\/brainx\.sqlite$/m);
+  assert.match(template, /^BRAINX_BASE_URL=https:\/\//m);
   assert.match(template, /^BRAINX_MYSQL_USER=brainx_worker_runtime$/m);
   assert.match(template, /^BRAINX_RELOOP_SYNC_ENABLED=1$/m);
   assert.match(template, /^BRAINX_DOCUMENT_LLM_ENABLED=0$/m);
@@ -158,7 +159,16 @@ test('worker has a separate least-DML environment and systemd does not reuse Age
   assert.match(template, /^BRAINX_RELOOP_SOURCE_OWNER_ID=/m);
   assert.doesNotMatch(template, /^BRAINX_AGENT_(GATEWAY_TOKEN|ASSERTION_SECRET|AUDIT_KEY)=/m);
 
-  const worker = await readFile(new URL('deploy/systemd/brainx-integration-worker.service', root), 'utf8');
-  assert.match(worker, /^EnvironmentFile=\/etc\/brainx\/worker\.env$/m);
-  assert.doesNotMatch(worker, /^EnvironmentFile=\/etc\/brainx\/agent\.env$/m);
+  const businessWorker = await readFile(new URL('deploy/systemd/brainx-worker.service', root), 'utf8');
+  assert.match(businessWorker, /^EnvironmentFile=\/etc\/brainx\/worker\.env$/m);
+  assert.match(businessWorker, /^ExecStart=\/usr\/bin\/node \/opt\/brainx\/src\/worker\.js$/m);
+  assert.match(businessWorker, /^Environment=BRAINX_EMBED_WORKER=0$/m);
+  const integrationWorker = await readFile(new URL('deploy/systemd/brainx-integration-worker.service', root), 'utf8');
+  assert.match(integrationWorker, /^EnvironmentFile=\/etc\/brainx\/worker\.env$/m);
+  assert.match(integrationWorker, /bin\/brainx-integration-worker\.mjs/);
+  for (const unit of [businessWorker, integrationWorker]) {
+    assert.doesNotMatch(unit, /^EnvironmentFile=\/etc\/brainx\/agent\.env$/m);
+  }
+  const installer = await readFile(new URL('deploy/openclaw/install.sh', root), 'utf8');
+  assert.match(installer, /deploy\/systemd\/brainx-worker\.service/);
 });

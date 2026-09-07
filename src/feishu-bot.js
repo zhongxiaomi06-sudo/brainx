@@ -91,6 +91,7 @@ export async function createProjectChat({
 export async function sendInteractiveCard({
   target,
   card,
+  idempotencyKey,
   appId = process.env.BRAINX_FEISHU_APP_ID || process.env.LARK_APP_ID,
   appSecret = process.env.BRAINX_FEISHU_APP_SECRET || process.env.LARK_APP_SECRET,
   fetchImpl = globalThis.fetch,
@@ -104,8 +105,9 @@ export async function sendInteractiveCard({
   const token = await getTenantAccessToken({ appId, appSecret, fetchImpl, timeoutMs });
 
   const receiveIdType = String(target).startsWith('oc_') ? 'chat_id' : 'open_id';
+  const uuidQuery = idempotencyKey ? `&uuid=${encodeURIComponent(idempotencyKey)}` : '';
   const sendResponse = await fetchImpl(
-    `${FEISHU_BASE}/open-apis/im/v1/messages?receive_id_type=${receiveIdType}`,
+    `${FEISHU_BASE}/open-apis/im/v1/messages?receive_id_type=${receiveIdType}${uuidQuery}`,
     {
       method: 'POST',
       headers: {

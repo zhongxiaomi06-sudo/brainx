@@ -74,7 +74,7 @@ export function createServer(db = openDb(), deps = {}) {
 
   const routes = {
     ...assistantRoutes(db, deps),
-    ...projectRoutes(db),
+    ...projectRoutes(db, deps.projectLaunch || {}),
     ...personalModelRoutes(db, deps),
     'GET /api/v1/consultants': (req, res) => {
       json(res, 200, { items: loadConsultants(db)

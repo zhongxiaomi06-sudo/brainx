@@ -5,13 +5,36 @@ import { listProjects } from './projects.js';
 import { relationOf } from './relations.js';
 import { jobVisibleTo } from './visibility.js';
 import { body, err, json } from './server-http.js';
+import { getProjectLaunch, launchProject, projectLaunchPreflight } from './project-launch.js';
 
-export function projectRoutes(db) {
+export function projectRoutes(db, dependencies = {}) {
   return {
     'GET /api/v1/projects': (req, res, cid) => {
       const items = listProjects(db, cid);
       json(res, 200, { items, total_count: items.length });
     },    'GET /api/v1/reports/data-isolation': (req, res) => json(res, 200, isolationReport(db)),
+
+    'GET /api/v1/opportunities/:id/launch': (req, res, cid, q, id) => {
+      try {
+        const preflight = projectLaunchPreflight(db, cid, id, {
+          appConfigured: dependencies.appConfigured,
+          publicBaseUrl: dependencies.publicBaseUrl,
+        });
+        json(res, 200, { ready: preflight.ready, blockers: preflight.blockers,
+          launch: getProjectLaunch(db, cid, id) });
+      } catch (error) {
+        err(res, error.status || 500, error.code || 'PROJECT_LAUNCH_STATUS_FAILED', error.message);
+      }
+    },
+    'POST /api/v1/opportunities/:id/launch': async (req, res, cid, q, id) => {
+      const input = await body(req);
+      if (!input) return err(res, 400, 'BAD_JSON', '请求体不是合法 JSON');
+      try {
+        json(res, 200, await launchProject(db, cid, id, input, dependencies));
+      } catch (error) {
+        err(res, error.status || 500, error.code || 'PROJECT_LAUNCH_FAILED', error.message);
+      }
+    },
 
     'PATCH /api/v1/opportunities/:id/membership': async (req, res, cid, q, id) => {
       const job = db.prepare('SELECT 1 FROM job_facts WHERE project_id=?').get(id);

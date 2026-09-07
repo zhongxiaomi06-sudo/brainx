@@ -1,0 +1,99 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { openDb, now } from '../src/db.js';
+import { runSync } from '../src/sync.js';
+import { confirmMembership } from '../src/membership.js';
+import { launchProject, ProjectLaunchError } from '../src/project-launch.js';
+
+const PID = 'P-LAUNCH-1';
+
+function readyDb({ withBinding = true } = {}) {
+  const db = openDb(':memory:');
+  runSync(db, { source: 'test', consultant_id: 'felix', payload: {
+    as_of: now(), jobs: [{ project_id: PID, company: '海马云', role: '产品经理', city: '上海',
+      pipeline: '待推荐', hc: 2, active_state: 'OPEN', source_url: null, captured_at: now() }],
+  } });
+  confirmMembership(db, 'felix', PID, { relation: 'MY_JOB', idempotency_key: 'join-launch' });
+  if (withBinding) {
+    const openId = db.prepare("SELECT open_id FROM consultants WHERE consultant_id='felix'").get().open_id;
+    db.prepare(`INSERT INTO feishu_identity_bindings
+      (binding_id, tenant_id, channel_account_id, feishu_app_key_hash, open_id, consultant_id,
+       binding_status, verified_at, verified_by, created_at, updated_at)
+      VALUES ('binding-launch','tenant-a','brainx-prod',?,?,'felix','ACTIVE',?,'system',?,?)`).run(
+      'a'.repeat(64), openId, now(), now(), now(),
+    );
+  }
+  return db;
+}
+
+test('项目启动：建群、投放职位、绑定项目并激活群 Agent 范围', async () => {
+  const db = readyDb();
+  const calls = [];
+  const deps = {
+    appConfigured: true,
+    publicBaseUrl: 'https://base.yorkteam.cn/',
+    createProjectChat: async (input) => { calls.push(['create', input]); return { chat_id: 'oc_launch', name: input.name }; },
+    sendInteractiveCard: async (input) => { calls.push(['send', input]); return { message_id: 'om_job' }; },
+  };
+  const result = await launchProject(db, 'felix', PID, { idempotency_key: 'launch-click-1' }, deps);
+  assert.equal(result.launch.status, 'READY');
+  assert.equal(result.launch.chat_id, 'oc_launch');
+  assert.equal(calls[0][1].ownerOpenId.startsWith('ou_'), true);
+  assert.equal(calls[1][1].target, 'oc_launch');
+  assert.equal(db.prepare('SELECT chat_id FROM job_facts WHERE project_id=?').get(PID).chat_id, 'oc_launch');
+  assert.equal(db.prepare('SELECT enabled FROM chat_contexts WHERE chat_id=?').get('oc_launch').enabled, 1);
+  const scope = db.prepare('SELECT * FROM agent_group_scopes WHERE chat_id=?').get('oc_launch');
+  assert.deepEqual(JSON.parse(scope.project_refs_json), [PID]);
+  assert.equal(JSON.parse(scope.allowed_senders_json).length, 1);
+
+  const duplicate = await launchProject(db, 'felix', PID, { idempotency_key: 'another-click' }, deps);
+  assert.equal(duplicate.already, true);
+  assert.equal(calls.length, 2, '重复启动不得再次建群或发卡');
+  db.close();
+});
+
+test('项目启动：群已创建但投放失败时重试复用原群', async () => {
+  const db = readyDb();
+  let creates = 0;
+  let sends = 0;
+  const deps = {
+    appConfigured: true,
+    publicBaseUrl: 'https://base.yorkteam.cn/',
+    createProjectChat: async () => { creates += 1; return { chat_id: 'oc_retry', name: '重试群' }; },
+    sendInteractiveCard: async () => {
+      sends += 1;
+      if (sends === 1) throw new Error('temporary');
+      return { message_id: 'om_retry' };
+    },
+  };
+  await assert.rejects(
+    launchProject(db, 'felix', PID, { idempotency_key: 'retry-1' }, deps),
+    (error) => error instanceof ProjectLaunchError && error.status === 502,
+  );
+  assert.equal(db.prepare('SELECT status FROM project_launches').get().status, 'FAILED');
+  let retried;
+  try {
+    retried = await launchProject(db, 'felix', PID, { idempotency_key: 'retry-2' }, deps);
+  } catch (error) {
+    assert.fail(`重试失败：${JSON.stringify(db.prepare('SELECT * FROM project_launches').get())} / ${error.message}`);
+  }
+  assert.equal(retried.launch.status, 'READY');
+  assert.equal(creates, 1);
+  assert.equal(sends, 2);
+  db.close();
+});
+
+test('项目启动：Agent 身份未绑定时在外部写入前阻断', async () => {
+  const db = readyDb({ withBinding: false });
+  let externalCalls = 0;
+  await assert.rejects(
+    launchProject(db, 'felix', PID, { idempotency_key: 'blocked' }, {
+      appConfigured: true,
+      createProjectChat: async () => { externalCalls += 1; },
+    }),
+    (error) => error.code === 'AGENT_IDENTITY_BINDING_REQUIRED' && error.status === 409,
+  );
+  assert.equal(externalCalls, 0);
+  assert.equal(db.prepare('SELECT COUNT(*) count FROM project_launches').get().count, 0);
+  db.close();
+});

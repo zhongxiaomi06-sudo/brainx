@@ -23,9 +23,12 @@ export async function searchAll(jwt, query = {}, fetchImpl, { paceMs = 0, maxPag
     const jobs = d?.jobs || [];
     out.push(...jobs);
     if (!d?.has_more) return out;
-    const nextCursor = String(d?.cursor || '').trim();
-    if (!nextCursor) throw incomplete(`第 ${p + 1} 页声明 has_more，但没有返回 cursor`);
-    if (nextCursor === cursor) throw incomplete(`第 ${p + 1} 页 cursor 未前进`);
+    // TTC cursor 是 JSON number，保留原生类型；转 string 会报 code=-111 参数有误（与 searchSince 同修法）
+    const nextCursor = d?.cursor;
+    if (nextCursor === undefined || nextCursor === null || nextCursor === '') {
+      throw incomplete(`第 ${p + 1} 页声明 has_more，但没有返回 cursor`);
+    }
+    if (String(nextCursor) === String(cursor)) throw incomplete(`第 ${p + 1} 页 cursor 未前进`);
     cursor = nextCursor;
   }
   throw incomplete(`达到 ${maxPages} 页安全上限，仍有下一页`);

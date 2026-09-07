@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-07｜fix(ttcsdk): searchAll 数字 cursor 保留原生类型——与 searchSince 对齐
+
+- 背景：生产对齐部署前的脏文件核对发现，生产 /opt/brainx 上有一个未回本地分支的关键热修——TTC 分页 cursor 是 JSON number，searchAll 里 `String(d?.cursor || '').trim()` 转成 string 后服务端报 code=-111「参数有误」。searchSince 已有正确修法（原生类型透传），但 searchAll 漏修；若直接按远端提交对齐生产，职位全量拉取分页会挂。
+- 实现：src/ttcsdk/job.js searchAll 改为与 searchSince 同款——cursor 原生透传、缺失/未前进判断兼容 number（String() 仅用于比较）；补最小回归测试（数字 cursor 按原生类型进请求体，旧实现会失败）。
+- 验证：tests/ttc-pagination.test.mjs 7/7、tests/ttcsdk.test.mjs 7/7 通过。
+
 ## 2026-09-04｜build(gate): 依赖审计超时 120s→240s——代理抖动导致 push 门禁连续假失败
 
 - 背景：push 前 full 门禁连续三轮在「npm audit」上超时假失败（第 1 轮后端、第 2/3 轮前端，互换出现），单独实测前端 audit 35s 通过、0 vulnerabilities——走代理时 registry 延迟尖峰偶发超过 120s 上限，属环境抖动而非依赖问题。

@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-07｜feat(supermai): 对接真实外网 sourcing web 契约——领英/Bonjour/论文/GitHub 四渠道自动找人
+
+- 背景：SuperMai 自动找人一直不可用。侦察确诊：旧实现猜测的 `gateway.ttcadvisory.com/search/scout/match` 端点从未存在（ALB 503）；真实契约在 `app.ttcadvisory.com/app/sourcing` 网页版前端 chunk 中逆向获得——①TTC JWT → `POST /app/sourcing/api/sourcing/v1/auth/login` 兑换 sourcing_token（生产实测 felix 兑换成功）；②Bonjour/论文/GitHub 走 `POST /chat/sql_query`（单次同步）；③领英走 `quick_db_search`（库内）+ `quick_search_urls → start_background_parse → task_status 轮询`（外部，best-effort 降级）；④响应统一 `{code:0,data}` 信封。同时实测确认：**TTC sourcing 检索后端当前整体宕机**（auth 正常、sessions/chat/samples 三种路径分别 404/500，与 gateway 503 同源），本 commit 让代码就绪、服务恢复即通。
+- 实现：supermai-sourcing.js 按真实契约重写（callApi 信封解析/AUTH_EXPIRED 穿透/候选字段 snake+camel 双轨防御归一/跨渠道合并去重/全渠道失败才报 SUPERMAI_UNAVAILABLE）；删除无消费方的 supermaiListJobs；工具 sources 枚举 +bonjour（registry 与插件 runtime 同步，1→4 选，插件版本 1.3.0）；tools-jobs supermaiScout 的 TIMEOUT 归一进 SUPERMAI_UNAVAILABLE、result.unknowns 透传给模型。
+- 回归测试：supermai-sourcing 10/10（兑换+四渠道 E2E 合并去重、领英外部失败降级、全渠道失败语义、401 穿透、criteria 校验、无凭证不发请求、账号隔离沿用）；framework 21/21、agent-tools/job-tools/gateway-http/authorization 32/32 通过。
+- 已知限制：①TTC 检索服务恢复前，工具返回 SUPERMAI_UNAVAILABLE（如实语义）；②领英外部 Exa 解析依赖其服务端管线，恢复后需线上实测一轮；③Boss/脉脉/猎聘是 App 版浏览器自动化能力，无开放 API，不在本次范围。
+
 ## 2026-09-07｜feat(agent-gateway): 群内 JD 建岗一步授权 + openmai 凭证兜底链
 
 - 背景：① 用户要求群内 JD 建岗自动化、授权即可接单（六场景①前置）；② 生产确诊 openmai 自动找人失败根因=york 无有效 TTC 凭证（9-07 实锤），9 次失败中 2 次无凭证、7 次职位无权查看。

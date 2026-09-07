@@ -231,14 +231,18 @@ async function supermaiScout(db, args, principal) {
       })) || [],
       recommendations: result.top_candidates?.slice(0, 5).map((c) =>
         `[${c.source_cn}] ${c.name} ${c.score}分${c.headline ? ` ${c.headline}` : ''}｜${c.reason}`) || [],
-      unknowns: result.empty_reason ? ['未找到匹配候选人，建议调整判据重试'] : [],
+      unknowns: [
+        ...(result.unknowns || []),
+        ...(result.empty_reason ? ['未找到匹配候选人，建议调整判据重试'] : []),
+      ],
       evidence_refs: [`supermai_scout:${args.criteria.slice(0, 40)}`],
     };
   } catch (error) {
     // 凭证失效与源不可用都归一为 SUPERMAI_UNAVAILABLE：只影响「SuperMai 这一个外部源」，
     // 引导模型如实告诉顾问（OpenMai/内部推荐池不受影响），不再臆断全链路挂。
+    // TIMEOUT 同归一：领英外部解析等长流程超时是源侧状态，不是系统故障。
     if (error.code === 'AUTH_EXPIRED') markSupermaiReauth(db, principal.consultantId);
-    if (['SUPERMAI_UNAVAILABLE', 'AUTH_EXPIRED', 'SOURCE_UNAVAILABLE'].includes(error.code)) {
+    if (['SUPERMAI_UNAVAILABLE', 'AUTH_EXPIRED', 'SOURCE_UNAVAILABLE', 'TIMEOUT'].includes(error.code)) {
       fail('SUPERMAI_UNAVAILABLE');
     }
     throw error;

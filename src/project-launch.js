@@ -163,7 +163,9 @@ export async function launchRecruitingWorkflow(db, bus, consultantId, projectId,
     if (!accepted.ok) fail(accepted.status || 409, 'PROJECT_ACCEPT_FAILED', accepted.error);
   }
   const startSearch = dependencies.startOpenmaiTask || startOpenmaiTask;
-  const search = startSearch(db, bus, consultantId, projectId);
+  const retryIncomplete = group.launch.search_status === 'FAILED'
+    && group.launch.error_code === 'OPENMAI_CANDIDATES_INCOMPLETE';
+  const search = startSearch(db, bus, consultantId, projectId, { force: retryIncomplete });
   const status = search.status === 'error' ? 'FAILED'
     : search.status === 'already_done' ? 'DONE' : 'RUNNING';
   db.prepare(`UPDATE project_launches SET search_status=?, search_task_id=?, search_started_at=?,

@@ -206,3 +206,27 @@ test('寻访启动：缺确认或 TTC 凭证时不创建飞书群', async () => 
   assert.equal(externalCalls, 0);
   db.close();
 });
+
+test('寻访启动：候选不足后的明确重试才强制发起新一轮搜索', async () => {
+  const db = readyDb();
+  const at = now();
+  db.prepare(`INSERT INTO project_launches
+    (launch_id,consultant_id,project_id,idempotency_key,status,current_step,chat_id,message_id,
+     search_status,error_code,error_message,created_at,updated_at)
+    VALUES ('launch-partial','felix',?,'first-click','READY','READY','oc_partial','om_job',
+      'FAILED','OPENMAI_CANDIDATES_INCOMPLETE','不足 6 人',?,?)`).run(PID, at, at);
+  let options;
+  const out = await launchRecruitingWorkflow(db, null, 'felix', PID, {
+    confirm: true, idempotency_key: 'retry-partial',
+  }, {
+    appConfigured: true, ttcConnected: true, publicBaseUrl: 'https://base.yorkteam.cn/',
+    startOpenmaiTask: (_store, _bus, _consultantId, _projectId, received) => {
+      options = received;
+      return { status: 'triggered', task_id: 'om_retry', started_at: at };
+    },
+  });
+  assert.deepEqual(options, { force: true });
+  assert.equal(out.launch.search_status, 'RUNNING');
+  assert.equal(out.launch.error_code, null);
+  db.close();
+});

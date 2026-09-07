@@ -5,6 +5,7 @@ import {
   groupSafeOpenmaiText, deliverOpenmaiResultsOnce, extractOpenmaiCandidates, downloadResumePdf,
   buildCandidateTopicCard,
   buildResumeUnavailableCard,
+  assessOpenmaiCandidateBatch,
 } from '../src/openmai-delivery.js';
 import { buildPrompt } from '../src/openmai-task.js';
 import { saveTtcToken } from '../src/ttcsdk/auth.js';
@@ -86,6 +87,40 @@ test('OpenMai 提示要求 6-10 人、逐人评估和真实 PDF，机器块可�
   assert.deepEqual(extractOpenmaiCandidates(text), [{ candidateRef: 'c-1', name: '张三',
     evaluation: '匹配', resumeUrl: 'https://gateway.ttcadvisory.com/resume/c-1.pdf' }]);
   assert.doesNotMatch(groupSafeOpenmaiText(text), /BRAINX_CANDIDATES|resume\/c-1/);
+});
+
+test('OpenMai 结构化候选少于 6 人时显式标记不足，历史无机器块结果保持兼容', () => {
+  const partial = `候选摘要\n<!-- BRAINX_CANDIDATES_V1\n${JSON.stringify({ candidates: [
+    { candidate_ref: 'c-1', name: '张三', evaluation: '匹配', resume_url: null },
+  ] })}\n-->`;
+  assert.deepEqual(assessOpenmaiCandidateBatch(partial), {
+    count: 1, hasMachineBlock: true, complete: false,
+    message: 'OpenMai 本轮仅返回 1 名结构化候选人，未达到首轮 6–10 人目标；已保留现有结果，请明确重试补充。',
+  });
+  assert.equal(assessOpenmaiCandidateBatch('历史候选结果').complete, true);
+});
+
+test('OpenMai 候选不足仍投递已有结果，并把项目置为明确可重试状态', async () => {
+  const db = seededDb();
+  const partial = `候选摘要\n<!-- BRAINX_CANDIDATES_V1\n${JSON.stringify({ candidates: [
+    { candidate_ref: 'c-1', name: '张三', evaluation: '匹配', resume_url: null },
+  ] })}\n-->`;
+  db.prepare("UPDATE openmai_results SET result_text=? WHERE task_id='om_delivery'").run(partial);
+  const cards = [];
+  const out = await deliverOpenmaiResultsOnce(db, {
+    at: now(), publicBaseUrl: 'https://base.yorkteam.cn/',
+    sendInteractiveCard: async (input) => { cards.push(input); return { message_id: `om_${cards.length}` }; },
+  });
+  assert.equal(out.sent, 1);
+  assert.equal(cards.length, 2, '整批告警和已有候选话题均须保留');
+  assert.equal(cards[0].card.header.template, 'orange');
+  assert.match(cards[0].card.header.title.content, /候选人不足/);
+  assert.match(cards[0].card.elements[0].content, /仅返回 1 名/);
+  const launch = db.prepare('SELECT search_status,error_code,error_message FROM project_launches').get();
+  assert.equal(launch.search_status, 'FAILED');
+  assert.equal(launch.error_code, 'OPENMAI_CANDIDATES_INCOMPLETE');
+  assert.match(launch.error_message, /明确重试/);
+  db.close();
 });
 
 test('候选人话题卡把评估、工作台入口和附件状态放在同一协作单元', () => {

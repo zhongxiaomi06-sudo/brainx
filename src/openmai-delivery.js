@@ -25,6 +25,19 @@ export function extractOpenmaiCandidates(value) {
   } catch { return []; }
 }
 
+export function assessOpenmaiCandidateBatch(value) {
+  const hasMachineBlock = CANDIDATE_BLOCK.test(String(value || ''));
+  const count = extractOpenmaiCandidates(value).length;
+  return {
+    count,
+    hasMachineBlock,
+    complete: !hasMachineBlock || count >= 6,
+    message: hasMachineBlock && count < 6
+      ? `OpenMai 本轮仅返回 ${count} 名结构化候选人，未达到首轮 6–10 人目标；已保留现有结果，请明确重试补充。`
+      : null,
+  };
+}
+
 function trustedResumeHosts(value = process.env.BRAINX_RESUME_DOWNLOAD_HOSTS) {
   return new Set(String(value || 'api.ttcadvisory.com,gateway.ttcadvisory.com,app.ttcadvisory.com')
     .split(',').map((host) => host.trim().toLowerCase()).filter(Boolean));
@@ -140,13 +153,17 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
   const baseUrl = productionBaseUrl(publicBaseUrl).href;
   const target = buildBrainxDeepLink({ baseUrl, objectType: 'opportunity', objectRef: job.project_id });
   const success = status === 'done';
+  const quality = success ? assessOpenmaiCandidateBatch(resultText) : null;
+  const complete = success && quality.complete;
   const content = success
     ? `**${job.company} · ${job.role}**\n\n${groupSafeOpenmaiText(resultText)}`
+      + (quality.message ? `\n\n> ⚠️ ${quality.message}` : '')
     : `**${job.company} · ${job.role}**\n\n本轮候选人搜索失败：${groupSafeOpenmaiText(error, 500)}\n\n请修复连接后在工作台重试。`;
   return {
     config: { wide_screen_mode: true },
-    header: { template: success ? 'green' : 'red', title: { tag: 'plain_text',
-      content: success ? 'BrainTex · 首轮候选人已就绪' : 'BrainTex · 候选人搜索失败' } },
+    header: { template: complete ? 'green' : success ? 'orange' : 'red', title: { tag: 'plain_text',
+      content: complete ? 'BrainTex · 首轮候选人已就绪'
+        : success ? 'BrainTex · 首轮候选人不足' : 'BrainTex · 候选人搜索失败' } },
     elements: [
       { tag: 'markdown', content },
       { tag: 'action', actions: [{ tag: 'button', type: 'primary',
@@ -159,7 +176,7 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
 }
 
 export function enqueueOpenmaiDeliveries(db, at = now()) {
-  const rows = db.prepare(`SELECT r.task_id, r.consultant_id, r.project_id, r.status, l.chat_id
+  const rows = db.prepare(`SELECT r.task_id, r.consultant_id, r.project_id, r.status, r.result_text, l.chat_id
     FROM openmai_results r JOIN project_launches l
       ON l.consultant_id=r.consultant_id AND l.project_id=r.project_id
     WHERE l.status='READY' AND l.chat_id IS NOT NULL AND r.task_id IS NOT NULL
@@ -174,9 +191,15 @@ export function enqueueOpenmaiDeliveries(db, at = now()) {
     for (const row of rows) {
       created += insert.run(randomUUID(), row.task_id, row.consultant_id, row.project_id,
         row.chat_id, row.status, at, at, at).changes;
-      db.prepare(`UPDATE project_launches SET search_status=?, search_task_id=?, updated_at=?
+      const quality = row.status === 'done' ? assessOpenmaiCandidateBatch(row.result_text) : null;
+      const incomplete = quality && !quality.complete;
+      db.prepare(`UPDATE project_launches SET search_status=?, search_task_id=?, error_code=?,
+        error_message=?, updated_at=?
         WHERE consultant_id=? AND project_id=?`).run(
-        row.status === 'done' ? 'DONE' : 'FAILED', row.task_id, at, row.consultant_id, row.project_id,
+        row.status === 'done' && !incomplete ? 'DONE' : 'FAILED', row.task_id,
+        incomplete ? 'OPENMAI_CANDIDATES_INCOMPLETE' : null,
+        incomplete ? quality.message : null,
+        at, row.consultant_id, row.project_id,
       );
     }
     db.exec('COMMIT');

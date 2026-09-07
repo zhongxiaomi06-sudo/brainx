@@ -25,10 +25,23 @@ const fail = (status, code, message) => { throw new ProjectLaunchError(status, c
 const safeError = (error) => String(error?.message || error || '未知错误').slice(0, 240);
 
 function findBinding(db, consultantId, openId) {
-  return db.prepare(`SELECT tenant_id, channel_account_id
+  return db.prepare(`SELECT tenant_id, channel_account_id, feishu_app_key_hash
     FROM feishu_identity_bindings
     WHERE consultant_id=? AND open_id=? AND binding_status='ACTIVE'
     ORDER BY updated_at DESC LIMIT 1`).get(consultantId, openId);
+}
+
+function findProjectCollaboratorOpenIds(db, projectId, binding, ownerOpenId) {
+  const rows = db.prepare(`SELECT DISTINCT c.open_id
+    FROM job_memberships m
+    JOIN consultants c ON c.consultant_id=m.consultant_id AND c.active=1
+    JOIN feishu_identity_bindings b
+      ON b.consultant_id=c.consultant_id AND b.open_id=c.open_id AND b.binding_status='ACTIVE'
+    WHERE m.project_id=? AND m.valid_to IS NULL AND m.relation IN ('MY_JOB','TEAM_SHARED')
+      AND b.tenant_id=? AND b.channel_account_id=? AND b.feishu_app_key_hash=?
+    ORDER BY c.open_id`).all(projectId, binding.tenant_id,
+    binding.channel_account_id, binding.feishu_app_key_hash);
+  return [...new Set([ownerOpenId, ...rows.map((row) => row.open_id)].filter(Boolean))];
 }
 
 export function projectLaunchPreflight(db, consultantId, projectId, {
@@ -87,7 +100,7 @@ function saveFailure(db, consultantId, projectId, code, message) {
     WHERE consultant_id=? AND project_id=?`).run(code, message, now(), consultantId, projectId);
 }
 
-function activateGroup(db, { consultantId, projectId, chatId, openId, binding }) {
+function activateGroup(db, { consultantId, projectId, chatId, openIds, binding }) {
   const at = now();
   registerChatContext(db, { chat_id: chatId, bot_mode: 'MENTION_ONLY', notes: `project:${projectId}` });
   const existing = db.prepare(`SELECT group_scope_id FROM agent_group_scopes
@@ -96,14 +109,14 @@ function activateGroup(db, { consultantId, projectId, chatId, openId, binding })
     db.prepare(`UPDATE agent_group_scopes SET tenant_id=?, allowed_purposes_json=?,
       allowed_senders_json=?, project_refs_json=?, require_mention=1, updated_at=?
       WHERE group_scope_id=?`).run(binding.tenant_id, JSON.stringify(GROUP_PURPOSES),
-      JSON.stringify([openId]), JSON.stringify([projectId]), at, existing.group_scope_id);
+      JSON.stringify(openIds), JSON.stringify([projectId]), at, existing.group_scope_id);
   } else {
     db.prepare(`INSERT INTO agent_group_scopes
       (group_scope_id, tenant_id, channel_account_id, chat_id, scope_status,
        allowed_purposes_json, allowed_senders_json, project_refs_json, require_mention, created_at, updated_at)
       VALUES (?, ?, ?, ?, 'ACTIVE', ?, ?, ?, 1, ?, ?)`).run(
       randomUUID(), binding.tenant_id, binding.channel_account_id, chatId,
-      JSON.stringify(GROUP_PURPOSES), JSON.stringify([openId]), JSON.stringify([projectId]), at, at,
+      JSON.stringify(GROUP_PURPOSES), JSON.stringify(openIds), JSON.stringify([projectId]), at, at,
     );
   }
 }
@@ -192,6 +205,9 @@ export async function launchProject(db, consultantId, projectId, input = {}, dep
   const createChat = dependencies.createProjectChat || createProjectChat;
   const sendCard = dependencies.sendInteractiveCard || sendInteractiveCard;
   const allowOpenClawGroup = dependencies.ensureOpenClawGroupAllowed || ensureOpenClawProjectGroup;
+  const collaboratorOpenIds = findProjectCollaboratorOpenIds(
+    db, projectId, preflight.binding, preflight.job.consultant_open_id,
+  );
   let chatId = launch.chat_id;
   try {
     if (!chatId) {
@@ -199,6 +215,7 @@ export async function launchProject(db, consultantId, projectId, input = {}, dep
         name: `${preflight.job.company}-${preflight.job.role}`,
         description: `BrainTex 职位项目 ${projectId}`,
         ownerOpenId: preflight.job.consultant_open_id,
+        memberOpenIds: collaboratorOpenIds,
         idempotencyKey: launch.launch_id,
       });
       chatId = created.chat_id;
@@ -217,7 +234,7 @@ export async function launchProject(db, consultantId, projectId, input = {}, dep
     db.exec('BEGIN');
     try {
       activateGroup(db, { consultantId, projectId, chatId,
-        openId: preflight.job.consultant_open_id, binding: preflight.binding });
+        openIds: collaboratorOpenIds, binding: preflight.binding });
       db.prepare('UPDATE job_facts SET chat_id=?, updated_at=? WHERE project_id=?')
         .run(chatId, now(), projectId);
       db.prepare(`UPDATE project_launches SET status='READY', current_step='READY', message_id=?,

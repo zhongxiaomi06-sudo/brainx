@@ -40,6 +40,7 @@ test('项目启动：建群、投放职位、绑定项目并激活群 Agent 范�
   assert.equal(result.launch.status, 'READY');
   assert.equal(result.launch.chat_id, 'oc_launch');
   assert.equal(calls[0][1].ownerOpenId.startsWith('ou_'), true);
+  assert.deepEqual(calls[0][1].memberOpenIds, [calls[0][1].ownerOpenId]);
   assert.deepEqual(calls[1], ['allow', 'oc_launch']);
   assert.equal(calls[2][1].target, 'oc_launch');
   assert.equal(db.prepare('SELECT chat_id FROM job_facts WHERE project_id=?').get(PID).chat_id, 'oc_launch');
@@ -52,6 +53,29 @@ test('项目启动：建群、投放职位、绑定项目并激活群 Agent 范�
   const duplicate = await launchProject(db, 'felix', PID, { idempotency_key: 'another-click' }, deps);
   assert.equal(duplicate.already, true);
   assert.equal(calls.length, 3, '重复启动不得再次改白名单、建群或发卡');
+  db.close();
+});
+
+test('项目启动：同职位已绑定协作者一起入群并可在群内使用候选工作流', async () => {
+  const db = readyDb();
+  confirmMembership(db, 'mia', PID, { relation: 'TEAM_SHARED', idempotency_key: 'share-launch' });
+  const miaOpenId = db.prepare("SELECT open_id FROM consultants WHERE consultant_id='mia'").get().open_id;
+  db.prepare(`INSERT INTO feishu_identity_bindings
+    (binding_id,tenant_id,channel_account_id,feishu_app_key_hash,open_id,consultant_id,
+     binding_status,verified_at,verified_by,created_at,updated_at)
+    VALUES ('binding-mia','tenant-a','brainx-prod',?,?, 'mia','ACTIVE',?,'system',?,?)`)
+    .run('a'.repeat(64), miaOpenId, now(), now(), now());
+  const calls = [];
+  await launchProject(db, 'felix', PID, { idempotency_key: 'team-launch' }, {
+    appConfigured: true, publicBaseUrl: 'https://base.yorkteam.cn/',
+    createProjectChat: async (input) => { calls.push(input); return { chat_id: 'oc_team', name: input.name }; },
+    ensureOpenClawGroupAllowed: async () => {},
+    sendInteractiveCard: async () => ({ message_id: 'om_team' }),
+  });
+  const ownerOpenId = db.prepare("SELECT open_id FROM consultants WHERE consultant_id='felix'").get().open_id;
+  assert.deepEqual(new Set(calls[0].memberOpenIds), new Set([ownerOpenId, miaOpenId]));
+  const scope = db.prepare("SELECT allowed_senders_json FROM agent_group_scopes WHERE chat_id='oc_team'").get();
+  assert.deepEqual(new Set(JSON.parse(scope.allowed_senders_json)), new Set([ownerOpenId, miaOpenId]));
   db.close();
 });
 

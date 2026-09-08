@@ -35,7 +35,8 @@ function mcpClient({ boundConsultantId = '', tenantId = '' } = {}) {
     const id = ++seq;
     pending.set(id, resolve);
     child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n');
-    setTimeout(() => reject(new Error(`timeout waiting ${method}`)), 8000);
+    // full 门禁并行负载下 spawn+迁移初始化可超 8s（2026-09-07 偶发假失败×2）→ 20s
+    setTimeout(() => reject(new Error(`timeout waiting ${method}`)), 20000);
   });
   const close = () => { child.kill(); rmSync(dir, { recursive: true, force: true }); };
   return { call, close };

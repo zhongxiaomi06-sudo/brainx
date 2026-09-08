@@ -38,6 +38,23 @@ test('jobVisibleTo：有关系/被推荐/操作过可见；陌生人不可见', 
   assert.equal(jobVisibleTo(db, 'mia', PID), true);
 });
 
+test('jobVisibleTo：职位挂载群 ∈ 顾问所在群 → 可见（2026-09-07 接单入口修复）', () => {
+  // 自建一条 felix/mia 均无关系的职位，挂到测试驾驶舱群
+  const pid = 'P-VIS-CHATTEST';
+  const syncId = db.prepare('SELECT sync_id FROM sync_runs LIMIT 1').get().sync_id;
+  const ts = new Date().toISOString();
+  db.prepare(`INSERT INTO job_facts (project_id, company, role, active_state, captured_at, sync_id, raw_json, updated_at)
+    VALUES (?, 'ChatVis 测试公司', '可见性测试岗', 'OPEN', ?, ?, '{}', ?)`).run(pid, ts, syncId, ts);
+  db.prepare('UPDATE job_facts SET chat_id=? WHERE project_id=?').get('oc_test_cockpit', pid);
+  db.prepare(`INSERT INTO consultant_chats (consultant_id, chat_id, name, seen_at)
+    VALUES ('felix', 'oc_test_cockpit', '测试项目群', datetime('now'))`).run();
+  assert.equal(jobVisibleTo(db, 'felix', pid), true,  'felix 在群里 → 可见可接单');
+  assert.equal(jobVisibleTo(db, 'mia', pid), false,   'mia 不在群里且无关系 → 仍不可见');
+  // 撤销 felix 群成员 → 立即回到不可见（fail-closed 不残留）
+  db.prepare(`DELETE FROM consultant_chats WHERE consultant_id='felix' AND chat_id='oc_test_cockpit'`).run();
+  assert.equal(jobVisibleTo(db, 'felix', pid), false);
+});
+
 test('HTTP 闸门：陌生人读职位 404；主人 200 且事件/结果只含自己的', async () => {
   // felix 与 mia 都操作过同一职位（mia 在上面 VIEW 过）
   engage(db, 'felix', PID, 'VIEW', { idempotency_key: 'vis:felix:view' });

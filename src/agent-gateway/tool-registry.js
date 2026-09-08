@@ -50,7 +50,7 @@ export const AGENT_TOOL_ROWS = Object.freeze([
   }, ['job_id']), projectKey: 'job_id' },
   { name: 'brainx_supermai_scout', purpose: ['candidate_review'], parameters: object({
     criteria: string({ minLength: 5, maxLength: 2000 }),
-    sources: array(string({ enum: ['linkedin', 'github', 'paper'] }), 1, 3),
+    sources: array(string({ enum: ['linkedin', 'bonjour', 'paper', 'github'] }), 1, 4),
     limit: integer(1, 50),
   }, ['criteria']), projectKey: 'criteria' },
   { name: 'brainx_pending_job_facts', purpose: ['job_fact_review'], p2pOnly: true, parameters: object({
@@ -59,8 +59,9 @@ export const AGENT_TOOL_ROWS = Object.freeze([
   { name: 'brainx_review_job_fact', purpose: ['job_fact_review'], p2pOnly: true, parameters: object({
     draft_id: string(), action: string({ enum: ['confirm', 'reject'] }), job_id: string(), confirm: boolean(),
   }, ['draft_id', 'action', 'confirm']) },
-  { name: 'brainx_submit_job_jd', purpose: ['job_fact_review'], p2pOnly: true, parameters: object({
+  { name: 'brainx_submit_job_jd', purpose: ['job_fact_review'], parameters: object({
     jd_text: string({ minLength: 50, maxLength: 8000 }), confirm: boolean(),
+    confirm_create: boolean(),
   }, ['jd_text', 'confirm']) },
   { name: 'brainx_push_preferences', purpose: ['preferences'], p2pOnly: true, parameters: object({}) },
   { name: 'brainx_update_push_preferences', purpose: ['preferences'], p2pOnly: true, parameters: object({

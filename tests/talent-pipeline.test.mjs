@@ -59,6 +59,5 @@ test('mysqlLocalDatetime keeps the MySQL wall-clock instead of shifting to UTC',
   // （本地字段由构造参数固定）：2026-08-29 04:46:38 本地墙钟必须原样往返。
   const local = new Date(2026, 7, 29, 4, 46, 38);
   assert.equal(mysqlLocalDatetime(local), '2026-08-29 04:46:38');
-  // 曾导致游标停滞的写法：toISOString 把 +08:00 墙钟转成 UTC 时刻（早 8 小时）。
-  assert.notEqual(local.toISOString(), '2026-08-29T04:46:38.000Z');
+  // CI 可能运行在 UTC；这里只验证业务函数保留墙钟，不对宿主机时区作假设。
 });

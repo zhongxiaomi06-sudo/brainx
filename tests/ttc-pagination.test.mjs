@@ -51,3 +51,20 @@ test('searchAll 对缺失或不前进的 cursor fail-fast', async (t) => {
 test('searchAll 拒绝无效 maxPages', async () => {
   await assert.rejects(searchAll('jwt', {}, async () => ok({ jobs: [] }), { maxPages: 0 }), /正整数/);
 });
+
+test('searchAll 数字 cursor 保留原生类型传给服务端（转 string 会报 code=-111）', async () => {
+  const requests = [];
+  const fetchImpl = async (_url, options) => {
+    requests.push(requestBody(options));
+    return requests.length === 1
+      ? ok({ jobs: [{ unique_id: 'a' }], has_more: true, cursor: 1706745600000 })
+      : ok({ jobs: [{ unique_id: 'b' }], has_more: false });
+  };
+
+  const jobs = await searchAll('jwt', {}, fetchImpl, { maxPages: 3 });
+  assert.deepEqual(jobs.map((job) => job.unique_id), ['a', 'b']);
+  assert.deepEqual(requests, [
+    { page: 1 },
+    { page: 1, cursor: 1706745600000 },
+  ]);
+});

@@ -1,8 +1,45 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { createProjectChat, sendInteractiveCard, sendPdfFile, replyInteractiveCard } from '../src/feishu-bot.js';
 
 const response = (body) => ({ ok: true, json: async () => body });
+
+test('飞书机器人可显式复用 OpenClaw 同一应用凭证', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'brainx-feishu-'));
+  const path = join(dir, 'openclaw.json');
+  writeFileSync(path, JSON.stringify({ channels: { feishu: {
+    appId: 'cli_openclaw', appSecret: 'openclaw-secret',
+  } } }));
+  const previous = {
+    flag: process.env.BRAINX_FEISHU_CREDENTIALS_FROM_OPENCLAW,
+    path: process.env.BRAINX_OPENCLAW_CONFIG_PATH,
+  };
+  process.env.BRAINX_FEISHU_CREDENTIALS_FROM_OPENCLAW = '1';
+  process.env.BRAINX_OPENCLAW_CONFIG_PATH = path;
+  const calls = [];
+  try {
+    await sendInteractiveCard({
+      target: 'ou_test', card: {}, fetchImpl: async (url, options) => {
+        calls.push({ url, options });
+        return calls.length === 1
+          ? response({ code: 0, tenant_access_token: 'token' })
+          : response({ code: 0, data: { message_id: 'om_test' } });
+      },
+    });
+    assert.deepEqual(JSON.parse(calls[0].options.body), {
+      app_id: 'cli_openclaw', app_secret: 'openclaw-secret',
+    });
+  } finally {
+    if (previous.flag === undefined) delete process.env.BRAINX_FEISHU_CREDENTIALS_FROM_OPENCLAW;
+    else process.env.BRAINX_FEISHU_CREDENTIALS_FROM_OPENCLAW = previous.flag;
+    if (previous.path === undefined) delete process.env.BRAINX_OPENCLAW_CONFIG_PATH;
+    else process.env.BRAINX_OPENCLAW_CONFIG_PATH = previous.path;
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 test('飞书机器人直连接口：获取 tenant token 后向 open_id 发送互动卡片', async () => {
   const calls = [];

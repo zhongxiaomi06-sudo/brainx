@@ -26,7 +26,10 @@
 
 - 建群与付费寻访改为可恢复的两个阶段：身份、飞书应用和工作台地址就绪后先创建项目群并投放职位；本人 TTC 尚未连接时，页面明确显示“启动 OpenMai 找人”，不再阻止建群或错误宣称已经开始搜索。
 - TTC 连接后再次点击只复用原群并启动搜索；同一职位仍不得重复建群，未确认时仍不产生任何外部写入。
-- 新增 Storybook 的“群已就绪、待连接 TTC”状态；真实 Dykes 飞书群和 OpenMai 仍待本轮真机验收。
+- 新增 Storybook 的“群已就绪、待连接 TTC”状态。
+- Dykes 真机验收已确认：本地工作台以 Dykes 身份创建 `海明微半导体-功率模块开发` 群，机器人成功投放职位卡；`project_launches=READY`、`chat_contexts=MENTION_ONLY`、`agent_group_scopes=ACTIVE`，OpenClaw 群白名单和 Dykes sender 白名单同步登记。
+- OpenMai 仍保持待本人 TTC 凭证状态，未借用 Mia 凭证；候选回群与简历附件因此尚未进入真实验收。
+- 首次真机请求暴露 `open_id cross app`：工作台和本地 OpenClaw 使用了不同飞书应用。新增显式本地配置，让工作台从同一 OpenClaw 配置读取机器人凭证；不复制或回显密钥。
 
 ## 相关文档
 

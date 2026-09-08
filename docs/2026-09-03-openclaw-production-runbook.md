@@ -18,6 +18,10 @@
 
 不得把 Gateway、OpenClaw 控制面、RDS 或 SQLite 暴露公网；不得从聊天文本推断 consultant_id；不得复制 Mia 的授权给其他顾问。
 
+### 本机同账号联调
+
+本机工作台和本机 OpenClaw 必须使用同一个飞书应用，否则应用身份创建群时会被飞书以 `open_id cross app` 拒绝。需要复用本机 OpenClaw 机器人时，同时设置 `BRAINX_OPENCLAW_CONFIG_PATH` 和 `BRAINX_FEISHU_CREDENTIALS_FROM_OPENCLAW=1`；工作台只在该显式开关开启时读取配置中的 `channels.feishu.appId/appSecret`。不得把配置内容复制进仓库、命令输出或提交记录。生产仍以三份环境配置交叉预检为准，不使用此本机便捷开关替代 systemd Secret 配置。
+
 ## 每次发布验收
 
 ```text

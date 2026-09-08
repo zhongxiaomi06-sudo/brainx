@@ -25,7 +25,7 @@
 | 审核对象 | Storybook | 用户审核 | 正式接入 | 目标环境发布 | 真实数据验证 | 结论 |
 |---|---|---|---|---|---|---|
 | `WorkspaceShell` 应用外壳 | 已完成 | 退回修改 | 已接入 | 未发布 | 已验证（本地） | 用户要求“我的项目”紧跟“精选盘”，正式外壳与审核稿已统一调整并加入顺序回归，待用户复看与目标环境验证 |
-| `SettingsCenterReview` 设置中心 | 已完成 | 已通过 | 已接入 | 待确认 | 已验证（本地） | 正式应用代码已使用 |
+| `SettingsCenterReview` 设置中心 | 已完成 | 已通过 | 已接入 | 待确认 | 已验证（本地） | 正式应用代码已使用；个人资料页可退出当前会话并切换本地测试账号，真实 Dykes 切换证据见 9 月 8 日记录 |
 | `PersonalModelPanel` 顾问个人模型 | 已完成 | 未审核 | 已接入 | 未发布 | 部分验证（脱敏契约） | 正式设置中心与飞书 HTTPS 深链已接入；真实凭据必须由所有者在生产页提交，待用户视觉复看和双账号真机问答 |
 | `TtcJobsTable` 真实职位表 | 已完成 | 退回修改 | 未接入 | 待确认 | 已验证（本地） | 原正式入口已由现代职位工作区替换；组件保留为历史事实表与 Storybook 参考 |
 | `ClientInsightsReview` 客户事实索引 | 已完成 | 已通过 | 已接入 | 待确认 | 已验证（本地） | 正式应用代码已使用 |
@@ -124,6 +124,7 @@
 - [BrainTex 飞书功能首页审核记录](2026-09-03-braintex-feishu-home.md)
 - [BrainTex 富卡片与业务闭环审核记录](2026-09-03-braintex-rich-cards-loop.md)
 - [顾问个人模型正式接入记录](2026-09-03-braintex-personal-model.md)
+- [本地工作台账号切换验收记录](2026-09-08-local-account-switch.md)
 - [推荐队列与职位决策产品架构](../recommendation-queue-product-architecture.md)
 - [前端真实数据重构施工清单](../frontend-refactor-construction-checklist.md)
 - [内部 Storybook 组件库](../storybook-component-library.md)

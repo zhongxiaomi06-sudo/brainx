@@ -48,7 +48,7 @@ type SettingsCenterReviewProps = {
   initialSection?: SettingsSection;
   review?: boolean;
   onBack?: () => void;
-  onAction?: (action: "edit-profile" | "connect-ttc" | "reauthorize-feishu" | "open-strategy" | "refresh-diagnostics") => void;
+  onAction?: (action: "edit-profile" | "connect-ttc" | "reauthorize-feishu" | "open-strategy" | "refresh-diagnostics" | "logout") => void;
 };
 
 const sectionGroups = [
@@ -96,6 +96,7 @@ function ProfilePanel({ data, onAction }: SettingsCenterReviewProps) {
     </SettingGroup>
     <SettingGroup title="资料操作">
       <SettingRow label="编辑个人资料" description="修改显示名称、方向关键词和画像备注" action={<button className="settings-inline-action" type="button" onClick={() => onAction?.("edit-profile")}>打开编辑</button>} />
+      <SettingRow label="切换登录账号" description="退出当前工作台会话，再选择本地测试账号或重新飞书授权" action={<button className="settings-inline-action" type="button" onClick={() => onAction?.("logout")}>退出并切换账号</button>} />
     </SettingGroup>
   </div>;
 }

@@ -79,6 +79,8 @@ export const ConnectedHealthy: Story = {
     await expect(canvas.getByText(/招聘意愿/)).toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: /个人资料/ }));
     await expect(canvas.getByRole("heading", { name: "身份" })).toBeInTheDocument();
+    await userEvent.click(canvas.getByRole("button", { name: "退出并切换账号" }));
+    await expect(action).toHaveBeenCalledWith("logout");
   },
 };
 

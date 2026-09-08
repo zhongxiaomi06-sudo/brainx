@@ -106,7 +106,13 @@ function WorkbenchSettingsPage({
     },
   }), [auth, consultantId, fieldReport, keywords, note, policyVersion, sync, talent, ttc]);
 
-  const handleAction = (action: "edit-profile" | "connect-ttc" | "reauthorize-feishu" | "open-strategy" | "refresh-diagnostics") => {
+  const handleAction = (action: "edit-profile" | "connect-ttc" | "reauthorize-feishu" | "open-strategy" | "refresh-diagnostics" | "logout") => {
+    if (action === "logout") {
+      void brainxFetch<null>("/api/v1/session", { method: "DELETE" })
+        .then(() => window.location.reload())
+        .catch(error => notify(`退出失败：${error instanceof Error ? error.message : "后端未响应"}`));
+      return;
+    }
     if (action === "connect-ttc") return onOpenConnections();
     if (action === "reauthorize-feishu") {
       window.location.assign("/api/v1/oauth/authorize");

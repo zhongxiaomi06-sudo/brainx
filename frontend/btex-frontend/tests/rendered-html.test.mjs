@@ -266,6 +266,16 @@ test("keeps the navigation permanently compact and retains the commitments panel
   assert.match(css, /\.mobile-commitment-trigger\{display:none\}/);
 });
 
+test("settings exposes a real session exit before switching local test accounts", async () => {
+  const [settings, page] = await Promise.all([
+    source("app/settings-center-review.tsx"),
+    source("app/workbench-settings-page.tsx"),
+  ]);
+  assert.match(settings, /退出并切换账号/);
+  assert.match(page, /method: "DELETE"/);
+  assert.match(page, /window\.location\.reload/);
+});
+
 test("manual tuning adjusts soft layers without bypassing hard rules", async () => {
   const [workbench, rules] = await Promise.all([workbenchSource(), source("app/workbench-rules.tsx")]);
 

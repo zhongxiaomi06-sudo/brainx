@@ -10,19 +10,22 @@ test('动态项目群按读改写追加到 OpenClaw allowlist，重复执行幂�
     calls.push(args);
     if (args[1] === 'get') return { stdout: JSON.stringify(args[2].includes('Sender') ? senders : groups) };
     if (args[2].includes('Sender')) senders = JSON.parse(args[3]);
-    else groups = JSON.parse(args[3]);
+    else if (args[2] === 'channels.feishu.groupAllowFrom') groups = JSON.parse(args[3]);
     return { stdout: '' };
   } } });
   const first = await access.ensure('oc_project', ['ou_owner', 'ou_partner']);
   const second = await access.ensure('oc_project', ['ou_owner', 'ou_partner']);
   assert.deepEqual(first, { chat_id: 'oc_project', added: true, count: 2,
-    sender_added: 2, sender_count: 3 });
+    sender_added: 2, sender_count: 3, card_actions_enabled: true });
   assert.deepEqual(second, { chat_id: 'oc_project', added: false, count: 2,
-    sender_added: 0, sender_count: 3 });
+    sender_added: 0, sender_count: 3, card_actions_enabled: true });
   assert.deepEqual(groups, ['oc_existing', 'oc_project']);
   assert.deepEqual(senders, ['ou_existing', 'ou_owner', 'ou_partner']);
   assert.deepEqual(calls[1].slice(0, 3), ['config', 'set', 'channels.feishu.groupAllowFrom']);
   assert.ok(calls[1].includes('--strict-json'));
+  assert.deepEqual(calls.find((args) => args[2]?.endsWith('.requireMention'))?.slice(1), [
+    'set', 'channels.feishu.groups.oc_project.requireMention', 'false', '--strict-json',
+  ]);
 });
 
 test('并发追加串行化，不丢任何项目群；非法群和坏配置失败关闭', async () => {
@@ -31,7 +34,7 @@ test('并发追加串行化，不丢任何项目群；非法群和坏配置失�
   const access = createOpenClawGroupAccess({ cli: { call: async (args) => {
     if (args[1] === 'get') return { stdout: JSON.stringify(args[2].includes('Sender') ? senders : groups) };
     if (args[2].includes('Sender')) senders = JSON.parse(args[3]);
-    else groups = JSON.parse(args[3]);
+    else if (args[2] === 'channels.feishu.groupAllowFrom') groups = JSON.parse(args[3]);
     return { stdout: '' };
   } } });
   await Promise.all([access.ensure('oc_a', ['ou_a']), access.ensure('oc_b', ['ou_b'])]);

@@ -29,8 +29,8 @@
 
 - [X] T004 先写并运行两顾问 Agent 派生、binding 校验、stdin 密钥、固定参数、超时与泄密负向测试 `tests/personal-model-config.test.mjs`
 - [X] T005 实现无 shell OpenClaw CLI runner、个人 Agent binding 解析、每顾问并发闸和安全错误归一化 `src/personal-model-config.js`
-- [X] T006 先写并运行动态 Agent、会话 self、agent-to-agent 关闭、无全局 StepFun、共享 Skills 与升级保留配置测试 `tests/openclaw-production-config.test.mjs`
-- [X] T007 实现 OpenClaw 动态个人 Agent、安全会话/模型作用域、批准 provider catalog 和无全局个人凭据配置 `deploy/openclaw/openclaw.production.json`
+- [X] T006 先写并运行动态 Agent、会话 self、agent-to-agent 关闭、公司 StepFun 默认、共享 Skills 与升级保留配置测试 `tests/openclaw-production-config.test.mjs`
+- [X] T007 实现 OpenClaw 动态个人 Agent、安全会话/模型作用域、批准 provider catalog 和服务器托管的公司默认模型配置 `deploy/openclaw/openclaw.production.json`
 - [X] T008 改造安装器为首次 seed、升级验证式 patch，并把七个 Skill 安装到 state 级共享目录 `deploy/openclaw/install.sh`
 
 **Checkpoint**: Foundation ready；假密钥隔离实验可证明两个 Agent 互不读取，重复安装不删除动态路由

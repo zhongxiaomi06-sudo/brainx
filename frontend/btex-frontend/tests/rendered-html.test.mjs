@@ -22,6 +22,7 @@ const workbenchSource = async () => (await Promise.all([
   source("app/job-detail-data.ts"),
   source("app/job-detail-card-review.tsx"),
   source("app/workbench-settings-page.tsx"),
+  source("app/openmai-panel.tsx"),
   source("app/workspace-shell.tsx"),
   source("app/ttc-jobs-table.tsx"),
   source("app/client-insights-review.tsx"),
@@ -247,6 +248,8 @@ test("keeps membership separate and gives pending projects one Feishu recruiting
   assert.match(workbench, /startProjectLaunch/);
   assert.match(workbench, /正在创建项目群…/);
   assert.match(workbench, /OpenMai 找人中/);
+  assert.match(workbench, /项目群和职位卡已就绪/);
+  assert.match(workbench, /启动 OpenMai 找人/);
   assert.doesNotMatch(visibleCopy, /确认接单|已接单|交付列表|接单后|再接单/);
 });
 
@@ -262,6 +265,30 @@ test("keeps the navigation permanently compact and retains the commitments panel
   assert.doesNotMatch(workbench, /mobile-commitment-trigger/);
   assert.doesNotMatch(workbench, /<section className="commitments">/);
   assert.match(css, /\.mobile-commitment-trigger\{display:none\}/);
+});
+
+test("OpenMai 需要画像时提供原地输入并把画像提交给重跑接口", async () => {
+  const [panel, api] = await Promise.all([
+    source("app/openmai-panel.tsx"),
+    source("app/brainx-api.ts"),
+  ]);
+  assert.match(panel, /aria-label="补充岗位画像"/);
+  assert.match(panel, /用此画像开始找人/);
+  assert.match(panel, /onRerun\(jobId,brief\.trim\(\)\)/);
+  assert.match(api, /body:\s*\{\s*search_brief:\s*searchBrief\s*\}/);
+  const workbench = await source("app/workbench.tsx");
+  assert.match(workbench, /void refreshBrainxJob\(job\.id\)/,
+    "从我的项目重开职位时也必须恢复持久化 OpenMai 结果");
+});
+
+test("settings exposes a real session exit before switching local test accounts", async () => {
+  const [settings, page] = await Promise.all([
+    source("app/settings-center-review.tsx"),
+    source("app/workbench-settings-page.tsx"),
+  ]);
+  assert.match(settings, /退出并切换账号/);
+  assert.match(page, /method: "DELETE"/);
+  assert.match(page, /window\.location\.reload/);
 });
 
 test("manual tuning adjusts soft layers without bypassing hard rules", async () => {

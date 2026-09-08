@@ -50,8 +50,14 @@ export function createOpenClawGroupAccess(options = {}) {
     const groupResult = await appendList('channels.feishu.groupAllowFrom', groups, [chatId]);
     const currentSenders = await readList('channels.feishu.groupSenderAllowFrom');
     const senderResult = await appendList('channels.feishu.groupSenderAllowFrom', currentSenders, senders);
+    try {
+      // 飞书卡片回调没有 @ 元数据。只对已登记项目群放开 mention 门，普通群仍保持全局门禁。
+      await cli.call(['config', 'set',
+        `channels.feishu.groups.${chatId}.requireMention`, 'false', '--strict-json']);
+    } catch (error) { fail('OPENCLAW_GROUP_ALLOWLIST_FAILED', error); }
     return { chat_id: chatId, added: groupResult.added > 0, count: groupResult.count,
-      sender_added: senderResult.added, sender_count: senderResult.count };
+      sender_added: senderResult.added, sender_count: senderResult.count,
+      card_actions_enabled: true };
   };
 
   return {

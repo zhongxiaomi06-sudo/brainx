@@ -24,11 +24,17 @@ test('object deep links use the controlled HTTPS workbench origin', () => {
 });
 
 test('production base and parser fail closed on unsafe input', () => {
+  const savedLoopback = process.env.BRAINX_ALLOW_HTTP_LOOPBACK;
+  delete process.env.BRAINX_ALLOW_HTTP_LOOPBACK;
   const credentialed = new URL('https://example.com');
   credentialed.username = 'test-user';
   credentialed.password = 'test-password';
-  for (const baseUrl of ['http://base.yorkteam.cn', 'http://127.0.0.1:3000', 'javascript:alert(1)', credentialed.href]) {
-    assert.throws(() => productionBaseUrl(baseUrl), /BRAINX_BASE_URL_INVALID/);
+  try {
+    for (const baseUrl of ['http://base.yorkteam.cn', 'http://127.0.0.1:3000', 'javascript:alert(1)', credentialed.href]) {
+      assert.throws(() => productionBaseUrl(baseUrl), /BRAINX_BASE_URL_INVALID/);
+    }
+  } finally {
+    if (savedLoopback !== undefined) process.env.BRAINX_ALLOW_HTTP_LOOPBACK = savedLoopback;
   }
   const savedBase = process.env.BRAINX_BASE_URL;
   delete process.env.BRAINX_BASE_URL;
@@ -36,6 +42,20 @@ test('production base and parser fail closed on unsafe input', () => {
   if (savedBase !== undefined) process.env.BRAINX_BASE_URL = savedBase;
   assert.equal(parseWorkbenchDeepLink('?open=unknown:x'), null);
   assert.equal(parseWorkbenchDeepLink('?open=opportunity:'), null);
+});
+
+test('local development may explicitly enable loopback HTTP without weakening other hosts', () => {
+  const saved = process.env.BRAINX_ALLOW_HTTP_LOOPBACK;
+  process.env.BRAINX_ALLOW_HTTP_LOOPBACK = '1';
+  try {
+    assert.equal(productionBaseUrl('http://127.0.0.1:3000/path').href, 'http://127.0.0.1:3000/');
+    assert.equal(productionBaseUrl('http://localhost:3000').href, 'http://localhost:3000/');
+    assert.throws(() => productionBaseUrl('http://192.168.1.5:3000'), /BRAINX_BASE_URL_INVALID/);
+    assert.throws(() => productionBaseUrl('http://base.yorkteam.cn'), /BRAINX_BASE_URL_INVALID/);
+  } finally {
+    if (saved === undefined) delete process.env.BRAINX_ALLOW_HTTP_LOOPBACK;
+    else process.env.BRAINX_ALLOW_HTTP_LOOPBACK = saved;
+  }
 });
 
 test('deep links carry references only and never grant browser authorization', () => {

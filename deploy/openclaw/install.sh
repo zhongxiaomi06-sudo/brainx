@@ -96,10 +96,6 @@ else
   # Patch 只更新产品受管字段；运行时生成的 agents.list、bindings 和个人认证库必须保留。
   run_openclaw config patch --file \
     "$BRAINX_DEPLOY_ROOT/deploy/openclaw/openclaw.production.json"
-  # 清除旧版本曾错误下发的共享默认模型；不存在时保持幂等。
-  for obsolete_path in agents.defaults.model agents.defaults.models models.providers.stepfun.apiKey; do
-    run_openclaw config unset "$obsolete_path" >/dev/null 2>&1 || true
-  done
 fi
 install -m 0644 "$BRAINX_DEPLOY_ROOT/deploy/systemd/"*.service /etc/systemd/system/
 

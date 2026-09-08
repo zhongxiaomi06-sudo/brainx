@@ -47,6 +47,10 @@ export const BRAINX_OPENCLAW_TOOLS = Object.freeze([
     ] }), note: string({ maxLength: 1000 }), confirm: boolean(),
   }, ['job_id', 'candidate_ref', 'action', 'confirm']),
   description: '经用户确认后把授权候选人加入项目，并记录准备联系、已发送、已回复、提交客户和面试阶段。' },
+  { name: 'brainx_send_candidate_resume', purpose: () => 'candidate_action', parameters: object({
+    job_id: string(), candidate_ref: string(), confirm: boolean(),
+  }, ['job_id', 'candidate_ref', 'confirm']),
+  description: '用户点击项目群候选人行的发送按钮后，把该候选人的真实 PDF 简历幂等发送到当前项目群。' },
 ]);
 
 function canonicalJson(value) {
@@ -122,7 +126,8 @@ export function createBrainxToolFactory(tool, dependencies = {}) {
       if (!gatewayToken || !assertionSecret) throw new Error('PLUGIN_NOT_CONFIGURED');
       const signed = createAssertion(principal, tool, args, assertionSecret, now);
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10_000);
+      const timeoutMs = tool.name === 'brainx_send_candidate_resume' ? 30_000 : 10_000;
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
       try {
         const response = await fetchImpl(`${GATEWAY_URL}/${tool.name}`, {
           method: 'POST', signal: controller.signal,

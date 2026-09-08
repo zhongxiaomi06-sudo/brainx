@@ -13,6 +13,8 @@ import { now } from '../db.js';
 import { enc, dec } from '../feishu.js';
 import { REAUTH_SOON_MS } from './config.js';
 
+const normName = (value) => String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
+
 /** 解析 JWT payload（不验签——验签是 TTC 服务端的事，我们只取 exp/身份回显）。 */
 export const decodeJwt = (jwt) => {
   const parts = String(jwt || '').split('.');
@@ -50,6 +52,61 @@ export function getValidTtcJwt(db, consultant_id) {
   try { return dec(r.jwt_enc); } catch { return null; }
 }
 
+function authorizedTtcRow(db, consultantId, purpose) {
+  const direct = db.prepare(`SELECT t.*, t.consultant_id AS credential_owner_consultant_id,
+    'personal' AS credential_mode FROM ttc_tokens t WHERE t.consultant_id=?`).get(consultantId);
+  if (direct) return direct;
+  return db.prepare(`SELECT t.*, g.source_consultant_id AS credential_owner_consultant_id,
+      'shared' AS credential_mode
+    FROM ttc_credential_grants g JOIN ttc_tokens t
+      ON t.consultant_id=g.source_consultant_id
+    WHERE g.grantee_consultant_id=? AND g.purpose=? AND g.grant_status='ACTIVE'
+    ORDER BY g.updated_at DESC LIMIT 1`).get(consultantId, purpose);
+}
+
+/** 只给明确授权的业务目的复用凭证；操作审计仍使用 grantee 顾问身份。 */
+export function getAuthorizedTtcJwt(db, consultantId, purpose = 'OPENMAI') {
+  const row = authorizedTtcRow(db, consultantId, purpose);
+  if (!row || row.needs_reauth || Date.parse(row.expires_at) <= Date.now()) return null;
+  try { return dec(row.jwt_enc); } catch { return null; }
+}
+
+export function grantSharedTtcCredential(db, {
+  sourceConsultantId, granteeConsultantId, purpose = 'OPENMAI', grantedBy, reason,
+}) {
+  if (purpose !== 'OPENMAI' || !grantedBy || !reason || sourceConsultantId === granteeConsultantId) {
+    throw new Error('TTC_CREDENTIAL_GRANT_INVALID');
+  }
+  const source = db.prepare(`SELECT c.display_name,t.ttc_user_name FROM consultants c
+    JOIN ttc_tokens t ON t.consultant_id=c.consultant_id
+    WHERE c.consultant_id=? AND c.active=1`).get(sourceConsultantId);
+  const grantee = db.prepare('SELECT consultant_id FROM consultants WHERE consultant_id=? AND active=1')
+    .get(granteeConsultantId);
+  if (!source || !grantee || normName(source.display_name) !== normName(source.ttc_user_name)) {
+    throw new Error('TTC_CREDENTIAL_OWNER_INVALID');
+  }
+  const at = now();
+  db.prepare(`UPDATE ttc_credential_grants SET grant_status='REVOKED',revoked_at=?,updated_at=?
+    WHERE grantee_consultant_id=? AND purpose=? AND grant_status='ACTIVE'`)
+    .run(at, at, granteeConsultantId, purpose);
+  const grantId = crypto.randomUUID();
+  db.prepare(`INSERT INTO ttc_credential_grants
+    (grant_id,source_consultant_id,grantee_consultant_id,purpose,grant_status,
+      granted_by,reason,granted_at,updated_at)
+    VALUES (?,?,?,?, 'ACTIVE',?,?,?,?)`).run(
+    grantId, sourceConsultantId, granteeConsultantId, purpose, grantedBy, reason, at, at,
+  );
+  return { grant_id: grantId, source_consultant_id: sourceConsultantId,
+    grantee_consultant_id: granteeConsultantId, purpose, grant_status: 'ACTIVE' };
+}
+
+export function revokeSharedTtcCredential(db, granteeConsultantId, purpose = 'OPENMAI') {
+  const at = now();
+  return db.prepare(`UPDATE ttc_credential_grants SET grant_status='REVOKED',revoked_at=?,updated_at=?
+    WHERE grantee_consultant_id=? AND purpose=? AND grant_status='ACTIVE'`)
+    .run(at, at, granteeConsultantId, purpose).changes;
+}
+
 /** 凭据失效标记（读取通道 401 时调用）→ 前端胶囊提示重连。 */
 export const markTtcReauth = (db, consultant_id) =>
   db.prepare('UPDATE ttc_tokens SET needs_reauth=1, updated_at=? WHERE consultant_id=?').run(now(), consultant_id);
@@ -63,4 +120,17 @@ export function ttcAuthStatus(db, consultant_id) {
   return { connected: !expired && !r.needs_reauth,
            ttc_user_name: r.ttc_user_name, expires_at: r.expires_at,
            needs_reauth: !!r.needs_reauth || expired, expiring_soon: expiringSoon || expired };
+}
+
+/** OpenMai 专用状态：允许个人凭证或经管理员留痕授权的团队凭证。 */
+export function ttcOpenmaiAuthStatus(db, consultantId) {
+  const row = authorizedTtcRow(db, consultantId, 'OPENMAI');
+  if (!row) return { connected: false };
+  const expired = Date.parse(row.expires_at) <= Date.now();
+  const expiringSoon = !expired && (Date.parse(row.expires_at) - Date.now()) < REAUTH_SOON_MS;
+  return { connected: !expired && !row.needs_reauth,
+    ttc_user_name: row.ttc_user_name, expires_at: row.expires_at,
+    needs_reauth: !!row.needs_reauth || expired, expiring_soon: expiringSoon || expired,
+    credential_mode: row.credential_mode,
+    credential_owner_consultant_id: row.credential_owner_consultant_id };
 }

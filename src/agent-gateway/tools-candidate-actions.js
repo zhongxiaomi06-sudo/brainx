@@ -1,9 +1,18 @@
+import { createHash } from 'node:crypto';
 import { now, uuid } from '../db.js';
 import { candidateShortlist } from '../candidate-shortlist.js';
 import { jobVisibleTo } from '../visibility.js';
-import { extractOpenmaiCandidates } from '../openmai-delivery.js';
+import { downloadResumePdf, extractOpenmaiCandidates } from '../openmai-delivery.js';
+import { sendPdfFile } from '../feishu-bot.js';
+import { getAuthorizedTtcJwt } from '../ttcsdk/auth.js';
+import { downloadTtcResumePdf, listTtcResumeAttachments } from '../ttcsdk/resume.js';
 
 function fail(code) { throw Object.assign(new Error(code), { code }); }
+
+function safePdfName(value, fallback) {
+  const cleaned = String(value || '').replace(/[\\/\r\n\0]/g, '_').trim().slice(0, 180);
+  return cleaned && /\.pdf$/i.test(cleaned) ? cleaned : fallback;
+}
 
 async function authorized(shortlistFn, principal, jobId, candidateRef) {
   let pageToken;
@@ -65,7 +74,23 @@ function transition(db, principal, args) {
   return current(db, principal, args);
 }
 
-export function createCandidateActionToolHandlers({ db, candidateShortlistFn = candidateShortlist } = {}) {
+function openmaiResume(db, jobId, candidateRef) {
+  const results = db.prepare(`SELECT consultant_id,result_text FROM openmai_results
+    WHERE project_id=? AND status='done' ORDER BY finished_at DESC`).all(jobId);
+  for (const result of results) {
+    const candidate = extractOpenmaiCandidates(result.result_text)
+      .find((item) => item.candidateRef === candidateRef);
+    if (candidate) return { ...candidate, credentialOwner: result.consultant_id };
+  }
+  return null;
+}
+
+export function createCandidateActionToolHandlers({
+  db, candidateShortlistFn = candidateShortlist, downloadResumeFn = downloadResumePdf,
+  sendPdfFileFn = sendPdfFile, getAuthorizedTtcJwtFn = getAuthorizedTtcJwt,
+  listTtcResumeAttachmentsFn = listTtcResumeAttachments,
+  downloadTtcResumePdfFn = downloadTtcResumePdf,
+} = {}) {
   return {
     brainx_candidate_workflow: async (args, context) => {
       if (args.confirm !== true || !jobVisibleTo(db, context.principal.consultantId, args.job_id)) {
@@ -82,6 +107,42 @@ export function createCandidateActionToolHandlers({ db, candidateShortlistFn = c
       return { data: row, facts: [{ candidate_ref: args.candidate_ref, milestone: row.milestone,
         outreach_state: row.outreach_state }], inferences: [], recommendations: [], unknowns: [],
         evidence_refs: [`candidate_case:${row.case_id}`], next_allowed_actions: ['brainx_candidate_contact'] };
+    },
+    brainx_send_candidate_resume: async (args, context) => {
+      if (args.confirm !== true || context.principal.chatType !== 'group'
+          || !jobVisibleTo(db, context.principal.consultantId, args.job_id)) {
+        fail(args.confirm === true ? 'NOT_FOUND_OR_FORBIDDEN' : 'INVALID_ARGUMENT');
+      }
+      const candidate = openmaiResume(db, args.job_id, args.candidate_ref);
+      if (!candidate) fail('RESUME_NOT_AVAILABLE');
+      const jwt = getAuthorizedTtcJwtFn(db, candidate.credentialOwner, 'OPENMAI');
+      if (!jwt) fail('SOURCE_UNAVAILABLE');
+      let bytes;
+      let fileName = `${candidate.name}-简历.pdf`;
+      try {
+        if (candidate.resumeUrl) {
+          bytes = await downloadResumeFn(candidate.resumeUrl, jwt);
+        } else {
+          const attachments = await listTtcResumeAttachmentsFn(candidate.candidateRef, jwt);
+          const attachment = attachments.find((item) => /\.pdf(?:$|\?)/i.test(item.name || item.url))
+            || attachments[0];
+          if (!attachment) fail('RESUME_NOT_AVAILABLE');
+          bytes = await downloadTtcResumePdfFn(attachment.url, jwt);
+          fileName = safePdfName(attachment.name, fileName);
+        }
+        const key = createHash('sha256').update(`${args.job_id}\0${args.candidate_ref}`).digest('hex').slice(0, 32);
+        await sendPdfFileFn({
+          target: context.principal.chatId, data: bytes,
+          fileName, idempotencyKey: `candidate-resume-${key}`,
+        });
+      } catch (error) {
+        if (error?.code === 'RESUME_NOT_AVAILABLE' || error?.message === 'RESUME_NOT_AVAILABLE') throw error;
+        fail(String(error?.message || '').startsWith('RESUME_') ? 'RESUME_NOT_AVAILABLE' : 'SOURCE_UNAVAILABLE');
+      }
+      return { data: { candidate_ref: args.candidate_ref, delivery_status: 'sent' },
+        facts: [{ candidate_ref: args.candidate_ref, resume_sent_to_current_project_group: true }],
+        inferences: [], recommendations: [], unknowns: [],
+        evidence_refs: [`openmai_candidate:${args.candidate_ref}`], next_allowed_actions: [] };
     },
   };
 }

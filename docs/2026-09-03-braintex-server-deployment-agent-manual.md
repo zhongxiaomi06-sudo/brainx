@@ -196,7 +196,7 @@ sudo deploy/openclaw/install.sh --apply
 | 两个 Agent secret | 与 `agent.env` 对应值逐字一致 |
 | `STEPFUN_API_KEY` | 公司默认模型凭证，仅保存在服务器；配置通过 SecretRef 读取，不得写入仓库或聊天 |
 
-生产默认模型为 `stepfun/step-3.5-flash`，失败时回退到 `stepfun/step-3.7-flash`。私聊会话按飞书用户隔离，顾问可发送 `/model`，或点击 `/brainx` 首页的“切换我的模型”，在管理员已批准的模型目录内改变本人当前会话模型；该操作不修改其他顾问会话，也不需要编辑服务器文件。个人自带 API Key/OAuth 属于后续独立 Agent 认证能力，不得通过飞书消息收集密钥。
+生产默认模型为 `stepfun/step-3.5-flash`，失败时回退到 `stepfun/step-3.7-flash`。六名白名单顾问无需在个人电脑配置 API Key；首次私聊建立的隔离 Agent 直接继承公司模型。顾问也可发送 `/model`，或点击 `/brainx` 首页的“切换我的模型”，使用个人模型覆盖本人私聊；停用后回退公司默认，不修改其他顾问会话。任何个人 API Key 均不得通过飞书消息收集。
 
 填完后先运行失败关闭的交叉校验；它只输出变量名和错误码，不输出任何值：
 
@@ -205,7 +205,7 @@ sudo deploy/openclaw/install.sh --validate
 stat -c '%a %U %G %n' /etc/brainx/*.env
 ```
 
-第一条必须返回 `ok=true`；它会同时检查占位符、密钥长度与复用、Gateway token/签名密钥跨文件一致、worker 与 OpenClaw 使用同一飞书 App 和 HTTPS 地址、Gateway/worker 使用同一 SQLite，以及六名员工白名单格式和管理员 allowlist。第二条必须显示 `640 root brainx`。不要使用 `set -x`，不要把环境文件整体打印到终端录屏。
+第一条必须返回 `ok=true`；它会同时检查公司模型 Key、占位符、密钥长度与复用、Gateway token/签名密钥跨文件一致、worker 与 OpenClaw 使用同一飞书 App 和 HTTPS 地址、Gateway/worker 使用同一 SQLite，以及六名员工白名单格式和管理员 allowlist。第二条必须显示 `640 root brainx`。不要使用 `set -x`，不要把环境文件整体打印到终端录屏。
 
 ### 7.4 主 BrainX 应用
 

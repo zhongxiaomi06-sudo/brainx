@@ -56,6 +56,7 @@ function nextStep(project: ProjectSummary) {
   if (project.launch?.search_status === "RUNNING") return "机器人正在搜索并评估首轮候选人";
   if (project.launch?.search_status === "DONE") return "候选人结果已回传飞书项目群";
   if (project.launch?.search_status === "FAILED") return project.launch.error_message || "寻访失败，可重试";
+  if (project.launch?.status === "READY") return "项目群和职位卡已就绪，连接 TTC 后启动 OpenMai";
   if (project.project_status === "PENDING_START") return "自动建群、投放职位并启动 OpenMai";
   if (project.project_status === "NEEDS_ACTION") return project.active_action?.status === "BLOCKED" ? "处理阻塞并更新下一行动" : "更新当前行动";
   if (project.project_status === "IN_PROGRESS") return "记录进展并建立下一行动";
@@ -66,6 +67,7 @@ function actionLabel(project: ProjectSummary) {
   if (project.launch?.search_status === "RUNNING") return "OpenMai 找人中";
   if (project.launch?.search_status === "DONE") return "查看候选人";
   if (project.launch?.search_status === "FAILED" || project.launch?.status === "FAILED") return "重试飞书寻访";
+  if (project.launch?.status === "READY") return "启动 OpenMai 找人";
   if (project.project_status === "PENDING_START") return "在飞书启动寻访";
   if (project.project_status === "NEEDS_ACTION") return "立即处理";
   if (project.project_status === "IN_PROGRESS") return "更新进展";

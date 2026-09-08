@@ -45,7 +45,7 @@ OpenClaw 多顾问版本在同机额外运行三个回环服务，安装、启�
 - **install.sh 已知坑（已修复入库）**：`npm pack` 路径必须带 `./` 前缀（否则被解析成 GitHub org/repo）；brainx 用户首次 npm 需要预建 `/var/lib/brainx/.npm`（否则 EACCES）。
 - **brainx 用户 home**：必须是 `/var/lib/brainx`（`useradd -r` 默认 home=/home/brainx 不存在，openclaw wiki 插件按 home 解析会 permission denied）。
 - **sandbox.mode**：服务器无 Docker 时设 `agents.defaults.sandbox.mode=off`（10 个工具本身最小权限只读）；装 Docker 后可改回 `all`。
-- **模型**：OpenClaw 默认模型走阶跃 `models.providers.stepfun`（openai-completions 适配）+ `agents.defaults.model=stepfun/step-3.5-flash`，凭据与 brainx `.env` 同一把 `BRAINX_LLM_API_KEY`。
+- **模型**：OpenClaw 默认模型走阶跃 `models.providers.stepfun`（openai-completions 适配）+ `agents.defaults.model=stepfun/step-3.5-flash`；独立公司凭据只放 `/etc/brainx/openclaw.env` 的 `STEPFUN_API_KEY`，不得与 BrainX 文档 LLM Key 混用。顾问个人模型仅作私聊可选覆盖。
 
 ## 本地开发
 

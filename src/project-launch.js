@@ -7,7 +7,7 @@ import { buildBrainxDeepLink, productionBaseUrl } from './brainx-deep-links.js';
 import { acceptCommitment } from './commitment.js';
 import { currentState } from './engagement.js';
 import { startOpenmaiTask } from './openmai-task.js';
-import { ttcAuthStatus } from './ttcsdk/auth.js';
+import { ttcOpenmaiAuthStatus } from './ttcsdk/auth.js';
 import { ensureOpenClawProjectGroup } from './openclaw-group-access.js';
 import { retryOpenmaiDelivery } from './openmai-delivery.js';
 
@@ -73,9 +73,9 @@ export function projectLaunchPreflight(db, consultantId, projectId, {
   const sharedLaunch = getProjectLaunch(db, consultantId, projectId);
   const reusesActiveSearch = sharedLaunch?.status === 'READY'
     && ['RUNNING', 'DONE'].includes(sharedLaunch.search_status);
-  const searchReady = ttcConnected ?? ttcAuthStatus(db, consultantId).connected;
+  const searchReady = ttcConnected ?? ttcOpenmaiAuthStatus(db, consultantId).connected;
   if (requireSearch && !reusesActiveSearch && !searchReady) {
-    blockers.push({ code: 'TTC_CREDENTIALS_REQUIRED', message: '请先用本人 TTC 账号连接 OpenMai' });
+    blockers.push({ code: 'TTC_CREDENTIALS_REQUIRED', message: '请先配置个人或已授权的团队 TTC 寻访凭证' });
   }
   return { ready: blockers.length === 0, blockers, job, membership: membership?.relation || null, binding };
 }
@@ -152,8 +152,7 @@ export async function launchRecruitingWorkflow(db, bus, consultantId, projectId,
   const preflight = projectLaunchPreflight(db, consultantId, projectId, {
     appConfigured: dependencies.appConfigured,
     publicBaseUrl: dependencies.publicBaseUrl,
-    requireSearch: true,
-    ttcConnected: dependencies.ttcConnected,
+    requireSearch: false,
   });
   if (!preflight.ready) {
     const first = preflight.blockers[0];
@@ -170,6 +169,12 @@ export async function launchRecruitingWorkflow(db, bus, consultantId, projectId,
       }, launch: group.launch };
     }
     fail(409, 'PROJECT_SEARCH_OWNER_REQUIRED', '项目群已由其他协作者启动，请由首轮寻访发起人重试');
+  }
+  const searchReady = dependencies.ttcConnected ?? ttcOpenmaiAuthStatus(db, consultantId).connected;
+  if (!searchReady) {
+    return { ok: true, group: group.launch, search: {
+      status: 'credentials_required', message: '项目群已创建并投放职位；配置个人或已授权团队 TTC 后可启动 OpenMai',
+    }, launch: group.launch };
   }
   const state = currentState(db, consultantId, projectId).state;
   if (['COMPLETED', 'RELEASED'].includes(state)) {

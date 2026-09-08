@@ -3,41 +3,15 @@ import { randomUUID } from 'node:crypto';
 import { now } from './db.js';
 import { sendInteractiveCard, sendPdfFile, replyInteractiveCard } from './feishu-bot.js';
 import { buildBrainxDeepLink, productionBaseUrl } from './brainx-deep-links.js';
-import { getValidTtcJwt } from './ttcsdk/auth.js';
+import { getAuthorizedTtcJwt } from './ttcsdk/auth.js';
+import { assessOpenmaiCandidateBatch, extractOpenmaiCandidates } from './openmai-result.js';
 
 const PHONE = /(?<!\d)(?:\+?86[-\s]?)?1[3-9]\d{9}(?!\d)/g;
 const EMAIL = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
-const CANDIDATE_BLOCK = /<!--\s*BRAINX_CANDIDATES_V1\s*([\s\S]*?)-->/;
 const MAX_RESUME_BYTES = 12 * 1024 * 1024;
 const STALE_SEARCH_MS = 60 * 60 * 1000;
 
-export function extractOpenmaiCandidates(value) {
-  const match = String(value || '').match(CANDIDATE_BLOCK);
-  if (!match) return [];
-  try {
-    const parsed = JSON.parse(match[1].trim());
-    if (!Array.isArray(parsed?.candidates)) return [];
-    return parsed.candidates.slice(0, 10).map((item, index) => ({
-      candidateRef: String(item?.candidate_ref || `candidate-${index + 1}`).slice(0, 100),
-      name: String(item?.name || `候选人${index + 1}`).slice(0, 60),
-      evaluation: String(item?.evaluation || '待顾问核验').slice(0, 300),
-      resumeUrl: typeof item?.resume_url === 'string' ? item.resume_url : null,
-    }));
-  } catch { return []; }
-}
-
-export function assessOpenmaiCandidateBatch(value) {
-  const hasMachineBlock = CANDIDATE_BLOCK.test(String(value || ''));
-  const count = extractOpenmaiCandidates(value).length;
-  return {
-    count,
-    hasMachineBlock,
-    complete: !hasMachineBlock || count >= 6,
-    message: hasMachineBlock && count < 6
-      ? `OpenMai 本轮仅返回 ${count} 名结构化候选人，未达到首轮 6–10 人目标；已保留现有结果，请明确重试补充。`
-      : null,
-  };
-}
+export { assessOpenmaiCandidateBatch, extractOpenmaiCandidates } from './openmai-result.js';
 
 function trustedResumeHosts(value = process.env.BRAINX_RESUME_DOWNLOAD_HOSTS) {
   return new Set(String(value || 'api.ttcadvisory.com,gateway.ttcadvisory.com,app.ttcadvisory.com')
@@ -105,11 +79,12 @@ export function buildResumeUnavailableCard(candidate) {
 }
 
 async function deliverCandidateTopics(db, row, dependencies) {
-  const candidates = extractOpenmaiCandidates(row.result_text);
+  // 总览统一放在一张表格卡中；只有真实 PDF 需要独立话题承载附件。
+  const candidates = extractOpenmaiCandidates(row.result_text).filter((candidate) => candidate.resumeUrl);
   if (candidates.length === 0) return 0;
   const send = dependencies.sendInteractiveCard || sendInteractiveCard;
   const withResume = candidates.some((candidate) => candidate.resumeUrl);
-  const jwt = withResume ? getValidTtcJwt(db, row.consultant_id) : null;
+  const jwt = withResume ? getAuthorizedTtcJwt(db, row.consultant_id, 'OPENMAI') : null;
   if (withResume && !jwt) throw new Error('TTC_CREDENTIALS_REQUIRED_FOR_RESUME');
   let sent = 0;
   for (const [index, candidate] of candidates.entries()) {
@@ -153,27 +128,75 @@ export function groupSafeOpenmaiText(value, max = 6500) {
 export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publicBaseUrl }) {
   const baseUrl = productionBaseUrl(publicBaseUrl).href;
   const target = buildBrainxDeepLink({ baseUrl, objectType: 'opportunity', objectRef: job.project_id });
-  const success = status === 'done';
+  const success = status === 'done' || status === 'needs_input';
   const quality = success ? assessOpenmaiCandidateBatch(resultText) : null;
+  const needsInput = status === 'needs_input' || quality?.needsInput;
   const complete = success && quality.complete;
+  const candidates = success ? extractOpenmaiCandidates(resultText) : [];
   const content = success
-    ? `**${job.company} · ${job.role}**\n\n${groupSafeOpenmaiText(resultText)}`
-      + (quality.message ? `\n\n> ⚠️ ${quality.message}` : '')
+    ? (candidates.length
+      ? `**${job.company} · ${job.role}**\n\n本轮共找到 ${candidates.length} 位候选人。`
+        + (quality.message ? `\n\n> ⚠️ ${quality.message}` : '')
+      : `**${job.company} · ${job.role}**\n\n${groupSafeOpenmaiText(resultText)}`)
     : `**${job.company} · ${job.role}**\n\n本轮候选人搜索失败：${groupSafeOpenmaiText(error, 500)}\n\n请修复连接后在工作台重试。`;
+  const table = candidates.length ? [
+    candidateTableHeading(),
+    ...candidates.flatMap((candidate, index) => candidateTableRow({
+      candidate, index, job, baseUrl,
+    })),
+  ] : [];
   return {
     config: { wide_screen_mode: true },
     header: { template: complete ? 'green' : success ? 'orange' : 'red', title: { tag: 'plain_text',
       content: complete ? 'BrainTex · 首轮候选人已就绪'
-        : success ? 'BrainTex · 首轮候选人不足' : 'BrainTex · 候选人搜索失败' } },
+        : needsInput ? 'BrainTex · 请补充岗位画像'
+          : success ? 'BrainTex · 首轮候选人不足' : 'BrainTex · 候选人搜索失败' } },
     elements: [
       { tag: 'markdown', content },
-      { tag: 'action', actions: [{ tag: 'button', type: 'primary',
-        text: { tag: 'plain_text', content: success ? '查看完整结果并评估' : '打开工作台处理' },
-        multi_url: { url: target, pc_url: target, android_url: target, ios_url: target } }] },
+      ...table,
+      ...(!success || !candidates.length ? [{ tag: 'action', actions: [{ tag: 'button', type: 'primary',
+        text: { tag: 'plain_text', content: success ? '打开工作台查看与评估' : '打开工作台处理' },
+        multi_url: { url: target, pc_url: target, android_url: target, ios_url: target } }] }] : []),
       { tag: 'note', elements: [{ tag: 'plain_text',
-        content: '项目群投递 · 联系方式默认隐藏 · 候选人事实仍需顾问核验' }] },
+        content: '点击“发送简历”后机器人会实时查询 TTC 附件并发到本群 · 联系方式默认隐藏 · 候选人事实仍需顾问核验' }] },
     ],
   };
+}
+
+function tableCell(content, weight, elements) {
+  return {
+    tag: 'column', width: 'weighted', weight, vertical_align: 'top',
+    elements: elements || [{ tag: 'div', text: { tag: 'plain_text', content } }],
+  };
+}
+
+function candidateTableHeading() {
+  return {
+    tag: 'column_set', flex_mode: 'none', background_style: 'grey',
+    columns: [tableCell('候选人', 2), tableCell('AI 初评', 5)],
+  };
+}
+
+function candidateTableRow({ candidate, index, job, baseUrl }) {
+  const detailUrl = buildBrainxDeepLink({ baseUrl, objectType: 'opportunity',
+    objectRef: job.project_id, candidateRef: candidate.candidateRef });
+  const resumeButton = {
+    tag: 'button', type: 'primary', text: { tag: 'plain_text', content: '发送简历' },
+    value: { command: `请立即调用 brainx_send_candidate_resume，参数为 ${JSON.stringify({
+      job_id: job.project_id, candidate_ref: candidate.candidateRef, confirm: true,
+    })}。本次按钮点击即为发送确认；成功后只回复“简历已发送”。` },
+  };
+  return [
+    { tag: 'column_set', flex_mode: 'none', background_style: 'default', columns: [
+      tableCell(`${index + 1}. ${groupSafeOpenmaiText(candidate.name, 60)}`, 2),
+      tableCell(groupSafeOpenmaiText(candidate.evaluation, 300), 5),
+    ] },
+    { tag: 'action', actions: [
+        { tag: 'button', text: { tag: 'plain_text', content: '查看' },
+          multi_url: { url: detailUrl, pc_url: detailUrl, android_url: detailUrl, ios_url: detailUrl } },
+        resumeButton,
+      ] },
+  ];
 }
 
 export function enqueueOpenmaiDeliveries(db, at = now()) {
@@ -185,7 +208,7 @@ export function enqueueOpenmaiDeliveries(db, at = now()) {
         ORDER BY CASE pl.status WHEN 'READY' THEN 0 WHEN 'POSTING_JOB' THEN 1
           WHEN 'CREATING_CHAT' THEN 2 ELSE 3 END, pl.created_at, pl.launch_id LIMIT 1)
     WHERE l.status='READY' AND l.chat_id IS NOT NULL AND r.task_id IS NOT NULL
-      AND r.status IN ('done','failed')`).all();
+      AND r.status IN ('done','needs_input','failed')`).all();
   const insert = db.prepare(`INSERT OR IGNORE INTO openmai_deliveries
     (delivery_id, task_id, consultant_id, project_id, chat_id, result_status,
      delivery_status, next_attempt_at, created_at, updated_at)
@@ -212,7 +235,8 @@ export function enqueueOpenmaiDeliveries(db, at = now()) {
 }
 
 function finishProjectDelivery(db, row, at) {
-  const quality = row.result_status === 'done' ? assessOpenmaiCandidateBatch(row.result_text) : null;
+  const quality = ['done', 'needs_input'].includes(row.result_status)
+    ? assessOpenmaiCandidateBatch(row.result_text) : null;
   const incomplete = quality && !quality.complete;
   const failed = row.result_status === 'failed';
   db.prepare(`UPDATE project_launches SET search_status=?, search_task_id=?, error_code=?,
@@ -220,7 +244,8 @@ function finishProjectDelivery(db, row, at) {
       WHERE project_id=? ORDER BY CASE status WHEN 'READY' THEN 0 WHEN 'POSTING_JOB' THEN 1
         WHEN 'CREATING_CHAT' THEN 2 ELSE 3 END, created_at, launch_id LIMIT 1)`).run(
     failed || incomplete ? 'FAILED' : 'DONE', row.task_id,
-    failed ? 'OPENMAI_SEARCH_FAILED' : incomplete ? 'OPENMAI_CANDIDATES_INCOMPLETE' : null,
+    failed ? 'OPENMAI_SEARCH_FAILED' : quality?.needsInput ? 'OPENMAI_SEARCH_BRIEF_REQUIRED'
+      : incomplete ? 'OPENMAI_CANDIDATES_INCOMPLETE' : null,
     failed ? String(row.error || 'OpenMai 搜索失败').slice(0, 240)
       : incomplete ? quality.message : null,
     at, row.project_id,

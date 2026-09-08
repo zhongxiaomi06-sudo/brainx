@@ -30,7 +30,7 @@ test('startOpenmaiTask 不借用其他顾问的 TTC 凭证', () => {
   try {
     const result = startOpenmaiTask(db, null, 'york', 'P-FIX-6FFEA4D1');
     assert.equal(result.status, 'error');
-    assert.match(result.message, /没有有效 TTC 凭证/);
+    assert.match(result.message, /没有个人或已授权的团队 TTC 寻访凭证/);
     assert.equal(requested, false);
     assert.equal(getOpenmaiResult(db, 'york', 'P-FIX-6FFEA4D1').status, 'failed');
   } finally {

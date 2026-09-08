@@ -54,4 +54,4 @@ DISABLED ──重新保存+同意─▶ PENDING
 
 - API Key 已写入但 Agent model 写失败：立即删除本次 profile；BrainX 记 `ERROR`。
 - Agent model 已写入但状态落库失败：恢复变更前 model/profile；若恢复也失败，返回 `ROLLBACK_FAILED` 并禁止声称成功。
-- 停用先移除认证 profile，再清除 Agent 显式 model；任一步失败保留 `ERROR`，不得切到他人或全局凭据。
+- 停用先移除认证 profile，再清除 Agent 显式 model；成功后继承服务器批准的公司默认模型。任一步失败保留 `ERROR`，不得切到他人凭据。

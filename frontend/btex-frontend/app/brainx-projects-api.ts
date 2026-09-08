@@ -117,6 +117,12 @@ export async function launchProjectWorkflow(id: string, idempotencyKey: string):
   return startProjectLaunch(id, idempotencyKey);
 }
 
+export function projectLaunchNotice(company: string, status: string): string {
+  if (status === "credentials_required") return `${company} · 飞书项目群已创建；连接本人 TTC 后可启动找人`;
+  if (status === "already_done") return `${company} · 候选人结果已存在`;
+  return `${company} · OpenMai 已开始找人`;
+}
+
 function directionOf(role: string): DecisionDirection {
   if (/投放|广告|优化师|sem|performance|paid/i.test(role)) return "paid";
   if (/市场|营销|品牌|公关|gtm|marketing|brand/i.test(role)) return "marketing";

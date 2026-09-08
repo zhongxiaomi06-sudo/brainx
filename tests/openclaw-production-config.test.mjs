@@ -24,9 +24,16 @@ test('production config isolates sessions, sandboxes all runs, and exposes no pl
   assert.deepEqual(config.gateway.auth.token, {
     source: 'env', provider: 'default', id: 'OPENCLAW_GATEWAY_TOKEN',
   });
-  assert.equal(config.agents.defaults.model, undefined, 'personal credentials must not inherit a global model');
-  assert.equal(config.agents.defaults.models, undefined, 'global aliases must not constrain personal selection');
-  assert.equal(config.models.providers.stepfun.apiKey, undefined, 'StepFun belongs to the configuring user');
+  assert.deepEqual(config.agents.defaults.model, {
+    primary: 'stepfun/step-3.5-flash', fallbacks: ['stepfun/step-3.7-flash'],
+  });
+  assert.deepEqual(config.agents.defaults.models, {
+    'stepfun/step-3.5-flash': { alias: 'fast' },
+    'stepfun/step-3.7-flash': { alias: 'strong' },
+  });
+  assert.deepEqual(config.models.providers.stepfun.apiKey, {
+    source: 'env', provider: 'default', id: 'STEPFUN_API_KEY',
+  });
   assert.deepEqual(config.models.providers.stepfun.models.map(({ id }) => id), [
     'step-3.5-flash', 'step-3.7-flash',
   ]);
@@ -101,6 +108,7 @@ test('systemd units keep internal services on one host and load secrets from pro
   assert.match(installer, /OPENCLAW_CONFIG_PATH=/);
   assert.match(installer, /OPENCLAW_STATE_DIR=/);
   assert.match(installer, /config patch --file/);
+  assert.doesNotMatch(installer, /config unset.*agents\.defaults\.model/);
   assert.doesNotMatch(installer, /install[^\n]+openclaw\.production\.json[^\n]+openclaw\.json/);
   assert.match(installer, /plugins inspect feishu --json/);
   assert.match(installer, /plugin\?\.version===process\.argv\[1\]/);
@@ -127,7 +135,7 @@ test('systemd units keep internal services on one host and load secrets from pro
 test('OpenClaw env template provides six consultants and three groups', async () => {
   const template = await readFile(new URL('deploy/openclaw/openclaw.env.example', root), 'utf8');
   assert.match(template, /^BRAINX_BASE_URL=https:\/\//m);
-  assert.doesNotMatch(template, /^STEPFUN_API_KEY=/m);
+  assert.match(template, /^STEPFUN_API_KEY=replace-stepfun-api-key$/m);
   assert.match(template, /^BRAINX_PERSONAL_MODELS_ENABLED=1$/m);
   for (const suffix of ['1', '2', '3', '4', '5', '6']) {
     assert.match(template, new RegExp(`^BRAINX_FEISHU_ALLOWED_OPEN_ID_${suffix}=`, 'm'));

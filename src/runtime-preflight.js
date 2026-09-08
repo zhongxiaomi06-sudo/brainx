@@ -38,6 +38,7 @@ export function validateRuntimeConfig({ agent = {}, worker = {}, openclaw = {} }
   requireKeys(openclaw, [
     'OPENCLAW_GATEWAY_TOKEN', 'BRAINX_FEISHU_APP_ID', 'BRAINX_FEISHU_APP_SECRET',
     'BRAINX_BASE_URL', 'BRAINX_AGENT_GATEWAY_TOKEN', 'BRAINX_AGENT_ASSERTION_SECRET',
+    'STEPFUN_API_KEY',
     ...Array.from({ length: 6 }, (_, index) => `BRAINX_FEISHU_ALLOWED_OPEN_ID_${index + 1}`),
     ...Array.from({ length: 3 }, (_, index) => `BRAINX_FEISHU_ALLOWED_CHAT_ID_${index + 1}`),
   ], 'openclaw.env', errors);
@@ -48,6 +49,7 @@ export function validateRuntimeConfig({ agent = {}, worker = {}, openclaw = {} }
     ['agent.env:BRAINX_AGENT_AUDIT_KEY', agent.BRAINX_AGENT_AUDIT_KEY],
     ['openclaw.env:OPENCLAW_GATEWAY_TOKEN', openclaw.OPENCLAW_GATEWAY_TOKEN],
     ['openclaw.env:BRAINX_FEISHU_APP_SECRET', openclaw.BRAINX_FEISHU_APP_SECRET],
+    ['openclaw.env:STEPFUN_API_KEY', openclaw.STEPFUN_API_KEY],
   ]) secret(value, name, errors);
 
   const independent = [agent.BRAINX_AGENT_GATEWAY_TOKEN, agent.BRAINX_AGENT_ASSERTION_SECRET,

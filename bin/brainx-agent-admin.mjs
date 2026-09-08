@@ -6,6 +6,7 @@ import {
   bindIdentity, revokeIdentity, grantGroupScope, revokeGroupScope,
   bindRosterIdentities, getRecruitingReadiness,
 } from '../src/agent-gateway/admin.js';
+import { grantSharedTtcCredential, revokeSharedTtcCredential } from '../src/ttcsdk/auth.js';
 
 function flags(argv) {
   const result = {};
@@ -44,6 +45,10 @@ const admin = {
 const db = openDb();
 let result;
 
+function requireAdmin() {
+  if (!admin.actor || !admin.allowedAdmins.includes(admin.actor)) throw new Error('ADMIN_NOT_ALLOWED');
+}
+
 if (command === 'bind-identity') {
   result = bindIdentity(db, {
     tenantId: input.tenant, accountId: input.account, openId: input['open-id'],
@@ -71,8 +76,19 @@ if (command === 'bind-identity') {
     feishuAppKeyHash: appHash(input.account),
     consultantIds: list(input.consultants), confirm: input.confirm === 'true',
   }, admin);
+} else if (command === 'grant-ttc-openmai') {
+  requireAdmin();
+  if (input.confirm !== 'true') throw new Error('CONFIRM_REQUIRED');
+  result = grantSharedTtcCredential(db, {
+    sourceConsultantId: input.source, granteeConsultantId: input.grantee,
+    purpose: 'OPENMAI', grantedBy: admin.actor, reason: input.reason,
+  });
+} else if (command === 'revoke-ttc-openmai') {
+  requireAdmin();
+  if (input.confirm !== 'true') throw new Error('CONFIRM_REQUIRED');
+  result = { revoked: revokeSharedTtcCredential(db, input.grantee, 'OPENMAI') };
 } else {
-  throw new Error('命令：readiness | bind-roster | bind-identity | revoke-identity | grant-group | revoke-group');
+  throw new Error('命令：readiness | bind-roster | bind-identity | revoke-identity | grant-group | revoke-group | grant-ttc-openmai | revoke-ttc-openmai');
 }
 
 console.log(JSON.stringify(result));

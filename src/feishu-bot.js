@@ -1,8 +1,26 @@
 /** feishu-bot.js — 使用企业自建应用身份发送飞书互动卡片。 */
 
+import { readFileSync } from 'node:fs';
+
 const FEISHU_BASE = 'https://open.feishu.cn';
 
 const safeMessage = (body, fallback) => String(body?.msg || body?.message || fallback).slice(0, 200);
+
+function feishuCredentials(appId, appSecret) {
+  if (appId !== undefined || appSecret !== undefined) return { appId, appSecret };
+  if (process.env.BRAINX_FEISHU_CREDENTIALS_FROM_OPENCLAW === '1') {
+    try {
+      const config = JSON.parse(readFileSync(process.env.BRAINX_OPENCLAW_CONFIG_PATH, 'utf8'));
+      return { appId: config.channels?.feishu?.appId, appSecret: config.channels?.feishu?.appSecret };
+    } catch {
+      return { appId: undefined, appSecret: undefined };
+    }
+  }
+  return {
+    appId: process.env.BRAINX_FEISHU_APP_ID || process.env.LARK_APP_ID,
+    appSecret: process.env.BRAINX_FEISHU_APP_SECRET || process.env.LARK_APP_SECRET,
+  };
+}
 
 async function readJson(response, fallback) {
   try {
@@ -13,11 +31,12 @@ async function readJson(response, fallback) {
 }
 
 export async function getTenantAccessToken({
-  appId = process.env.BRAINX_FEISHU_APP_ID || process.env.LARK_APP_ID,
-  appSecret = process.env.BRAINX_FEISHU_APP_SECRET || process.env.LARK_APP_SECRET,
+  appId,
+  appSecret,
   fetchImpl = globalThis.fetch,
   timeoutMs = 15_000,
 } = {}) {
+  ({ appId, appSecret } = feishuCredentials(appId, appSecret));
   if (!appId || !appSecret) throw new Error('FEISHU_BOT_CREDENTIALS_MISSING');
   const response = await fetchImpl(`${FEISHU_BASE}/open-apis/auth/v3/tenant_access_token/internal`, {
     method: 'POST',
@@ -43,11 +62,12 @@ export async function createProjectChat({
   memberOpenIds = [],
   botAppIds,
   idempotencyKey,
-  appId = process.env.BRAINX_FEISHU_APP_ID || process.env.LARK_APP_ID,
-  appSecret = process.env.BRAINX_FEISHU_APP_SECRET || process.env.LARK_APP_SECRET,
+  appId,
+  appSecret,
   fetchImpl = globalThis.fetch,
   timeoutMs = 15_000,
 }) {
+  ({ appId, appSecret } = feishuCredentials(appId, appSecret));
   const title = String(name || '').trim();
   if (!title) throw new Error('FEISHU_CHAT_NAME_REQUIRED');
   if (!idempotencyKey || typeof idempotencyKey !== 'string') {
@@ -92,11 +112,12 @@ export async function sendInteractiveCard({
   target,
   card,
   idempotencyKey,
-  appId = process.env.BRAINX_FEISHU_APP_ID || process.env.LARK_APP_ID,
-  appSecret = process.env.BRAINX_FEISHU_APP_SECRET || process.env.LARK_APP_SECRET,
+  appId,
+  appSecret,
   fetchImpl = globalThis.fetch,
   timeoutMs = 15_000,
 }) {
+  ({ appId, appSecret } = feishuCredentials(appId, appSecret));
   if (!appId || !appSecret) throw new Error('FEISHU_BOT_CREDENTIALS_MISSING');
   if (!/^(ou|oc)_[A-Za-z0-9_-]+$/.test(String(target || ''))) {
     throw new Error('FEISHU_TARGET_INVALID');
@@ -134,11 +155,12 @@ export async function replyInteractiveCard({
   messageId,
   card,
   idempotencyKey,
-  appId = process.env.BRAINX_FEISHU_APP_ID || process.env.LARK_APP_ID,
-  appSecret = process.env.BRAINX_FEISHU_APP_SECRET || process.env.LARK_APP_SECRET,
+  appId,
+  appSecret,
   fetchImpl = globalThis.fetch,
   timeoutMs = 15_000,
 }) {
+  ({ appId, appSecret } = feishuCredentials(appId, appSecret));
   if (!/^om_[A-Za-z0-9_-]+$/.test(String(messageId || ''))) throw new Error('FEISHU_REPLY_MESSAGE_ID_INVALID');
   if (!idempotencyKey) throw new Error('FEISHU_REPLY_IDEMPOTENCY_KEY_REQUIRED');
   const token = await getTenantAccessToken({ appId, appSecret, fetchImpl, timeoutMs });
@@ -164,11 +186,12 @@ export async function sendPdfFile({
   data,
   idempotencyKey,
   replyToMessageId,
-  appId = process.env.BRAINX_FEISHU_APP_ID || process.env.LARK_APP_ID,
-  appSecret = process.env.BRAINX_FEISHU_APP_SECRET || process.env.LARK_APP_SECRET,
+  appId,
+  appSecret,
   fetchImpl = globalThis.fetch,
   timeoutMs = 30_000,
 }) {
+  ({ appId, appSecret } = feishuCredentials(appId, appSecret));
   if (!/^oc_[A-Za-z0-9_-]+$/.test(String(target || ''))) throw new Error('FEISHU_FILE_TARGET_INVALID');
   if (!idempotencyKey) throw new Error('FEISHU_FILE_IDEMPOTENCY_KEY_REQUIRED');
   if (replyToMessageId && !/^om_[A-Za-z0-9_-]+$/.test(String(replyToMessageId))) {

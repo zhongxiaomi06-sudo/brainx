@@ -9,7 +9,11 @@ import { join } from 'node:path';
 
 // data/.secret 依赖：测试用临时目录（auth.js 读 ../../data/.secret 相对自身——用真实仓的 data/.secret 已有）
 import { openDb } from '../src/db.js';
-import { validateJwt, decodeJwt, saveTtcToken, getValidTtcJwt, markTtcReauth, ttcAuthStatus } from '../src/ttcsdk/auth.js';
+import {
+  validateJwt, decodeJwt, saveTtcToken, getValidTtcJwt, getAuthorizedTtcJwt,
+  grantSharedTtcCredential, revokeSharedTtcCredential, markTtcReauth,
+  ttcAuthStatus, ttcOpenmaiAuthStatus,
+} from '../src/ttcsdk/auth.js';
 
 let db;
 before(() => { db = openDb(':memory:'); });
@@ -58,6 +62,41 @@ test('过期 JWT：getValidTtcJwt → null，状态 needs_reauth', () => {
 
 test('未托管：connected=false', () => {
   assert.deepEqual(ttcAuthStatus(db, 'nobody'), { connected: false });
+});
+
+test('团队 TTC 授权：不复制 token，只允许指定顾问用于 OpenMai', () => {
+  db.prepare(`INSERT OR IGNORE INTO consultants
+    (consultant_id,display_name,profile_json,source,active,created_at)
+    VALUES ('dykes','Dykes 曾源熙','{}','test',1,datetime('now'))`).run();
+  const jwt = makeJwt({ exp: FUTURE, nick: 'Mia 钟笑咪', personId: 'MIA-1' });
+  saveTtcToken(db, 'mia', jwt, validateJwt(jwt));
+  const grant = grantSharedTtcCredential(db, {
+    sourceConsultantId: 'mia', granteeConsultantId: 'dykes',
+    grantedBy: 'Dykes 曾源熙', reason: '用户确认 Mia TTC 为团队共享寻访账号',
+  });
+  assert.equal(grant.grant_status, 'ACTIVE');
+  assert.equal(getValidTtcJwt(db, 'dykes'), null, '不得把共享凭证伪装成本人凭证');
+  assert.equal(getAuthorizedTtcJwt(db, 'dykes', 'OPENMAI'), jwt);
+  assert.deepEqual(ttcAuthStatus(db, 'dykes'), { connected: false }, '职位同步仍不得借用共享凭证');
+  const status = ttcOpenmaiAuthStatus(db, 'dykes');
+  assert.equal(status.connected, true);
+  assert.equal(status.credential_mode, 'shared');
+  assert.equal(status.credential_owner_consultant_id, 'mia');
+  assert.ok(!JSON.stringify(status).includes(jwt));
+  assert.equal(revokeSharedTtcCredential(db, 'dykes'), 1);
+  assert.equal(getAuthorizedTtcJwt(db, 'dykes', 'OPENMAI'), null);
+  db.prepare("DELETE FROM ttc_credential_grants WHERE grantee_consultant_id='dykes'").run();
+  db.prepare("DELETE FROM ttc_tokens WHERE consultant_id='mia'").run();
+});
+
+test('团队 TTC 授权：来源 token 归属与花名册不一致时失败关闭', () => {
+  const jwt = makeJwt({ exp: FUTURE, nick: 'Mia 钟笑咪' });
+  saveTtcToken(db, 'felix', jwt, validateJwt(jwt));
+  assert.throws(() => grantSharedTtcCredential(db, {
+    sourceConsultantId: 'felix', granteeConsultantId: 'dykes',
+    grantedBy: 'admin', reason: 'invalid owner',
+  }), /TTC_CREDENTIAL_OWNER_INVALID/);
+  db.prepare("DELETE FROM ttc_tokens WHERE consultant_id='felix'").run();
 });
 
 /* 端点 E2E：PUT 粘贴 → 活验证（打桩 fetch）→ 落库；GET 不回显 JWT；401 路径不落库 */

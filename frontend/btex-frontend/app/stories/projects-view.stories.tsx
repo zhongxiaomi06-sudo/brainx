@@ -106,6 +106,19 @@ export const SearchingInFeishu: Story = {
   },
 };
 
+export const GroupReadyNeedsTtc: Story = {
+  args: { projects: [project("P-GROUP-READY", "PENDING_START", { launch: {
+    status: "READY", current_step: "READY", chat_id: "oc_masked", chat_name: "项目群",
+    search_status: null, search_task_id: null, error_code: null,
+    error_message: null, updated_at: "2026-09-08T10:00:00.000Z",
+  } })] },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText(/项目群和职位卡已就绪/)).toBeInTheDocument();
+    await expect(canvas.getByRole("button", { name: /启动 OpenMai 找人/ })).toBeEnabled();
+  },
+};
+
 export const Empty: Story = {
   args: { projects: [] },
 };

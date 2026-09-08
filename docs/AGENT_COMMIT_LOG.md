@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-08｜docs(sourcing): T8 生产部署完成 + 三通道 E2E 验证通过（specs/007/008）
+
+- 部署：本地 full 门禁 24/24 → push（5474798..ddb8d18）→ ECS 经 SSH 直推 ff 对齐（ECS→GitHub 443 持续连不通，`git push ssh://…/opt/brainx main:refs/heads/deploy-tmp` + `merge --ff-only` 绕过）→ 重启 brainx/brainx-worker/brainx-agent-gateway/openclaw-brainx 四服务，`/api/v1/meta/guard` 200。
+- E2E（生产真实链路）：① 三 skill 发现 ✅；② Reloop 内部库真实查 RDS ✅（信封 candidate_match_bundle_v1，empty_reason=NO_AUTHORIZED_SHORTLIST + 溯源引导正确；RDS 公网偶发连接抖动会转 SOURCE_UNAVAILABLE，属瞬态）；③ OpenMai 按职位：生产当晨 mia 两单自动 done（04:26/02:46 UTC）证明自动链路存活；④ SuperMai criteria 真实找人 ✅：触发→done 仅 3 分 43 秒，命中 608 人、结构化返回 10 名（机器块解析正常、assess complete=true），渠道证据脉脉、resume_url 如实为 null。
+- 测试发现的运维事实：①worker.env 的 BRAINX_DB=brainx.sqlite 是遗留值，服务实际都用 data/brainx.db（冒烟脚本曾误建 brainx.sqlite 已删）；②进程中途死亡会留僵尸 running 行，但 worker 的 failStaleOpenmaiTasks（60 分钟）会自动置 failed 允许重试——自愈已验证；③冒烟脚本进程内触发必须守到收敛，不能立即 exit。
+- 冒烟脚本与日志已从服务器清除。
+
 ## 2026-09-08｜feat(sourcing): 三通道人才搜索 skill 打包（specs/008）
 
 - 决议（用户）：人才搜索三通道、三个工具包、skill 形式自由调用；工具逻辑沿用已搭建成果不改动。

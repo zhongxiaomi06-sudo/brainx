@@ -7,4 +7,4 @@
 - [x] T5 插件 runtime.js 同步 + 版本 1.3.0
 - [x] T6 tests/supermai-sourcing.test.mjs 重写并通过
 - [x] T7 verify:quick 通过 + 原子 commit + AGENT_COMMIT_LOG
-- [ ] T8 生产部署（另行执行：/opt/brainx 对齐 + 四服务重启 + 冒烟）
+- [x] T8 生产部署（另行执行：/opt/brainx 对齐 + 四服务重启 + 冒烟）

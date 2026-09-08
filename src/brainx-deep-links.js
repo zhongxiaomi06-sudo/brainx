@@ -5,7 +5,10 @@ export function productionBaseUrl(explicit) {
   if (!raw) throw new Error('BRAINX_BASE_URL_REQUIRED');
   let parsed;
   try { parsed = new URL(raw); } catch { throw new Error('BRAINX_BASE_URL_INVALID'); }
-  if (parsed.protocol !== 'https:' || parsed.username || parsed.password) {
+  const loopbackHttp = process.env.BRAINX_ALLOW_HTTP_LOOPBACK === '1'
+    && parsed.protocol === 'http:'
+    && ['127.0.0.1', 'localhost'].includes(parsed.hostname);
+  if ((!loopbackHttp && parsed.protocol !== 'https:') || parsed.username || parsed.password) {
     throw new Error('BRAINX_BASE_URL_INVALID');
   }
   parsed.pathname = '/';

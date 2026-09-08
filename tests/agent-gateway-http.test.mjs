@@ -59,7 +59,7 @@ after(() => {
   server?.close();
 });
 
-test('健康检查返回状态、授权就绪度、版本与固定 23 个工具', async () => {
+test('健康检查返回状态、授权就绪度、版本与固定 24 个工具', async () => {
   const response = await fetch(`${base}/internal/v1/agent/health`);
   assert.equal(response.status, 200);
   const data = await response.json();
@@ -67,7 +67,7 @@ test('健康检查返回状态、授权就绪度、版本与固定 23 个工具'
   assert.deepEqual(data.authorization, {
     status: 'ready', configured_accounts: 1, bound_identities: 1,
   });
-  assert.equal(data.tools.length, 23);
+  assert.equal(data.tools.length, 24);
   assert.equal(data.tool_catalog_version, 'agent-tools.v2');
   assert.doesNotMatch(JSON.stringify(data), /token|secret|open_id|consultant/i);
 });

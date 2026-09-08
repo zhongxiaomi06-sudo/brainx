@@ -130,6 +130,7 @@ registry.js（15）                    mcp/server.mjs（15）
 | `brainx_record_progress` | **仅 MCP** | 写 | ✅ | 守门正确 |
 | `brainx_terminal_result` | **仅 MCP** | 写 | ✅ | 守门正确 |
 | `brainx_candidate_shortlist` | **仅 MCP** | 读 | ⚠️ | 已有双重职位/人才授权与脱敏；仅在单顾问+单租户绑定 PoC 外露，生产需 Agent Gateway |
+| `brainx_send_candidate_resume` | **仅 Agent Gateway** | 写 | ✅ | 仅登记项目群、绑定 sender、可见职位与 OpenMai 候选；按钮显式确认后回查 TTC，文件不进入模型上下文 |
 | `brainx_opportunity` | 两套都有 | 读 | ⚠️ | 先查 `job_facts` migrations 有无客户 BD 联系人字段 |
 | `brainx_recommend_run` | **仅 MCP** | 写 | ✅ | 已加 60s 限流（B6 测试覆盖） |
 | `brainx_feedback` | **仅 MCP** | 写 | ⚠️ | 核 `recommendationFeedback` 是否校验职位归属 |

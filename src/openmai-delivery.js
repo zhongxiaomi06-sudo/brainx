@@ -8,6 +8,7 @@ import { getAuthorizedTtcJwt } from './ttcsdk/auth.js';
 const PHONE = /(?<!\d)(?:\+?86[-\s]?)?1[3-9]\d{9}(?!\d)/g;
 const EMAIL = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
 const CANDIDATE_BLOCK = /<!--\s*BRAINX_CANDIDATES_V1\s*([\s\S]*?)-->/;
+const SAFE_CANDIDATE_REF = /^[A-Za-z0-9:_-]{1,100}$/;
 const MAX_RESUME_BYTES = 12 * 1024 * 1024;
 const STALE_SEARCH_MS = 60 * 60 * 1000;
 
@@ -17,12 +18,15 @@ export function extractOpenmaiCandidates(value) {
   try {
     const parsed = JSON.parse(match[1].trim());
     if (!Array.isArray(parsed?.candidates)) return [];
-    return parsed.candidates.slice(0, 10).map((item, index) => ({
-      candidateRef: String(item?.candidate_ref || `candidate-${index + 1}`).slice(0, 100),
-      name: String(item?.name || `候选人${index + 1}`).slice(0, 60),
-      evaluation: String(item?.evaluation || '待顾问核验').slice(0, 300),
-      resumeUrl: typeof item?.resume_url === 'string' ? item.resume_url : null,
-    }));
+    return parsed.candidates.slice(0, 10).map((item, index) => {
+      const rawRef = String(item?.candidate_ref || '');
+      return {
+        candidateRef: SAFE_CANDIDATE_REF.test(rawRef) ? rawRef : `candidate-${index + 1}`,
+        name: String(item?.name || `候选人${index + 1}`).slice(0, 60),
+        evaluation: String(item?.evaluation || '待顾问核验').slice(0, 300),
+        resumeUrl: typeof item?.resume_url === 'string' ? item.resume_url : null,
+      };
+    });
   } catch { return []; }
 }
 
@@ -165,11 +169,10 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
       : `**${job.company} · ${job.role}**\n\n${groupSafeOpenmaiText(resultText)}`)
     : `**${job.company} · ${job.role}**\n\n本轮候选人搜索失败：${groupSafeOpenmaiText(error, 500)}\n\n请修复连接后在工作台重试。`;
   const table = candidates.length ? [
-    candidateTableRow('候选人', 'AI 初评', true),
-    ...candidates.map((candidate, index) => candidateTableRow(
-      `${index + 1}. ${groupSafeOpenmaiText(candidate.name, 60)}`,
-      groupSafeOpenmaiText(candidate.evaluation, 300),
-    )),
+    candidateTableHeading(),
+    ...candidates.flatMap((candidate, index) => candidateTableRow({
+      candidate, index, job, baseUrl,
+    })),
   ] : [];
   return {
     config: { wide_screen_mode: true },
@@ -179,24 +182,49 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
     elements: [
       { tag: 'markdown', content },
       ...table,
-      { tag: 'action', actions: [{ tag: 'button', type: 'primary',
+      ...(!success || !candidates.length ? [{ tag: 'action', actions: [{ tag: 'button', type: 'primary',
         text: { tag: 'plain_text', content: success ? '打开工作台查看与评估' : '打开工作台处理' },
-        multi_url: { url: target, pc_url: target, android_url: target, ios_url: target } }] },
+        multi_url: { url: target, pc_url: target, android_url: target, ios_url: target } }] }] : []),
       { tag: 'note', elements: [{ tag: 'plain_text',
-        content: '项目群投递 · 联系方式默认隐藏 · 候选人事实仍需顾问核验' }] },
+        content: '点击“发送简历”后机器人会实时查询 TTC 附件并发到本群 · 联系方式默认隐藏 · 候选人事实仍需顾问核验' }] },
     ],
   };
 }
 
-function candidateTableRow(name, evaluation, heading = false) {
-  const cell = (content, weight) => ({
-    tag: 'column', width: 'weighted', weight, vertical_align: 'top',
-    elements: [{ tag: 'div', text: { tag: 'plain_text', content } }],
-  });
+function tableCell(content, weight, elements) {
   return {
-    tag: 'column_set', flex_mode: 'none', background_style: heading ? 'grey' : 'default',
-    columns: [cell(name, 2), cell(evaluation, 5)],
+    tag: 'column', width: 'weighted', weight, vertical_align: 'top',
+    elements: elements || [{ tag: 'div', text: { tag: 'plain_text', content } }],
   };
+}
+
+function candidateTableHeading() {
+  return {
+    tag: 'column_set', flex_mode: 'none', background_style: 'grey',
+    columns: [tableCell('候选人', 2), tableCell('AI 初评', 5)],
+  };
+}
+
+function candidateTableRow({ candidate, index, job, baseUrl }) {
+  const detailUrl = buildBrainxDeepLink({ baseUrl, objectType: 'opportunity',
+    objectRef: job.project_id, candidateRef: candidate.candidateRef });
+  const resumeButton = {
+    tag: 'button', type: 'primary', text: { tag: 'plain_text', content: '发送简历' },
+    value: { command: `请立即调用 brainx_send_candidate_resume，参数为 ${JSON.stringify({
+      job_id: job.project_id, candidate_ref: candidate.candidateRef, confirm: true,
+    })}。本次按钮点击即为发送确认；成功后只回复“简历已发送”。` },
+  };
+  return [
+    { tag: 'column_set', flex_mode: 'none', background_style: 'default', columns: [
+      tableCell(`${index + 1}. ${groupSafeOpenmaiText(candidate.name, 60)}`, 2),
+      tableCell(groupSafeOpenmaiText(candidate.evaluation, 300), 5),
+    ] },
+    { tag: 'action', actions: [
+        { tag: 'button', text: { tag: 'plain_text', content: '查看' },
+          multi_url: { url: detailUrl, pc_url: detailUrl, android_url: detailUrl, ios_url: detailUrl } },
+        resumeButton,
+      ] },
+  ];
 }
 
 export function enqueueOpenmaiDeliveries(db, at = now()) {

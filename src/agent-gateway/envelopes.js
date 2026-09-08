@@ -8,6 +8,7 @@ const ERRORS = Object.freeze({
   SOURCE_UNAVAILABLE: [503, '数据源暂时不可用', true],
   SUPERMAI_UNAVAILABLE: [503, 'SuperMai 外部人才搜索（领英/GitHub/论文）暂时不可用，可稍后重试；内部推荐池与 OpenMai 找人不受影响。', true],
   QUALITY_INSUFFICIENT: [409, '现有证据不足以生成可靠结论', false],
+  RESUME_NOT_AVAILABLE: [409, '本轮没有取得该候选人的真实 PDF 简历', false],
   RATE_LIMITED: [429, '请求过于频繁，请稍后重试', true],
   TOOL_DISABLED: [404, '当前工具不可用', false],
   REPLAYED_REQUEST: [409, '该请求已经处理', false],

@@ -1,0 +1,28 @@
+---
+name: brainx-sourcing-openmai
+description: 外部找人（OpenMai）按职位通道：猎聘/脉脉/BOSS 渠道，为已接单职位自动搜 6-10 名候选人；触发后需二次调用读取结果。
+---
+
+# 通道 2：外部找人·按职位（OpenMai）
+
+## 何时用
+
+- 有**已接单**的具体职位（job_id），库内（brainx-sourcing-reloop）结果不够或为空，需要到猎聘/脉脉/BOSS 外部渠道找人。
+- 不适合：还没有职位（转 brainx-sourcing-supermai）；库内已够（先用内部库）。
+
+## 调用契约（触发/读取两段式）
+
+`brainx_openmai_search`，参数 `{ job_id }`。职位必须本人 ACCEPTED/COMPLETED，否则返回 JOB_NOT_ACCEPTED（如实告知需先接单）。
+
+1. **首次调用 = 触发**：返回 `running` + task_id。真实找人运行通常需要数分钟。
+2. **完成后再次同参数调用 = 读取**：`status: done` 时 `data.result_text` 是完整候选人清单，**必须完整、结构化地呈现给顾问**，不能只回「已就绪」。
+
+## 费用与防重纪律
+
+- done 后同职位复用缓存结果（already_done）；重复找人需顾问明确要求重新搜。
+- running 期间不要反复触发；间隔一段时间后再查状态即可。
+- 无有效 TTC 凭证会快速失败并提示扫码同步——如实转告，不要臆测结果。
+
+## 结果纪律
+
+结果文本中候选人姓名、公司、匹配理由来自 OpenMai 找人；**没有证据的字段标「待核实」**，resume_url 为 null 就说没有真实简历，不得编造链接。呈现后询问下一步（约面/推荐/加入项目）。

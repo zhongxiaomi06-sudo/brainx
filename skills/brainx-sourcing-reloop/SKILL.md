@@ -1,0 +1,28 @@
+---
+name: brainx-sourcing-reloop
+description: 内部人才库（Reloop）通道：按职位读取已授权的预计算人才短名单，零外部成本即时返回；讨论人才供给或开始找人时应最先查这里。
+---
+
+# 通道 1：内部人才库（Reloop）
+
+## 何时用
+
+- 有具体职位（job_id），想知道「库内有没有已评估过的匹配人才」——**任何找人动作前先查这里**。
+- 用户问「这个职位咱们库里有没有人」「人才供给怎么样」。
+- 不适合：没有职位、或库内结果不够需要外部找人（转 brainx-sourcing-openmai / brainx-sourcing-supermai）。
+
+## 调用契约
+
+`brainx_candidate_shortlist`，参数 `{ job_id, limit?（1-5，默认 5）, page_token? }`。
+
+- 只读预计算结果：授权（talent/job access grants）在 SQL 内校验，服务端注入身份，不在参数里指定顾问或租户。
+- 分页：`data.page.next_page_token` 非空时可用 `page_token` 继续取下一页。
+- 姓名**只显示掩码**（`姓*`）；履历、评分、证据在授权范围内展示。
+
+## 空结果语义（重要）
+
+`empty_reason: NO_AUTHORIZED_SHORTLIST` 或空 items ≠ 数据故障：可能是该职位无匹配运行、无授权、或确实无人。如实说「内部库此职位暂无已授权的匹配结果」，不要臆断「人才库挂了」，也不要编造候选人。需要外部供给时明确建议转 OpenMai/SuperMai 通道。
+
+## 组合策略
+
+标准顺序：**内部库（先，零成本）→ 不够再 OpenMai（按职位外部找人）→ 模糊探索用 SuperMai（按判据）**。三通道可并行；对外部找人结果与库内结果做合并去重时，以库内 `candidate_ref` 为准。

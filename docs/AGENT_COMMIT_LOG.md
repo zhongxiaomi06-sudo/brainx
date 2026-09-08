@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-08｜feat(sourcing): 三通道人才搜索 skill 打包（specs/008）
+
+- 决议（用户）：人才搜索三通道、三个工具包、skill 形式自由调用；工具逻辑沿用已搭建成果不改动。
+- 三个 SKILL.md（frontmatter 仅 name/description，产品内嵌 agent discoverSkills 自动发现，重启生效）：`skills/brainx-sourcing-reloop/`（内部人才库 Reloop，brainx_candidate_shortlist——先查零成本即时）、`skills/brainx-sourcing-openmai/`（OpenMai 按职位外部找人，brainx_openmai_search——两段式触发/读取）、`skills/brainx-sourcing-supermai/`（SuperMai 按判据自由找人，brainx_supermai_scout——无职位也能搜，猎聘/脉脉）。每包含：三通道决策树、调用契约、费用与防重纪律、空结果溯源话术、隐私掩码纪律、组合策略（内部库 → 外部找人，合并以库内 candidate_ref 为准）。
+- 边界：不加入 openclaw 安装集（tests 的 installable/allowed 断言不变）；不改工具参数与处理器。
+- 验证：agent-tools 回归 17/17；verify:quick 16/16。生产部署与 specs/007 T8 合并执行。
+
 ## 2026-09-08｜feat(supermai): 找人双入口落地——SuperMai 按判据找人改接 OpenMai 引擎（specs/007）
 
 - 根因纠正（用户拍板）：SuperMai 找人的真实形态 = 在猎聘、脉脉上找人，不在 TTC。09-07 按前端 chunk 接的 `app.ttcadvisory.com/app/sourcing/api/sourcing/v1` web 检索后端整个是错误对象（实测 /auth/* 200 在线、/sessions 与 /chat/* 持续 404，五重证据排除探测机因素），全部调用代码移除；supermai_credentials 表保留不删（代码不再读写）。

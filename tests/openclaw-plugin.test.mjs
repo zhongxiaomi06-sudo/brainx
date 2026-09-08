@@ -8,6 +8,7 @@ import {
   createBrainxToolFactory,
   resolveTrustedPrincipal,
 } from '../plugins/brainx-openclaw/runtime.js';
+import { createBraintexPromptContext } from '../plugins/brainx-openclaw/prompt.js';
 
 const root = new URL('../', import.meta.url);
 const fixture = JSON.parse(await readFile(new URL('tests/fixtures/openclaw-production/plugin-contract.json', root)));
@@ -35,6 +36,7 @@ test('plugin package and manifest declare exactly the approved tools', () => {
   assert.equal(manifest.id, 'brainx-openclaw');
   assert.deepEqual(manifest.activation, { onStartup: true });
   assert.match(entrySource, /api\.on\('reply_payload_sending'/);
+  assert.match(entrySource, /api\.on\('before_prompt_build'/);
   assert.doesNotMatch(entrySource, /registerHook\('reply_payload_sending'/);
   assert.equal(manifest.configSchema.additionalProperties, false);
   assert.deepEqual(manifest.contracts.commands, ['brainx']);
@@ -46,6 +48,14 @@ test('plugin package and manifest declare exactly the approved tools', () => {
     assert.equal('url' in tool.parameters.properties, false);
     assert.equal('sender' in tool.parameters.properties, false);
   }
+});
+
+test('BrainTex prompt routes natural-language job recommendations to authorized data', () => {
+  const prompt = createBraintexPromptContext({ messageProvider: 'feishu' });
+  assert.match(prompt, /推荐三个/);
+  assert.match(prompt, /brainx_daily_brief/);
+  assert.match(prompt, /不得凭常识编造职位方向/);
+  assert.equal(createBraintexPromptContext({ messageProvider: 'telegram' }), undefined);
 });
 
 test('trusted principal rejects missing, inconsistent, non-Feishu, and forged private contexts', () => {

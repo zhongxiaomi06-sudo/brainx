@@ -222,14 +222,20 @@ function supermaiScout(db, args, principal) {
   const cur = getOpenmaiResult(db, principal.consultantId, project_id) || {};
   if (cur.status === 'done' || cur.status === 'running') {
     const candidates = cur.status === 'done' ? extractOpenmaiCandidates(cur.result_text) : [];
+    // NO_REPLY/空结果：OpenMai 对极窄判据可能零命中（返回占位符）——语义化为「未搜到」而非当成成功交付。
+    const noReply = cur.status === 'done' && !candidates.length
+      && ['NO_REPLY', ''].includes(String(cur.result_text || '').trim());
     return {
       data: { entry: 'supermai', criteria, status: cur.status,
-              result_text: cur.result_text || null, candidates,
+              result_text: noReply ? null : cur.result_text || null, candidates,
+              empty_reason: noReply ? 'NO_MATCHES_FOUND' : null,
               started_at: cur.started_at || null, finished_at: cur.finished_at || null },
       facts: [], inferences: [],
-      recommendations: cur.status === 'done' ? [{ action: 'present_result',
+      recommendations: cur.status === 'done' && !noReply ? [{ action: 'present_result',
         note: '结果已就绪——请把 data.result_text 里的候选人列表完整、结构化地呈现给顾问，并询问下一步（约面/推荐）。' }] : [],
-      unknowns: cur.status === 'running' ? ['找人任务进行中，稍后再调本工具取结果'] : [],
+      unknowns: cur.status === 'running'
+        ? ['找人任务进行中，稍后再调本工具取结果']
+        : noReply ? ['本轮未搜到匹配候选人——建议放宽判据（去掉具体公司名、缩短方向、拆成 2-3 个宽方向）后重新触发'] : [],
       evidence_refs: [`supermai:${cur.task_id || project_id}`],
     };
   }

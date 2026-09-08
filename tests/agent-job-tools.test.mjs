@@ -124,3 +124,18 @@ test('SuperMai 入口（specs/007）：无 TTC 凭证 → error + 引导语，�
   assert.equal(out.data.status, 'error');
   assert.ok(out.data.message.includes('TTC 凭证'));
 });
+
+test('SuperMai 入口（specs/008）：NO_REPLY 零命中语义化为未搜到，不当成成功交付', async () => {
+  const { db, handlers } = fixture();
+  const criteria = '北京视界引擎科技 海外产品UI设计专家';
+  const key = supermaiCriteriaKey(criteria);
+  const at = new Date().toISOString();
+  db.prepare(`INSERT INTO openmai_results (project_id, consultant_id, status, result_text, task_id, started_at, finished_at)
+    VALUES (?,?,?,?,?,?,?)`).run(key, 'felix', 'done', 'NO_REPLY', 'sm_zero', at, at);
+  const out = await handlers.brainx_supermai_scout({ criteria }, context('felix', 'candidate_review'));
+  assert.equal(out.data.status, 'done');
+  assert.equal(out.data.result_text, null, 'NO_REPLY 不作为结果文本交付');
+  assert.equal(out.data.empty_reason, 'NO_MATCHES_FOUND');
+  assert.ok(out.unknowns.some((u) => u.includes('放宽判据')), '零命中要给出放宽判据建议');
+  assert.equal(out.recommendations.length, 0, '零命中不出现 present_result');
+});

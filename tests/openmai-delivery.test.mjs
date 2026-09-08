@@ -4,6 +4,7 @@ import { openDb, now } from '../src/db.js';
 import {
   groupSafeOpenmaiText, deliverOpenmaiResultsOnce, extractOpenmaiCandidates, downloadResumePdf,
   buildCandidateTopicCard,
+  buildOpenmaiDeliveryCard,
   buildResumeUnavailableCard,
   assessOpenmaiCandidateBatch,
   retryOpenmaiDelivery,
@@ -163,6 +164,28 @@ test('OpenMai 结构化候选少于 6 人时显式标记不足，历史无机器
   assert.equal(assessOpenmaiCandidateBatch('历史候选结果').complete, true);
 });
 
+test('OpenMai 总览使用整洁双列表格且末尾只有一个操作按钮', () => {
+  const resultText = `不应把这段 Markdown 原文直接发群\n|姓名|详情|\n|---|---|\n<!-- BRAINX_CANDIDATES_V1
+${JSON.stringify({ candidates: [
+    { candidate_ref: 'c-1', name: '张三', evaluation: '匹配 91%，驱动经验待核实', resume_url: null },
+    { candidate_ref: 'c-2', name: '李四', evaluation: '匹配 86%，地点待核实', resume_url: null },
+  ] })}
+-->`;
+  const card = buildOpenmaiDeliveryCard({ job: { project_id: 'P-DELIVERY', company: '甲公司', role: '研发负责人' },
+    status: 'done', resultText, publicBaseUrl: 'https://base.yorkteam.cn/' });
+  const rows = card.elements.filter((element) => element.tag === 'column_set');
+  assert.equal(rows.length, 3, '一行表头加两行候选人');
+  assert.equal(rows[0].columns[0].elements[0].text.content, '候选人');
+  assert.equal(rows[1].columns[0].elements[0].text.content, '1. 张三');
+  assert.match(rows[1].columns[1].elements[0].text.content, /91%/);
+  assert.doesNotMatch(JSON.stringify(card), /\|姓名\|详情\||不应把这段/);
+  const actions = card.elements.filter((element) => element.tag === 'action');
+  assert.equal(actions.length, 1);
+  assert.equal(actions[0].actions.length, 1);
+  assert.equal(actions[0].actions[0].text.content, '打开工作台查看与评估');
+  assert.equal(card.elements.at(-2).tag, 'action');
+});
+
 test('OpenMai 候选不足仍投递已有结果，并把项目置为明确可重试状态', async () => {
   const db = seededDb();
   const partial = `候选摘要\n<!-- BRAINX_CANDIDATES_V1\n${JSON.stringify({ candidates: [
@@ -175,7 +198,7 @@ test('OpenMai 候选不足仍投递已有结果，并把项目置为明确可重
     sendInteractiveCard: async (input) => { cards.push(input); return { message_id: `om_${cards.length}` }; },
   });
   assert.equal(out.sent, 1);
-  assert.equal(cards.length, 2, '整批告警和已有候选话题均须保留');
+  assert.equal(cards.length, 1, '无真实 PDF 时只投递一张整洁总览卡');
   assert.equal(cards[0].card.header.template, 'orange');
   assert.match(cards[0].card.header.title.content, /候选人不足/);
   assert.match(cards[0].card.elements[0].content, /仅返回 1 名/);

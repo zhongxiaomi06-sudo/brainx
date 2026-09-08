@@ -51,6 +51,8 @@ BrainTex 飞书功能首页不在 React Storybook 里复制一套仿真卡片；
 
 BrainTex 每日推荐卡不在 Storybook 复制飞书组件；条数来自本人配置，正文组织为结论、依据、风险和下一步，URL 只负责打开已鉴权的正式工作台。2026-09-03 已在目标飞书验证原生互动卡；普通自然语言回复的 `presentation` typed hook 已实现，但当前锁定版 Feishu 自动回复路径没有传入该 hook，仍需升级或修复后再验收。候选 Case 专页尚未设计，不能把底层状态工具记为前端完成。状态见 [BrainTex 富卡片与业务闭环审核记录](frontend-reviews/2026-09-03-braintex-rich-cards-loop.md)。
 
+OpenMai 候选人总览同样不在 React Storybook 伪造飞书组件。正式投递使用原生双列布局展示候选人与 AI 初评，只在末尾提供一个工作台按钮；原始 Markdown 表格不再进入群消息，没有真实 PDF 时不创建重复逐人话题。自动测试负责结构和安全边界，视觉以真实飞书预览为准，见 [OpenMai 候选人表格卡复审](frontend-reviews/2026-09-08-openmai-candidate-table.md)。
+
 ## 使用命令
 
 从仓库根目录执行：

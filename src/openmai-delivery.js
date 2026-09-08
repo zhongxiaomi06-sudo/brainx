@@ -105,7 +105,8 @@ export function buildResumeUnavailableCard(candidate) {
 }
 
 async function deliverCandidateTopics(db, row, dependencies) {
-  const candidates = extractOpenmaiCandidates(row.result_text);
+  // 总览统一放在一张表格卡中；只有真实 PDF 需要独立话题承载附件。
+  const candidates = extractOpenmaiCandidates(row.result_text).filter((candidate) => candidate.resumeUrl);
   if (candidates.length === 0) return 0;
   const send = dependencies.sendInteractiveCard || sendInteractiveCard;
   const withResume = candidates.some((candidate) => candidate.resumeUrl);
@@ -156,10 +157,20 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
   const success = status === 'done';
   const quality = success ? assessOpenmaiCandidateBatch(resultText) : null;
   const complete = success && quality.complete;
+  const candidates = success ? extractOpenmaiCandidates(resultText) : [];
   const content = success
-    ? `**${job.company} · ${job.role}**\n\n${groupSafeOpenmaiText(resultText)}`
-      + (quality.message ? `\n\n> ⚠️ ${quality.message}` : '')
+    ? (candidates.length
+      ? `**${job.company} · ${job.role}**\n\n本轮共找到 ${candidates.length} 位候选人。`
+        + (quality.message ? `\n\n> ⚠️ ${quality.message}` : '')
+      : `**${job.company} · ${job.role}**\n\n${groupSafeOpenmaiText(resultText)}`)
     : `**${job.company} · ${job.role}**\n\n本轮候选人搜索失败：${groupSafeOpenmaiText(error, 500)}\n\n请修复连接后在工作台重试。`;
+  const table = candidates.length ? [
+    candidateTableRow('候选人', 'AI 初评', true),
+    ...candidates.map((candidate, index) => candidateTableRow(
+      `${index + 1}. ${groupSafeOpenmaiText(candidate.name, 60)}`,
+      groupSafeOpenmaiText(candidate.evaluation, 300),
+    )),
+  ] : [];
   return {
     config: { wide_screen_mode: true },
     header: { template: complete ? 'green' : success ? 'orange' : 'red', title: { tag: 'plain_text',
@@ -167,12 +178,24 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
         : success ? 'BrainTex · 首轮候选人不足' : 'BrainTex · 候选人搜索失败' } },
     elements: [
       { tag: 'markdown', content },
+      ...table,
       { tag: 'action', actions: [{ tag: 'button', type: 'primary',
-        text: { tag: 'plain_text', content: success ? '查看完整结果并评估' : '打开工作台处理' },
+        text: { tag: 'plain_text', content: success ? '打开工作台查看与评估' : '打开工作台处理' },
         multi_url: { url: target, pc_url: target, android_url: target, ios_url: target } }] },
       { tag: 'note', elements: [{ tag: 'plain_text',
         content: '项目群投递 · 联系方式默认隐藏 · 候选人事实仍需顾问核验' }] },
     ],
+  };
+}
+
+function candidateTableRow(name, evaluation, heading = false) {
+  const cell = (content, weight) => ({
+    tag: 'column', width: 'weighted', weight, vertical_align: 'top',
+    elements: [{ tag: 'div', text: { tag: 'plain_text', content } }],
+  });
+  return {
+    tag: 'column_set', flex_mode: 'none', background_style: heading ? 'grey' : 'default',
+    columns: [cell(name, 2), cell(evaluation, 5)],
   };
 }
 

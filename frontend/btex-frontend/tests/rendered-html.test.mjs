@@ -247,6 +247,8 @@ test("keeps membership separate and gives pending projects one Feishu recruiting
   assert.match(workbench, /startProjectLaunch/);
   assert.match(workbench, /正在创建项目群…/);
   assert.match(workbench, /OpenMai 找人中/);
+  assert.match(workbench, /项目群和职位卡已就绪/);
+  assert.match(workbench, /启动 OpenMai 找人/);
   assert.doesNotMatch(visibleCopy, /确认接单|已接单|交付列表|接单后|再接单/);
 });
 

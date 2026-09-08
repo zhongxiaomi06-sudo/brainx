@@ -17,7 +17,7 @@ import {
   type BackendSessionStatus, type BrainxReplay, type BrainxSnapshot, type OpenmaiResult,
   type BackendClientRow, type RadarPayload,
 } from "./brainx-api";
-import { getProjects, launchProjectWorkflow, projectToDecisionJob, updateOpportunityMembership, type ProjectSummary } from "./brainx-projects-api";
+import { getProjects, launchProjectWorkflow, projectLaunchNotice, projectToDecisionJob, updateOpportunityMembership, type ProjectSummary } from "./brainx-projects-api";
 import { streamAssistant, type AssistantMessage, type AssistantToolEvent } from "./brainx-assistant-api";
 import { actionSeed, clients, decisionGroupMeta, decisionJobs, DEFAULT_FOLDERS, engagementPrerequisite, events, initialEngagement, initialEvents, initialOutcomes, INITIAL_TRAY_IDS, legalActions, nextState, readSavedWorkbenchState, stateEvent, verificationJobs, type DecisionAction, type DecisionGroup, type DecisionJob, type MembershipRelation, type Page, type Panel, type PickFolder, type SourceMode } from "./workbench-model";
 import { DrawerSection, FilterSelect, Heading, StatusTag, type FilterSelectOption } from "./workbench-controls";
@@ -218,7 +218,7 @@ export default function DecisionWorkbench({demo=false}:{demo?:boolean}={}){
   const response=await getProjects();setBrainxProjects(response.items);
   setMembershipRelations(Object.fromEntries(response.items.map(project=>[project.project_id,project.relation])));
  };
- const launchProjectInFeishu=async(project:ProjectSummary)=>{if(brainxMode!=="connected")throw new Error("BrainTex 服务当前不可用，请恢复连接后重试");const response=await launchProjectWorkflow(project.project_id,makeIdempotencyKey(`project-launch:${project.project_id}`));await Promise.all([refreshProjects(),refreshBrainxJob(project.project_id)]);notify(`${project.company} · 飞书项目群已就绪，${response.search.status==="already_done"?"候选人结果已存在":"OpenMai 已开始找人"}`)};
+ const launchProjectInFeishu=async(project:ProjectSummary)=>{if(brainxMode!=="connected")throw new Error("BrainTex 服务当前不可用，请恢复连接后重试");const response=await launchProjectWorkflow(project.project_id,makeIdempotencyKey(`project-launch:${project.project_id}`));await Promise.all([refreshProjects(),refreshBrainxJob(project.project_id)]);notify(projectLaunchNotice(project.company,response.search.status))};
  const mergeProject=(project:ProjectSummary|null)=>{if(!project)return;setBrainxProjects(current=>[project,...current.filter(item=>item.project_id!==project.project_id)]);setMembershipRelations(current=>({...current,[project.project_id]:project.relation}))};
  const addToMyProjects=async(jobId:string,label="该职位")=>{
   if(joiningProjects.current.has(jobId))return;

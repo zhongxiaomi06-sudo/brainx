@@ -152,8 +152,7 @@ export async function launchRecruitingWorkflow(db, bus, consultantId, projectId,
   const preflight = projectLaunchPreflight(db, consultantId, projectId, {
     appConfigured: dependencies.appConfigured,
     publicBaseUrl: dependencies.publicBaseUrl,
-    requireSearch: true,
-    ttcConnected: dependencies.ttcConnected,
+    requireSearch: false,
   });
   if (!preflight.ready) {
     const first = preflight.blockers[0];
@@ -170,6 +169,12 @@ export async function launchRecruitingWorkflow(db, bus, consultantId, projectId,
       }, launch: group.launch };
     }
     fail(409, 'PROJECT_SEARCH_OWNER_REQUIRED', '项目群已由其他协作者启动，请由首轮寻访发起人重试');
+  }
+  const searchReady = dependencies.ttcConnected ?? ttcAuthStatus(db, consultantId).connected;
+  if (!searchReady) {
+    return { ok: true, group: group.launch, search: {
+      status: 'credentials_required', message: '项目群已创建并投放职位；连接本人 TTC 后可启动 OpenMai',
+    }, launch: group.launch };
   }
   const state = currentState(db, consultantId, projectId).state;
   if (['COMPLETED', 'RELEASED'].includes(state)) {

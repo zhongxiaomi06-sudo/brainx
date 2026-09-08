@@ -19,8 +19,7 @@ export function projectRoutes(db, dependencies = {}) {
         const preflight = projectLaunchPreflight(db, cid, id, {
           appConfigured: dependencies.appConfigured,
           publicBaseUrl: dependencies.publicBaseUrl,
-          requireSearch: true,
-          ttcConnected: dependencies.ttcConnected,
+          requireSearch: false,
         });
         json(res, 200, { ready: preflight.ready, blockers: preflight.blockers,
           launch: getProjectLaunch(db, cid, id) });

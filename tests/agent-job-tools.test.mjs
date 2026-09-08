@@ -5,6 +5,7 @@ import { runSync } from '../src/sync.js';
 import { recommend } from '../src/recommend.js';
 import { createJobToolHandlers } from '../src/agent-gateway/tools-jobs.js';
 import { createActionToolHandlers } from '../src/agent-gateway/tools-actions.js';
+import { supermaiCriteriaKey } from '../src/supermai-sourcing.js';
 
 function fixture() {
   const db = openDb(':memory:');
@@ -92,4 +93,34 @@ test('OpenMai done 结果返回带 present_result 呈现指引，不能只回「
   assert.ok(out.recommendations.some((r) => r.action === 'present_result' && r.note.includes('完整')),
     'done 分支必须带 present_result 指引，防止模型只回“已就绪”不交付候选人');
   assert.equal(out.unknowns.length, 0);
+});
+
+test('SuperMai 入口（specs/007）：done 结果带结构化 candidates + present_result 指引', async () => {
+  const { db, handlers } = fixture();
+  const criteria = '北京 5年 React 资深前端工程师';
+  const key = supermaiCriteriaKey(criteria);
+  const at = new Date().toISOString();
+  const resultText = [
+    '1. 王五｜Acme｜高级前端',
+    '<!-- BRAINX_CANDIDATES_V1',
+    '{"candidates":[{"candidate_ref":"c1","name":"王五","evaluation":"5年React","resume_url":null}]}',
+    '-->',
+  ].join('\n');
+  db.prepare(`INSERT INTO openmai_results (project_id, consultant_id, status, result_text, task_id, started_at, finished_at)
+    VALUES (?,?,?,?,?,?,?)`).run(key, 'felix', 'done', resultText, 'sm_test1', at, at);
+
+  const out = await handlers.brainx_supermai_scout({ criteria }, context('felix', 'candidate_review'));
+  assert.equal(out.data.entry, 'supermai');
+  assert.equal(out.data.status, 'done');
+  assert.equal(out.data.candidates.length, 1, '机器块解析为结构化 candidates');
+  assert.equal(out.data.candidates[0].name, '王五');
+  assert.ok(out.recommendations.some((r) => r.action === 'present_result'));
+});
+
+test('SuperMai 入口（specs/007）：无 TTC 凭证 → error + 引导语，不臆断成功', async () => {
+  const { handlers } = fixture(); // fixture 库无 ttc_tokens
+  const out = await handlers.brainx_supermai_scout(
+    { criteria: '上海 3年 Java 后端工程师' }, context('felix', 'candidate_review'));
+  assert.equal(out.data.status, 'error');
+  assert.ok(out.data.message.includes('TTC 凭证'));
 });

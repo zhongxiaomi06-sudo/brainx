@@ -98,11 +98,13 @@ export function buildPrompt(job) {
   ].join('\n');
 }
 
-async function callOpenmai(jwt, job) {
+/** 通用 OpenMai 对话调用：SSE 流式读取 + 异步轮询 + 持久化兜底。
+ * jobId 可选：job 模式带 CRM job_id；criteria 模式（supermai-sourcing.js）不带。 */
+export async function callOpenmaiContent(jwt, content, { jobId } = {}) {
   const resp = await fetch(`${OPENMAI_BASE}/api/openmai/v1/completions`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json', Accept: 'text/event-stream' },
-    body: JSON.stringify({ content: buildPrompt(job), job_id: job.unique_id }),
+    body: JSON.stringify(jobId ? { content, job_id: jobId } : { content }),
     signal: AbortSignal.timeout(OPENMAI_TIMEOUT_MS),
   });
   if (!resp.ok) {
@@ -131,6 +133,10 @@ async function callOpenmai(jwt, job) {
   if (!state.result) state.result = await loadPersisted(jwt, state);
   if (!state.result) throw new Error('OpenMai 已结束但没有读取到会话结果');
   return state.result;
+}
+
+async function callOpenmai(jwt, job) {
+  return callOpenmaiContent(jwt, buildPrompt(job), { jobId: job.unique_id });
 }
 
 async function pollAsyncResult(jwt, state) {

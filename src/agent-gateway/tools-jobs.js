@@ -4,7 +4,8 @@ import { jobVisibleTo } from '../visibility.js';
 import { relationOf } from '../relations.js';
 import { currentState } from '../engagement.js';
 import { startOpenmaiTask, getOpenmaiResult } from '../openmai-task.js';
-import { supermaiScoutMatch, getSupermaiCredentials, markSupermaiReauth } from '../supermai-sourcing.js';
+import { supermaiCriteriaKey, startSupermaiScoutTask } from '../supermai-sourcing.js';
+import { extractOpenmaiCandidates } from '../openmai-delivery.js';
 import { getPushPreferences } from '../push-preferences.js';
 
 function fail(code) {
@@ -210,43 +211,38 @@ function openmaiSearch(db, args, principal) {
   };
 }
 
-/** SuperMai 多源搜索（第 22 工具，2026-09-03）：调用 SuperMai 云端 sourcing API
- * 在领英/GitHub/论文渠道搜索候选人，补充 OpenMai 的 BOSS/脉脉/猎聘渠道。
- * 凭证从 supermai_credentials 表读取（AES-GCM 加密，同 ttc_tokens 安全纪律）。 */
-async function supermaiScout(db, args, principal) {
-  const creds = getSupermaiCredentials(db, principal.consultantId);
-  if (!creds) fail('SUPERMAI_UNAVAILABLE');
-  try {
-    const result = await supermaiScoutMatch({
-      criteria: args.criteria,
-      sources: args.sources,
-      limit: args.limit,
-      _credentials: creds,
-    });
+/** SuperMai 按判据找人（第 22 工具；2026-09-08 按 specs/007 纠正重接）：
+ * SuperMai 找人 = 猎聘/脉脉渠道 → 与 openmai_search 共用 OpenMai 引擎，
+ * 本入口是「无需职位、直接给判据」的自由找人（completions 无 job_id 模式）。
+ * 触发/读取两段式：首次调用触发任务返回 running，完成后同参数再调读取结果。 */
+function supermaiScout(db, args, principal) {
+  const criteria = String(args.criteria || '').trim();
+  if (criteria.length < 5) fail('INVALID_ARGUMENT');
+  const project_id = supermaiCriteriaKey(criteria);
+  const cur = getOpenmaiResult(db, principal.consultantId, project_id) || {};
+  if (cur.status === 'done' || cur.status === 'running') {
+    const candidates = cur.status === 'done' ? extractOpenmaiCandidates(cur.result_text) : [];
     return {
-      data: result,
-      facts: [],
-      inferences: result.top_candidates?.slice(0, 3).map((c) => ({
-        candidate_ref: c.ref_id, source: c.source_cn, name: c.name, score: c.score,
-      })) || [],
-      recommendations: result.top_candidates?.slice(0, 5).map((c) =>
-        `[${c.source_cn}] ${c.name} ${c.score}分${c.headline ? ` ${c.headline}` : ''}｜${c.reason}`) || [],
-      unknowns: [
-        ...(result.unknowns || []),
-        ...(result.empty_reason ? ['未找到匹配候选人，建议调整判据重试'] : []),
-      ],
-      evidence_refs: [`supermai_scout:${args.criteria.slice(0, 40)}`],
+      data: { entry: 'supermai', criteria, status: cur.status,
+              result_text: cur.result_text || null, candidates,
+              started_at: cur.started_at || null, finished_at: cur.finished_at || null },
+      facts: [], inferences: [],
+      recommendations: cur.status === 'done' ? [{ action: 'present_result',
+        note: '结果已就绪——请把 data.result_text 里的候选人列表完整、结构化地呈现给顾问，并询问下一步（约面/推荐）。' }] : [],
+      unknowns: cur.status === 'running' ? ['找人任务进行中，稍后再调本工具取结果'] : [],
+      evidence_refs: [`supermai:${cur.task_id || project_id}`],
     };
-  } catch (error) {
-    // 凭证失效与源不可用都归一为 SUPERMAI_UNAVAILABLE：只影响「SuperMai 这一个外部源」，
-    // 引导模型如实告诉顾问（OpenMai/内部推荐池不受影响），不再臆断全链路挂。
-    // TIMEOUT 同归一：领英外部解析等长流程超时是源侧状态，不是系统故障。
-    if (error.code === 'AUTH_EXPIRED') markSupermaiReauth(db, principal.consultantId);
-    if (['SUPERMAI_UNAVAILABLE', 'AUTH_EXPIRED', 'SOURCE_UNAVAILABLE', 'TIMEOUT'].includes(error.code)) {
-      fail('SUPERMAI_UNAVAILABLE');
-    }
-    throw error;
   }
+  const out = startSupermaiScoutTask(db, null, principal.consultantId, criteria);
+  return {
+    data: { entry: 'supermai', criteria, status: out.status || 'triggered',
+            task_id: out.task_id || null, message: out.message || null,
+            note: out.status === 'already_done'
+              ? '同判据结果已存在，请再次调用本工具读取'
+              : '找人任务已触发，完成后再调本工具取结果（OpenMai 找人通常需要数分钟）' },
+    facts: [], inferences: [], recommendations: [], unknowns: [],
+    evidence_refs: [`supermai:${out.task_id || project_id}`],
+  };
 }
 
 export function createJobToolHandlers({ db }) {
@@ -258,6 +254,6 @@ export function createJobToolHandlers({ db }) {
     brainx_personal_review: (args, context) => personalReview(db, args, context.principal),
     brainx_run_status: (args, context) => runStatus(db, args, context.principal),
     brainx_openmai_search: (args, context) => openmaiSearch(db, args, context.principal),
-    brainx_supermai_scout: async (args, context) => supermaiScout(db, args, context.principal),
+    brainx_supermai_scout: (args, context) => supermaiScout(db, args, context.principal),
   };
 }

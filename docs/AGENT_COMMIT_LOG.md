@@ -1,5 +1,13 @@
 # Agent Commit 记录
 
+## 2026-09-08｜feat(supermai): 找人双入口落地——SuperMai 按判据找人改接 OpenMai 引擎（specs/007）
+
+- 根因纠正（用户拍板）：SuperMai 找人的真实形态 = 在猎聘、脉脉上找人，不在 TTC。09-07 按前端 chunk 接的 `app.ttcadvisory.com/app/sourcing/api/sourcing/v1` web 检索后端整个是错误对象（实测 /auth/* 200 在线、/sessions 与 /chat/* 持续 404，五重证据排除探测机因素），全部调用代码移除；supermai_credentials 表保留不删（代码不再读写）。
+- 双入口设计（用户决议「建立两个入口，可以选择找人」）：入口 1 `brainx_openmai_search`（按职位，job_id → CRM 详情 → completions，不变）；入口 2 `brainx_supermai_scout`（按判据自由找人，completions 无 job_id 模式——2026-09-08 18:12 最小付费实测 200 可用）。
+- 实现：openmai-task.js 提取导出 `callOpenmaiContent(jwt, content, { jobId })`（SSE+异步轮询+持久化兜底完全复用）；supermai-sourcing.js 重写为 criteria 入口（合成键 `supermai:<sha256 前 12 位>` 落 openmai_results，匹配不到 project_launches → 无项目群投递副作用；防重纪律与 job 模式一致：running 集合/ done 复用/ 失败 60s 冷却/ 无凭证 fail-closed）；tools-jobs.js supermaiScout 改触发/读取两段式，done 时复用 openmai-delivery 解析器返回结构化 candidates + present_result 指引；tool-registry 与插件 runtime 参数收缩为 `{ criteria }`（移除错误契约的 sources/limit），PLUGIN_VERSION 1.2.1→1.3.0；工具名不变 → 生产 openclaw 白名单无需改动。
+- 测试：supermai-sourcing.test.mjs 按新契约重写 6/6（键稳定性/提示词契约/fail-closed/E2E 无 job_id/失败冷却/并发防重）；agent-job-tools.test.mjs 增 handler 级 2 用例（done 结构化返回、无凭证 error）8/8；verify:quick 16/16 通过。
+- 规格：specs/007-dual-sourcing-entries/（spec/plan/tasks）。生产部署（T8）另行执行。
+
 ## 2026-09-08｜merge(pr): 整合灰度能力并收紧凭证隔离
 
 - 合并：将远端 PR #56 的群内建岗、职位群可见性、TTC 数字游标、SuperMai 真实网页契约和 MCP 初始化超时调整并入本地较新分支，同时保留本地后续的项目群唯一性、OpenMai 防重与部署预检实现。

@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-09｜feat(openclaw): 三通道 sourcing 技能挂进机器人技能白名单（specs/008 收尾）
+
+- 检查发现缺口：openclaw 的 agents.defaults.skills 仍是旧 7 项，三个新 sourcing skill 未被飞书机器人加载——自动选择链路只有工具描述层依据，缺 skill 层指引。
+- 修复：模板 openclaw.production.json 与 tests/agent-tools.test.mjs（installable/allowed 断言）加入 brainx-sourcing-{reloop,openmai,supermai} 与对应工具；服务器已同步 skill 文件到 /var/lib/brainx/.openclaw/skills/、更新生产 openclaw.json（备份 openclaw.json.bak-sourcing-skills-20260909）并重启 openclaw-brainx。
+- 验证：agent-tools 回归通过、quick 门禁 16/16；`openclaw skills list` 显示三技能 ✓ ready；服务 ws client ready 无警告。
+- 注：本提交在 PR #58 合并（9804eae）之后——该合并保留了我们 specs/007 的 callOpenmaiContent 通用导出，双通道地基完好；我的首版补丁曾被合并解决覆盖，本次重打。
+
 ## 2026-09-08｜docs(sourcing): T8 生产部署完成 + 三通道 E2E 验证通过（specs/007/008）
 
 - 部署：本地 full 门禁 24/24 → push（5474798..ddb8d18）→ ECS 经 SSH 直推 ff 对齐（ECS→GitHub 443 持续连不通，`git push ssh://…/opt/brainx main:refs/heads/deploy-tmp` + `merge --ff-only` 绕过）→ 重启 brainx/brainx-worker/brainx-agent-gateway/openclaw-brainx 四服务，`/api/v1/meta/guard` 200。

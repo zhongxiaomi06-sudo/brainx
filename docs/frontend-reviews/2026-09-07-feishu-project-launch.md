@@ -28,7 +28,9 @@
 - TTC 连接后再次点击只复用原群并启动搜索；同一职位仍不得重复建群，未确认时仍不产生任何外部写入。
 - 新增 Storybook 的“群已就绪、待连接 TTC”状态。
 - Dykes 真机验收已确认：本地工作台以 Dykes 身份创建 `海明微半导体-功率模块开发` 群，机器人成功投放职位卡；`project_launches=READY`、`chat_contexts=MENTION_ONLY`、`agent_group_scopes=ACTIVE`，OpenClaw 群白名单和 Dykes sender 白名单同步登记。
-- OpenMai 仍保持待本人 TTC 凭证状态，未借用 Mia 凭证；候选回群与简历附件因此尚未进入真实验收。
+- 用户确认 Mia TTC 是团队共享寻访账号并授权 Dykes 使用后，系统以独立 grant 复用唯一密文；项目和审计继续归 Dykes，职位同步仍不借用 Mia 视野。
+- Dykes 真机 OpenMai 在约 6 分钟后完成：`openmai_results=DONE`、结果 7,029 字、结构化候选人 9 名、飞书 delivery 首次即 `SENT`。群内出现 1 张结果总卡和 9 张逐人评估卡；本轮上游没有返回真实 PDF，因此每张卡明确标示“未取得真实 PDF”，没有伪造简历链接。
+- 职位和候选人深链真机验证可打开 Dykes 本地工作台：对应职位详情自动展开，候选编号进入 BrainX 助手评估上下文。
 - 首次真机请求暴露 `open_id cross app`：工作台和本地 OpenClaw 使用了不同飞书应用。新增显式本地配置，让工作台从同一 OpenClaw 配置读取机器人凭证；不复制或回显密钥。
 
 ## 相关文档

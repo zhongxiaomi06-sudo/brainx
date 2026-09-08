@@ -10,7 +10,7 @@
  *   - 无有效 TTC 凭证快速失败（failed + 引导提示），不空转。
  */
 import { now, uuid } from './db.js';
-import { getValidTtcJwt } from './ttcsdk/auth.js';
+import { getAuthorizedTtcJwt } from './ttcsdk/auth.js';
 
 const API_BASE = process.env.BRAINX_TTC_API_BASE || 'https://api.ttcadvisory.com';
 const OPENMAI_BASE = process.env.BRAINX_OPENMAI_API_BASE || 'https://gateway.ttcadvisory.com';
@@ -167,16 +167,16 @@ export function startOpenmaiTask(db, bus, consultant_id, project_id, { force = f
   if (!force && existing?.status === 'failed' && Date.now() - Date.parse(existing.started_at || 0) < 60_000)
     return { status: 'error', message: '最近一次失败未超过 1 分钟，稍后再试或显式重新找人' };
 
-  const jwt = getValidTtcJwt(db, consultant_id);
+  const jwt = getAuthorizedTtcJwt(db, consultant_id, 'OPENMAI');
   if (!jwt) {
     const t = now();
     db.prepare(`INSERT INTO openmai_results (project_id, consultant_id, status, error, started_at, finished_at)
       VALUES (?,?,?,?,?,?)
       ON CONFLICT(project_id, consultant_id) DO UPDATE SET status='failed', error=excluded.error,
         started_at=excluded.started_at, finished_at=excluded.finished_at`)
-      .run(project_id, consultant_id, 'failed', '没有有效 TTC 凭证——请用浏览器扩展扫码同步', t, t);
+      .run(project_id, consultant_id, 'failed', '没有个人或已授权的团队 TTC 寻访凭证', t, t);
     bus?.emit?.({ type: 'openmai_result', consultant_id, project_id, status: 'failed' });
-    return { status: 'error', message: '没有有效 TTC 凭证——请用浏览器扩展扫码同步' };
+    return { status: 'error', message: '没有个人或已授权的团队 TTC 寻访凭证' };
   }
 
   const task_id = `om_${uuid().slice(0, 8)}`;

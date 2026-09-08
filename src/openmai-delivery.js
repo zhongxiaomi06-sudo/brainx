@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { now } from './db.js';
 import { sendInteractiveCard, sendPdfFile, replyInteractiveCard } from './feishu-bot.js';
 import { buildBrainxDeepLink, productionBaseUrl } from './brainx-deep-links.js';
-import { getValidTtcJwt } from './ttcsdk/auth.js';
+import { getAuthorizedTtcJwt } from './ttcsdk/auth.js';
 
 const PHONE = /(?<!\d)(?:\+?86[-\s]?)?1[3-9]\d{9}(?!\d)/g;
 const EMAIL = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
@@ -109,7 +109,7 @@ async function deliverCandidateTopics(db, row, dependencies) {
   if (candidates.length === 0) return 0;
   const send = dependencies.sendInteractiveCard || sendInteractiveCard;
   const withResume = candidates.some((candidate) => candidate.resumeUrl);
-  const jwt = withResume ? getValidTtcJwt(db, row.consultant_id) : null;
+  const jwt = withResume ? getAuthorizedTtcJwt(db, row.consultant_id, 'OPENMAI') : null;
   if (withResume && !jwt) throw new Error('TTC_CREDENTIALS_REQUIRED_FOR_RESUME');
   let sent = 0;
   for (const [index, candidate] of candidates.entries()) {

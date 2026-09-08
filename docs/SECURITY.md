@@ -72,6 +72,10 @@ systemctl restart brainx
 2. 进「凭证中心」粘贴自己的 TTC JWT（个人视野的职位数据源；不粘则只看团队池数据）
 3. 等下一轮同步（≤3 分钟），确认工作台出现自己名下的推荐
 
+### 团队 TTC 寻访账号
+
+当业务实际只有一个经组织授权的 TTC 登录时，不得把同一 JWT 复制到多个顾问的个人槽位。凭证只保存在真实 TTC 账号对应的 `ttc_tokens` 行；管理员以 `ttc_credential_grants` 明确登记来源顾问、被授权顾问、用途、授权人和原因。当前共享授权只允许 `OPENMAI`：项目、群、任务和操作审计仍记真实发起顾问，共享凭证不能用于该顾问的职位同步，也不能改变其数据可见范围。撤销 grant 或来源凭证过期后立即失败关闭。
+
 ### 验证（管理员在 Workbench 执行）
 
 ```bash
@@ -94,6 +98,7 @@ sqlite3 /opt/brainx/data/brainx.db \
 | session HMAC | `src/session.js` |
 | 令牌 AES 加解密 | `src/feishu.js` |
 | TTC JWT 托管 | `src/ttcsdk/auth.js` |
+| TTC 团队寻访授权 | `migrations/0043_ttc_credential_grants.sql`、`src/ttcsdk/auth.js` |
 | MySQL 连接与 SSL 开关 | `src/db.js`（`BRAINX_MYSQL_SSL`） |
 | OAuth 回调存令牌 | `src/server.js`（saveUserTokens） |
 | 按人同步回退逻辑 | `src/bridge.js`（无令牌 → skipped） |

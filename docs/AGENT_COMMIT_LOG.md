@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-08｜feat(ttc): 支持授权团队账号启动寻访
+
+- 根因：真实业务只有 Mia 的 TTC 登录，原链路要求每位顾问必须拥有个人 TTC 账号，导致 Dykes 即使已经完成建群和机器人联调也无法启动 OpenMai。
+- 改动：新增用途受限的 `ttc_credential_grants`；JWT 仍只保存在真实账号名下，Dykes 仅获得 `OPENMAI` 使用权，不能借此同步 Mia 职位视野。任务、项目、群和审计继续记录真实操作人 Dykes，撤权或凭证失效后立即失败关闭。
+- 本机数据：纠正历史上误挂 Felix 名下、实际归属 Mia 的 TTC 密文，再登记用户明确批准的 Mia→Dykes OpenMai grant；未解密、复制或输出 token。
+- 验证：TTC、项目启动、OpenMai 执行与回群专项 41/41、快速门禁 16/16 通过。Dykes 真机 OpenMai 返回 9 名结构化候选人并一次投递成功；飞书实际显示 1 张总卡和 9 张逐人卡，候选深链可打开本地职位与评估上下文。本轮上游未提供 PDF，界面如实标记缺失。
+
 ## 2026-09-08｜fix(feishu): 本机工作台复用机器人应用凭证
 
 - 根因：Dykes 真机建群首次失败并返回 `open_id cross app`；本地工作台和本地 OpenClaw 机器人实际使用了不同飞书应用，Dykes 的 app-scoped open_id 不能跨应用拉群。

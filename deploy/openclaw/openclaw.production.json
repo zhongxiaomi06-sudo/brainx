@@ -9,6 +9,7 @@
     "providers": {
       "stepfun": {
         "baseUrl": "https://api.stepfun.com/step_plan/v1",
+        "apiKey": { "source": "env", "provider": "default", "id": "STEPFUN_API_KEY" },
         "api": "openai-completions",
         "auth": "api-key",
         "models": [
@@ -32,6 +33,14 @@
   },
   "agents": {
     "defaults": {
+      "model": {
+        "primary": "stepfun/step-3.5-flash",
+        "fallbacks": ["stepfun/step-3.7-flash"]
+      },
+      "models": {
+        "stepfun/step-3.5-flash": { "alias": "fast" },
+        "stepfun/step-3.7-flash": { "alias": "strong" }
+      },
       "skills": [
         "brainx-today",
         "brainx-job",

@@ -80,6 +80,8 @@ Gateway、OpenClaw、业务 worker 和可选 integration worker 都在 systemd `
 
 ## 2026-09-03 个人模型生产发布证据
 
+> 这是 2026-09-03 当时的生产快照。其“移除共享默认模型”决策已被 2026-09-08 的产品决定取代：服务器恢复公司 StepFun 默认模型，个人模型变为可选覆盖；下面其余身份隔离和凭据保护证据仍有效。
+
 - 运行版本：`afddd38ab7258bdd2a2ae9086d5e27475e383396`；该版本已合并服务器原有六人灰度分支，未覆盖 `backups/` 与 `deploy/openclaw/sandbox/`。
 - 回退点：`/root/brainx-backups/20260903-220634-personal-model`，权限仅 root；包含 BrainX SQLite 压缩副本、环境/系统服务/nginx 配置和排除 npm 缓存后的 OpenClaw 状态，附 SHA-256 清单。
 - 本地与远端门禁：完整门禁 24/24 通过；后端 503/503、前端 42/42、Storybook 81/81；PR #47 的 `quality-gate` 与 `docker-build` 均成功。
@@ -87,3 +89,10 @@ Gateway、OpenClaw、业务 worker 和可选 integration worker 都在 systemd `
 - 权限检查：`mia` 飞书技术账号下六名顾问均为 ACTIVE；渠道私聊白名单为 6 人，工具白名单 21 个，会话只见本人且 Agent 间通信关闭。
 - 模型边界：共享默认模型、共享 StepFun 环境变量及旧 main Agent 内嵌 StepFun Key 均已移除；StepFun 只保留无凭据的可选模型目录，顾问模型与 Key 必须写入其动态个人 Agent。
 - 尚未完成：当前生产 OpenClaw 尚无动态个人 Agent/binding；每位顾问需先私聊发送 `/brainx` 生成个人 Agent，再从“配置我的模型”录入本人 Key。至少两位顾问使用不同供应商完成真实问答，才能把六人真机验收标记为通过。
+
+### 2026-09-08 公司默认模型恢复规则
+
+- 默认 `stepfun/step-3.5-flash`，失败回退 `stepfun/step-3.7-flash`；公司 Key 仅存 `/etc/brainx/openclaw.env` 的 `STEPFUN_API_KEY`。
+- 六名白名单顾问无需在电脑或飞书中填写 API Key；首次私聊创建的个人 Agent 继承公司默认模型。
+- 个人模型仍是可选覆盖；停用后回退公司默认，绝不借用其他顾问的个人 Key。共享群始终只用公司模型。
+- 部署前 `deploy/openclaw/install.sh --validate` 必须通过；缺失、占位或过短的公司 Key 会阻止服务启动。

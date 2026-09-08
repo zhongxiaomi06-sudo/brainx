@@ -28,6 +28,7 @@ function valid() {
     BRAINX_BASE_URL: worker.BRAINX_BASE_URL,
     BRAINX_AGENT_GATEWAY_TOKEN: agent.BRAINX_AGENT_GATEWAY_TOKEN,
     BRAINX_AGENT_ASSERTION_SECRET: agent.BRAINX_AGENT_ASSERTION_SECRET,
+    STEPFUN_API_KEY: value('i'),
   };
   for (let index = 1; index <= 6; index++) openclaw[`BRAINX_FEISHU_ALLOWED_OPEN_ID_${index}`] = `ou_user_${index}`;
   for (let index = 1; index <= 3; index++) openclaw[`BRAINX_FEISHU_ALLOWED_CHAT_ID_${index}`] = `oc_group_${index}`;
@@ -41,6 +42,7 @@ test('运行配置预检接受三份一致且无占位符的最小生产配置',
 test('运行配置预检一次指出 Agent API、身份白名单和回群 worker 的具体配置层', () => {
   const input = valid();
   input.openclaw.BRAINX_AGENT_GATEWAY_TOKEN = 'must-equal-agent.env';
+  input.openclaw.STEPFUN_API_KEY = 'replace-stepfun-api-key';
   input.openclaw.BRAINX_AGENT_ASSERTION_SECRET = value('x');
   input.worker.BRAINX_FEISHU_APP_ID = 'cli_other';
   input.worker.BRAINX_BASE_URL = 'http://127.0.0.1:3000';
@@ -50,6 +52,7 @@ test('运行配置预检一次指出 Agent API、身份白名单和回群 worker
   const result = validateRuntimeConfig(input);
   assert.equal(result.ok, false);
   assert.ok(result.errors.includes('openclaw.env:BRAINX_AGENT_GATEWAY_TOKEN:PLACEHOLDER'));
+  assert.ok(result.errors.includes('openclaw.env:STEPFUN_API_KEY:PLACEHOLDER'));
   assert.ok(result.errors.some(error => error.endsWith(':BRAINX_AGENT_ASSERTION_SECRET:MISMATCH')));
   assert.ok(result.errors.some(error => error.endsWith(':BRAINX_FEISHU_APP_ID:MISMATCH')));
   assert.ok(result.errors.some(error => error.endsWith(':BRAINX_DB:MISMATCH')));

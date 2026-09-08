@@ -1,6 +1,6 @@
 # Quickstart: 顾问个人模型配置验收
 
-> 只使用假密钥做自动化；真实密钥仅由凭据所有者在 HTTPS 页面输入。
+> 只使用假密钥做自动化；公司真实密钥仅由管理员写入受保护的服务器环境文件，个人真实密钥仅由凭据所有者在 HTTPS 页面输入。
 
 ## 1. 自动化
 
@@ -25,7 +25,7 @@ npm --prefix frontend/btex-frontend test
 ## 3. 发布前服务器验收
 
 1. 备份 `/var/lib/brainx/.openclaw`、BrainX SQLite、环境文件和当前 commit。
-2. 确认生产配置不再含 `STEPFUN_API_KEY` SecretRef 或全局 StepFun primary。
+2. 确认生产配置通过 SecretRef 读取 `STEPFUN_API_KEY`，默认 `stepfun/step-3.5-flash`，备用 `stepfun/step-3.7-flash`；配置文件不得含明文 Key。
 3. 安装器升级后确认既有 `agents.list`、`bindings` 和个人 auth store 未被覆盖。
 4. 确认七个 BrainX Skills 位于 `<state-dir>/skills` 并对个人 Agent 可见。
 5. 确认 OpenClaw/Gateway/BrainX/nginx 运行，worker 仅在真实 RDS 配置完整时启用。
@@ -35,13 +35,13 @@ npm --prefix frontend/btex-frontend test
 每位灰度顾问：
 
 1. 私聊发送 `/brainx`，确认确定性首页出现。
-2. 点击“配置我的模型”，OAuth 登录后进入个人模型页。
-3. 选择供应商、填写模型 ID 和本人 Key，阅读提示并勾选同意。
-4. 保存后页面显示本人供应商/模型/ACTIVE，不显示 Key。
-5. 回飞书发送 `/model status` 和一个不含候选隐私的简单问题。
+2. 不配置个人 Key，直接发送一个不含候选隐私的简单问题，确认使用公司默认模型成功返回。
+3. 如需个人覆盖，再点击“配置我的模型”，OAuth 登录后进入个人模型页。
+4. 选择供应商、填写模型 ID 和本人 Key，阅读提示并勾选同意。
+5. 保存后页面显示本人供应商/模型/ACTIVE，不显示 Key；停用后重新继承公司默认模型。
 6. 再查询一条本人授权职位；检查回答身份、工具和数据范围均属于本人。
 
-至少选两位顾问配置不同供应商，交叉修改并复验互不影响。共享群在公司模型未配置时必须明确不可用，不能借个人 Key。
+六名顾问都应在不配置个人 Key 时完成默认模型真机问答；另选两位配置不同供应商，交叉修改并复验互不影响。共享群在公司模型未配置时必须明确不可用，不能借个人 Key。
 
 ## 5. 失败与回滚
 

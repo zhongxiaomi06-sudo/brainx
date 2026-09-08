@@ -6,7 +6,7 @@
 
 ## Summary
 
-将当前共享 StepFun 默认模型改为飞书私聊“一人一 OpenClaw Agent”。官方 Feishu 动态 Agent 负责建立独立 workspace、session、agentDir 和认证库；BrainX 工作台提供已登录顾问的自助配置页，通过受控、无 shell 的 OpenClaw CLI 子进程把密钥从 stdin 写入本人认证库，并只把供应商、模型、同意和状态写入 BrainX 审计表。共享 Skills 改装到 state 级目录供所有个人 Agent 使用；共享群不借用个人密钥。
+飞书私聊保持“一人一 OpenClaw Agent”，公司同时在服务器提供共享 StepFun 默认模型，让获准顾问无需自行配置 API Key 即可开始使用。官方 Feishu 动态 Agent 负责建立独立 workspace、session、agentDir 和认证库；BrainX 工作台仍提供可选的个人模型覆盖，通过受控、无 shell 的 OpenClaw CLI 子进程把个人密钥从 stdin 写入本人认证库，并只把供应商、模型、同意和状态写入 BrainX 审计表。共享群只用公司模型，不借用个人密钥。
 
 ## Technical Context
 
@@ -24,7 +24,7 @@
 
 **Performance Goals**: 状态读取 3 秒内；配置操作 15 秒内成功或明确失败；同一顾问并发配置串行；不增加每次普通 Agent 问答的额外模型调用
 
-**Constraints**: API Key 不进入参数列表、日志、URL、业务库或浏览器存储；个人模型仅用于私聊；无配置时失败关闭；动态 Agent 上限 20；现有服务器磁盘空间紧张，不引入容器或大型依赖
+**Constraints**: API Key 不进入参数列表、日志、URL、业务库或浏览器存储；公司 Key 只在服务器环境文件，个人模型仅用于本人私聊；无个人配置时回退公司模型，两者均不可用时失败关闭；动态 Agent 上限 20；现有服务器磁盘空间紧张，不引入容器或大型依赖
 
 **Scale/Scope**: 首批 6 名顾问、最多 20 个动态 Agent、4 个批准供应商；架构可扩展但本次不开放任意自定义 Base URL
 

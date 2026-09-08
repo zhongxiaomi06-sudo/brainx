@@ -169,13 +169,15 @@ test('仓库 skills/ 同时发现历史本地技能与七个生产技能,加载�
 test('OpenClaw 安装集只引用当前精确白名单工具', () => {
   const index = discoverSkills({ includeGlobal: false });
   const installable = ['brainx-today', 'brainx-job', 'brainx-talent', 'brainx-match',
-    'brainx-engagement-draft', 'brainx-interview-prep', 'brainx-review'];
+    'brainx-engagement-draft', 'brainx-interview-prep', 'brainx-review',
+    'brainx-sourcing-reloop', 'brainx-sourcing-openmai', 'brainx-sourcing-supermai'];
   const allowed = new Set(['brainx_me_context', 'brainx_daily_brief', 'brainx_job_assessment',
     'brainx_candidate_shortlist', 'brainx_candidate_facts', 'brainx_candidate_fit',
     'brainx_gap_questions', 'brainx_interview_prep', 'brainx_personal_review', 'brainx_run_status',
     'brainx_push_preferences', 'brainx_update_push_preferences', 'brainx_job_contacts',
     'brainx_candidate_contact', 'brainx_accept_job', 'brainx_start_candidate_search',
-    'brainx_record_job_progress', 'brainx_candidate_workflow', 'brainx_send_candidate_resume']);
+    'brainx_record_job_progress', 'brainx_candidate_workflow', 'brainx_send_candidate_resume',
+    'brainx_openmai_search', 'brainx_supermai_scout']);
   for (const name of installable) {
     const body = loadSkill(index, name).body;
     const referenced = body.match(/brainx_[a-z_]+/g) || [];

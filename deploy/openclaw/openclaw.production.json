@@ -1,7 +1,9 @@
 {
   "secrets": {
     "providers": {
-      "default": { "source": "env" }
+      "default": {
+        "source": "env"
+      }
     }
   },
   "models": {
@@ -9,12 +11,22 @@
     "providers": {
       "stepfun": {
         "baseUrl": "https://api.stepfun.com/step_plan/v1",
-        "apiKey": { "source": "env", "provider": "default", "id": "STEPFUN_API_KEY" },
+        "apiKey": {
+          "source": "env",
+          "provider": "default",
+          "id": "STEPFUN_API_KEY"
+        },
         "api": "openai-completions",
         "auth": "api-key",
         "models": [
-          { "id": "step-3.5-flash", "name": "Step 3.5 Flash" },
-          { "id": "step-3.7-flash", "name": "Step 3.7 Flash" }
+          {
+            "id": "step-3.5-flash",
+            "name": "Step 3.5 Flash"
+          },
+          {
+            "id": "step-3.7-flash",
+            "name": "Step 3.7 Flash"
+          }
         ]
       }
     }
@@ -25,7 +37,11 @@
     "port": 18789,
     "auth": {
       "mode": "token",
-      "token": { "source": "env", "provider": "default", "id": "OPENCLAW_GATEWAY_TOKEN" }
+      "token": {
+        "source": "env",
+        "provider": "default",
+        "id": "OPENCLAW_GATEWAY_TOKEN"
+      }
     }
   },
   "session": {
@@ -35,11 +51,17 @@
     "defaults": {
       "model": {
         "primary": "stepfun/step-3.5-flash",
-        "fallbacks": ["stepfun/step-3.7-flash"]
+        "fallbacks": [
+          "stepfun/step-3.7-flash"
+        ]
       },
       "models": {
-        "stepfun/step-3.5-flash": { "alias": "fast" },
-        "stepfun/step-3.7-flash": { "alias": "strong" }
+        "stepfun/step-3.5-flash": {
+          "alias": "fast"
+        },
+        "stepfun/step-3.7-flash": {
+          "alias": "strong"
+        }
       },
       "skills": [
         "brainx-today",
@@ -48,7 +70,10 @@
         "brainx-match",
         "brainx-engagement-draft",
         "brainx-interview-prep",
-        "brainx-review"
+        "brainx-review",
+        "brainx-sourcing-reloop",
+        "brainx-sourcing-openmai",
+        "brainx-sourcing-supermai"
       ],
       "sandbox": {
         "mode": "all",
@@ -59,18 +84,29 @@
   },
   "plugins": {
     "enabled": true,
-    "allow": ["feishu", "brainx-openclaw"],
+    "allow": [
+      "feishu",
+      "brainx-openclaw"
+    ],
     "entries": {
-      "feishu": { "enabled": true },
+      "feishu": {
+        "enabled": true
+      },
       "brainx-openclaw": {
         "enabled": true,
-        "hooks": { "allowPromptInjection": false }
+        "hooks": {
+          "allowPromptInjection": false
+        }
       }
     }
   },
   "tools": {
-    "sessions": { "visibility": "self" },
-    "agentToAgent": { "enabled": false },
+    "sessions": {
+      "visibility": "self"
+    },
+    "agentToAgent": {
+      "enabled": false
+    },
     "allow": [
       "brainx_me_context",
       "brainx_daily_brief",
@@ -98,10 +134,23 @@
       "brainx_send_candidate_resume"
     ],
     "deny": [
-      "exec", "process", "read", "write", "edit", "apply_patch",
-      "browser", "web_search", "web_fetch", "query_sql", "brainx_sync_now",
-      "brainx_talent", "brainx_engage", "brainx_record_progress",
-      "brainx_terminal_result", "brainx_record_outcome", "brainx_feedback",
+      "exec",
+      "process",
+      "read",
+      "write",
+      "edit",
+      "apply_patch",
+      "browser",
+      "web_search",
+      "web_fetch",
+      "query_sql",
+      "brainx_sync_now",
+      "brainx_talent",
+      "brainx_engage",
+      "brainx_record_progress",
+      "brainx_terminal_result",
+      "brainx_record_outcome",
+      "brainx_feedback",
       "brainx_recommend_run"
     ]
   },

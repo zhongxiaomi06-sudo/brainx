@@ -25,6 +25,7 @@ import { jobVisibleTo } from './visibility.js';
 import { relationOf } from './relations.js';
 import { projectRoutes } from './project-routes.js';
 import { startOpenmaiTask, getOpenmaiResult } from './openmai-task.js';
+import { openmaiRoutes } from './openmai-routes.js';
 import { radarPayload, clientRows } from './radar.js';
 import { ttcFieldReportForSync } from './ttc-field-report.js';
 import { ttcAuthStatus, ttcRoutes } from './ttc-routes.js';
@@ -76,6 +77,7 @@ export function createServer(db = openDb(), deps = {}) {
     ...assistantRoutes(db, deps),
     ...projectRoutes(db, { ...(deps.projectLaunch || {}), bus }),
     ...personalModelRoutes(db, deps),
+    ...openmaiRoutes(db, bus),
     'GET /api/v1/consultants': (req, res) => {
       json(res, 200, { items: loadConsultants(db)
         .map((c) => ({ consultant_id: c.consultant_id, display_name: c.display_name })) });
@@ -432,23 +434,6 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       if (!b) return err(res, 400, 'BAD_JSON', '请求体不是合法 JSON');
       const out = recordTerminalResult(db, cid, id, b);
       json(res, out.ok ? 200 : (out.status || 422), out);
-    },
-
-    // —— 接单自动找人：状态/结果查询（fail-closed：只许本人接单过的职位）——
-    'GET /api/v1/opportunities/:id/openmai': (req, res, cid, q, id) => {
-      const st = currentState(db, cid, id)?.state;
-      if (!['ACCEPTED', 'COMPLETED'].includes(st)) return err(res, 404, 'NOT_FOUND', '职位不存在或未接单');
-      json(res, 200, getOpenmaiResult(db, cid, id));
-    },
-    // 显式重新找人（防重复费用：running 拒绝；done/failed 才可重跑）
-    'POST /api/v1/opportunities/:id/openmai/rerun': (req, res, cid, q, id) => {
-      const st = currentState(db, cid, id)?.state;
-      if (!['ACCEPTED', 'COMPLETED'].includes(st)) return err(res, 404, 'NOT_FOUND', '职位不存在或未接单');
-      const cur = getOpenmaiResult(db, cid, id);
-      const staleMs = Date.now() - Date.parse(cur.started_at || 0); // 超 60min 视为僵死放行（曾永久 409）
-      if (cur.status === 'running' && !(Number.isFinite(staleMs) && staleMs > 60 * 60 * 1000)) return err(res, 409, 'RUNNING', '找人在进行中，请等待完成后再试');
-      const out = startOpenmaiTask(db, bus, cid, id, { force: true });
-      json(res, 200, { ok: true, openmai: out });
     },
 
     'GET /api/v1/decisions/:id/replay': (req, res, cid, q, id) => {

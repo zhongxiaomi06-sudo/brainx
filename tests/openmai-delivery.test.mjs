@@ -162,10 +162,23 @@ test('OpenMai 结构化候选少于 6 人时显式标记不足，历史无机器
     { candidate_ref: 'c-1', name: '张三', evaluation: '匹配', resume_url: null },
   ] })}\n-->`;
   assert.deepEqual(assessOpenmaiCandidateBatch(partial), {
-    count: 1, hasMachineBlock: true, complete: false,
+    count: 1, hasMachineBlock: true, needsInput: false, complete: false,
     message: 'OpenMai 本轮仅返回 1 名结构化候选人，未达到首轮 6–10 人目标；已保留现有结果，请明确重试补充。',
   });
   assert.equal(assessOpenmaiCandidateBatch('历史候选结果').complete, true);
+});
+
+test('OpenMai 澄清语句不得伪装成候选人已就绪', () => {
+  const quality = assessOpenmaiCandidateBatch('请选择测试岗位画像');
+  assert.equal(quality.needsInput, true);
+  assert.equal(quality.complete, false);
+  const card = buildOpenmaiDeliveryCard({
+    job: { project_id: 'P-NEEDS-INPUT', company: '测试客户', role: '测试' },
+    status: 'needs_input', resultText: '请选择测试岗位画像', publicBaseUrl: 'https://base.yorkteam.cn/',
+  });
+  assert.equal(card.header.template, 'orange');
+  assert.match(card.header.title.content, /补充岗位画像/);
+  assert.doesNotMatch(card.header.title.content, /已就绪/);
 });
 
 test('OpenMai 总览每行提供独立查看和发送简历按钮', () => {

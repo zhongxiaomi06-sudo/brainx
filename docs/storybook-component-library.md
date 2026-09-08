@@ -53,6 +53,8 @@ BrainTex 每日推荐卡不在 Storybook 复制飞书组件；条数来自本人
 
 OpenMai 候选人总览同样不在 React Storybook 伪造飞书组件。正式投递使用原生双列布局展示候选人与 AI 初评，每名候选行后紧跟独立“查看 / 发送简历”操作区；原始 Markdown 表格不再进入群消息，也不创建重复逐人话题。“发送简历”会实时回查 TTC 附件，OpenMai 没有 URL 不等于禁用按钮。自动测试负责结构和安全边界，视觉及动作以真实飞书预览为准，见 [OpenMai 候选人表格卡复审](frontend-reviews/2026-09-08-openmai-candidate-table.md)。
 
+岗位画像输入使用 React Storybook 的“业务组件/OpenMai 岗位画像输入”场景覆盖：验证 `needs_input` 提示、输入框和提交动作。飞书的“请补充岗位画像”橙卡仍以原生客户端验收，不在 Storybook 复制。
+
 ## 使用命令
 
 从仓库根目录执行：

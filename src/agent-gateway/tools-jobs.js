@@ -194,7 +194,10 @@ function openmaiSearch(db, args, principal) {
       data: { job_ref: args.job_id, status: cur.status, result_text: cur.result_text || null,
               started_at: cur.started_at || null, finished_at: cur.finished_at || null },
       facts: [], inferences: [], recommendations: [],
-      unknowns: cur.status === 'running' ? ['找人任务进行中，稍后再查'] : [],
+      unknowns: cur.status === 'running'
+        ? ['找人任务进行中——正常 3-5 分钟收敛，请每隔约 1 分钟再次调用本工具查询，最多守候 10 分钟；'
+           + '守候期间不要切换其他找人方式、不要尝试 read/exec 等文件工具（本环境不可用）']
+        : [],
       // done：结果就在 result_text（markdown 候选人清单），必须完整呈现给顾问，
       // 不能只回「已就绪」三个字（2026-09-04 wendy 案例：结果躺在表里 3 小时没人交付）。
       ...(cur.status === 'done' ? { recommendations: [{ action: 'present_result',
@@ -205,7 +208,8 @@ function openmaiSearch(db, args, principal) {
   const out = startOpenmaiTask(db, null, principal.consultantId, args.job_id);
   return {
     data: { job_ref: args.job_id, status: out.status || 'triggered', task_id: out.task_id || null,
-            note: '找人任务已触发，完成后再调本工具取结果（或在工作台承接面板查看）' },
+            note: '找人任务已触发，正常 3-5 分钟收敛——请守候并每隔约 1 分钟再调本工具读取（最多 10 分钟），'
+                  + '完成后把 result_text 候选人完整呈现给顾问' },
     facts: [], inferences: [], recommendations: [], unknowns: [],
     evidence_refs: [`openmai:${out.task_id || args.job_id}`],
   };
@@ -234,7 +238,8 @@ function supermaiScout(db, args, principal) {
       recommendations: cur.status === 'done' && !noReply ? [{ action: 'present_result',
         note: '结果已就绪——请把 data.result_text 里的候选人列表完整、结构化地呈现给顾问，并询问下一步（约面/推荐）。' }] : [],
       unknowns: cur.status === 'running'
-        ? ['找人任务进行中，稍后再调本工具取结果']
+        ? ['找人任务进行中——正常 3-5 分钟收敛，请每隔约 1 分钟再次调用本工具查询，最多守候 10 分钟；'
+           + '守候期间不要切换其他找人方式、不要尝试 read/exec 等文件工具（本环境不可用）']
         : noReply ? ['本轮未搜到匹配候选人——建议放宽判据（去掉具体公司名、缩短方向、拆成 2-3 个宽方向）后重新触发'] : [],
       evidence_refs: [`supermai:${cur.task_id || project_id}`],
     };
@@ -245,7 +250,8 @@ function supermaiScout(db, args, principal) {
             task_id: out.task_id || null, message: out.message || null,
             note: out.status === 'already_done'
               ? '同判据结果已存在，请再次调用本工具读取'
-              : '找人任务已触发，完成后再调本工具取结果（OpenMai 找人通常需要数分钟）' },
+              : '找人任务已触发，正常 3-5 分钟收敛——请守候并每隔约 1 分钟再调本工具读取（最多 10 分钟），'
+                + '完成后把 result_text 候选人完整呈现给顾问' },
     facts: [], inferences: [], recommendations: [], unknowns: [],
     evidence_refs: [`supermai:${out.task_id || project_id}`],
   };

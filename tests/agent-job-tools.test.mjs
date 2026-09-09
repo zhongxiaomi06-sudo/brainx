@@ -139,3 +139,25 @@ test('SuperMai 入口（specs/008）：NO_REPLY 零命中语义化为未搜到�
   assert.ok(out.unknowns.some((u) => u.includes('放宽判据')), '零命中要给出放宽判据建议');
   assert.equal(out.recommendations.length, 0, '零命中不出现 present_result');
 });
+
+test('找人任务 running/触发响应内嵌守候纪律（2026-09-09 事故：模型 2 分钟放弃+重试被禁工具）', async () => {
+  const { db, handlers } = fixture();
+  const criteria = '北京 5年 React 资深前端工程师';
+  const key = supermaiCriteriaKey(criteria);
+  const at = new Date().toISOString();
+  db.prepare(`INSERT INTO openmai_results (project_id, consultant_id, status, task_id, started_at)
+    VALUES (?,?,?,?,?)`).run(key, 'felix', 'running', 'sm_wait', at);
+
+  const running = await handlers.brainx_supermai_scout({ criteria }, context('felix', 'candidate_review'));
+  assert.equal(running.data.status, 'running');
+  const guard = running.unknowns.join('');
+  assert.ok(guard.includes('3-5 分钟'), 'running 响应写明收敛时长');
+  assert.ok(guard.includes('最多守候 10 分钟'), 'running 响应写明守候上限');
+  assert.ok(guard.includes('不要尝试 read/exec'), 'running 响应禁止尝试被禁工具');
+
+  // 触发响应同样带守候纪律
+  db.prepare(`DELETE FROM openmai_results WHERE project_id=?`).run(key);
+  const triggered = await handlers.brainx_supermai_scout({ criteria }, context('felix', 'candidate_review'));
+  assert.ok(triggered.data.note.includes('3-5 分钟'), '触发响应写明收敛时长');
+  assert.ok(triggered.data.note.includes('每隔约 1 分钟'), '触发响应写明轮询节奏');
+});

@@ -182,7 +182,7 @@ test('OpenMai 澄清语句不得伪装成候选人已就绪', () => {
   assert.doesNotMatch(card.header.title.content, /已就绪/);
 });
 
-test('OpenMai 总览每行最右侧只提供 TTC 查看人才按钮', () => {
+test('OpenMai 总览每行提供 TTC 查看人才与项目共享保留按钮', () => {
   const resultText = `不应把这段 Markdown 原文直接发群\n|姓名|详情|\n|---|---|\n<!-- BRAINX_CANDIDATES_V1
 ${JSON.stringify({ candidates: [
     { candidate_ref: 'c-1', name: '张三', evaluation: '匹配 91%，驱动经验待核实',
@@ -202,9 +202,14 @@ ${JSON.stringify({ candidates: [
   const firstButton = rows[1].columns[5].elements[0];
   assert.equal(firstButton.text.content, '查看人才');
   assert.equal(firstButton.multi_url.url, 'https://app.ttcadvisory.com/app/talent/c-1');
+  const keepButton = rows[1].columns[5].elements[1];
+  assert.equal(keepButton.text.content, '□ 保留');
+  assert.match(keepButton.value.text, /candidate_ref=c-1/);
+  assert.match(keepButton.value.text, /action=KEEP_FOR_REVIEW/);
+  assert.match(keepButton.value.text, /confirm=true/);
   const secondButton = rows[2].columns[5].elements[0];
   assert.equal(secondButton.multi_url.url, 'https://app.ttcadvisory.com/app/talent/c-2');
-  assert.match(card.elements.at(-1).elements[0].content, /不发送简历附件/);
+  assert.match(card.elements.at(-1).elements[0].content, /项目共同重点名单/);
   assert.match(card.elements[0].content, /第 2 轮/);
   const continueActions = card.elements.filter((element) => element.tag === 'action');
   assert.equal(continueActions.length, 1, '候选行操作仍在最右侧，名单后只追加继续找人入口');

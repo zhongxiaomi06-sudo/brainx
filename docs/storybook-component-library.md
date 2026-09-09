@@ -51,7 +51,7 @@ BrainTex 飞书功能首页不在 React Storybook 里复制一套仿真卡片；
 
 BrainTex 每日推荐卡不在 Storybook 复制飞书组件；条数来自本人配置，正文组织为结论、依据、风险和下一步，URL 只负责打开已鉴权的正式工作台。2026-09-03 已在目标飞书验证原生互动卡；普通自然语言回复的 `presentation` typed hook 已实现，但当前锁定版 Feishu 自动回复路径没有传入该 hook，仍需升级或修复后再验收。候选 Case 专页尚未设计，不能把底层状态工具记为前端完成。状态见 [BrainTex 富卡片与业务闭环审核记录](frontend-reviews/2026-09-03-braintex-rich-cards-loop.md)。
 
-OpenMai 候选人总览同样不在 React Storybook 伪造飞书组件。正式投递使用飞书 Card 2.0 原生列布局：筛选条件用纯文字，候选人按姓名与岗位、经验与城市、学历、核心匹配点、匹配度和操作形成整洁表格，每行最右侧只保留直达 TTC 人才详情的“查看人才”。原始 Markdown、反斜杠和 HTML 空格实体不进入最终卡片，也不创建逐人话题或发送简历附件。自动测试负责结构和链接安全边界，视觉及动作以真实飞书预览为准，见 [TTC 候选人表格与人才链接复审](frontend-reviews/2026-09-09-ttc-candidate-table-link.md)。
+OpenMai 候选人总览同样不在 React Storybook 伪造飞书组件。正式投递使用飞书 Card 2.0 原生列布局：筛选条件用纯文字，候选人按姓名与岗位、经验与城市、学历、核心匹配点、匹配度和操作形成整洁表格，每行最右侧提供直达 TTC 人才详情的“查看人才”和写入项目共享重点名单的“□ 保留”。原始 Markdown、反斜杠和 HTML 空格实体不进入最终卡片，也不创建逐人话题或发送简历附件。自动测试负责结构、链接与写入契约，视觉及动作以真实飞书预览为准，见 [候选人保留与项目共享上下文复核](frontend-reviews/2026-09-09-candidate-focus-context.md)。
 
 岗位画像输入使用 React Storybook 的“业务组件/OpenMai 岗位画像输入”场景覆盖：验证 `needs_input` 提示、输入框和提交动作。飞书的“请补充岗位画像”橙卡仍以原生客户端验收，不在 Storybook 复制。
 

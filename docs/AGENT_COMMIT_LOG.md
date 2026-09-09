@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-09｜feat(候选人): 增加项目共享重点名单
+
+- 改动：候选结果表格每行增加“□ 保留”，按钮以 `KEEP_FOR_REVIEW` 和 `confirm=true` 复用受控候选流程；明确取消时支持 `REMOVE_FROM_REVIEW`。OpenClaw 插件版本升至 `1.3.4`，插件与 Agent Gateway 参数契约保持精确一致。
+- 上下文：新增 `project_candidate_focus`，按租户、项目和候选编号持久化选择状态、来源任务与不含联系方式的安全摘要；即使下一轮结果覆盖当前名单，重点候选信息仍保留。`brainx_candidate_shortlist` 返回 `focused_candidates`，供同项目已授权成员的后续群问答优先读取。
+- 安全：只允许职位可见且确实来自授权 shortlist、本项目结构化找人结果或既有重点名单的候选编号；不接受伪造编号、不跨项目共享，不保存电话、邮箱或简历原文。正式候选推进仍按顾问隔离，不因“保留”自动联系或推荐客户。
+- 验证：迁移、项目成员共享、取消保留、伪造编号拒绝、跨轮摘要保留、群问答上下文、卡片按钮及插件契约专项 66/66 通过；`npm run verify:quick` 16/16 通过。
+
 ## 2026-09-09｜feat(找人): 下一轮自动排除历史 TTC 候选
 
 - 改动：候选结果卡底部增加“OpenMai 继续找人”和“SuperMai 继续找人”；继续动作只传项目、可选条件和 `continue_search=true`，BrainX 从项目历史结构化结果提取并累计 TTC 候选编号，持久化搜索轮次和排除列表，再把名单写入下一轮 OpenMai / SuperMai 提示词。

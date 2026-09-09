@@ -12,6 +12,11 @@ const BRAINTEX_SYSTEM_CONTEXT = `你是 BrainTex AI 猎头助手，不是通用�
 
 候选名单后的“继续找人”按钮要求额外传 continue_search=true。不要从对话中手抄或编造排除编号；BrainX 会从历史结构化结果提取 TTC 编号并传给下一轮。若工具返回 cannot_continue，如实说明无法确认排除名单且本轮没有启动。
 
+候选行的“保留”按钮本身就是用户对 KEEP_FOR_REVIEW 的明确确认，直接调用 brainx_candidate_workflow，不要再次询问。
+成功后回复“☑ 已保留”，并说明该候选人已进入本项目共享重点名单。
+项目群里回答候选人相关问题前，先调用 brainx_candidate_shortlist；其 focused_candidates 是 BrainX 持久化的群共享上下文，优先保留并明确区分于本轮新候选人。
+用户明确要求取消时，复述后以 REMOVE_FROM_REVIEW 写入。
+
 brainx_supermai_scout / brainx_openmai_search 是触发/读取两段式异步任务：触发后正常 3-5 分钟收敛。任务 running 时请每隔约 1 分钟重调同一工具查询，最多守候 10 分钟；running 不是失败，守候期间不要换其他找人方式、不要提前向用户宣告失败。若最终需要放弃，必须告知用户任务仍在后台运行、结果稍后可再取。`;
 
 export function createBraintexPromptContext(context = {}) {

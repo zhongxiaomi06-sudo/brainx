@@ -36,6 +36,9 @@ test('候选流程拒绝未授权候选人、未确认写入和非法跳步', as
     job_id: jobId, candidate_ref: 'candidate-x', action: 'ADD_TO_PROJECT', confirm: true,
   }, context), /NOT_FOUND_OR_FORBIDDEN/);
   await assert.rejects(() => handlers.brainx_candidate_workflow({
+    job_id: jobId, candidate_ref: 'candidate-x', action: 'KEEP_FOR_REVIEW', confirm: true,
+  }, context), /NOT_FOUND_OR_FORBIDDEN/);
+  await assert.rejects(() => handlers.brainx_candidate_workflow({
     job_id: jobId, candidate_ref: 'candidate-a', action: 'ADD_TO_PROJECT', confirm: false,
   }, context), /INVALID_ARGUMENT/);
   await handlers.brainx_candidate_workflow({
@@ -46,7 +49,7 @@ test('候选流程拒绝未授权候选人、未确认写入和非法跳步', as
   }, context), /INVALID_ARGUMENT/);
 });
 
-test('OpenMai 在本人授权职位发现的候选人可进入项目，不能跨顾问或伪造编号', async () => {
+test('OpenMai 候选可进入项目，重点名单在项目成员间共享且不能跨项目', async () => {
   const { db, context, jobId } = fixture();
   const resultText = `候选结果\n<!-- BRAINX_CANDIDATES_V1\n${JSON.stringify({ candidates: [
     { candidate_ref: 'openmai-candidate-1', name: '李四', evaluation: '待核实', resume_url: null },
@@ -55,13 +58,16 @@ test('OpenMai 在本人授权职位发现的候选人可进入项目，不能跨
     (project_id,consultant_id,status,result_text,task_id,started_at,finished_at)
     VALUES (?,?,'done',?,'om-case','2026-09-07T00:00:00.000Z','2026-09-07T00:01:00.000Z')`)
     .run(jobId, 'felix', resultText);
-  const handlers = createCandidateActionToolHandlers({ db, candidateShortlistFn: async () => ({
-    items: [], page: { next_page_token: null },
-  }) });
+  let shortlistCalls = 0;
+  const handlers = createCandidateActionToolHandlers({ db, candidateShortlistFn: async () => {
+    shortlistCalls += 1;
+    return { items: [], page: { next_page_token: null } };
+  } });
   const added = await handlers.brainx_candidate_workflow({
     job_id: jobId, candidate_ref: 'openmai-candidate-1', action: 'ADD_TO_PROJECT', confirm: true,
   }, context);
   assert.equal(added.data.candidate_ref, 'openmai-candidate-1');
+  assert.equal(shortlistCalls, 0, '项目找人结果已授权时不依赖外部 shortlist 可用性');
   assert.equal((await handlers.brainx_candidate_workflow({
     job_id: jobId, candidate_ref: 'openmai-candidate-1', action: 'MARK_PREPARING', confirm: true,
   }, context)).data.outreach_state, 'PREPARING');
@@ -72,6 +78,19 @@ test('OpenMai 在本人授权职位发现的候选人可进入项目，不能跨
   await assert.rejects(() => handlers.brainx_candidate_workflow({
     job_id: jobId, candidate_ref: 'openmai-candidate-1', action: 'ADD_TO_PROJECT', confirm: true,
   }, other), /NOT_FOUND_OR_FORBIDDEN/);
+  db.prepare(`INSERT INTO job_memberships
+    (consultant_id,project_id,relation,source,valid_from)
+    VALUES ('mia',?,'OTHER_CONSULTANT','TEST','2026-09-09T00:00:00.000Z')`).run(jobId);
+  const kept = await handlers.brainx_candidate_workflow({
+    job_id: jobId, candidate_ref: 'openmai-candidate-1', action: 'KEEP_FOR_REVIEW', confirm: true,
+  }, other);
+  assert.equal(kept.data.focus_status, 'FOCUSED');
+  assert.equal(db.prepare(`SELECT selected_by FROM project_candidate_focus
+    WHERE position_id=? AND candidate_ref=?`).get(jobId, 'openmai-candidate-1').selected_by, 'mia');
+  const removed = await handlers.brainx_candidate_workflow({
+    job_id: jobId, candidate_ref: 'openmai-candidate-1', action: 'REMOVE_FROM_REVIEW', confirm: true,
+  }, context);
+  assert.equal(removed.data.focus_status, 'REMOVED');
   db.close();
 });
 

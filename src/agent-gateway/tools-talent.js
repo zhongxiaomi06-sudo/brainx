@@ -1,5 +1,6 @@
 import { withMysql } from '../db.js';
 import { candidateShortlist, maskCandidateName } from '../candidate-shortlist.js';
+import { listProjectCandidateFocus } from '../candidate-focus.js';
 import { parseCandidateFact } from '../talent-contracts.js';
 
 function fail(code) {
@@ -120,12 +121,13 @@ function publicFact(fact) {
   };
 }
 
-function shortlistResult(bundle) {
+function shortlistResult(bundle, focusedCandidates = []) {
   const items = bundle.items;
   return {
-    data: bundle,
+    data: { ...bundle, focused_candidates: focusedCandidates },
     facts: [
       ...(bundle.job_context ? [{ kind: 'job_context', ...bundle.job_context }] : []),
+      ...focusedCandidates.map((entry) => ({ kind: 'focused_candidate', ...entry })),
       ...items.map((entry) => ({
         kind: 'candidate', candidate_ref: entry.candidate_ref,
         display_name_masked: entry.display_name_masked, profile: entry.profile,
@@ -146,6 +148,7 @@ function shortlistResult(bundle) {
     ]),
     evidence_refs: unique([
       ...(bundle.match_run ? [`match_run:${bundle.match_run.match_run_id}`] : []),
+      ...focusedCandidates.map((entry) => `candidate_focus:${bundle.job_ref}:${entry.candidate_ref}`),
       ...items.flatMap((entry) => [...entry.strength.evidence_refs, ...entry.job_fit.evidence_refs,
         ...entry.hard_conditions.flatMap((condition) => condition.evidence_refs)]),
     ]),
@@ -154,7 +157,8 @@ function shortlistResult(bundle) {
       algorithm: bundle.match_run.algorithm_version,
       features: bundle.match_run.feature_schema_version,
     } : {},
-    next_allowed_actions: items.length ? ['brainx_candidate_fit', 'brainx_interview_prep'] : [],
+    next_allowed_actions: items.length || focusedCandidates.length
+      ? ['brainx_candidate_fit', 'brainx_interview_prep', 'brainx_candidate_workflow'] : [],
   };
 }
 
@@ -199,7 +203,9 @@ export function createTalentToolHandlers(options = {}) {
     },
     brainx_candidate_shortlist: async (args, context) => {
       const bundle = await getShortlist(args, context);
-      const envelope = shortlistResult(bundle);
+      const focusedCandidates = listProjectCandidateFocus(options.db,
+        context.principal.tenantId, args.job_id);
+      const envelope = shortlistResult(bundle, focusedCandidates);
       if (!bundle.items?.length) {
         const guidance = emptyShortlistGuidance(options.db, context.principal.consultantId, args.job_id);
         if (guidance) envelope.unknowns.push(guidance);

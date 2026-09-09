@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
 import { now, uuid } from '../db.js';
 import { candidateShortlist } from '../candidate-shortlist.js';
+import { listProjectCandidateFocus, projectSearchCandidate,
+  setProjectCandidateFocus } from '../candidate-focus.js';
 import { jobVisibleTo } from '../visibility.js';
 import { downloadResumePdf, extractOpenmaiCandidates } from '../openmai-delivery.js';
 import { sendPdfFile } from '../feishu-bot.js';
@@ -25,14 +27,6 @@ async function authorized(shortlistFn, principal, jobId, candidateRef) {
     if (!pageToken) break;
   }
   return false;
-}
-
-function discoveredByOpenmai(db, principal, jobId, candidateRef) {
-  const row = db.prepare(`SELECT result_text FROM openmai_results
-    WHERE consultant_id=? AND project_id=? AND status='done' LIMIT 1`)
-    .get(principal.consultantId, jobId);
-  return extractOpenmaiCandidates(row?.result_text)
-    .some((candidate) => candidate.candidateRef === candidateRef);
 }
 
 function current(db, principal, args) {
@@ -97,11 +91,25 @@ export function createCandidateActionToolHandlers({
         fail(args.confirm === true ? 'NOT_FOUND_OR_FORBIDDEN' : 'INVALID_ARGUMENT');
       }
       const existing = current(db, context.principal, args);
-      const permitted = existing
-        || await authorized(candidateShortlistFn, context.principal, args.job_id, args.candidate_ref)
-        || discoveredByOpenmai(db, context.principal, args.job_id, args.candidate_ref);
+      const discovered = projectSearchCandidate(db, args.job_id, args.candidate_ref);
+      const focused = listProjectCandidateFocus(db, context.principal.tenantId, args.job_id)
+        .some((candidate) => candidate.candidate_ref === args.candidate_ref);
+      const permitted = existing || discovered || focused
+        || await authorized(candidateShortlistFn, context.principal, args.job_id, args.candidate_ref);
       if (!permitted) {
         fail('NOT_FOUND_OR_FORBIDDEN');
+      }
+      if (args.action === 'KEEP_FOR_REVIEW' || args.action === 'REMOVE_FROM_REVIEW') {
+        const row = setProjectCandidateFocus(db, {
+          tenantId: context.principal.tenantId, consultantId: context.principal.consultantId,
+          jobId: args.job_id, candidateRef: args.candidate_ref,
+          sourceTaskId: discovered?.sourceTaskId || null, candidateSnapshot: discovered,
+        }, args.action === 'KEEP_FOR_REVIEW');
+        return { data: row, facts: [{ candidate_ref: args.candidate_ref,
+          project_focus: row.focus_status === 'FOCUSED' }], inferences: [], recommendations: [], unknowns: [],
+        evidence_refs: [`candidate_focus:${args.job_id}:${args.candidate_ref}`],
+        next_allowed_actions: row.focus_status === 'FOCUSED'
+          ? ['brainx_candidate_fit', 'brainx_candidate_workflow'] : ['brainx_candidate_workflow'] };
       }
       const row = transition(db, context.principal, args);
       return { data: row, facts: [{ candidate_ref: args.candidate_ref, milestone: row.milestone,

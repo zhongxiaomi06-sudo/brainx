@@ -85,7 +85,7 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
         text: { tag: 'plain_text', content: success ? '打开工作台查看与评估' : '打开工作台处理' },
         multi_url: { url: target, pc_url: target, android_url: target, ios_url: target } }] }] : []),
       { tag: 'note', elements: [{ tag: 'plain_text',
-        content: '点击“查看人才”将打开 TTC 人才库详情页 · 不发送简历附件 · 候选人事实仍需顾问核验' }] },
+        content: '“保留”会加入本项目共同重点名单 · “查看人才”直达 TTC · 不发送简历附件' }] },
     ],
   };
 }
@@ -112,7 +112,7 @@ function candidateTableHeading() {
   return {
     tag: 'column_set', flex_mode: 'none', background_style: 'grey',
     columns: [tableCell('候选人 / 当前岗位', 3), tableCell('经验 / 城市', 2),
-      tableCell('学历', 2), tableCell('核心匹配点', 5), tableCell('匹配度', 1), tableCell('操作', 2)],
+      tableCell('学历', 2), tableCell('核心匹配点', 5), tableCell('匹配度', 1), tableCell('操作 / 保留', 3)],
   };
 }
 
@@ -129,14 +129,25 @@ function ttcTalentUrl(candidate) {
   return `https://app.ttcadvisory.com/app/talent/${encodeURIComponent(candidate.candidateRef)}`;
 }
 
+function keepCandidateAction(job, candidate) {
+  const projectRef = String(job.project_id || '').trim().slice(0, 64);
+  const command = `把项目 ${projectRef} 的候选人 ${candidate.candidateRef} 标记为重点关注。`
+    + '这个按钮就是我的明确确认：现在调用 brainx_candidate_workflow，'
+    + `传入 job_id=${projectRef}、candidate_ref=${candidate.candidateRef}、`
+    + 'action=KEEP_FOR_REVIEW、confirm=true。成功后告诉群里“☑ 已保留”，'
+    + '并说明此人已进入本项目共享上下文；不要发送简历。';
+  return { tag: 'button', type: 'default', text: { tag: 'plain_text', content: '□ 保留' },
+    value: { text: command } };
+}
+
 function candidateTableRow({ candidate, index, job, baseUrl }) {
-  void job;
   void baseUrl;
   const detailUrl = ttcTalentUrl(candidate);
   const action = detailUrl ? [{ tag: 'button', type: 'primary',
     text: { tag: 'plain_text', content: '查看人才' },
     multi_url: { url: detailUrl, pc_url: detailUrl, android_url: detailUrl, ios_url: detailUrl } }]
     : [{ tag: 'div', text: { tag: 'plain_text', content: '链接待核实' } }];
+  if (candidate.candidateRefValid !== false) action.push(keepCandidateAction(job, candidate));
   return [
     { tag: 'column_set', flex_mode: 'none', background_style: 'default', columns: [
       tableCell(`${index + 1}. ${groupSafeOpenmaiText(candidate.name, 60)}\n${groupSafeOpenmaiText(candidate.role, 120)}`, 3),

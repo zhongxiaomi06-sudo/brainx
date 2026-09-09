@@ -151,6 +151,16 @@ OpenClaw 只读取 BrainX 已经处理完成并授权的数据，不直接读取
 
 人才不存在、职位不存在、无授权和没有可用 shortlist 对外统一为空或 `NOT_FOUND_OR_FORBIDDEN`，不能靠响应差异枚举对象。RDS 不可用返回 `SOURCE_UNAVAILABLE`，不退到 `src/talent.js` 的进程内内存库，也不输出 SQL、主机名或凭据提示。
 
+### 6.1 项目共享重点名单
+
+`brainx_candidate_shortlist` 的 Agent Gateway 响应可额外包含 `data.focused_candidates`。它不是新的匹配运行，也不改变 `candidate_match_bundle_v1` 的排序；它表示项目成员经飞书候选卡明确“保留”的共享上下文。
+
+- 重点名单按租户、项目和稳定 `candidate_ref` 唯一保存；不同顾问的临时会话记忆不是事实源。
+- 只保存卡片已展示的安全摘要、来源任务和选择时间，不保存联系方式或简历原文。
+- 即使后续搜索替换了最新结果，已保留摘要仍可供同项目的授权群成员读取。
+- 写入和移出均复用 `brainx_candidate_workflow`，继续经过可信发送人、项目范围、候选来源、明确确认和审计校验。
+- `focused_candidates` 用于回答时优先保留、比较和追问，不代表已联系、已推荐客户或通过任何硬条件。
+
 ## 7. OpenClaw 接入边界
 
 当前 `mcp/server.mjs` 的实现只适用于“服务端绑定一个顾问和一个租户”的可信本地/隔离 PoC：

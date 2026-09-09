@@ -1,7 +1,7 @@
 import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
 
 const GATEWAY_URL = 'http://127.0.0.1:3102/internal/v1/agent/tools';
-const PLUGIN_VERSION = '1.3.1';
+const PLUGIN_VERSION = '1.3.2';
 const OPENCLAW_VERSION = '2026.7.1-2';
 const string = (extra = {}) => ({ type: 'string', minLength: 1, maxLength: 512, ...extra });
 const integer = (minimum, maximum) => ({ type: 'integer', minimum, maximum });
@@ -22,8 +22,8 @@ export const BRAINX_OPENCLAW_TOOLS = Object.freeze([
   { name: 'brainx_interview_prep', purpose: () => 'interview_prep', parameters: object({ job_id: string(), candidate_ref: string() }, ['job_id', 'candidate_ref']), description: '生成基于证据的面试准备材料。' },
   { name: 'brainx_personal_review', purpose: () => 'personal_review', parameters: object({ date_from: string({ pattern: '^\\d{4}-\\d{2}-\\d{2}$' }), date_to: string({ pattern: '^\\d{4}-\\d{2}-\\d{2}$' }) }, ['date_from', 'date_to']), description: '读取当前顾问个人复盘数据。' },
   { name: 'brainx_run_status', purpose: () => 'run_status', parameters: object({ run_id: string() }, ['run_id']), description: '查询当前顾问本人任务运行状态。' },
-  { name: 'brainx_openmai_search', purpose: () => 'candidate_review', parameters: object({ job_id: string() }, ['job_id']), description: '为当前顾问有权查看的职位启动一次 OpenMai 候选人搜索。' },
-  { name: 'brainx_supermai_scout', purpose: () => 'candidate_review', parameters: object({ criteria: string({ minLength: 5, maxLength: 2000 }) }, ['criteria']), description: 'SuperMai 按判据自由找人（猎聘/脉脉渠道，无需先有职位）：首次调用触发任务返回 running，完成后以同参数再调本工具读取候选人结果。与 brainx_openmai_search（按职位找人）二选一按语境使用。' },
+  { name: 'brainx_openmai_search', purpose: () => 'candidate_review', parameters: object({ job_id: string(), criteria: string({ maxLength: 2000 }) }, ['job_id']), description: '为当前顾问有权查看的职位启动一次 OpenMai 候选人搜索；criteria 是群内顾问可选的本轮补充条件，留空时按职位事实自动搜索。' },
+  { name: 'brainx_supermai_scout', purpose: () => 'candidate_review', parameters: object({ job_id: string(), criteria: string({ maxLength: 2000 }) }), description: 'SuperMai 在猎聘、脉脉等渠道按判据找人。项目群入口传 job_id，criteria 可选且留空时由职位事实生成；无职位的自由找人必须传 criteria。首次调用触发任务，完成后同参数可读取结果。' },
   { name: 'brainx_pending_job_facts', purpose: () => 'job_fact_review', parameters: object({ limit: integer(1, 20) }), description: '在私聊中列出当前顾问所在已登记群的待确认职位事实。' },
   { name: 'brainx_review_job_fact', purpose: () => 'job_fact_review', parameters: object({ draft_id: string(), action: string({ enum: ['confirm', 'reject'] }), job_id: string(), confirm: boolean() }, ['draft_id', 'action', 'confirm']), description: '在私聊中经用户明确确认后确认或拒绝一条本人可见的职位事实草稿。' },
   { name: 'brainx_submit_job_jd', purpose: () => 'job_fact_review', parameters: object({ jd_text: string({ minLength: 50, maxLength: 8000 }), confirm: boolean(), confirm_create: boolean() }, ['jd_text', 'confirm']), description: '在私聊或已登记项目群中提交整段 JD 原文，AI 提炼为待确认职位事实草稿；执行前向用户复述该操作并取得确认。confirm_create=true 表示用户已授权当场建岗（草稿立即转正、可接单）；否则建岗仍需本人显式确认草稿。' },

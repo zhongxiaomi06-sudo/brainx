@@ -1,6 +1,6 @@
-/** openmai-task.js — 接单后自动触发 OpenMai 找人（异步任务 + 状态落库 openmai_results + SSE 定向通知）。
+/** openmai-task.js — 显式触发 OpenMai 找人（异步任务 + 状态落库 openmai_results + SSE 定向通知）。
  *
- * 链路：顾问工作台点「接单」（engagement ACCEPT）→ startOpenmaiTask 后台异步执行
+ * 链路：顾问确认找人 → startOpenmaiTask 后台异步执行
  *   （getValidTtcJwt → CRM job detail → OpenMai completions → 结果/错误落库）→
  *   bus.emit 定向推 openmai_result 事件 → 前端刷新展示候选人列表。
  *
@@ -139,8 +139,8 @@ export async function callOpenmaiContent(jwt, content, { jobId } = {}) {
   return state.result;
 }
 
-async function callOpenmai(jwt, job) {
-  return callOpenmaiContent(jwt, buildPrompt(job), { jobId: job.unique_id });
+async function callOpenmai(jwt, job, searchBrief = '') {
+  return callOpenmaiContent(jwt, buildPrompt(job, searchBrief), { jobId: job.unique_id });
 }
 
 async function pollAsyncResult(jwt, state) {
@@ -166,9 +166,10 @@ async function loadPersisted(jwt, state) {
   return [...messages].reverse().find((m) => m?.role === 'assistant' && m?.status === 0)?.content || '';
 }
 
-/** 启动找人任务（接单后自动触发）。返回 { status: triggered|running|already_done|error, ... }。 */
+/** 启动找人任务。返回 { status: triggered|running|already_done|error, ... }。 */
 export function startOpenmaiTask(db, bus, consultant_id, project_id, { force = false, searchBrief = '' } = {}) {
   const key = `${project_id}|${consultant_id}`;
+  const brief = String(searchBrief || '').trim().slice(0, 2000);
   const existing = db.prepare('SELECT status, started_at, finished_at FROM openmai_results WHERE project_id=? AND consultant_id=?')
     .get(project_id, consultant_id);
   if (running.has(key)) return { status: 'running', started_at: existing?.started_at };
@@ -180,11 +181,14 @@ export function startOpenmaiTask(db, bus, consultant_id, project_id, { force = f
   const jwt = getAuthorizedTtcJwt(db, consultant_id, 'OPENMAI');
   if (!jwt) {
     const t = now();
-    db.prepare(`INSERT INTO openmai_results (project_id, consultant_id, status, error, started_at, finished_at)
-      VALUES (?,?,?,?,?,?)
+    db.prepare(`INSERT INTO openmai_results
+      (project_id, consultant_id, status, error, started_at, finished_at, search_brief)
+      VALUES (?,?,?,?,?,?,?)
       ON CONFLICT(project_id, consultant_id) DO UPDATE SET status='failed', error=excluded.error,
-        started_at=excluded.started_at, finished_at=excluded.finished_at`)
-      .run(project_id, consultant_id, 'failed', '没有个人或已授权的团队 TTC 寻访凭证', t, t);
+        started_at=excluded.started_at, finished_at=excluded.finished_at,
+        search_brief=excluded.search_brief`)
+      .run(project_id, consultant_id, 'failed', '没有个人或已授权的团队 TTC 寻访凭证',
+        t, t, brief || null);
     bus?.emit?.({ type: 'openmai_result', consultant_id, project_id, status: 'failed' });
     return { status: 'error', message: '没有个人或已授权的团队 TTC 寻访凭证' };
   }
@@ -192,7 +196,6 @@ export function startOpenmaiTask(db, bus, consultant_id, project_id, { force = f
   const task_id = `om_${uuid().slice(0, 8)}`;
   const started_at = now();
   running.add(key);
-  const brief = String(searchBrief || '').trim().slice(0, 2000);
   db.prepare(`INSERT INTO openmai_results (project_id, consultant_id, status, task_id, started_at, search_brief)
     VALUES (?,?, 'running', ?, ?, ?)
     ON CONFLICT(project_id, consultant_id) DO UPDATE SET status='running', error=NULL, result_text=NULL,

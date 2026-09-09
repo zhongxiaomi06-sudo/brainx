@@ -82,13 +82,22 @@ export function buildProjectLaunchCard(job, { publicBaseUrl } = {}) {
   const baseUrl = productionBaseUrl(publicBaseUrl).href;
   const detailUrl = buildBrainxDeepLink({ baseUrl, objectType: 'opportunity', objectRef: job.project_id });
   const facts = [job.city, job.hc == null ? null : `HC ${job.hc}`, job.pipeline].filter(Boolean).join(' · ');
+  const projectRef = String(job.project_id || '').trim().slice(0, 64);
+  const openmaiCommand = `为项目 ${projectRef} 使用 OpenMai 找人。读取本群最近一条由顾问明确发送的“找人条件：”作为补充条件；如果没有，就只根据职位事实自动找人。现在直接调用 brainx_openmai_search，不要再次询问找人方式。`;
+  const supermaiCommand = `为项目 ${projectRef} 使用 SuperMai 找人。读取本群最近一条由顾问明确发送的“找人条件：”作为补充条件；如果没有，就根据职位事实自动生成判据。现在直接调用 brainx_supermai_scout，不要再次询问找人方式。`;
   return {
     config: { wide_screen_mode: true },
     header: { template: 'blue', title: { tag: 'plain_text', content: `BrainTex 项目 · ${job.company}` } },
     elements: [
       { tag: 'markdown', content: `**${job.role}**\n${facts || '职位基础信息待补充'}\n\n`
         + `项目编号：${job.project_id}\n负责人：${job.consultant_name}` },
-      { tag: 'markdown', content: '**机器人已进入项目群**\n候选人搜索尚未启动；请在群内选择 OpenMai 或 SuperMai，可先补充找人条件，也可留空由系统根据职位自动生成。' },
+      { tag: 'markdown', content: '**机器人已进入项目群**\n候选人搜索尚未启动。可先在群里发送“找人条件：……”再点击按钮；不补充则根据职位信息自动找人。' },
+      { tag: 'action', actions: [
+        { tag: 'button', type: 'primary', text: { tag: 'plain_text', content: 'OpenMai 找人' },
+          value: { text: openmaiCommand } },
+        { tag: 'button', type: 'default', text: { tag: 'plain_text', content: 'SuperMai 找人' },
+          value: { text: supermaiCommand } },
+      ] },
       { tag: 'action', actions: [{
         tag: 'button', type: 'primary', text: { tag: 'plain_text', content: '打开职位工作台' },
         multi_url: { url: detailUrl, pc_url: detailUrl, android_url: detailUrl, ios_url: detailUrl },

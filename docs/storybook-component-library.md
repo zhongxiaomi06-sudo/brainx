@@ -55,7 +55,7 @@ OpenMai 候选人总览同样不在 React Storybook 伪造飞书组件。正式�
 
 岗位画像输入使用 React Storybook 的“业务组件/OpenMai 岗位画像输入”场景覆盖：验证 `needs_input` 提示、输入框和提交动作。飞书的“请补充岗位画像”橙卡仍以原生客户端验收，不在 Storybook 复制。
 
-项目群启动状态已调整为“建群后等待选择找人方式”：正式工作台不再把建群描述为自动启动 OpenMai，后端也不会在建群阶段检查 TTC 凭证或发起搜索。当前任务只完成状态与文案收口；OpenMai / SuperMai 选择按钮及可选条件输入尚未接入，不能把下一阶段交互记为 Storybook 或正式应用完成。状态见 [项目群等待选择找人方式复核](frontend-reviews/2026-09-09-project-search-method-waiting.md)。
+项目群启动状态为“建群后等待选择找人方式”：正式工作台不再把建群描述为自动启动 OpenMai，后端也不会在建群阶段检查 TTC 凭证或发起搜索。飞书原生项目卡片现已接入“OpenMai 找人”和“SuperMai 找人”两个真实按钮；顾问可先在群里发送 `找人条件：……`，留空则按职位事实自动生成。该卡片不在 React Storybook 复制。锁定版 OpenClaw 的语义化飞书卡片尚不能把表单输入值交给 Agent，因此卡片内联输入框仍未完成，真实视觉与回调以飞书客户端验收为准。状态见 [项目群双找人入口与可选条件复核](frontend-reviews/2026-09-09-project-search-method-buttons.md)。
 
 ## 使用命令
 

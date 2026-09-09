@@ -179,6 +179,55 @@ function runStatus(db, args, principal) {
   return { data: run, facts: [{ run_ref: args.run_id, status: run.status }], inferences: [], recommendations: [], unknowns: [], evidence_refs: [`run:${args.run_id}`] };
 }
 
+function cleanSearchCriteria(value) {
+  const criteria = String(value || '').trim();
+  if (criteria.length > 2000) fail('INVALID_ARGUMENT');
+  return criteria;
+}
+
+function projectCriteria(job, extra = '') {
+  return [
+    `目标职位：${job.role || '职位待确认'}`,
+    job.city ? `工作城市：${job.city}` : null,
+    job.company ? `客户业务背景：${job.company}` : null,
+    Number.isInteger(job.hc) ? `招聘人数：${job.hc}` : null,
+    job.pipeline ? `当前进展：${job.pipeline}` : null,
+    extra ? `顾问补充条件：${extra}` : null,
+  ].filter(Boolean).join('；').slice(0, 2000);
+}
+
+function activeProjectSearch(db, projectId) {
+  return db.prepare(`SELECT search_status,search_task_id FROM project_launches
+    WHERE project_id=? AND status='READY' AND search_status IN ('RUNNING','DONE')
+    ORDER BY created_at,launch_id LIMIT 1`).get(projectId) || null;
+}
+
+function markProjectSearch(db, projectId, out) {
+  const status = out.status === 'error' ? 'FAILED'
+    : out.status === 'already_done' ? 'DONE' : 'RUNNING';
+  db.prepare(`UPDATE project_launches SET search_status=?,search_task_id=?,
+    search_started_at=COALESCE(search_started_at,?),error_code=?,error_message=?,updated_at=?
+    WHERE project_id=? AND status='READY'`).run(
+    status, out.task_id || null, out.started_at || new Date().toISOString(),
+    status === 'FAILED' ? 'CANDIDATE_SEARCH_START_FAILED' : null,
+    status === 'FAILED' ? String(out.message || '找人启动失败').slice(0, 240) : null,
+    new Date().toISOString(), projectId,
+  );
+}
+
+function sharedProjectSearch(projectId, active, entry) {
+  return {
+    data: { entry, job_ref: projectId,
+      status: active.search_status === 'DONE' ? 'done' : 'running',
+      task_id: active.search_task_id, shared: true },
+    facts: [], inferences: [], recommendations: [],
+    unknowns: active.search_status === 'RUNNING'
+      ? ['该项目已有找人任务进行中，结果会自动回到当前项目群']
+      : [],
+    evidence_refs: [`project_search:${active.search_task_id || projectId}`],
+  };
+}
+
 /** OpenMai 找人（第 11 工具，2026-09-03）：纪律与承接路由一致——
  * 仅本人 ACCEPTED/COMPLETED 的职位可触发/读取（fail-closed，不泄露存在性）。
  * 费用门控：done 读缓存、running 报状态、其他才触发新任务（防重复费用）。 */
@@ -188,6 +237,7 @@ function openmaiSearch(db, args, principal) {
   const st = currentState(db, principal.consultantId, args.job_id)?.state;
   // 职位本人可见但未接单：明确提醒接单入口（不泄露任何额外信息——可见性已校验）
   if (!['ACCEPTED', 'COMPLETED'].includes(st)) fail('JOB_NOT_ACCEPTED');
+  const criteria = cleanSearchCriteria(args.criteria);
   const cur = getOpenmaiResult(db, principal.consultantId, args.job_id) || {};
   if (cur.status === 'done' || cur.status === 'running') {
     return {
@@ -205,11 +255,19 @@ function openmaiSearch(db, args, principal) {
       evidence_refs: [`openmai:${cur.task_id || args.job_id}`],
     };
   }
-  const out = startOpenmaiTask(db, null, principal.consultantId, args.job_id);
+  const shared = activeProjectSearch(db, args.job_id);
+  if (shared) return sharedProjectSearch(args.job_id, shared, 'openmai');
+  const out = startOpenmaiTask(db, null, principal.consultantId, args.job_id, {
+    searchBrief: criteria,
+  });
+  markProjectSearch(db, args.job_id, out);
   return {
-    data: { job_ref: args.job_id, status: out.status || 'triggered', task_id: out.task_id || null,
-            note: '找人任务已触发，正常 3-5 分钟收敛——请守候并每隔约 1 分钟再调本工具读取（最多 10 分钟），'
-                  + '完成后把 result_text 候选人完整呈现给顾问' },
+    data: { entry: 'openmai', job_ref: args.job_id, criteria: criteria || null,
+            status: out.status || 'triggered', task_id: out.task_id || null,
+            message: out.message || null,
+            note: out.status === 'error' ? '找人任务未启动，请处理提示后重试'
+              : '找人任务已触发，正常 3-5 分钟收敛；结果会自动回到项目群。'
+                + '请每隔约 1 分钟再调本工具读取（最多 10 分钟），完成后完整呈现 result_text' },
     facts: [], inferences: [], recommendations: [], unknowns: [],
     evidence_refs: [`openmai:${out.task_id || args.job_id}`],
   };
@@ -220,9 +278,17 @@ function openmaiSearch(db, args, principal) {
  * 本入口是「无需职位、直接给判据」的自由找人（completions 无 job_id 模式）。
  * 触发/读取两段式：首次调用触发任务返回 running，完成后同参数再调读取结果。 */
 function supermaiScout(db, args, principal) {
-  const criteria = String(args.criteria || '').trim();
+  const jobId = String(args.job_id || '').trim();
+  const extra = cleanSearchCriteria(args.criteria);
+  const job = jobId ? db.prepare('SELECT * FROM job_facts WHERE project_id=?').get(jobId) : null;
+  if (jobId && (!job || !jobVisibleTo(db, principal.consultantId, jobId))) fail('NOT_FOUND_OR_FORBIDDEN');
+  if (jobId) {
+    const st = currentState(db, principal.consultantId, jobId)?.state;
+    if (!['ACCEPTED', 'COMPLETED'].includes(st)) fail('JOB_NOT_ACCEPTED');
+  }
+  const criteria = job ? projectCriteria(job, extra) : extra;
   if (criteria.length < 5) fail('INVALID_ARGUMENT');
-  const project_id = supermaiCriteriaKey(criteria);
+  const project_id = jobId || supermaiCriteriaKey(criteria);
   const cur = getOpenmaiResult(db, principal.consultantId, project_id) || {};
   if (cur.status === 'done' || cur.status === 'running') {
     const candidates = cur.status === 'done' ? extractOpenmaiCandidates(cur.result_text) : [];
@@ -230,7 +296,7 @@ function supermaiScout(db, args, principal) {
     const noReply = cur.status === 'done' && !candidates.length
       && ['NO_REPLY', ''].includes(String(cur.result_text || '').trim());
     return {
-      data: { entry: 'supermai', criteria, status: cur.status,
+      data: { entry: 'supermai', job_ref: jobId || null, criteria, status: cur.status,
               result_text: noReply ? null : cur.result_text || null, candidates,
               empty_reason: noReply ? 'NO_MATCHES_FOUND' : null,
               started_at: cur.started_at || null, finished_at: cur.finished_at || null },
@@ -244,14 +310,21 @@ function supermaiScout(db, args, principal) {
       evidence_refs: [`supermai:${cur.task_id || project_id}`],
     };
   }
-  const out = startSupermaiScoutTask(db, null, principal.consultantId, criteria);
+  const shared = jobId ? activeProjectSearch(db, jobId) : null;
+  if (shared) return sharedProjectSearch(jobId, shared, 'supermai');
+  const out = startSupermaiScoutTask(db, null, principal.consultantId, criteria, {
+    projectId: jobId || null,
+  });
+  if (jobId) markProjectSearch(db, jobId, out);
   return {
-    data: { entry: 'supermai', criteria, status: out.status || 'triggered',
+    data: { entry: 'supermai', job_ref: jobId || null, criteria, status: out.status || 'triggered',
             task_id: out.task_id || null, message: out.message || null,
             note: out.status === 'already_done'
               ? '同判据结果已存在，请再次调用本工具读取'
-              : '找人任务已触发，正常 3-5 分钟收敛——请守候并每隔约 1 分钟再调本工具读取（最多 10 分钟），'
-                + '完成后把 result_text 候选人完整呈现给顾问' },
+              : out.status === 'error' ? '找人任务未启动，请处理提示后重试'
+              : jobId ? '找人任务已触发，正常 3-5 分钟收敛；结果会自动回到项目群。'
+                + '请每隔约 1 分钟再调本工具读取（最多 10 分钟）'
+                : '找人任务已触发，正常 3-5 分钟收敛；请每隔约 1 分钟再调本工具读取（最多 10 分钟）' },
     facts: [], inferences: [], recommendations: [], unknowns: [],
     evidence_refs: [`supermai:${out.task_id || project_id}`],
   };

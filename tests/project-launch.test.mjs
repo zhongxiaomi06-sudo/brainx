@@ -44,6 +44,13 @@ test('项目启动：建群、投放职位、绑定项目并激活群 Agent 范�
   assert.deepEqual(calls[0][1].memberOpenIds, [calls[0][1].ownerOpenId]);
   assert.deepEqual(calls[1], ['allow', 'oc_launch', [calls[0][1].ownerOpenId]]);
   assert.equal(calls[2][1].target, 'oc_launch');
+  const searchButtons = calls[2][1].card.elements
+    .flatMap((element) => element.actions || []).filter((button) => button.value?.text);
+  assert.deepEqual(searchButtons.map((button) => button.text.content), ['OpenMai 找人', 'SuperMai 找人']);
+  assert.match(searchButtons[0].value.text, /brainx_openmai_search/);
+  assert.match(searchButtons[1].value.text, /brainx_supermai_scout/);
+  assert.ok(searchButtons.every((button) => button.value.text.includes(`项目 ${PID}`)));
+  assert.match(calls[2][1].card.elements[1].content, /找人条件：/);
   assert.equal(db.prepare('SELECT chat_id FROM job_facts WHERE project_id=?').get(PID).chat_id, 'oc_launch');
   assert.equal(db.prepare('SELECT enabled FROM chat_contexts WHERE chat_id=?').get('oc_launch').enabled, 1);
   const scope = db.prepare('SELECT * FROM agent_group_scopes WHERE chat_id=?').get('oc_launch');

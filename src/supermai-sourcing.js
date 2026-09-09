@@ -10,10 +10,10 @@
  *   入口 2 brainx_supermai_scout（按判据，本模块，completions 无 job_id 模式——
  *          2026-09-08 18:12 最小付费实测 200 可用）
  *
- * 任务落库复用 openmai_results（project_id = supermai:<sha256(criteria) 前 12 位>）。
- * 合成 key 匹配不到 project_launches → enqueueOpenmaiDeliveries 的 JOIN 天然不命中，
- * 不会触发项目群投递副作用。防重纪律与 job 模式一致：running 集合 + DB 主键防并发
- * 重入；done 复用（already_done）；失败 60s 冷却；无凭证快速失败。
+ * 任务落库复用 openmai_results。自由搜索使用
+ * project_id = supermai:<sha256(criteria) 前 12 位>，不会命中项目群投递；项目群按钮则使用
+ * 真实 project_id，完成后复用既有 worker 投递回原群。防重纪律与 job 模式一致：running
+ * 集合 + DB 主键防并发重入；done 复用（already_done）；失败 60s 冷却；无凭证快速失败。
  */
 import { createHash } from 'node:crypto';
 import { now, uuid } from './db.js';
@@ -45,8 +45,10 @@ export function buildScoutPrompt(criteria) {
 
 /** 启动 SuperMai 按判据找人任务（触发/读取两段式的触发侧）。
  * 返回 { status: triggered|running|already_done|error, ... }，语义与 startOpenmaiTask 一致。 */
-export function startSupermaiScoutTask(db, bus, consultant_id, criteria, { force = false } = {}) {
-  const project_id = supermaiCriteriaKey(criteria);
+export function startSupermaiScoutTask(db, bus, consultant_id, criteria, {
+  force = false, projectId = null,
+} = {}) {
+  const project_id = String(projectId || '').trim() || supermaiCriteriaKey(criteria);
   const key = `${project_id}|${consultant_id}`;
   const existing = db.prepare('SELECT status, started_at, finished_at FROM openmai_results WHERE project_id=? AND consultant_id=?')
     .get(project_id, consultant_id);
@@ -59,11 +61,14 @@ export function startSupermaiScoutTask(db, bus, consultant_id, criteria, { force
   const jwt = getValidTtcJwt(db, consultant_id);
   if (!jwt) {
     const t = now();
-    db.prepare(`INSERT INTO openmai_results (project_id, consultant_id, status, error, started_at, finished_at)
-      VALUES (?,?,?,?,?,?)
+    db.prepare(`INSERT INTO openmai_results
+      (project_id, consultant_id, status, error, started_at, finished_at, search_brief)
+      VALUES (?,?,?,?,?,?,?)
       ON CONFLICT(project_id, consultant_id) DO UPDATE SET status='failed', error=excluded.error,
-        started_at=excluded.started_at, finished_at=excluded.finished_at`)
-      .run(project_id, consultant_id, 'failed', '没有有效 TTC 凭证——请用浏览器扩展扫码同步', t, t);
+        started_at=excluded.started_at, finished_at=excluded.finished_at,
+        search_brief=excluded.search_brief`)
+      .run(project_id, consultant_id, 'failed', '没有有效 TTC 凭证——请用浏览器扩展扫码同步',
+        t, t, String(criteria || '').trim().slice(0, 2000) || null);
     bus?.emit?.({ type: 'supermai_result', consultant_id, project_id, status: 'failed' });
     return { status: 'error', message: '没有有效 TTC 凭证——请用浏览器扩展扫码同步' };
   }
@@ -71,11 +76,14 @@ export function startSupermaiScoutTask(db, bus, consultant_id, criteria, { force
   const task_id = `sm_${uuid().slice(0, 8)}`;
   const started_at = now();
   running.add(key);
-  db.prepare(`INSERT INTO openmai_results (project_id, consultant_id, status, task_id, started_at)
-    VALUES (?,?, 'running', ?, ?)
+  db.prepare(`INSERT INTO openmai_results
+    (project_id, consultant_id, status, task_id, started_at, search_brief)
+    VALUES (?,?, 'running', ?, ?, ?)
     ON CONFLICT(project_id, consultant_id) DO UPDATE SET status='running', error=NULL, result_text=NULL,
-      task_id=excluded.task_id, started_at=excluded.started_at, finished_at=NULL`)
-    .run(project_id, consultant_id, task_id, started_at);
+      task_id=excluded.task_id, started_at=excluded.started_at, finished_at=NULL,
+      search_brief=excluded.search_brief`)
+    .run(project_id, consultant_id, task_id, started_at,
+      String(criteria || '').trim().slice(0, 2000) || null);
 
   (async () => {
     let status = 'failed';

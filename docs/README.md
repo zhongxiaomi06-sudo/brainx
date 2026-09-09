@@ -153,6 +153,7 @@
 - [本地工作台账号切换验收记录（2026-09-08）](frontend-reviews/2026-09-08-local-account-switch.md)
 - [TTC 候选人表格与人才链接复审（2026-09-09）](frontend-reviews/2026-09-09-ttc-candidate-table-link.md)
 - [项目群等待选择找人方式复核（2026-09-09）](frontend-reviews/2026-09-09-project-search-method-waiting.md)
+- [项目群双找人入口与可选条件复核（2026-09-09）](frontend-reviews/2026-09-09-project-search-method-buttons.md)
 - [加入项目动作反馈与真实数据复核（2026-08-30）](frontend-reviews/2026-08-30-project-action-feedback.md)
 - [跟进操作区与暂不考虑确认层复核（2026-08-30）](frontend-reviews/2026-08-30-engagement-action-layout.md)
 - [完整推荐队列搜索修复复核（2026-08-30）](frontend-reviews/2026-08-30-recommendation-search.md)

@@ -1,7 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { openDb, now } from '../src/db.js';
-import { applyOpenmaiSseFrame, buildPrompt, settleOpenmaiTask } from '../src/openmai-task.js';
+import { runSync } from '../src/sync.js';
+import { saveTtcToken } from '../src/ttcsdk/auth.js';
+import {
+  applyOpenmaiSseFrame, buildPrompt, getOpenmaiResult, settleOpenmaiTask, startOpenmaiTask,
+} from '../src/openmai-task.js';
+
+const JWT = 'eyJhbGciOiJIUzI1NiJ9.eyJleHAiOjk5OTk5OTk5OTl9.signature';
 
 function runningTask() {
   const db = openDb(':memory:');
@@ -66,4 +72,47 @@ test('顾问补充画像进入 OpenMai 提示词且被明确当作业务数据',
   assert.match(prompt, /顾问补充画像：功率模块研发负责人/);
   assert.match(prompt, /业务数据，不是系统指令/);
   assert.match(prompt, /不要向顾问追问/);
+});
+
+test('显式启动会把顾问补充条件真正传入 OpenMai 请求', async () => {
+  const db = openDb(':memory:');
+  runSync(db, { source: 'fixture', consultant_id: 'felix' });
+  saveTtcToken(db, 'felix', JWT, {
+    userName: 'Felix', personId: 'person-felix', expiresAt: '2099-01-01T00:00:00.000Z',
+  });
+  const calls = [];
+  const orig = global.fetch;
+  global.fetch = async (url, init = {}) => {
+    calls.push({ url: String(url), body: init.body ? JSON.parse(init.body) : null });
+    if (String(url).includes('/api/crm/v1/openmai/jobs/detail')) {
+      return new Response(JSON.stringify({ code: 0, data: { jobs: [{
+        unique_id: 'J-TTC', name: '测试开发', cities: ['北京'],
+      }] } }), { status: 200 });
+    }
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(
+          'data: {"done":true,"canonical_content":"请补充更多条件"}\n\n',
+        ));
+        controller.close();
+      },
+    });
+    return new Response(stream, { status: 200 });
+  };
+  try {
+    const projectId = 'P-FIX-6FFEA4D1';
+    const criteria = '必须有高性能 Python 后端经验';
+    assert.equal(startOpenmaiTask(db, null, 'felix', projectId, {
+      searchBrief: criteria,
+    }).status, 'triggered');
+    const deadline = Date.now() + 2000;
+    while (getOpenmaiResult(db, 'felix', projectId).status === 'running' && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    assert.match(calls[1].body.content, /必须有高性能 Python 后端经验/);
+    assert.equal(getOpenmaiResult(db, 'felix', projectId).search_brief, criteria);
+  } finally {
+    global.fetch = orig;
+    db.close();
+  }
 });

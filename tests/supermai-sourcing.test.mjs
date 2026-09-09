@@ -119,6 +119,27 @@ test('E2E：触发 → running（sm_ 任务号）→ completions criteria 模式
   }
 });
 
+test('项目模式：使用真实项目编号落库并保留判据供原群投递', async () => {
+  const db = seededDb();
+  const bodies = [];
+  const orig = global.fetch;
+  global.fetch = async (url, init = {}) => {
+    bodies.push({ url: String(url), body: init.body ? JSON.parse(init.body) : null });
+    return sseResponse([{ done: true, canonical_content: DONE_RESULT }]);
+  };
+  try {
+    const out = startSupermaiScoutTask(db, null, 'felix', CRITERIA, { projectId: 'P-PROJECT' });
+    assert.equal(out.status, 'triggered');
+    const settled = await waitForStatus(db, 'felix', 'P-PROJECT');
+    assert.equal(settled.status, 'done');
+    assert.equal(settled.search_brief, CRITERIA);
+    assert.equal(bodies[0].body.job_id, undefined, 'SuperMai 仍以判据模式调用');
+    assert.ok(bodies[0].body.content.includes(CRITERIA));
+  } finally {
+    global.fetch = orig;
+  }
+});
+
 test('completions 失败 → failed 落库；60s 冷却内拒绝重启，force 可重试', async () => {
   const db = seededDb();
   const orig = global.fetch;

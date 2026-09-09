@@ -82,12 +82,13 @@ function matches(project: ProjectSummary, query: string) {
     .filter(Boolean).join(" ").toLocaleLowerCase().includes(keyword);
 }
 
-export function ProjectsView({ projects, query, setQuery, focusedProjectId, open, onIgnore, onLaunch }: {
+export function ProjectsView({ projects, query, setQuery, focusedProjectId, openDetails, openAction, onIgnore, onLaunch }: {
   projects: ProjectSummary[];
   query: string;
   setQuery: (value: string) => void;
   focusedProjectId: string | null;
-  open: (project: ProjectSummary) => void;
+  openDetails: (project: ProjectSummary) => void;
+  openAction: (project: ProjectSummary) => void;
   onIgnore: (project: ProjectSummary) => Promise<void>;
   onLaunch: (project: ProjectSummary) => Promise<void>;
 }) {
@@ -156,7 +157,7 @@ export function ProjectsView({ projects, query, setQuery, focusedProjectId, open
               </button>}
               <button type="button" className="is-primary" disabled={launching || project.launch?.search_status === "RUNNING"}
                 onClick={() => {
-                  if (!canLaunch) { open(project); return; }
+                  if (!canLaunch) { openAction(project); return; }
                   setLaunchingId(project.project_id);
                   setLaunchErrors(current => ({ ...current, [project.project_id]: "" }));
                   void onLaunch(project)
@@ -165,6 +166,9 @@ export function ProjectsView({ projects, query, setQuery, focusedProjectId, open
                     .finally(() => setLaunchingId(null));
                 }}>
                 {canLaunch && <Bot />}{launching ? "正在创建项目群…" : actionLabel(project)}{!canLaunch && <ChevronRight />}
+              </button>
+              <button type="button" className="is-detail" onClick={() => openDetails(project)}>
+                详情<ChevronRight />
               </button>
             </div>
           </div>

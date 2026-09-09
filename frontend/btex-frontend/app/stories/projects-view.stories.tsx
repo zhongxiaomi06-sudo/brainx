@@ -3,7 +3,8 @@ import { expect, fn, userEvent, within } from "storybook/test";
 import type { ProjectStatus, ProjectSummary } from "../brainx-projects-api";
 import { ProjectsView } from "../projects-view";
 
-const open = fn();
+const openDetails = fn();
+const openAction = fn();
 const ignore = fn(async () => undefined);
 const launch = fn(async () => undefined);
 
@@ -54,7 +55,7 @@ const meta = {
   title: "业务组件/我的项目行动工作台",
   component: ProjectsView,
   parameters: { bare: true },
-  args: { projects, query: "", setQuery: fn(), focusedProjectId: null, open, onIgnore: ignore, onLaunch: launch },
+  args: { projects, query: "", setQuery: fn(), focusedProjectId: null, openDetails, openAction, onIgnore: ignore, onLaunch: launch },
 } satisfies Meta<typeof ProjectsView>;
 
 export default meta;
@@ -65,11 +66,14 @@ export const AllStates: Story = {
     const canvas = within(canvasElement);
     await expect(canvas.getByRole("heading", { name: "我的项目" })).toBeInTheDocument();
     await expect(canvas.getAllByRole("article")).toHaveLength(5);
+    await expect(canvas.getAllByRole("button", { name: "详情" })).toHaveLength(5);
     await userEvent.click(canvas.getByRole("button", { name: /需处理/ }));
     await expect(canvas.getByRole("article", { name: "客户成功负责人 · 云帆科技" })).toBeInTheDocument();
     await expect(canvas.queryByRole("article", { name: "AI 产品负责人 · 深势科技" })).not.toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: "立即处理" }));
-    await expect(open).toHaveBeenCalledWith(expect.objectContaining({ project_id: "P-NEEDS" }));
+    await expect(openAction).toHaveBeenCalledWith(expect.objectContaining({ project_id: "P-NEEDS" }));
+    await userEvent.click(canvas.getByRole("button", { name: "详情" }));
+    await expect(openDetails).toHaveBeenCalledWith(expect.objectContaining({ project_id: "P-NEEDS" }));
   },
 };
 
@@ -117,6 +121,7 @@ export const GroupReadyAwaitingMethod: Story = {
     await expect(canvas.getByText(/项目群和职位卡已就绪/)).toBeInTheDocument();
     await expect(canvas.getByText(/选择 OpenMai 或 SuperMai/)).toBeInTheDocument();
     await expect(canvas.getByRole("button", { name: /前往群内选择找人方式/ })).toBeEnabled();
+    await expect(canvas.getByRole("button", { name: "详情" })).toBeEnabled();
   },
 };
 

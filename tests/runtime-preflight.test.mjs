@@ -30,7 +30,7 @@ function valid() {
     BRAINX_AGENT_ASSERTION_SECRET: agent.BRAINX_AGENT_ASSERTION_SECRET,
     STEPFUN_API_KEY: value('i'),
   };
-  for (let index = 1; index <= 6; index++) openclaw[`BRAINX_FEISHU_ALLOWED_OPEN_ID_${index}`] = `ou_user_${index}`;
+  for (let index = 1; index <= 7; index++) openclaw[`BRAINX_FEISHU_ALLOWED_OPEN_ID_${index}`] = `ou_user_${index}`;
   for (let index = 1; index <= 3; index++) openclaw[`BRAINX_FEISHU_ALLOWED_CHAT_ID_${index}`] = `oc_group_${index}`;
   return { agent, worker, openclaw };
 }

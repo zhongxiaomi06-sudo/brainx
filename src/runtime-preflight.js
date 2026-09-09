@@ -39,7 +39,7 @@ export function validateRuntimeConfig({ agent = {}, worker = {}, openclaw = {} }
     'OPENCLAW_GATEWAY_TOKEN', 'BRAINX_FEISHU_APP_ID', 'BRAINX_FEISHU_APP_SECRET',
     'BRAINX_BASE_URL', 'BRAINX_AGENT_GATEWAY_TOKEN', 'BRAINX_AGENT_ASSERTION_SECRET',
     'STEPFUN_API_KEY',
-    ...Array.from({ length: 6 }, (_, index) => `BRAINX_FEISHU_ALLOWED_OPEN_ID_${index + 1}`),
+    ...Array.from({ length: 7 }, (_, index) => `BRAINX_FEISHU_ALLOWED_OPEN_ID_${index + 1}`),
     ...Array.from({ length: 3 }, (_, index) => `BRAINX_FEISHU_ALLOWED_CHAT_ID_${index + 1}`),
   ], 'openclaw.env', errors);
 
@@ -77,7 +77,7 @@ export function validateRuntimeConfig({ agent = {}, worker = {}, openclaw = {} }
     errors.push('openclaw.env:BRAINX_FEISHU_APP_ID:INVALID');
   }
 
-  const people = Array.from({ length: 6 }, (_, index) =>
+  const people = Array.from({ length: 7 }, (_, index) =>
     openclaw[`BRAINX_FEISHU_ALLOWED_OPEN_ID_${index + 1}`]).filter(Boolean);
   const chats = Array.from({ length: 3 }, (_, index) =>
     openclaw[`BRAINX_FEISHU_ALLOWED_CHAT_ID_${index + 1}`]).filter(Boolean);

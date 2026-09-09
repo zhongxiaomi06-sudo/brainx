@@ -72,6 +72,7 @@ test('Feishu is websocket-only, allowlisted, and mention-gated in groups', () =>
     '${BRAINX_FEISHU_ALLOWED_OPEN_ID_4}',
     '${BRAINX_FEISHU_ALLOWED_OPEN_ID_5}',
     '${BRAINX_FEISHU_ALLOWED_OPEN_ID_6}',
+    '${BRAINX_FEISHU_ALLOWED_OPEN_ID_7}',
   ];
   assert.equal(feishu.connectionMode, 'websocket');
   assert.equal(feishu.streaming, false, 'final reply hook needs to own the completed rich card');
@@ -133,7 +134,7 @@ test('systemd units keep internal services on one host and load secrets from pro
   assert.doesNotMatch(installer, /install -m 0600 -o root -g brainx/);
 });
 
-test('OpenClaw env template provides six consultants and three groups', async () => {
+test('OpenClaw env template provides seven consultants and three groups', async () => {
   const template = await readFile(new URL('deploy/openclaw/openclaw.env.example', root), 'utf8');
   assert.match(template, /^BRAINX_BASE_URL=https:\/\//m);
   assert.match(template, /^STEPFUN_API_KEY=replace-stepfun-api-key$/m);

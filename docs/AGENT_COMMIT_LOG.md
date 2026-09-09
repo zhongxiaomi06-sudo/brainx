@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-09｜fix(openclaw): 配置更新后强制刷新工具策略
+
+- 根因：OpenClaw 的工具白名单会进入现有群会话运行态；此前只更新 `tools.alsoAllow` 并依赖配置/渠道热重载，旧群仍会过滤 `brainx_openmai_search`，随后模型退回旧入口并把工具策略问题误报为职位 `NOT_FOUND_OR_FORBIDDEN`。
+- 修复：生产安装器在检测到 `openclaw-brainx` 正在运行时，于配置和插件安装完成后强制完整重启；首次安装仍不擅自启动未配置服务。运行手册同步要求真实群调用与 Gateway 审计双重验收，不再以静态配置或插件 loaded 作为生效证据。
+- 本机实证：完整重启 OpenClaw 后飞书 WebSocket 恢复；同轮另一项目的 `brainx_openmai_search` 已在 Agent Gateway 审计中得到 `ALLOWED` 与 `SUCCEEDED`，证明专用工具链本身可用。
+- 验证：生产安装配置与运行预检专项 11/11 通过；`npm run verify:quick` 16/16 通过。
+
 ## 2026-09-09｜fix(项目卡): 常驻职位详情入口
 
 - 改动：“我的项目”每张卡右侧固定增加“详情”，始终打开统一职位弹窗的“职位事实”；原阶段按钮独立保留，继续根据状态显示启动寻访、选择找人方式、查看候选人或更新进展。

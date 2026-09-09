@@ -153,7 +153,7 @@ sudo deploy/openclaw/install.sh --apply
 
 同时安装 `brainx-today`、`brainx-job`、`brainx-talent`、`brainx-match`、`brainx-engagement-draft`、`brainx-interview-prep`、`brainx-review` 七个生产 Skill。其余仓库 Skill 不进入首批生产，避免把历史工具名或更宽能力一起带入。
 
-安装器不会覆盖已经存在的环境文件，也不会启动服务。每次新 release 包含插件变化时都必须重新运行 `--apply`，否则服务器仍在运行旧插件副本。
+安装器不会覆盖已经存在的环境文件，也不会首次启动尚未运行的服务。若 `openclaw-brainx` 已在运行，`--apply` 会在更新配置和插件后完整重启它，确保工具白名单对既有群会话生效；不要用配置热更新或飞书渠道重载代替该重启。每次新 release 包含插件或工具策略变化时都必须重新运行 `--apply`，否则服务器仍可能使用旧插件副本或旧会话策略。
 
 ## 7. 配置三个环境文件
 

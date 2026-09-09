@@ -62,6 +62,7 @@ Gateway、OpenClaw、业务 worker 和可选 integration worker 都在 systemd `
 - 每日看四个服务状态、最近错误码、草稿积压、任务和 outbox；日志不得出现 prompt、简历正文、联系方式或密钥。
 - 遇到“某员工能看到机器人但工具不可用”时，先运行 `readiness`。它分别检查花名册 open_id、OpenClaw 白名单、Gateway ACTIVE 身份和 TTC 寻访凭证，输出不含 open_id、token 或 app key；不要把所有缺项笼统归因于 Gateway。团队共享 TTC 必须通过 `ttc_credential_grants` 显式授权，不能复制到员工个人槽位。
 - 若项目群点击 OpenMai / SuperMai 后，Agent 声称职位不存在或无权限，但 `project_launches`、`agent_group_scopes` 和 `job_memberships` 均正常，应检查运行中的 `tools.allow` / `tools.alsoAllow` 是否遗漏对应专用工具。工具被策略过滤后，模型可能退回旧入口并产生误导性错误；修复时只恢复生产模板批准的工具，不得通过扩大 profile 绕过。
+- 修改 `tools.allow`、`tools.alsoAllow`、`tools.deny` 或安装 BrainX 插件后，必须完整重启 `openclaw-brainx`；配置 patch 或飞书渠道热重载不能作为工具策略已经对现有群会话生效的证据。`deploy/openclaw/install.sh --apply` 会在服务已运行时自动执行这次重启。重启后须从真实项目群触发一次专用工具，并在 Agent Gateway 审计中确认该工具为 `ALLOWED` 且 `SUCCEEDED`；只看配置文件或插件 `loaded` 不算通过。
 - `node bin/brainx-openmai-health.mjs` 逐人检查 TTC 凭证，并从任一有效顾问凭证执行一次无副作用 GET 可达性探测；晨检严禁向 `/completions` POST `ping`，避免误创建找人任务或产生费用。
 - 团队 TTC 账号授权必须由 allowlist 管理员显式执行：`node bin/brainx-agent-admin.mjs grant-ttc-openmai --source mia --grantee dykes --reason "已核验的业务授权" --confirm true`；撤销使用 `revoke-ttc-openmai --grantee dykes --confirm true`。命令只记录引用和授权证据，不读取或复制 JWT。
 - 任务租约过期会被同类 handler 重新领取；费用或尝试次数到上限后进入 FAILED，不无限消耗模型额度。

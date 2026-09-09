@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { openDb } from '../src/db.js';
+import { runSync } from '../src/sync.js';
+import { setProjectCandidateFocus } from '../src/candidate-focus.js';
 import { createTalentToolHandlers } from '../src/agent-gateway/tools-talent.js';
 
 const ISO = '2026-09-03T08:00:00.000Z';
@@ -71,6 +74,40 @@ test('shortlist 从可信 principal 注入范围，群聊上限三人', async ()
   assert.ok(out.evidence_refs.includes('match_run:match-run-a'));
 });
 
+test('shortlist 带回项目共享重点名单供后续群问答使用', async () => {
+  const db = openDb(':memory:');
+  runSync(db, { source: 'fixture', consultant_id: 'felix' });
+  const jobId = db.prepare("SELECT project_id FROM job_memberships WHERE consultant_id='felix' LIMIT 1").get().project_id;
+  const resultText = `候选结果\n<!-- BRAINX_CANDIDATES_V1\n${JSON.stringify({ candidates: [
+    { candidate_ref: 'TTC-KEEP-1', name: '李四', role: '未来科技 / 测试开发',
+      evaluation: 'Python 与自动化经验匹配', score: '88%' },
+  ] })}\n-->`;
+  db.prepare(`INSERT INTO openmai_results
+    (project_id,consultant_id,status,result_text,task_id,started_at,finished_at)
+    VALUES (?,?,'done',?,'om-focus','2026-09-09T00:00:00.000Z','2026-09-09T00:01:00.000Z')`)
+    .run(jobId, 'felix', resultText);
+  setProjectCandidateFocus(db, { tenantId: 'tenant-a', consultantId: 'felix', jobId,
+    candidateRef: 'TTC-KEEP-1', sourceTaskId: 'om-focus', candidateSnapshot: {
+      name: '李四', role: '未来科技 / 测试开发', experience: '7 年', city: '北京',
+      education: '本科', evaluation: 'Python 与自动化经验匹配', score: '88%',
+    } }, true, '2026-09-09T00:02:00.000Z');
+  db.prepare("UPDATE openmai_results SET result_text='下一轮没有该候选人' WHERE task_id='om-focus'").run();
+  const api = createTalentToolHandlers({ db, candidateShortlistFn: async (input) => ({
+    ...bundle, job_ref: jobId, items: [], match_run: null,
+    data_scope: { ...bundle.data_scope, purpose: input.purpose },
+  }) });
+  const out = await api.brainx_candidate_shortlist({ job_id: jobId }, principal('group'));
+  assert.deepEqual(out.data.focused_candidates, [{
+    candidate_ref: 'TTC-KEEP-1', name: '李四', role: '未来科技 / 测试开发',
+    experience: '7 年', city: '北京', education: '本科',
+    evaluation: 'Python 与自动化经验匹配', score: '88%', source_task_id: 'om-focus',
+    focused_at: '2026-09-09T00:02:00.000Z',
+  }]);
+  assert.ok(out.facts.some((entry) => entry.kind === 'focused_candidate'));
+  assert.ok(out.evidence_refs.includes(`candidate_focus:${jobId}:TTC-KEEP-1`));
+  db.close();
+});
+
 test('candidate facts 只投影结构化事实，不返回姓名、contact_ref、hash 或原文', async () => {
   const out = await handlers().brainx_candidate_facts({ candidate_ref: 'cand-a', purpose: 'candidate_review' }, principal());
   const serialized = JSON.stringify(out);
@@ -115,6 +152,7 @@ test('授权源失败原样返回稳定错误码，不把空数据伪装为无�
 function emptyGuidanceDb(openmaiRow, engagedRow) {
   return {
     prepare: (sql) => ({
+      all: () => [],
       get: () => {
         if (sql.includes('openmai_results')) return openmaiRow;
         if (sql.includes('decision_events')) return engagedRow;

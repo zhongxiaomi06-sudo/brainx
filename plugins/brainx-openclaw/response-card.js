@@ -1,3 +1,5 @@
+import { parseCandidateTableReply } from './candidate-table.js';
+
 const FIELD_LABELS = ['结论', '关键依据', '主要风险', '下一步'];
 
 function safeWorkbenchUrl(value) {
@@ -157,6 +159,19 @@ export function formatBrainxReplyPayload(event, context = {}) {
   if (event?.kind !== 'final' || channel !== 'feishu' || hasExistingControls
       || payload?.isReasoning || payload?.isCommentary || payload?.isStatusNotice
       || typeof payload?.text !== 'string' || !payload.text.trim()) return undefined;
+  const candidateTable = parseCandidateTableReply(payload.text);
+  if (candidateTable) {
+    return {
+      payload: {
+        ...payload,
+        text: candidateTable.fallback,
+        channelData: {
+          ...payload.channelData,
+          feishu: { ...payload.channelData?.feishu, card: candidateTable.card },
+        },
+      },
+    };
+  }
   const workbenchUrl = safeWorkbenchUrl(publicBaseUrl);
   const recommendation = parseRecommendation(payload.text);
   const blocks = recommendation

@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import { verifyPrincipalAssertion } from '../src/agent-gateway/assertion.js';
+import { createToolRegistry } from '../src/agent-gateway/tool-registry.js';
 import {
   BRAINX_OPENCLAW_TOOLS,
   createBrainxToolFactory,
@@ -42,7 +43,8 @@ test('plugin package and manifest declare exactly the approved tools', () => {
   assert.deepEqual(manifest.contracts.commands, ['brainx']);
   assert.deepEqual(manifest.contracts.tools, fixture.allowed_tools);
   assert.deepEqual(BRAINX_OPENCLAW_TOOLS.map(({ name }) => name), fixture.allowed_tools);
-  assert.equal(new Set(manifest.contracts.tools).size, 24);
+  assert.equal(new Set(manifest.contracts.tools).size, 23);
+  assert.ok(!manifest.contracts.tools.includes('brainx_send_candidate_resume'));
   for (const tool of BRAINX_OPENCLAW_TOOLS) {
     assert.equal(tool.parameters.additionalProperties, false);
     assert.equal('url' in tool.parameters.properties, false);
@@ -55,7 +57,38 @@ test('BrainTex prompt routes natural-language job recommendations to authorized 
   assert.match(prompt, /推荐三个/);
   assert.match(prompt, /brainx_daily_brief/);
   assert.match(prompt, /不得凭常识编造职位方向/);
+  assert.match(prompt, /OpenMai 找人.*SuperMai 找人/s);
+  assert.match(prompt, /找人条件：/);
+  assert.match(prompt, /按钮本身就是.*明确选择/);
+  assert.match(prompt, /KEEP_FOR_REVIEW/);
+  assert.match(prompt, /focused_candidates/);
+  assert.match(prompt, /发送卡片.*SEND_TALENT_CARD/s);
+  assert.match(prompt, /为这个人建群.*CREATE_DECISION_GROUP/s);
+  assert.match(prompt, /消息本身就是.*明确确认/);
   assert.equal(createBraintexPromptContext({ messageProvider: 'telegram' }), undefined);
+});
+
+test('项目群双找人入口支持可选条件且不接受身份或路由注入', () => {
+  const openmai = BRAINX_OPENCLAW_TOOLS.find(({ name }) => name === 'brainx_openmai_search');
+  const supermai = BRAINX_OPENCLAW_TOOLS.find(({ name }) => name === 'brainx_supermai_scout');
+  assert.deepEqual(openmai.parameters.required, ['job_id']);
+  assert.equal(openmai.parameters.properties.criteria.maxLength, 2000);
+  assert.equal(openmai.parameters.properties.continue_search.type, 'boolean');
+  assert.deepEqual(supermai.parameters.required, []);
+  assert.deepEqual(Object.keys(supermai.parameters.properties), ['job_id', 'criteria', 'continue_search']);
+  assert.equal(supermai.parameters.additionalProperties, false);
+  const gateway = createToolRegistry();
+  assert.deepEqual(gateway.schema('brainx_openmai_search'), openmai.parameters,
+    '插件参数必须与 BrainX 网关白名单一致');
+  assert.deepEqual(gateway.schema('brainx_supermai_scout'), supermai.parameters,
+    '插件参数必须与 BrainX 网关白名单一致');
+  const workflow = BRAINX_OPENCLAW_TOOLS.find(({ name }) => name === 'brainx_candidate_workflow');
+  assert.ok(workflow.parameters.properties.action.enum.includes('KEEP_FOR_REVIEW'));
+  assert.ok(workflow.parameters.properties.action.enum.includes('REMOVE_FROM_REVIEW'));
+  assert.ok(workflow.parameters.properties.action.enum.includes('CREATE_DECISION_GROUP'));
+  assert.ok(workflow.parameters.properties.action.enum.includes('SEND_TALENT_CARD'));
+  assert.deepEqual(gateway.schema('brainx_candidate_workflow'), workflow.parameters,
+    '候选保留参数必须与 BrainX 网关白名单一致');
 });
 
 test('trusted principal rejects missing, inconsistent, non-Feishu, and forged private contexts', () => {
@@ -107,7 +140,7 @@ test('tool request is fixed to loopback and produces a BrainX-verifiable asserti
   const body = JSON.parse(calls[0].options.body);
   assert.equal(body.schema_version, 'agent_tool_request.v1');
   assert.deepEqual(body.client, {
-    plugin_version: '1.3.1', openclaw_version: '2026.7.1-2', model_ref: 'openai/gpt-5',
+    plugin_version: '1.3.6', openclaw_version: '2026.7.1-2', model_ref: 'openai/gpt-5',
   });
   const payload = verifyPrincipalAssertion(body.principal_assertion, {
     secret,

@@ -133,4 +133,11 @@ if ! run_openclaw plugins inspect feishu --json 2>/dev/null | \
 fi
 install_plugin "$BRAINX_PLUGIN_ARCHIVE"
 systemctl daemon-reload
-echo "installed; fill /etc/brainx/*.env, then validate and enable services per runbook"
+if systemctl is-active --quiet openclaw-brainx; then
+  # OpenClaw 的工具策略会进入现有会话运行态。仅 patch 配置或依赖渠道热重载，
+  # 可能让旧群继续沿用旧 allowlist，因此更新配置/插件后必须完整重启。
+  systemctl restart openclaw-brainx
+  echo "installed; restarted active openclaw-brainx so tool policy is effective"
+else
+  echo "installed; fill /etc/brainx/*.env, then validate and enable services per runbook"
+fi

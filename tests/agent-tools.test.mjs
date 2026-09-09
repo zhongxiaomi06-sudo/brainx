@@ -176,7 +176,7 @@ test('OpenClaw 安装集只引用当前精确白名单工具', () => {
     'brainx_gap_questions', 'brainx_interview_prep', 'brainx_personal_review', 'brainx_run_status',
     'brainx_push_preferences', 'brainx_update_push_preferences', 'brainx_job_contacts',
     'brainx_candidate_contact', 'brainx_accept_job', 'brainx_start_candidate_search',
-    'brainx_record_job_progress', 'brainx_candidate_workflow', 'brainx_send_candidate_resume',
+    'brainx_record_job_progress', 'brainx_candidate_workflow',
     'brainx_openmai_search', 'brainx_supermai_scout']);
   for (const name of installable) {
     const body = loadSkill(index, name).body;

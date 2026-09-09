@@ -1,6 +1,7 @@
 /** 工作台 OpenMai 状态与显式重跑接口。 */
 import { currentState } from './engagement.js';
 import { startOpenmaiTask, getOpenmaiResult } from './openmai-task.js';
+import { nextSearchExclusions } from './search-rounds.js';
 import { body, err, json } from './server-http.js';
 
 export function openmaiRoutes(db, bus) {
@@ -22,7 +23,9 @@ export function openmaiRoutes(db, bus) {
       if (payload === null) return err(res, 400, 'BAD_JSON', '请求体不是合法 JSON');
       const searchBrief = String(payload?.search_brief || '').trim();
       if (searchBrief.length > 2000) return err(res, 422, 'SEARCH_BRIEF_TOO_LONG', '岗位画像不能超过 2000 字');
-      const out = startOpenmaiTask(db, bus, cid, id, { force: true, searchBrief });
+      const out = startOpenmaiTask(db, bus, cid, id, {
+        force: true, searchBrief, excludeCandidateRefs: nextSearchExclusions(db, id),
+      });
       json(res, 200, { ok: true, openmai: out });
     },
   };

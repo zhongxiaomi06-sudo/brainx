@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { readFileSync } from 'node:fs';
 import { parseEnv } from 'node:util';
-import { validateRuntimeConfig } from '../src/runtime-preflight.js';
+import { validateOpenClawToolPolicy, validateRuntimeConfig } from '../src/runtime-preflight.js';
 
 const paths = {
   agent: process.argv[2] || '/etc/brainx/agent.env',
@@ -12,6 +12,14 @@ let result;
 try {
   result = validateRuntimeConfig(Object.fromEntries(Object.entries(paths)
     .map(([name, path]) => [name, parseEnv(readFileSync(path, 'utf8'))])));
+  if (process.env.OPENCLAW_CONFIG_PATH) {
+    const config = JSON.parse(readFileSync(process.env.OPENCLAW_CONFIG_PATH, 'utf8'));
+    const policy = validateOpenClawToolPolicy(config);
+    result = {
+      ok: result.ok && policy.ok,
+      errors: [...new Set([...result.errors, ...policy.errors])].sort(),
+    };
+  }
 } catch (error) {
   console.error(JSON.stringify({ ok: false, errors: [`runtime:ENV_FILE_UNREADABLE:${error.code || 'UNKNOWN'}`] }));
   process.exit(1);

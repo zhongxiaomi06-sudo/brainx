@@ -44,6 +44,13 @@ test('项目启动：建群、投放职位、绑定项目并激活群 Agent 范�
   assert.deepEqual(calls[0][1].memberOpenIds, [calls[0][1].ownerOpenId]);
   assert.deepEqual(calls[1], ['allow', 'oc_launch', [calls[0][1].ownerOpenId]]);
   assert.equal(calls[2][1].target, 'oc_launch');
+  const searchButtons = calls[2][1].card.elements
+    .flatMap((element) => element.actions || []).filter((button) => button.value?.text);
+  assert.deepEqual(searchButtons.map((button) => button.text.content), ['OpenMai 找人', 'SuperMai 找人']);
+  assert.match(searchButtons[0].value.text, /brainx_openmai_search/);
+  assert.match(searchButtons[1].value.text, /brainx_supermai_scout/);
+  assert.ok(searchButtons.every((button) => button.value.text.includes(`项目 ${PID}`)));
+  assert.match(calls[2][1].card.elements[1].content, /找人条件：/);
   assert.equal(db.prepare('SELECT chat_id FROM job_facts WHERE project_id=?').get(PID).chat_id, 'oc_launch');
   assert.equal(db.prepare('SELECT enabled FROM chat_contexts WHERE chat_id=?').get('oc_launch').enabled, 1);
   const scope = db.prepare('SELECT * FROM agent_group_scopes WHERE chat_id=?').get('oc_launch');
@@ -204,40 +211,33 @@ test('项目启动：Agent 身份未绑定时在外部写入前阻断', async ()
   db.close();
 });
 
-test('寻访启动：一次确认完成建群、接单行动和 OpenMai 触发', async () => {
+test('寻访启动：一次确认完成建群和接单，等待用户选择找人方式', async () => {
   const db = readyDb();
-  const events = [];
-  const bus = { emit: (event) => events.push(event) };
+  let searchCalls = 0;
   const dependencies = {
     appConfigured: true,
-    ttcConnected: true,
     publicBaseUrl: 'https://base.yorkteam.cn/',
     createProjectChat: async () => ({ chat_id: 'oc_workflow', name: '项目群' }),
     ensureOpenClawGroupAllowed: async () => {},
     sendInteractiveCard: async () => ({ message_id: 'om_workflow' }),
-    startOpenmaiTask: (store, passedBus, consultantId, projectId) => {
-      assert.equal(store, db);
-      assert.equal(passedBus, bus);
-      assert.equal(consultantId, 'felix');
-      assert.equal(projectId, PID);
-      return { status: 'triggered', task_id: 'om_task', started_at: now() };
-    },
+    startOpenmaiTask: () => { searchCalls += 1; },
   };
-  const out = await launchRecruitingWorkflow(db, bus, 'felix', PID, {
+  const out = await launchRecruitingWorkflow(db, null, 'felix', PID, {
     confirm: true, idempotency_key: 'workflow-1',
   }, dependencies);
-  assert.equal(out.launch.search_status, 'RUNNING');
-  assert.equal(out.launch.search_task_id, 'om_task');
+  assert.equal(out.search.status, 'awaiting_method');
+  assert.equal(out.launch.search_status, null);
+  assert.equal(searchCalls, 0);
   assert.equal(db.prepare(`SELECT state FROM current_engagement
     WHERE consultant_id='felix' AND project_id=?`).get(PID).state, 'ACCEPTED');
   const action = db.prepare(`SELECT title, goal FROM commitment_actions
     WHERE consultant_id='felix' AND project_id=? AND status='OPEN'`).get(PID);
-  assert.match(action.title, /首轮候选人/);
+  assert.match(action.title, /OpenMai 或 SuperMai/);
   assert.match(action.goal, /搜索与匹配评估/);
   db.close();
 });
 
-test('寻访启动：缺确认不建群；缺 TTC 时先建群投放职位并等待连接', async () => {
+test('寻访启动：缺确认不建群；建群阶段不因 TTC 状态自动搜索', async () => {
   const db = readyDb();
   let externalCalls = 0;
   let searchCalls = 0;
@@ -258,15 +258,15 @@ test('寻访启动：缺确认不建群；缺 TTC 时先建群投放职位并等
   }, { ...dependencies, ttcConnected: false });
   assert.equal(result.launch.status, 'READY');
   assert.equal(result.launch.chat_id, 'oc_wait_ttc');
-  assert.equal(result.search.status, 'credentials_required');
+  assert.equal(result.search.status, 'awaiting_method');
   assert.equal(externalCalls, 1);
   assert.equal(searchCalls, 0);
   assert.equal(db.prepare('SELECT state FROM current_engagement WHERE consultant_id=? AND project_id=?')
-    .get('felix', PID)?.state, undefined);
+    .get('felix', PID)?.state, 'ACCEPTED');
   db.close();
 });
 
-test('寻访启动：候选不足后的明确重试才强制发起新一轮搜索', async () => {
+test('寻访启动：候选不足后重新进入项目也不自动发起新一轮搜索', async () => {
   const db = readyDb();
   const at = now();
   db.prepare(`INSERT INTO project_launches
@@ -274,23 +274,21 @@ test('寻访启动：候选不足后的明确重试才强制发起新一轮搜�
      search_status,error_code,error_message,created_at,updated_at)
     VALUES ('launch-partial','felix',?,'first-click','READY','READY','oc_partial','om_job',
       'FAILED','OPENMAI_CANDIDATES_INCOMPLETE','不足 6 人',?,?)`).run(PID, at, at);
-  let options;
+  let searchCalls = 0;
   const out = await launchRecruitingWorkflow(db, null, 'felix', PID, {
     confirm: true, idempotency_key: 'retry-partial',
   }, {
     appConfigured: true, ttcConnected: true, publicBaseUrl: 'https://base.yorkteam.cn/',
-    startOpenmaiTask: (_store, _bus, _consultantId, _projectId, received) => {
-      options = received;
-      return { status: 'triggered', task_id: 'om_retry', started_at: at };
-    },
+    startOpenmaiTask: () => { searchCalls += 1; },
   });
-  assert.deepEqual(options, { force: true });
-  assert.equal(out.launch.search_status, 'RUNNING');
-  assert.equal(out.launch.error_code, null);
+  assert.equal(searchCalls, 0);
+  assert.equal(out.search.status, 'awaiting_method');
+  assert.equal(out.launch.search_status, 'FAILED');
+  assert.equal(out.launch.error_code, 'OPENMAI_CANDIDATES_INCOMPLETE');
   db.close();
 });
 
-test('寻访启动：飞书投递耗尽后只重试投递，不重复运行 OpenMai', async () => {
+test('寻访启动：飞书投递耗尽后重新进入项目也不自动重试', async () => {
   const db = readyDb();
   const at = now();
   db.prepare(`INSERT INTO project_launches
@@ -310,9 +308,9 @@ test('寻访启动：飞书投递耗尽后只重试投递，不重复运行 Open
     },
     startOpenmaiTask: () => { searchCalls++; },
   });
-  assert.equal(deliveryCalls, 1);
+  assert.equal(deliveryCalls, 0);
   assert.equal(searchCalls, 0);
-  assert.equal(out.search.status, 'delivery_retry');
-  assert.equal(out.launch.search_status, 'RUNNING');
+  assert.equal(out.search.status, 'awaiting_method');
+  assert.equal(out.launch.search_status, 'FAILED');
   db.close();
 });

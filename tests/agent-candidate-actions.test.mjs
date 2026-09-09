@@ -36,6 +36,9 @@ test('候选流程拒绝未授权候选人、未确认写入和非法跳步', as
     job_id: jobId, candidate_ref: 'candidate-x', action: 'ADD_TO_PROJECT', confirm: true,
   }, context), /NOT_FOUND_OR_FORBIDDEN/);
   await assert.rejects(() => handlers.brainx_candidate_workflow({
+    job_id: jobId, candidate_ref: 'candidate-x', action: 'KEEP_FOR_REVIEW', confirm: true,
+  }, context), /NOT_FOUND_OR_FORBIDDEN/);
+  await assert.rejects(() => handlers.brainx_candidate_workflow({
     job_id: jobId, candidate_ref: 'candidate-a', action: 'ADD_TO_PROJECT', confirm: false,
   }, context), /INVALID_ARGUMENT/);
   await handlers.brainx_candidate_workflow({
@@ -46,7 +49,7 @@ test('候选流程拒绝未授权候选人、未确认写入和非法跳步', as
   }, context), /INVALID_ARGUMENT/);
 });
 
-test('OpenMai 在本人授权职位发现的候选人可进入项目，不能跨顾问或伪造编号', async () => {
+test('OpenMai 候选可进入项目，重点名单在项目成员间共享且不能跨项目', async () => {
   const { db, context, jobId } = fixture();
   const resultText = `候选结果\n<!-- BRAINX_CANDIDATES_V1\n${JSON.stringify({ candidates: [
     { candidate_ref: 'openmai-candidate-1', name: '李四', evaluation: '待核实', resume_url: null },
@@ -55,13 +58,16 @@ test('OpenMai 在本人授权职位发现的候选人可进入项目，不能跨
     (project_id,consultant_id,status,result_text,task_id,started_at,finished_at)
     VALUES (?,?,'done',?,'om-case','2026-09-07T00:00:00.000Z','2026-09-07T00:01:00.000Z')`)
     .run(jobId, 'felix', resultText);
-  const handlers = createCandidateActionToolHandlers({ db, candidateShortlistFn: async () => ({
-    items: [], page: { next_page_token: null },
-  }) });
+  let shortlistCalls = 0;
+  const handlers = createCandidateActionToolHandlers({ db, candidateShortlistFn: async () => {
+    shortlistCalls += 1;
+    return { items: [], page: { next_page_token: null } };
+  } });
   const added = await handlers.brainx_candidate_workflow({
     job_id: jobId, candidate_ref: 'openmai-candidate-1', action: 'ADD_TO_PROJECT', confirm: true,
   }, context);
   assert.equal(added.data.candidate_ref, 'openmai-candidate-1');
+  assert.equal(shortlistCalls, 0, '项目找人结果已授权时不依赖外部 shortlist 可用性');
   assert.equal((await handlers.brainx_candidate_workflow({
     job_id: jobId, candidate_ref: 'openmai-candidate-1', action: 'MARK_PREPARING', confirm: true,
   }, context)).data.outreach_state, 'PREPARING');
@@ -72,6 +78,77 @@ test('OpenMai 在本人授权职位发现的候选人可进入项目，不能跨
   await assert.rejects(() => handlers.brainx_candidate_workflow({
     job_id: jobId, candidate_ref: 'openmai-candidate-1', action: 'ADD_TO_PROJECT', confirm: true,
   }, other), /NOT_FOUND_OR_FORBIDDEN/);
+  db.prepare(`INSERT INTO job_memberships
+    (consultant_id,project_id,relation,source,valid_from)
+    VALUES ('mia',?,'OTHER_CONSULTANT','TEST','2026-09-09T00:00:00.000Z')`).run(jobId);
+  const kept = await handlers.brainx_candidate_workflow({
+    job_id: jobId, candidate_ref: 'openmai-candidate-1', action: 'KEEP_FOR_REVIEW', confirm: true,
+  }, other);
+  assert.equal(kept.data.focus_status, 'FOCUSED');
+  assert.equal(db.prepare(`SELECT selected_by FROM project_candidate_focus
+    WHERE position_id=? AND candidate_ref=?`).get(jobId, 'openmai-candidate-1').selected_by, 'mia');
+  const removed = await handlers.brainx_candidate_workflow({
+    job_id: jobId, candidate_ref: 'openmai-candidate-1', action: 'REMOVE_FROM_REVIEW', confirm: true,
+  }, context);
+  assert.equal(removed.data.focus_status, 'REMOVED');
+  db.close();
+});
+
+test('候选卡片按钮发送 TTC 链接，自然语言建群可自动加入重点名单', async () => {
+  const { db, jobId } = fixture();
+  const resultText = `候选结果\n<!-- BRAINX_CANDIDATES_V1
+${JSON.stringify({ candidates: [{ candidate_ref: 'openmai-card-1', name: '李四',
+  role: '甲公司 / 算法工程师', experience: '6 年', city: '上海', education: '硕士',
+  evaluation: '大模型经验匹配，管理跨度待核实，手机号 13800138000', score: '88%',
+  talent_url: 'https://app.ttcadvisory.com/app/talent/openmai-card-1' }] })}
+-->`;
+  db.prepare(`INSERT INTO openmai_results
+    (project_id,consultant_id,status,result_text,task_id,started_at,finished_at)
+    VALUES (?,?,'done',?,'om-card','2026-09-09T00:00:00.000Z','2026-09-09T00:01:00.000Z')`)
+    .run(jobId, 'felix', resultText);
+  db.prepare(`INSERT INTO project_launches
+    (launch_id,consultant_id,project_id,idempotency_key,status,current_step,chat_id,created_at,updated_at)
+    VALUES ('launch-card','felix',?,'launch-card-key','READY','READY','oc_project',
+      '2026-09-09T00:00:00.000Z','2026-09-09T00:00:00.000Z')`).run(jobId);
+  const sent = [];
+  const created = [];
+  const handlers = createCandidateActionToolHandlers({ db,
+    candidateShortlistFn: async () => ({ items: [], page: { next_page_token: null } }),
+    sendInteractiveCardFn: async (input) => { sent.push(input); return { message_id: 'om-card' }; },
+    createCandidateDecisionGroupFn: async (innerDb, _principal, args) => {
+      created.push(args);
+      assert.equal(innerDb.prepare(`SELECT focus_status FROM project_candidate_focus
+        WHERE position_id=? AND candidate_ref=?`).get(jobId, args.candidate_ref).focus_status, 'FOCUSED');
+      return { decision_group_id: 'decision-1', status: 'READY' };
+    },
+  });
+  const context = { principal: { tenantId: 'tenant-a', consultantId: 'felix',
+    chatType: 'group', chatId: 'oc_project' } };
+  const shared = await handlers.brainx_candidate_workflow({ job_id: jobId,
+    candidate_ref: 'openmai-card-1', action: 'SEND_TALENT_CARD', confirm: true }, context);
+  assert.equal(shared.data.talent_card_status, 'sent');
+  assert.equal(sent[0].target, 'oc_project');
+  assert.match(JSON.stringify(sent[0].card), /李四|88%|打开 TTC 人才库/);
+  assert.match(sent[0].card.elements[2].actions[0].multi_url.url,
+    /app\.ttcadvisory\.com\/app\/talent\/openmai-card-1/);
+  assert.doesNotMatch(JSON.stringify(sent[0].card), /简历\.pdf|138\d{8}/);
+  await assert.rejects(() => handlers.brainx_candidate_workflow({ job_id: jobId,
+    candidate_ref: 'openmai-card-1', action: 'SEND_TALENT_CARD', confirm: true },
+  { principal: { ...context.principal, chatType: 'p2p', chatId: 'ou_felix' } }),
+  /NOT_FOUND_OR_FORBIDDEN/);
+
+  await assert.rejects(() => handlers.brainx_candidate_workflow({ job_id: jobId,
+    candidate_ref: 'openmai-card-1', action: 'CREATE_DECISION_GROUP', confirm: true },
+  { principal: { ...context.principal, chatId: 'oc_other' } }), /NOT_FOUND_OR_FORBIDDEN/);
+  assert.equal(db.prepare(`SELECT COUNT(*) n FROM project_candidate_focus
+    WHERE position_id=? AND candidate_ref=?`).get(jobId, 'openmai-card-1').n, 0,
+  '错误群建群被拒绝时不能留下自动保留副作用');
+
+  const group = await handlers.brainx_candidate_workflow({ job_id: jobId,
+    candidate_ref: 'openmai-card-1', action: 'CREATE_DECISION_GROUP', confirm: true }, context);
+  assert.equal(group.data.decision_group_status, 'READY');
+  assert.equal(group.data.added_to_project_focus, true);
+  assert.equal(created.length, 1);
   db.close();
 });
 

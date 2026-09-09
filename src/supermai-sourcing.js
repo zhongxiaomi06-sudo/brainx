@@ -10,15 +10,16 @@
  *   入口 2 brainx_supermai_scout（按判据，本模块，completions 无 job_id 模式——
  *          2026-09-08 18:12 最小付费实测 200 可用）
  *
- * 任务落库复用 openmai_results（project_id = supermai:<sha256(criteria) 前 12 位>）。
- * 合成 key 匹配不到 project_launches → enqueueOpenmaiDeliveries 的 JOIN 天然不命中，
- * 不会触发项目群投递副作用。防重纪律与 job 模式一致：running 集合 + DB 主键防并发
- * 重入；done 复用（already_done）；失败 60s 冷却；无凭证快速失败。
+ * 任务落库复用 openmai_results。自由搜索使用
+ * project_id = supermai:<sha256(criteria) 前 12 位>，不会命中项目群投递；项目群按钮则使用
+ * 真实 project_id，完成后复用既有 worker 投递回原群。防重纪律与 job 模式一致：running
+ * 集合 + DB 主键防并发重入；done 复用（already_done）；失败 60s 冷却；无凭证快速失败。
  */
 import { createHash } from 'node:crypto';
 import { now, uuid } from './db.js';
 import { getValidTtcJwt } from './ttcsdk/auth.js';
 import { callOpenmaiContent, settleOpenmaiTask as settleSupermaiTask } from './openmai-task.js';
+import { normalizeExcludedCandidateRefs } from './search-rounds.js';
 
 const running = new Set(); // `${key}|${consultant_id}`
 
@@ -30,26 +31,36 @@ export function supermaiCriteriaKey(criteria) {
 
 /** criteria 模式提示词：与 job 模式（openmai-task.js#buildPrompt）同一产物格式，
  * 渠道表述为猎聘、脉脉（SuperMai 找人的真实承载）。 */
-export function buildScoutPrompt(criteria) {
+export function buildScoutPrompt(criteria, excludedCandidateRefs = []) {
+  const exclusions = normalizeExcludedCandidateRefs(excludedCandidateRefs);
   return [
     '请使用 SuperMai 找人能力在猎聘、脉脉等候选人渠道，搜索以下判据的 6-10 名匹配候选人：',
     `[找人判据] ${String(criteria || '').trim()}`,
+    `[排除 TTC 编号] ${exclusions.length ? exclusions.join('、') : '无'}`,
+    exclusions.length ? '排除名单中的候选人此前已经推荐过，本轮严禁再次返回。' : '',
     '每人必须给出姓名、当前公司/职位、匹配判断、推荐理由、风险或待核实项；没有证据的字段写“待核实”。',
-    '如果系统能取得候选人的真实 PDF，请提供可直接下载的 HTTPS 地址；不能取得时 resume_url 必须为 null，不得编造链接。',
+    '如候选人来自 TTC 人才库，必须给出 https://app.ttcadvisory.com/app/talent/<candidate_ref> 详情链接；不得发送或索取简历附件。',
     '在面向人的结果末尾追加下面格式的机器块，JSON 必须合法，且不要把电话或邮箱放入机器块：',
     '<!-- BRAINX_CANDIDATES_V1',
-    '{"candidates":[{"candidate_ref":"稳定候选编号","name":"姓名","evaluation":"一句话评估","resume_url":"https://受信地址/真实简历.pdf或null"}]}',
+    '{"candidates":[{"candidate_ref":"稳定候选编号","name":"姓名","role":"当前公司 / 职位","experience":"经验年限","city":"城市","education":"学历 / 院校","evaluation":"核心匹配点","score":"匹配度","talent_url":"https://app.ttcadvisory.com/app/talent/稳定候选编号或null"}]}',
     '-->',
   ].join('\n');
 }
 
 /** 启动 SuperMai 按判据找人任务（触发/读取两段式的触发侧）。
  * 返回 { status: triggered|running|already_done|error, ... }，语义与 startOpenmaiTask 一致。 */
-export function startSupermaiScoutTask(db, bus, consultant_id, criteria, { force = false } = {}) {
-  const project_id = supermaiCriteriaKey(criteria);
+export function startSupermaiScoutTask(db, bus, consultant_id, criteria, {
+  force = false, projectId = null, excludeCandidateRefs = [],
+} = {}) {
+  const project_id = String(projectId || '').trim() || supermaiCriteriaKey(criteria);
   const key = `${project_id}|${consultant_id}`;
-  const existing = db.prepare('SELECT status, started_at, finished_at FROM openmai_results WHERE project_id=? AND consultant_id=?')
+  const exclusions = normalizeExcludedCandidateRefs(excludeCandidateRefs);
+  const existing = db.prepare(`SELECT status,started_at,finished_at,search_round
+    FROM openmai_results WHERE project_id=? AND consultant_id=?`)
     .get(project_id, consultant_id);
+  const projectRound = Number(db.prepare(`SELECT COALESCE(MAX(search_round),0) value
+    FROM openmai_results WHERE project_id=?`).get(project_id).value);
+  const searchRound = force ? Math.max(1, projectRound + 1) : Number(existing?.search_round || 1);
   if (running.has(key)) return { status: 'running', started_at: existing?.started_at };
   if (!force && existing?.status === 'done')
     return { status: 'already_done', finished_at: existing.finished_at };
@@ -59,11 +70,17 @@ export function startSupermaiScoutTask(db, bus, consultant_id, criteria, { force
   const jwt = getValidTtcJwt(db, consultant_id);
   if (!jwt) {
     const t = now();
-    db.prepare(`INSERT INTO openmai_results (project_id, consultant_id, status, error, started_at, finished_at)
-      VALUES (?,?,?,?,?,?)
+    db.prepare(`INSERT INTO openmai_results
+      (project_id,consultant_id,status,error,started_at,finished_at,search_brief,
+       search_round,excluded_candidate_refs_json)
+      VALUES (?,?,?,?,?,?,?,?,?)
       ON CONFLICT(project_id, consultant_id) DO UPDATE SET status='failed', error=excluded.error,
-        started_at=excluded.started_at, finished_at=excluded.finished_at`)
-      .run(project_id, consultant_id, 'failed', '没有有效 TTC 凭证——请用浏览器扩展扫码同步', t, t);
+        started_at=excluded.started_at, finished_at=excluded.finished_at,
+        search_brief=excluded.search_brief,search_round=excluded.search_round,
+        excluded_candidate_refs_json=excluded.excluded_candidate_refs_json`)
+      .run(project_id, consultant_id, 'failed', '没有有效 TTC 凭证——请用浏览器扩展扫码同步',
+        t, t, String(criteria || '').trim().slice(0, 2000) || null,
+        searchRound, JSON.stringify(exclusions));
     bus?.emit?.({ type: 'supermai_result', consultant_id, project_id, status: 'failed' });
     return { status: 'error', message: '没有有效 TTC 凭证——请用浏览器扩展扫码同步' };
   }
@@ -71,17 +88,23 @@ export function startSupermaiScoutTask(db, bus, consultant_id, criteria, { force
   const task_id = `sm_${uuid().slice(0, 8)}`;
   const started_at = now();
   running.add(key);
-  db.prepare(`INSERT INTO openmai_results (project_id, consultant_id, status, task_id, started_at)
-    VALUES (?,?, 'running', ?, ?)
+  db.prepare(`INSERT INTO openmai_results
+    (project_id,consultant_id,status,task_id,started_at,search_brief,search_round,
+     excluded_candidate_refs_json)
+    VALUES (?,?, 'running', ?, ?, ?, ?, ?)
     ON CONFLICT(project_id, consultant_id) DO UPDATE SET status='running', error=NULL, result_text=NULL,
-      task_id=excluded.task_id, started_at=excluded.started_at, finished_at=NULL`)
-    .run(project_id, consultant_id, task_id, started_at);
+      task_id=excluded.task_id, started_at=excluded.started_at, finished_at=NULL,
+      search_brief=excluded.search_brief,search_round=excluded.search_round,
+      excluded_candidate_refs_json=excluded.excluded_candidate_refs_json`)
+    .run(project_id, consultant_id, task_id, started_at,
+      String(criteria || '').trim().slice(0, 2000) || null,
+      searchRound, JSON.stringify(exclusions));
 
   (async () => {
     let status = 'failed';
     let settled = false;
     try {
-      const result = await callOpenmaiContent(jwt, buildScoutPrompt(criteria));
+      const result = await callOpenmaiContent(jwt, buildScoutPrompt(criteria, exclusions));
       settled = settleSupermaiTask(db, { projectId: project_id, consultantId: consultant_id,
         taskId: task_id, status: 'done', resultText: result });
       status = 'done';

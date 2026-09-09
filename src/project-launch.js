@@ -6,10 +6,8 @@ import { registerChatContext } from './gateway/chat-contexts.js';
 import { buildBrainxDeepLink, productionBaseUrl } from './brainx-deep-links.js';
 import { acceptCommitment } from './commitment.js';
 import { currentState } from './engagement.js';
-import { startOpenmaiTask } from './openmai-task.js';
 import { ttcOpenmaiAuthStatus } from './ttcsdk/auth.js';
 import { ensureOpenClawProjectGroup } from './openclaw-group-access.js';
-import { retryOpenmaiDelivery } from './openmai-delivery.js';
 
 const GROUP_PURPOSES = ['job_review', 'candidate_review', 'candidate_action', 'interview_prep'];
 
@@ -84,13 +82,22 @@ export function buildProjectLaunchCard(job, { publicBaseUrl } = {}) {
   const baseUrl = productionBaseUrl(publicBaseUrl).href;
   const detailUrl = buildBrainxDeepLink({ baseUrl, objectType: 'opportunity', objectRef: job.project_id });
   const facts = [job.city, job.hc == null ? null : `HC ${job.hc}`, job.pipeline].filter(Boolean).join(' · ');
+  const projectRef = String(job.project_id || '').trim().slice(0, 64);
+  const openmaiCommand = `为项目 ${projectRef} 使用 OpenMai 找人。读取本群最近一条由顾问明确发送的“找人条件：”作为补充条件；如果没有，就只根据职位事实自动找人。现在直接调用 brainx_openmai_search，不要再次询问找人方式。`;
+  const supermaiCommand = `为项目 ${projectRef} 使用 SuperMai 找人。读取本群最近一条由顾问明确发送的“找人条件：”作为补充条件；如果没有，就根据职位事实自动生成判据。现在直接调用 brainx_supermai_scout，不要再次询问找人方式。`;
   return {
     config: { wide_screen_mode: true },
     header: { template: 'blue', title: { tag: 'plain_text', content: `BrainTex 项目 · ${job.company}` } },
     elements: [
       { tag: 'markdown', content: `**${job.role}**\n${facts || '职位基础信息待补充'}\n\n`
         + `项目编号：${job.project_id}\n负责人：${job.consultant_name}` },
-      { tag: 'markdown', content: '**机器人已进入项目群**\n正在准备启动候选人搜索；后续候选人、简历和匹配评估会在本群更新。' },
+      { tag: 'markdown', content: '**机器人已进入项目群**\n候选人搜索尚未启动。可先在群里发送“找人条件：……”再点击按钮；不补充则根据职位信息自动找人。' },
+      { tag: 'action', actions: [
+        { tag: 'button', type: 'primary', text: { tag: 'plain_text', content: 'OpenMai 找人' },
+          value: { text: openmaiCommand } },
+        { tag: 'button', type: 'default', text: { tag: 'plain_text', content: 'SuperMai 找人' },
+          value: { text: supermaiCommand } },
+      ] },
       { tag: 'action', actions: [{
         tag: 'button', type: 'primary', text: { tag: 'plain_text', content: '打开职位工作台' },
         multi_url: { url: detailUrl, pc_url: detailUrl, android_url: detailUrl, ios_url: detailUrl },
@@ -146,7 +153,7 @@ function workflowDueAt() {
   return value.toISOString();
 }
 
-/** 一次明确确认完成：项目群 → 接单行动 → OpenMai。 */
+/** 一次明确确认完成：项目群 → 接单行动；找人方式必须在群内另行选择。 */
 export async function launchRecruitingWorkflow(db, bus, consultantId, projectId, input = {}, dependencies = {}) {
   if (input.confirm !== true) fail(422, 'CONFIRM_REQUIRED', '启动飞书寻访需要本次明确确认');
   const preflight = projectLaunchPreflight(db, consultantId, projectId, {
@@ -168,12 +175,9 @@ export async function launchRecruitingWorkflow(db, bus, consultantId, projectId,
         shared: true,
       }, launch: group.launch };
     }
-    fail(409, 'PROJECT_SEARCH_OWNER_REQUIRED', '项目群已由其他协作者启动，请由首轮寻访发起人重试');
-  }
-  const searchReady = dependencies.ttcConnected ?? ttcOpenmaiAuthStatus(db, consultantId).connected;
-  if (!searchReady) {
     return { ok: true, group: group.launch, search: {
-      status: 'credentials_required', message: '项目群已创建并投放职位；配置个人或已授权团队 TTC 后可启动 OpenMai',
+      status: 'awaiting_method', shared: true,
+      message: '项目群已就绪，请在群内选择 OpenMai 或 SuperMai 后开始找人',
     }, launch: group.launch };
   }
   const state = currentState(db, consultantId, projectId).state;
@@ -182,39 +186,18 @@ export async function launchRecruitingWorkflow(db, bus, consultantId, projectId,
   }
   if (state !== 'ACCEPTED') {
     const accepted = acceptCommitment(db, consultantId, projectId, {
-      goal: '完成首轮候选人搜索与匹配评估',
-      action_title: '查看首轮候选人并决定联系或继续搜索',
+      goal: '选择合适的找人方式并完成候选人搜索与匹配评估',
+      action_title: '在项目群选择 OpenMai 或 SuperMai，并确认是否补充找人条件',
       due_at: workflowDueAt(),
       idempotency_key: `project-launch:${launchId}:accept`,
     });
     if (!accepted.ok) fail(accepted.status || 409, 'PROJECT_ACCEPT_FAILED', accepted.error);
   }
-  if (group.launch.search_status === 'FAILED'
-      && group.launch.error_code === 'FEISHU_OPENMAI_DELIVERY_FAILED') {
-    const retryDelivery = dependencies.retryOpenmaiDelivery || retryOpenmaiDelivery;
-    const search = retryDelivery(db, consultantId, projectId);
-    if (search) {
-      db.prepare(`UPDATE project_launches SET search_status='RUNNING',error_code=NULL,error_message=NULL,
-        updated_at=? WHERE launch_id=?`).run(now(), launchId);
-      return { ok: true, group: group.launch, search,
-        launch: getProjectLaunch(db, consultantId, projectId) };
-    }
-  }
-  const startSearch = dependencies.startOpenmaiTask || startOpenmaiTask;
-  const retryIncomplete = group.launch.search_status === 'FAILED'
-    && group.launch.error_code === 'OPENMAI_CANDIDATES_INCOMPLETE';
-  const search = startSearch(db, bus, consultantId, projectId, { force: retryIncomplete });
-  const status = search.status === 'error' ? 'FAILED'
-    : search.status === 'already_done' ? 'DONE' : 'RUNNING';
-  db.prepare(`UPDATE project_launches SET search_status=?, search_task_id=?, search_started_at=?,
-    error_code=CASE WHEN ?='FAILED' THEN 'OPENMAI_START_FAILED' ELSE NULL END,
-    error_message=CASE WHEN ?='FAILED' THEN ? ELSE NULL END, updated_at=?
-    WHERE launch_id=?`).run(
-    status, search.task_id || null, search.started_at || now(), status, status,
-    status === 'FAILED' ? safeError(search.message) : null, now(), launchId,
-  );
-  if (status === 'FAILED') fail(502, 'OPENMAI_START_FAILED', search.message || 'OpenMai 启动失败');
-  return { ok: true, group: group.launch, search, launch: getProjectLaunch(db, consultantId, projectId) };
+  const launch = getProjectLaunch(db, consultantId, projectId);
+  return { ok: true, group: launch, search: {
+    status: 'awaiting_method',
+    message: '项目群已就绪，请在群内选择 OpenMai 或 SuperMai 后开始找人',
+  }, launch };
 }
 
 export async function launchProject(db, consultantId, projectId, input = {}, dependencies = {}) {

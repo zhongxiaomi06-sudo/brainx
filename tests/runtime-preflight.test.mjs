@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateRuntimeConfig } from '../src/runtime-preflight.js';
+import { validateOpenClawToolPolicy, validateRuntimeConfig } from '../src/runtime-preflight.js';
 
 const value = (char) => char.repeat(64);
 function valid() {
@@ -60,4 +60,16 @@ test('运行配置预检一次指出 Agent API、身份白名单和回群 worker
   assert.ok(result.errors.includes('openclaw.env:ALLOWED_OPEN_IDS:DUPLICATE'));
   assert.ok(result.errors.includes('agent.env:BRAINX_AGENT_ADMIN_ALLOWLIST:ADMIN_MISSING'));
   assert.equal(JSON.stringify(result).includes(value('a')), false, '报告不得回显任何密钥');
+});
+
+test('OpenClaw 工具策略必须同时开放两个候选人搜索入口', () => {
+  assert.deepEqual(validateOpenClawToolPolicy({
+    tools: { profile: 'minimal', alsoAllow: ['brainx_openmai_search'] },
+  }), {
+    ok: false,
+    errors: ['openclaw.json:tools:brainx_supermai_scout:MISSING'],
+  });
+  assert.deepEqual(validateOpenClawToolPolicy({
+    tools: { allow: ['brainx_openmai_search', 'brainx_supermai_scout'] },
+  }), { ok: true, errors: [] });
 });

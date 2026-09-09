@@ -95,6 +95,124 @@ test('OpenMai done 结果返回带 present_result 呈现指引，不能只回「
   assert.equal(out.unknowns.length, 0);
 });
 
+test('OpenMai 项目入口接收可选找人条件并在无凭证时也如实留痕', () => {
+  const { db, projectId, handlers } = fixture();
+  const action = createActionToolHandlers({ db, startSearchFn: () => ({ status: 'triggered', task_id: 'stub' }) });
+  action.brainx_accept_job({ job_id: projectId, goal: '找到候选人', action_title: '选择找人渠道',
+    due_at: new Date(Date.now() + 2 * 86400000).toISOString(),
+    idempotency_key: 'agent:om:criteria', confirm: true }, context('felix', 'job_review'));
+  const out = handlers.brainx_openmai_search({
+    job_id: projectId, criteria: '北京，必须有测试平台从零搭建经验',
+  }, context('felix', 'candidate_review'));
+  assert.equal(out.data.entry, 'openmai');
+  assert.equal(out.data.status, 'error');
+  assert.match(out.data.message, /TTC 寻访凭证/);
+  assert.equal(db.prepare(`SELECT search_brief FROM openmai_results
+    WHERE consultant_id='felix' AND project_id=?`).get(projectId).search_brief,
+  '北京，必须有测试平台从零搭建经验');
+});
+
+test('SuperMai 项目入口留空时按职位生成判据并关联原项目群', () => {
+  const { db, projectId, handlers } = fixture();
+  const action = createActionToolHandlers({ db, startSearchFn: () => ({ status: 'triggered', task_id: 'stub' }) });
+  action.brainx_accept_job({ job_id: projectId, goal: '找到候选人', action_title: '选择找人渠道',
+    due_at: new Date(Date.now() + 2 * 86400000).toISOString(),
+    idempotency_key: 'agent:sm:project', confirm: true }, context('felix', 'job_review'));
+  const at = new Date().toISOString();
+  db.prepare(`INSERT INTO project_launches
+    (launch_id,consultant_id,project_id,idempotency_key,status,current_step,chat_id,created_at,updated_at)
+    VALUES ('launch-sm','felix',?,'launch-sm','READY','READY','oc_project',?,?)`).run(projectId, at, at);
+  const out = handlers.brainx_supermai_scout({ job_id: projectId }, context('felix', 'candidate_review'));
+  assert.equal(out.data.entry, 'supermai');
+  assert.equal(out.data.job_ref, projectId);
+  assert.equal(out.data.status, 'error');
+  assert.match(out.data.criteria, /目标职位：/);
+  const stored = db.prepare(`SELECT project_id,search_brief FROM openmai_results
+    WHERE consultant_id='felix' AND project_id=?`).get(projectId);
+  assert.equal(stored.project_id, projectId, '项目模式不使用脱离项目群的 supermai 合成键');
+  assert.match(stored.search_brief, /目标职位：/);
+  assert.equal(db.prepare('SELECT search_status FROM project_launches WHERE launch_id=?')
+    .get('launch-sm').search_status, 'FAILED');
+});
+
+test('项目已有共享找人任务时另一位顾问选择渠道不会重复触发', () => {
+  const { db, projectId, handlers } = fixture();
+  const action = createActionToolHandlers({ db, startSearchFn: () => ({ status: 'triggered', task_id: 'stub' }) });
+  const at = new Date().toISOString();
+  db.prepare(`INSERT INTO job_memberships
+    (consultant_id,project_id,relation,source,valid_from)
+    VALUES ('mia',?,'TEAM_SHARED','project_group',?)`).run(projectId, at);
+  action.brainx_accept_job({ job_id: projectId, goal: '找到候选人', action_title: '选择找人渠道',
+    due_at: new Date(Date.now() + 2 * 86400000).toISOString(),
+    idempotency_key: 'agent:shared:project', confirm: true }, context('mia', 'job_review'));
+  db.prepare(`INSERT INTO project_launches
+    (launch_id,consultant_id,project_id,idempotency_key,status,current_step,chat_id,
+     search_status,search_task_id,created_at,updated_at)
+    VALUES ('launch-running','felix',?,'launch-running','READY','READY','oc_project',
+      'RUNNING','task-owner',?,?)`).run(projectId, at, at);
+  const out = handlers.brainx_supermai_scout({ job_id: projectId }, context('mia', 'candidate_review'));
+  assert.equal(out.data.status, 'running');
+  assert.equal(out.data.shared, true);
+  assert.equal(out.data.task_id, 'task-owner');
+  assert.equal(db.prepare(`SELECT COUNT(*) count FROM openmai_results
+    WHERE consultant_id='mia' AND project_id=?`).get(projectId).count, 0);
+});
+
+test('OpenMai 继续找人自动带入上一轮 TTC 编号并进入第二轮', () => {
+  const { db, projectId, handlers } = fixture();
+  const action = createActionToolHandlers({ db, startSearchFn: () => ({ status: 'triggered', task_id: 'stub' }) });
+  const at = new Date().toISOString();
+  db.prepare(`INSERT INTO job_memberships
+    (consultant_id,project_id,relation,source,valid_from)
+    VALUES ('mia',?,'TEAM_SHARED','project_group',?)`).run(projectId, at);
+  action.brainx_accept_job({ job_id: projectId, goal: '找到候选人', action_title: '继续找人',
+    due_at: new Date(Date.now() + 2 * 86400000).toISOString(),
+    idempotency_key: 'agent:round:accept', confirm: true }, context('mia', 'job_review'));
+  const previous = `首轮结果\n<!-- BRAINX_CANDIDATES_V1\n${JSON.stringify({ candidates: [
+    { candidate_ref: 'TTC-101', name: '张三', talent_url: 'https://app.ttcadvisory.com/app/talent/TTC-101' },
+    { candidate_ref: 'TTC-102', name: '李四', talent_url: 'https://app.ttcadvisory.com/app/talent/TTC-102' },
+  ] })}\n-->`;
+  db.prepare(`INSERT INTO openmai_results
+    (project_id,consultant_id,status,result_text,task_id,started_at,finished_at)
+    VALUES (?, 'felix','done',?,'om_previous',?,?)`).run(projectId, previous, at, at);
+  db.prepare(`INSERT INTO project_launches
+    (launch_id,consultant_id,project_id,idempotency_key,status,current_step,chat_id,
+     search_status,search_task_id,created_at,updated_at)
+    VALUES ('launch-round','felix',?,'launch-round','READY','READY','oc_project',
+      'DONE','om_previous',?,?)`).run(projectId, at, at);
+
+  const out = handlers.brainx_openmai_search({
+    job_id: projectId, criteria: '更偏测试平台负责人', continue_search: true,
+  }, context('mia', 'candidate_review'));
+  assert.equal(out.data.continue_search, true);
+  assert.deepEqual(out.data.excluded_candidate_refs, ['TTC-101', 'TTC-102']);
+  assert.equal(out.data.status, 'error', '测试环境无 TTC 凭证，应在真实网络前失败关闭');
+  const row = db.prepare(`SELECT status,search_round,excluded_candidate_refs_json,search_brief
+    FROM openmai_results WHERE project_id=? AND consultant_id='mia'`).get(projectId);
+  assert.equal(row.status, 'failed');
+  assert.equal(row.search_round, 2);
+  assert.deepEqual(JSON.parse(row.excluded_candidate_refs_json), ['TTC-101', 'TTC-102']);
+  assert.equal(row.search_brief, '更偏测试平台负责人');
+});
+
+test('无法确认上一轮 TTC 编号时继续找人不启动新任务', () => {
+  const { db, projectId, handlers } = fixture();
+  const action = createActionToolHandlers({ db, startSearchFn: () => ({ status: 'triggered', task_id: 'stub' }) });
+  action.brainx_accept_job({ job_id: projectId, goal: '找到候选人', action_title: '继续找人',
+    due_at: new Date(Date.now() + 2 * 86400000).toISOString(),
+    idempotency_key: 'agent:round:no-refs', confirm: true }, context('felix', 'job_review'));
+  const at = new Date().toISOString();
+  db.prepare(`INSERT INTO openmai_results
+    (project_id,consultant_id,status,result_text,task_id,started_at,finished_at)
+    VALUES (?, 'felix','done','历史纯文本结果','om_legacy',?,?)`).run(projectId, at, at);
+  const out = handlers.brainx_openmai_search({ job_id: projectId, continue_search: true },
+    context('felix', 'candidate_review'));
+  assert.equal(out.data.status, 'cannot_continue');
+  assert.match(out.unknowns[0], /未启动下一轮/);
+  assert.equal(db.prepare(`SELECT task_id FROM openmai_results
+    WHERE project_id=? AND consultant_id='felix'`).get(projectId).task_id, 'om_legacy');
+});
+
 test('SuperMai 入口（specs/007）：done 结果带结构化 candidates + present_result 指引', async () => {
   const { db, handlers } = fixture();
   const criteria = '北京 5年 React 资深前端工程师';

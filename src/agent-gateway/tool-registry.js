@@ -46,11 +46,11 @@ export const AGENT_TOOL_ROWS = Object.freeze([
   }, ['date_from', 'date_to']) },
   { name: 'brainx_run_status', purpose: ['run_status'], p2pOnly: true, parameters: object({ run_id: string() }, ['run_id']) },
   { name: 'brainx_openmai_search', purpose: ['candidate_review'], parameters: object({
-    job_id: string(),
+    job_id: string(), criteria: string({ maxLength: 2000 }), continue_search: boolean(),
   }, ['job_id']), projectKey: 'job_id' },
   { name: 'brainx_supermai_scout', purpose: ['candidate_review'], parameters: object({
-    criteria: string({ minLength: 5, maxLength: 2000 }),
-  }, ['criteria']), projectKey: 'criteria' },
+    job_id: string(), criteria: string({ maxLength: 2000 }), continue_search: boolean(),
+  }), projectKey: 'job_id' },
   { name: 'brainx_pending_job_facts', purpose: ['job_fact_review'], p2pOnly: true, parameters: object({
     limit: integer(1, 20),
   }) },
@@ -84,7 +84,8 @@ export const AGENT_TOOL_ROWS = Object.freeze([
   }, ['job_id', 'action_id', 'kind', 'summary', 'next_action_title', 'next_due_at', 'idempotency_key', 'confirm']), projectKey: 'job_id' },
   { name: 'brainx_candidate_workflow', purpose: ['candidate_action'], parameters: object({
     job_id: string(), candidate_ref: string(), action: string({ enum: ['ADD_TO_PROJECT', 'MARK_PREPARING',
-      'RECORD_OUTREACH_SENT', 'RECORD_REPLIED', 'SUBMIT_TO_CLIENT', 'MOVE_TO_INTERVIEW'] }),
+      'RECORD_OUTREACH_SENT', 'RECORD_REPLIED', 'SUBMIT_TO_CLIENT', 'MOVE_TO_INTERVIEW',
+      'KEEP_FOR_REVIEW', 'REMOVE_FROM_REVIEW', 'CREATE_DECISION_GROUP', 'SEND_TALENT_CARD'] }),
     note: string({ maxLength: 1000 }), confirm: boolean(),
   }, ['job_id', 'candidate_ref', 'action', 'confirm']), projectKey: 'job_id' },
   { name: 'brainx_send_candidate_resume', purpose: ['candidate_action'], parameters: object({

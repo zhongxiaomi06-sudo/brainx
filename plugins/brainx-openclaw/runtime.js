@@ -1,7 +1,7 @@
 import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
 
 const GATEWAY_URL = 'http://127.0.0.1:3102/internal/v1/agent/tools';
-const PLUGIN_VERSION = '1.3.1';
+const PLUGIN_VERSION = '1.3.6';
 const OPENCLAW_VERSION = '2026.7.1-2';
 const string = (extra = {}) => ({ type: 'string', minLength: 1, maxLength: 512, ...extra });
 const integer = (minimum, maximum) => ({ type: 'integer', minimum, maximum });
@@ -22,8 +22,8 @@ export const BRAINX_OPENCLAW_TOOLS = Object.freeze([
   { name: 'brainx_interview_prep', purpose: () => 'interview_prep', parameters: object({ job_id: string(), candidate_ref: string() }, ['job_id', 'candidate_ref']), description: '生成基于证据的面试准备材料。' },
   { name: 'brainx_personal_review', purpose: () => 'personal_review', parameters: object({ date_from: string({ pattern: '^\\d{4}-\\d{2}-\\d{2}$' }), date_to: string({ pattern: '^\\d{4}-\\d{2}-\\d{2}$' }) }, ['date_from', 'date_to']), description: '读取当前顾问个人复盘数据。' },
   { name: 'brainx_run_status', purpose: () => 'run_status', parameters: object({ run_id: string() }, ['run_id']), description: '查询当前顾问本人任务运行状态。' },
-  { name: 'brainx_openmai_search', purpose: () => 'candidate_review', parameters: object({ job_id: string() }, ['job_id']), description: '为当前顾问有权查看的职位启动一次 OpenMai 候选人搜索。' },
-  { name: 'brainx_supermai_scout', purpose: () => 'candidate_review', parameters: object({ criteria: string({ minLength: 5, maxLength: 2000 }) }, ['criteria']), description: 'SuperMai 按判据自由找人（猎聘/脉脉渠道，无需先有职位）：首次调用触发任务返回 running，完成后以同参数再调本工具读取候选人结果。与 brainx_openmai_search（按职位找人）二选一按语境使用。' },
+  { name: 'brainx_openmai_search', purpose: () => 'candidate_review', parameters: object({ job_id: string(), criteria: string({ maxLength: 2000 }), continue_search: boolean() }, ['job_id']), description: '为当前顾问有权查看的职位启动 OpenMai 搜索；criteria 是可选补充条件。项目群点击继续找人时传 continue_search=true，后端会自动排除历史 TTC 候选编号。' },
+  { name: 'brainx_supermai_scout', purpose: () => 'candidate_review', parameters: object({ job_id: string(), criteria: string({ maxLength: 2000 }), continue_search: boolean() }), description: 'SuperMai 在猎聘、脉脉等渠道按判据找人。项目群入口传 job_id；点击继续找人时传 continue_search=true，后端会自动排除历史 TTC 候选编号。无职位自由找人必须传 criteria。' },
   { name: 'brainx_pending_job_facts', purpose: () => 'job_fact_review', parameters: object({ limit: integer(1, 20) }), description: '在私聊中列出当前顾问所在已登记群的待确认职位事实。' },
   { name: 'brainx_review_job_fact', purpose: () => 'job_fact_review', parameters: object({ draft_id: string(), action: string({ enum: ['confirm', 'reject'] }), job_id: string(), confirm: boolean() }, ['draft_id', 'action', 'confirm']), description: '在私聊中经用户明确确认后确认或拒绝一条本人可见的职位事实草稿。' },
   { name: 'brainx_submit_job_jd', purpose: () => 'job_fact_review', parameters: object({ jd_text: string({ minLength: 50, maxLength: 8000 }), confirm: boolean(), confirm_create: boolean() }, ['jd_text', 'confirm']), description: '在私聊或已登记项目群中提交整段 JD 原文，AI 提炼为待确认职位事实草稿；执行前向用户复述该操作并取得确认。confirm_create=true 表示用户已授权当场建岗（草稿立即转正、可接单）；否则建岗仍需本人显式确认草稿。' },
@@ -44,13 +44,10 @@ export const BRAINX_OPENCLAW_TOOLS = Object.freeze([
     job_id: string(), candidate_ref: string(), action: string({ enum: [
       'ADD_TO_PROJECT', 'MARK_PREPARING', 'RECORD_OUTREACH_SENT',
       'RECORD_REPLIED', 'SUBMIT_TO_CLIENT', 'MOVE_TO_INTERVIEW',
+      'KEEP_FOR_REVIEW', 'REMOVE_FROM_REVIEW', 'CREATE_DECISION_GROUP', 'SEND_TALENT_CARD',
     ] }), note: string({ maxLength: 1000 }), confirm: boolean(),
   }, ['job_id', 'candidate_ref', 'action', 'confirm']),
-  description: '经用户确认后把授权候选人加入项目，并记录准备联系、已发送、已回复、提交客户和面试阶段。' },
-  { name: 'brainx_send_candidate_resume', purpose: () => 'candidate_action', parameters: object({
-    job_id: string(), candidate_ref: string(), confirm: boolean(),
-  }, ['job_id', 'candidate_ref', 'confirm']),
-  description: '用户点击项目群候选人行的发送按钮后，把该候选人的真实 PDF 简历幂等发送到当前项目群。' },
+  description: '经用户确认后把授权候选人加入项目、发送人才卡、管理共享重点名单、创建候选人决策群，并记录后续阶段。' },
 ]);
 
 function canonicalJson(value) {
@@ -126,8 +123,7 @@ export function createBrainxToolFactory(tool, dependencies = {}) {
       if (!gatewayToken || !assertionSecret) throw new Error('PLUGIN_NOT_CONFIGURED');
       const signed = createAssertion(principal, tool, args, assertionSecret, now);
       const controller = new AbortController();
-      const timeoutMs = tool.name === 'brainx_send_candidate_resume' ? 30_000 : 10_000;
-      const timeout = setTimeout(() => controller.abort(), timeoutMs);
+      const timeout = setTimeout(() => controller.abort(), 10_000);
       try {
         const response = await fetchImpl(`${GATEWAY_URL}/${tool.name}`, {
           method: 'POST', signal: controller.signal,

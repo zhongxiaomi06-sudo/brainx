@@ -79,3 +79,44 @@ test('模型使用公司职位分行格式时仍生成逐职位按钮', () => {
   assert.equal(buttonGroups[0].buttons[0].url, 'https://brainx.example.com/?open=opportunity%3AJTQTOTR');
   assert.equal(buttonGroups[0].buttons[1].label, '联系人与推进');
 });
+
+test('TTC 候选结果清除转义乱码并改为行内人才库按钮', () => {
+  const text = String.raw`TTC 测试客户 · 测试开发
+\
+\## 搜索结果
+\
+已先搜索我的人才库，随后搜索 TTC 公域人才库。
+\
+\### 条件分类
+\
+\- 底线条件：Python、测试开发、5–8 年。
+\
+\### 推荐候选人
+\
+\| # | 姓名 | 当前公司 / 职位 | 经验 | 城市 | 学历 / 院校 | 核心匹配点 | 匹配度 | 详情 |
+\|---|---|---|---|---|---|---|---|---|
+\| 1 | 张三 | 百度 / 测试开发 | 7 年 | 北京 | 硕士 / 211 | Python、自动化测试 | 86% | [查看](https://app.ttcadvisory.com/app/talent/PL123) |
+\| 2 | 李四 | 京东 / 测试开发 | 5 年 | 北京 | 本科 / 985 | 电商测试平台 | 84% | [查看](https://brainx.example.com/?candidate=PL456) |`;
+  const result = formatBrainxReplyPayload({ kind: 'final', channel: 'feishu', payload: { text } });
+  const card = result.payload.channelData.feishu.card;
+  assert.equal(card.schema, '2.0');
+  const rows = card.body.elements.filter((element) => element.tag === 'column_set');
+  assert.equal(rows.length, 3, '一行表头加两行候选人');
+  assert.equal(rows[1].columns[0].elements[0].text.content, '张三\n百度 / 测试开发');
+  const firstButton = rows[1].columns.at(-1).elements[0];
+  assert.equal(firstButton.text.content, '查看人才');
+  assert.equal(firstButton.behaviors[0].default_url, 'https://app.ttcadvisory.com/app/talent/PL123');
+  assert.equal(rows[2].columns.at(-1).elements[0].behaviors[0].default_url,
+    'https://app.ttcadvisory.com/app/talent/PL456');
+  assert.doesNotMatch(JSON.stringify(result.payload), /"content":"发送简历"|brainx_send_candidate_resume|&#x20;|\\\||\\##/);
+  assert.match(result.payload.text, /张三.*PL123/s);
+});
+
+test('候选表格不把第三方或无效链接包装成 TTC 按钮', () => {
+  const text = `候选人结果\n| 姓名 | 当前公司 / 职位 | 匹配度 | 详情 |\n|---|---|---|---|\n| 张三 | 甲公司 / 测试开发 | 80% | [查看](https://evil.example/talent/PL123) |`;
+  const result = formatBrainxReplyPayload({ kind: 'final', channel: 'feishu', payload: { text } });
+  const rows = result.payload.channelData.feishu.card.body.elements
+    .filter((element) => element.tag === 'column_set');
+  assert.equal(rows[1].columns.at(-1).elements[0].text.content, '链接待核实');
+  assert.doesNotMatch(JSON.stringify(result.payload), /evil\.example/);
+});

@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-09｜fix(openclaw): 恢复项目群双找人工具并阻止白名单漂移
+
+- 根因：本机 OpenClaw 使用 `minimal + alsoAllow`，运行配置遗漏 `brainx_openmai_search` 和 `brainx_supermai_scout`，导致项目卡按钮虽已正常回调，Agent 却退回仅限私聊的旧找人入口，并把工具选择错误误报为 `NOT_FOUND_OR_FORBIDDEN`。
+- 修复：本机运行配置仅恢复 OpenMai / SuperMai 两个已批准的找人工具，同时移除废弃的发送简历入口；生产启动预检新增专用工具策略检查，任一入口缺失都会拒绝启动，不再静默带病运行。
+- 核验：`P294569` 的项目群、职位、MY_JOB 成员、发送人绑定、`candidate_review` purpose 与项目范围全部有效；插件实际加载 23 个工具，两个找人入口均可见，真实群范围的 OpenMai 授权校验通过。
+- 验证：运行配置专项与生产配置/插件契约 18/18 通过；`npm run verify:quick` 16/16 通过。
+
 ## 2026-09-09｜feat(候选人): 创建 Offer 决策群并迁移上下文
 
 - 改动：候选结果每行增加“为 TA 建决策群”，复用 `brainx_candidate_workflow` 的 `CREATE_DECISION_GROUP` 明确确认动作；OpenClaw 插件版本升至 `1.3.5`，网关与插件参数契约同步。

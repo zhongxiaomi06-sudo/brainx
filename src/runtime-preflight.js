@@ -2,6 +2,10 @@
 
 const PLACEHOLDER = /(replace-|must-equal-|cli_replace|ou_replace|oc_replace)/i;
 const ID = /^(?:ou|oc)_[A-Za-z0-9_-]+$/;
+const REQUIRED_SOURCING_TOOLS = Object.freeze([
+  'brainx_openmai_search',
+  'brainx_supermai_scout',
+]);
 
 function requireKeys(source, names, file, errors) {
   for (const name of names) {
@@ -101,4 +105,14 @@ export function validateRuntimeConfig({ agent = {}, worker = {}, openclaw = {} }
   } catch { errors.push('agent.env:BRAINX_AGENT_FEISHU_APP_KEYS_JSON:INVALID_JSON'); }
 
   return { ok: errors.length === 0, errors: [...new Set(errors)].sort() };
+}
+
+export function validateOpenClawToolPolicy(config = {}) {
+  const allow = [config.tools?.allow, config.tools?.alsoAllow]
+    .filter(Array.isArray)
+    .flat();
+  const errors = REQUIRED_SOURCING_TOOLS
+    .filter((tool) => !allow.includes(tool))
+    .map((tool) => `openclaw.json:tools:${tool}:MISSING`);
+  return { ok: errors.length === 0, errors };
 }

@@ -41,11 +41,11 @@ curl -fsS http://127.0.0.1:3102/internal/v1/agent/health
 curl -fsS https://base.yorkteam.cn/api/v1/meta/guard
 ```
 
-然后由六名在职灰度顾问完成私聊、白名单群 @、跨人负向读取、候选敏感字段扫描和手机/异机 HTTPS 深链。当前批准 21 个窄工具，包含 OpenMai 直接搜索、本人待确认草稿列表和显式草稿裁决；未知群、撤权用户、跨项目和重复 nonce 必须失败。
+然后由六名在职灰度顾问完成私聊、白名单群 @、跨人负向读取、候选敏感字段扫描和手机/异机 HTTPS 深链。当前批准 23 个窄工具，包含 OpenMai / SuperMai 搜索、本人待确认草稿列表和显式草稿裁决；未知群、撤权用户、跨项目和重复 nonce 必须失败。
 
 Gateway 健康响应必须同时满足 `status=ready`、`authorization.status=ready`、`configured_accounts>=1` 和 `bound_identities>=1`。缺 App 映射时进程拒绝启动；只有数据库和工具目录正常、但没有匹配当前 App key 的 ACTIVE 身份时返回 503 `not_ready`，不得把它当成可服务状态。
 
-Gateway、OpenClaw、业务 worker 和可选 integration worker 都在 systemd `ExecStartPre` 运行同一份三文件交叉预检。配置存在占位符、共享密钥不一致、飞书 App/SQLite/HTTPS 地址跨进程漂移或员工白名单损坏时，服务必须启动失败；不得删除该前置检查来追求 `active` 状态。
+Gateway、OpenClaw、业务 worker 和可选 integration worker 都在 systemd `ExecStartPre` 运行同一份三文件交叉预检。配置存在占位符、共享密钥不一致、飞书 App/SQLite/HTTPS 地址跨进程漂移或员工白名单损坏时，服务必须启动失败；OpenClaw 服务还会检查运行配置确实开放 `brainx_openmai_search` 和 `brainx_supermai_scout`。不得删除该前置检查来追求 `active` 状态。
 
 ## York 业务主体与审计身份
 
@@ -61,6 +61,7 @@ Gateway、OpenClaw、业务 worker 和可选 integration worker 都在 systemd `
 
 - 每日看四个服务状态、最近错误码、草稿积压、任务和 outbox；日志不得出现 prompt、简历正文、联系方式或密钥。
 - 遇到“某员工能看到机器人但工具不可用”时，先运行 `readiness`。它分别检查花名册 open_id、OpenClaw 白名单、Gateway ACTIVE 身份和 TTC 寻访凭证，输出不含 open_id、token 或 app key；不要把所有缺项笼统归因于 Gateway。团队共享 TTC 必须通过 `ttc_credential_grants` 显式授权，不能复制到员工个人槽位。
+- 若项目群点击 OpenMai / SuperMai 后，Agent 声称职位不存在或无权限，但 `project_launches`、`agent_group_scopes` 和 `job_memberships` 均正常，应检查运行中的 `tools.allow` / `tools.alsoAllow` 是否遗漏对应专用工具。工具被策略过滤后，模型可能退回旧入口并产生误导性错误；修复时只恢复生产模板批准的工具，不得通过扩大 profile 绕过。
 - `node bin/brainx-openmai-health.mjs` 逐人检查 TTC 凭证，并从任一有效顾问凭证执行一次无副作用 GET 可达性探测；晨检严禁向 `/completions` POST `ping`，避免误创建找人任务或产生费用。
 - 团队 TTC 账号授权必须由 allowlist 管理员显式执行：`node bin/brainx-agent-admin.mjs grant-ttc-openmai --source mia --grantee dykes --reason "已核验的业务授权" --confirm true`；撤销使用 `revoke-ttc-openmai --grantee dykes --confirm true`。命令只记录引用和授权证据，不读取或复制 JWT。
 - 任务租约过期会被同类 handler 重新领取；费用或尝试次数到上限后进入 FAILED，不无限消耗模型额度。

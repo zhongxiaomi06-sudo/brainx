@@ -85,7 +85,7 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
         text: { tag: 'plain_text', content: success ? '打开工作台查看与评估' : '打开工作台处理' },
         multi_url: { url: target, pc_url: target, android_url: target, ios_url: target } }] }] : []),
       { tag: 'note', elements: [{ tag: 'plain_text',
-        content: '“保留”会加入本项目共同重点名单 · “查看人才”直达 TTC · 不发送简历附件' }] },
+        content: '“发送卡片”会在群里投放带 TTC 链接的人才卡 · “保留”会加入项目共同重点名单' }] },
     ],
   };
 }
@@ -112,7 +112,7 @@ function candidateTableHeading() {
   return {
     tag: 'column_set', flex_mode: 'none', background_style: 'grey',
     columns: [tableCell('候选人 / 当前岗位', 3), tableCell('经验 / 城市', 2),
-      tableCell('学历', 2), tableCell('核心匹配点', 5), tableCell('匹配度', 1), tableCell('操作 / 保留', 3)],
+      tableCell('学历', 2), tableCell('核心匹配', 4), tableCell('匹配度', 1), tableCell('操作', 2)],
   };
 }
 
@@ -140,34 +140,32 @@ function keepCandidateAction(job, candidate) {
     value: { text: command } };
 }
 
-function candidateDecisionGroupAction(job, candidate) {
+function candidateCardAction(job, candidate) {
   const projectRef = String(job.project_id || '').trim().slice(0, 64);
-  const command = `为项目 ${projectRef} 的重点候选人 ${candidate.candidateRef} 创建独立 Offer 决策群。`
+  const command = `把项目 ${projectRef} 的候选人 ${candidate.candidateRef} 作为一张人才卡片发到当前群。`
     + '这个按钮就是我的明确确认：现在调用 brainx_candidate_workflow，'
     + `传入 job_id=${projectRef}、candidate_ref=${candidate.candidateRef}、`
-    + 'action=CREATE_DECISION_GROUP、confirm=true。成功后告诉我新群已继承原项目群的候选人相关摘要；不要发送简历。';
-  return { tag: 'button', type: 'default', text: { tag: 'plain_text', content: '为 TA 建决策群' },
+    + 'action=SEND_TALENT_CARD、confirm=true。人才卡必须包含 TTC 人才库链接；不要发送简历附件。';
+  return { tag: 'button', type: 'primary', text: { tag: 'plain_text', content: '发送卡片' },
     value: { text: command } };
 }
 
 function candidateTableRow({ candidate, index, job, baseUrl }) {
   void baseUrl;
   const detailUrl = ttcTalentUrl(candidate);
-  const action = detailUrl ? [{ tag: 'button', type: 'primary',
-    text: { tag: 'plain_text', content: '查看人才' },
-    multi_url: { url: detailUrl, pc_url: detailUrl, android_url: detailUrl, ios_url: detailUrl } }]
+  const action = detailUrl ? [candidateCardAction(job, candidate)]
     : [{ tag: 'div', text: { tag: 'plain_text', content: '链接待核实' } }];
   if (candidate.candidateRefValid !== false) {
-    action.push(keepCandidateAction(job, candidate), candidateDecisionGroupAction(job, candidate));
+    action.push(keepCandidateAction(job, candidate));
   }
   return [
     { tag: 'column_set', flex_mode: 'none', background_style: 'default', columns: [
       tableCell(`${index + 1}. ${groupSafeOpenmaiText(candidate.name, 60)}\n${groupSafeOpenmaiText(candidate.role, 120)}`, 3),
       tableCell(`${groupSafeOpenmaiText(candidate.experience, 40)} · ${groupSafeOpenmaiText(candidate.city, 40)}`, 2),
       tableCell(groupSafeOpenmaiText(candidate.education, 80), 2),
-      tableCell(groupSafeOpenmaiText(candidate.evaluation, 300), 5),
+      tableCell(groupSafeOpenmaiText(candidate.evaluation, 300), 4),
       tableCell(groupSafeOpenmaiText(candidate.score, 20), 1),
-      tableCell('', 3, action),
+      tableCell('', 2, action),
     ] },
   ];
 }

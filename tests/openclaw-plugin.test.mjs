@@ -62,6 +62,9 @@ test('BrainTex prompt routes natural-language job recommendations to authorized 
   assert.match(prompt, /按钮本身就是.*明确选择/);
   assert.match(prompt, /KEEP_FOR_REVIEW/);
   assert.match(prompt, /focused_candidates/);
+  assert.match(prompt, /发送卡片.*SEND_TALENT_CARD/s);
+  assert.match(prompt, /为这个人建群.*CREATE_DECISION_GROUP/s);
+  assert.match(prompt, /消息本身就是.*明确确认/);
   assert.equal(createBraintexPromptContext({ messageProvider: 'telegram' }), undefined);
 });
 
@@ -83,6 +86,7 @@ test('项目群双找人入口支持可选条件且不接受身份或路由注�
   assert.ok(workflow.parameters.properties.action.enum.includes('KEEP_FOR_REVIEW'));
   assert.ok(workflow.parameters.properties.action.enum.includes('REMOVE_FROM_REVIEW'));
   assert.ok(workflow.parameters.properties.action.enum.includes('CREATE_DECISION_GROUP'));
+  assert.ok(workflow.parameters.properties.action.enum.includes('SEND_TALENT_CARD'));
   assert.deepEqual(gateway.schema('brainx_candidate_workflow'), workflow.parameters,
     '候选保留参数必须与 BrainX 网关白名单一致');
 });
@@ -136,7 +140,7 @@ test('tool request is fixed to loopback and produces a BrainX-verifiable asserti
   const body = JSON.parse(calls[0].options.body);
   assert.equal(body.schema_version, 'agent_tool_request.v1');
   assert.deepEqual(body.client, {
-    plugin_version: '1.3.5', openclaw_version: '2026.7.1-2', model_ref: 'openai/gpt-5',
+    plugin_version: '1.3.6', openclaw_version: '2026.7.1-2', model_ref: 'openai/gpt-5',
   });
   const payload = verifyPrincipalAssertion(body.principal_assertion, {
     secret,

@@ -85,7 +85,7 @@ export const AGENT_TOOL_ROWS = Object.freeze([
   { name: 'brainx_candidate_workflow', purpose: ['candidate_action'], parameters: object({
     job_id: string(), candidate_ref: string(), action: string({ enum: ['ADD_TO_PROJECT', 'MARK_PREPARING',
       'RECORD_OUTREACH_SENT', 'RECORD_REPLIED', 'SUBMIT_TO_CLIENT', 'MOVE_TO_INTERVIEW',
-      'KEEP_FOR_REVIEW', 'REMOVE_FROM_REVIEW', 'CREATE_DECISION_GROUP'] }),
+      'KEEP_FOR_REVIEW', 'REMOVE_FROM_REVIEW', 'CREATE_DECISION_GROUP', 'SEND_TALENT_CARD'] }),
     note: string({ maxLength: 1000 }), confirm: boolean(),
   }, ['job_id', 'candidate_ref', 'action', 'confirm']), projectKey: 'job_id' },
   { name: 'brainx_send_candidate_resume', purpose: ['candidate_action'], parameters: object({

@@ -5,12 +5,54 @@ import { listProjectCandidateFocus, projectSearchCandidate,
   setProjectCandidateFocus } from '../candidate-focus.js';
 import { jobVisibleTo } from '../visibility.js';
 import { downloadResumePdf, extractOpenmaiCandidates } from '../openmai-delivery.js';
-import { sendPdfFile } from '../feishu-bot.js';
+import { sendInteractiveCard, sendPdfFile } from '../feishu-bot.js';
 import { getAuthorizedTtcJwt } from '../ttcsdk/auth.js';
 import { downloadTtcResumePdf, listTtcResumeAttachments } from '../ttcsdk/resume.js';
 import { createCandidateDecisionGroup } from '../candidate-decision-group.js';
 
 function fail(code) { throw Object.assign(new Error(code), { code }); }
+
+const PHONE = /(?<!\d)(?:\+?86[-\s]?)?1[3-9]\d{9}(?!\d)/g;
+const EMAIL = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
+
+function safeCardText(value, max = 300) {
+  const text = String(value || '').replace(PHONE, '[联系方式已隐藏]')
+    .replace(EMAIL, '[联系方式已隐藏]').replace(/\s+/g, ' ').trim();
+  return (text || '待核实').slice(0, max);
+}
+
+function talentUrl(candidateRef, candidate = {}) {
+  try {
+    const target = new URL(candidate.talentUrl || '');
+    if (target.origin === 'https://app.ttcadvisory.com'
+        && target.pathname.startsWith('/app/talent/')) return target.toString();
+  } catch { /* 使用受控候选编号回退。 */ }
+  return `https://app.ttcadvisory.com/app/talent/${encodeURIComponent(candidateRef)}`;
+}
+
+function candidateShareCard(jobId, candidateRef, candidate = {}) {
+  const url = talentUrl(candidateRef, candidate);
+  const profile = [candidate.experience, candidate.city, candidate.education]
+    .filter(Boolean).map((item) => safeCardText(item, 80)).join(' · ') || '经历信息待核实';
+  return { config: { wide_screen_mode: true },
+    header: { template: 'blue', title: { tag: 'plain_text', content: 'BrainTex · 候选人卡片' } },
+    elements: [
+      { tag: 'markdown', content: `**${safeCardText(candidate.name || candidateRef, 80)}**\n${safeCardText(candidate.role || '当前岗位待核实', 120)}` },
+      { tag: 'markdown', content: `**经历**：${profile}\n**匹配度**：${safeCardText(candidate.score || '待核实', 20)}\n**核心匹配点**：${safeCardText(candidate.evaluation, 500)}` },
+      { tag: 'action', actions: [{ tag: 'button', type: 'primary',
+        text: { tag: 'plain_text', content: '打开 TTC 人才库' },
+        multi_url: { url, pc_url: url, android_url: url, ios_url: url } }] },
+      { tag: 'note', elements: [{ tag: 'plain_text',
+        content: `项目 ${safeCardText(jobId, 80)} · 链接仍由 TTC 登录与权限控制 · 不发送简历附件` }] },
+    ] };
+}
+
+function isSourceProjectGroup(db, principal, jobId) {
+  if (principal.chatType !== 'group' || !principal.chatId) return false;
+  const launch = db.prepare(`SELECT 1 ok FROM project_launches
+    WHERE project_id=? AND status='READY' AND chat_id=? LIMIT 1`).get(jobId, principal.chatId);
+  return Boolean(launch?.ok);
+}
 
 function safePdfName(value, fallback) {
   const cleaned = String(value || '').replace(/[\\/\r\n\0]/g, '_').trim().slice(0, 180);
@@ -86,6 +128,7 @@ export function createCandidateActionToolHandlers({
   listTtcResumeAttachmentsFn = listTtcResumeAttachments,
   downloadTtcResumePdfFn = downloadTtcResumePdf,
   createCandidateDecisionGroupFn = createCandidateDecisionGroup,
+  sendInteractiveCardFn = sendInteractiveCard,
 } = {}) {
   return {
     brainx_candidate_workflow: async (args, context) => {
@@ -94,8 +137,9 @@ export function createCandidateActionToolHandlers({
       }
       const existing = current(db, context.principal, args);
       const discovered = projectSearchCandidate(db, args.job_id, args.candidate_ref);
-      const focused = listProjectCandidateFocus(db, context.principal.tenantId, args.job_id)
-        .some((candidate) => candidate.candidate_ref === args.candidate_ref);
+      const focusedCandidate = listProjectCandidateFocus(db, context.principal.tenantId, args.job_id)
+        .find((candidate) => candidate.candidate_ref === args.candidate_ref);
+      const focused = Boolean(focusedCandidate);
       const permitted = existing || discovered || focused
         || await authorized(candidateShortlistFn, context.principal, args.job_id, args.candidate_ref);
       if (!permitted) {
@@ -114,11 +158,33 @@ export function createCandidateActionToolHandlers({
           ? ['brainx_candidate_fit', 'brainx_candidate_workflow'] : ['brainx_candidate_workflow'] };
       }
       if (args.action === 'CREATE_DECISION_GROUP') {
+        if (!isSourceProjectGroup(db, context.principal, args.job_id)) fail('NOT_FOUND_OR_FORBIDDEN');
+        if (!focused) {
+          setProjectCandidateFocus(db, {
+            tenantId: context.principal.tenantId, consultantId: context.principal.consultantId,
+            jobId: args.job_id, candidateRef: args.candidate_ref,
+            sourceTaskId: discovered?.sourceTaskId || null, candidateSnapshot: discovered,
+          }, true);
+        }
         const row = await createCandidateDecisionGroupFn(db, context.principal, args);
-        return { data: { candidate_ref: args.candidate_ref, decision_group_status: row.status },
+        return { data: { candidate_ref: args.candidate_ref, decision_group_status: row.status,
+          added_to_project_focus: !focused },
           facts: [{ candidate_ref: args.candidate_ref,
           decision_group_ready: row.status === 'READY' }], inferences: [], recommendations: [], unknowns: [],
           evidence_refs: [`candidate_decision_group:${row.decision_group_id}`], next_allowed_actions: [] };
+      }
+      if (args.action === 'SEND_TALENT_CARD') {
+        if (!isSourceProjectGroup(db, context.principal, args.job_id)) fail('NOT_FOUND_OR_FORBIDDEN');
+        const candidate = discovered || focusedCandidate || { candidateRef: args.candidate_ref };
+        const key = createHash('sha256').update(`${args.job_id}\0${args.candidate_ref}\0${context.principal.chatId}`)
+          .digest('hex').slice(0, 32);
+        await sendInteractiveCardFn({ target: context.principal.chatId,
+          card: candidateShareCard(args.job_id, args.candidate_ref, candidate),
+          idempotencyKey: `candidate-card-${key}` });
+        return { data: { candidate_ref: args.candidate_ref, talent_card_status: 'sent' },
+          facts: [{ candidate_ref: args.candidate_ref, talent_card_sent_to_current_group: true }],
+          inferences: [], recommendations: [], unknowns: [],
+          evidence_refs: [`candidate_card:${args.job_id}:${args.candidate_ref}`], next_allowed_actions: [] };
       }
       const row = transition(db, context.principal, args);
       return { data: row, facts: [{ candidate_ref: args.candidate_ref, milestone: row.milestone,

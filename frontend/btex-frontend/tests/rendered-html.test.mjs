@@ -232,13 +232,14 @@ test("keeps the unified job detail large enough for working content", async () =
 });
 
 test("keeps membership separate and gives pending projects one Feishu recruiting action", async () => {
-  const [workbench, demo, editor, api] = await Promise.all([
+  const [workbench, projects, demo, editor, api] = await Promise.all([
     workbenchSource(),
+    source("app/projects-view.tsx"),
     source("app/decision-demo.ts"),
     source("app/engagement-loop-editor.tsx"),
     source("app/brainx-api.ts"),
   ]);
-  const visibleCopy = [workbench, demo, editor, api].join("\n");
+  const visibleCopy = [workbench, projects, demo, editor, api].join("\n");
 
   assert.match(demo, /ACCEPT:"开始跟进"/);
   assert.match(editor, /确认开始跟进/);
@@ -249,7 +250,8 @@ test("keeps membership separate and gives pending projects one Feishu recruiting
   assert.match(workbench, /正在创建项目群…/);
   assert.match(workbench, /OpenMai 找人中/);
   assert.match(workbench, /项目群和职位卡已就绪/);
-  assert.match(workbench, /启动 OpenMai 找人/);
+  assert.match(projects, /选择 OpenMai 或 SuperMai/);
+  assert.doesNotMatch(projects, /创建飞书项目群并自动找人/);
   assert.doesNotMatch(visibleCopy, /确认接单|已接单|交付列表|接单后|再接单/);
 });
 

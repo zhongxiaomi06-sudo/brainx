@@ -106,7 +106,7 @@ export const SearchingInFeishu: Story = {
   },
 };
 
-export const GroupReadyNeedsTtc: Story = {
+export const GroupReadyAwaitingMethod: Story = {
   args: { projects: [project("P-GROUP-READY", "PENDING_START", { launch: {
     status: "READY", current_step: "READY", chat_id: "oc_masked", chat_name: "项目群",
     search_status: null, search_task_id: null, error_code: null,
@@ -115,7 +115,8 @@ export const GroupReadyNeedsTtc: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByText(/项目群和职位卡已就绪/)).toBeInTheDocument();
-    await expect(canvas.getByRole("button", { name: /启动 OpenMai 找人/ })).toBeEnabled();
+    await expect(canvas.getByText(/选择 OpenMai 或 SuperMai/)).toBeInTheDocument();
+    await expect(canvas.getByRole("button", { name: /前往群内选择找人方式/ })).toBeEnabled();
   },
 };
 

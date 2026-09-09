@@ -8,6 +8,7 @@ import { downloadResumePdf, extractOpenmaiCandidates } from '../openmai-delivery
 import { sendPdfFile } from '../feishu-bot.js';
 import { getAuthorizedTtcJwt } from '../ttcsdk/auth.js';
 import { downloadTtcResumePdf, listTtcResumeAttachments } from '../ttcsdk/resume.js';
+import { createCandidateDecisionGroup } from '../candidate-decision-group.js';
 
 function fail(code) { throw Object.assign(new Error(code), { code }); }
 
@@ -84,6 +85,7 @@ export function createCandidateActionToolHandlers({
   sendPdfFileFn = sendPdfFile, getAuthorizedTtcJwtFn = getAuthorizedTtcJwt,
   listTtcResumeAttachmentsFn = listTtcResumeAttachments,
   downloadTtcResumePdfFn = downloadTtcResumePdf,
+  createCandidateDecisionGroupFn = createCandidateDecisionGroup,
 } = {}) {
   return {
     brainx_candidate_workflow: async (args, context) => {
@@ -110,6 +112,13 @@ export function createCandidateActionToolHandlers({
         evidence_refs: [`candidate_focus:${args.job_id}:${args.candidate_ref}`],
         next_allowed_actions: row.focus_status === 'FOCUSED'
           ? ['brainx_candidate_fit', 'brainx_candidate_workflow'] : ['brainx_candidate_workflow'] };
+      }
+      if (args.action === 'CREATE_DECISION_GROUP') {
+        const row = await createCandidateDecisionGroupFn(db, context.principal, args);
+        return { data: { candidate_ref: args.candidate_ref, decision_group_status: row.status },
+          facts: [{ candidate_ref: args.candidate_ref,
+          decision_group_ready: row.status === 'READY' }], inferences: [], recommendations: [], unknowns: [],
+          evidence_refs: [`candidate_decision_group:${row.decision_group_id}`], next_allowed_actions: [] };
       }
       const row = transition(db, context.principal, args);
       return { data: row, facts: [{ candidate_ref: args.candidate_ref, milestone: row.milestone,

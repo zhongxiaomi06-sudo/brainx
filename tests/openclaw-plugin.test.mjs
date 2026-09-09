@@ -82,6 +82,7 @@ test('项目群双找人入口支持可选条件且不接受身份或路由注�
   const workflow = BRAINX_OPENCLAW_TOOLS.find(({ name }) => name === 'brainx_candidate_workflow');
   assert.ok(workflow.parameters.properties.action.enum.includes('KEEP_FOR_REVIEW'));
   assert.ok(workflow.parameters.properties.action.enum.includes('REMOVE_FROM_REVIEW'));
+  assert.ok(workflow.parameters.properties.action.enum.includes('CREATE_DECISION_GROUP'));
   assert.deepEqual(gateway.schema('brainx_candidate_workflow'), workflow.parameters,
     '候选保留参数必须与 BrainX 网关白名单一致');
 });
@@ -135,7 +136,7 @@ test('tool request is fixed to loopback and produces a BrainX-verifiable asserti
   const body = JSON.parse(calls[0].options.body);
   assert.equal(body.schema_version, 'agent_tool_request.v1');
   assert.deepEqual(body.client, {
-    plugin_version: '1.3.4', openclaw_version: '2026.7.1-2', model_ref: 'openai/gpt-5',
+    plugin_version: '1.3.5', openclaw_version: '2026.7.1-2', model_ref: 'openai/gpt-5',
   });
   const payload = verifyPrincipalAssertion(body.principal_assertion, {
     secret,

@@ -140,6 +140,16 @@ function keepCandidateAction(job, candidate) {
     value: { text: command } };
 }
 
+function candidateDecisionGroupAction(job, candidate) {
+  const projectRef = String(job.project_id || '').trim().slice(0, 64);
+  const command = `为项目 ${projectRef} 的重点候选人 ${candidate.candidateRef} 创建独立 Offer 决策群。`
+    + '这个按钮就是我的明确确认：现在调用 brainx_candidate_workflow，'
+    + `传入 job_id=${projectRef}、candidate_ref=${candidate.candidateRef}、`
+    + 'action=CREATE_DECISION_GROUP、confirm=true。成功后告诉我新群已继承原项目群的候选人相关摘要；不要发送简历。';
+  return { tag: 'button', type: 'default', text: { tag: 'plain_text', content: '为 TA 建决策群' },
+    value: { text: command } };
+}
+
 function candidateTableRow({ candidate, index, job, baseUrl }) {
   void baseUrl;
   const detailUrl = ttcTalentUrl(candidate);
@@ -147,7 +157,9 @@ function candidateTableRow({ candidate, index, job, baseUrl }) {
     text: { tag: 'plain_text', content: '查看人才' },
     multi_url: { url: detailUrl, pc_url: detailUrl, android_url: detailUrl, ios_url: detailUrl } }]
     : [{ tag: 'div', text: { tag: 'plain_text', content: '链接待核实' } }];
-  if (candidate.candidateRefValid !== false) action.push(keepCandidateAction(job, candidate));
+  if (candidate.candidateRefValid !== false) {
+    action.push(keepCandidateAction(job, candidate), candidateDecisionGroupAction(job, candidate));
+  }
   return [
     { tag: 'column_set', flex_mode: 'none', background_style: 'default', columns: [
       tableCell(`${index + 1}. ${groupSafeOpenmaiText(candidate.name, 60)}\n${groupSafeOpenmaiText(candidate.role, 120)}`, 3),
@@ -155,7 +167,7 @@ function candidateTableRow({ candidate, index, job, baseUrl }) {
       tableCell(groupSafeOpenmaiText(candidate.education, 80), 2),
       tableCell(groupSafeOpenmaiText(candidate.evaluation, 300), 5),
       tableCell(groupSafeOpenmaiText(candidate.score, 20), 1),
-      tableCell('', 2, action),
+      tableCell('', 3, action),
     ] },
   ];
 }

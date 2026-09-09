@@ -207,6 +207,9 @@ ${JSON.stringify({ candidates: [
   assert.match(keepButton.value.text, /candidate_ref=c-1/);
   assert.match(keepButton.value.text, /action=KEEP_FOR_REVIEW/);
   assert.match(keepButton.value.text, /confirm=true/);
+  const decisionButton = rows[1].columns[5].elements[2];
+  assert.equal(decisionButton.text.content, '为 TA 建决策群');
+  assert.match(decisionButton.value.text, /action=CREATE_DECISION_GROUP/);
   const secondButton = rows[2].columns[5].elements[0];
   assert.equal(secondButton.multi_url.url, 'https://app.ttcadvisory.com/app/talent/c-2');
   assert.match(card.elements.at(-1).elements[0].content, /项目共同重点名单/);

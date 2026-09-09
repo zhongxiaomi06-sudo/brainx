@@ -1,7 +1,7 @@
 import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
 
 const GATEWAY_URL = 'http://127.0.0.1:3102/internal/v1/agent/tools';
-const PLUGIN_VERSION = '1.3.4';
+const PLUGIN_VERSION = '1.3.5';
 const OPENCLAW_VERSION = '2026.7.1-2';
 const string = (extra = {}) => ({ type: 'string', minLength: 1, maxLength: 512, ...extra });
 const integer = (minimum, maximum) => ({ type: 'integer', minimum, maximum });
@@ -44,10 +44,10 @@ export const BRAINX_OPENCLAW_TOOLS = Object.freeze([
     job_id: string(), candidate_ref: string(), action: string({ enum: [
       'ADD_TO_PROJECT', 'MARK_PREPARING', 'RECORD_OUTREACH_SENT',
       'RECORD_REPLIED', 'SUBMIT_TO_CLIENT', 'MOVE_TO_INTERVIEW',
-      'KEEP_FOR_REVIEW', 'REMOVE_FROM_REVIEW',
+      'KEEP_FOR_REVIEW', 'REMOVE_FROM_REVIEW', 'CREATE_DECISION_GROUP',
     ] }), note: string({ maxLength: 1000 }), confirm: boolean(),
   }, ['job_id', 'candidate_ref', 'action', 'confirm']),
-  description: '经用户确认后把授权候选人加入项目、加入或移出项目共享重点名单，并记录准备联系、已发送、已回复、提交客户和面试阶段。' },
+  description: '经用户确认后把授权候选人加入项目、管理共享重点名单、创建候选人决策群，并记录后续阶段。' },
 ]);
 
 function canonicalJson(value) {

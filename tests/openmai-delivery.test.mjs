@@ -191,7 +191,7 @@ ${JSON.stringify({ candidates: [
       resume_url: 'https://gateway.ttcadvisory.com/resume/c-2.pdf' },
   ] })}
 -->`;
-  const card = buildOpenmaiDeliveryCard({ job: { project_id: 'P-DELIVERY', company: '甲公司', role: '研发负责人' },
+  const card = buildOpenmaiDeliveryCard({ job: { project_id: 'P-DELIVERY', company: '甲公司', role: '研发负责人', search_round: 2 },
     status: 'done', resultText, publicBaseUrl: 'https://base.yorkteam.cn/' });
   const rows = card.elements.filter((element) => element.tag === 'column_set');
   assert.equal(rows.length, 3, '一行表头加两行候选人');
@@ -205,8 +205,13 @@ ${JSON.stringify({ candidates: [
   const secondButton = rows[2].columns[5].elements[0];
   assert.equal(secondButton.multi_url.url, 'https://app.ttcadvisory.com/app/talent/c-2');
   assert.match(card.elements.at(-1).elements[0].content, /不发送简历附件/);
-  assert.equal(card.elements.filter((element) => element.tag === 'action').length, 0,
-    '操作必须位于候选人行最右侧，不再另起按钮行');
+  assert.match(card.elements[0].content, /第 2 轮/);
+  const continueActions = card.elements.filter((element) => element.tag === 'action');
+  assert.equal(continueActions.length, 1, '候选行操作仍在最右侧，名单后只追加继续找人入口');
+  assert.deepEqual(continueActions[0].actions.map((button) => button.text.content),
+    ['OpenMai 继续找人', 'SuperMai 继续找人']);
+  assert.ok(continueActions[0].actions.every((button) => button.value.text.includes('continue_search=true')));
+  assert.ok(continueActions[0].actions.every((button) => button.value.text.includes('BrainX')));
   assert.doesNotMatch(JSON.stringify(card), /"content":"发送简历"|brainx_send_candidate_resume/);
 });
 

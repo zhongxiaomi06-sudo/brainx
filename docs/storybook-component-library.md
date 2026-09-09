@@ -57,6 +57,8 @@ OpenMai 候选人总览同样不在 React Storybook 伪造飞书组件。正式�
 
 项目群启动状态为“建群后等待选择找人方式”：正式工作台不再把建群描述为自动启动 OpenMai，后端也不会在建群阶段检查 TTC 凭证或发起搜索。飞书原生项目卡片现已接入“OpenMai 找人”和“SuperMai 找人”两个真实按钮；顾问可先在群里发送 `找人条件：……`，留空则按职位事实自动生成。该卡片不在 React Storybook 复制。锁定版 OpenClaw 的语义化飞书卡片尚不能把表单输入值交给 Agent，因此卡片内联输入框仍未完成，真实视觉与回调以飞书客户端验收为准。状态见 [项目群双找人入口与可选条件复核](frontend-reviews/2026-09-09-project-search-method-buttons.md)。
 
+候选结果卡在表格之后提供“OpenMai 继续找人”和“SuperMai 继续找人”。按钮只表达渠道与继续动作，历史 TTC 编号由 BrainX 从结构化结果提取、累计并传入下一轮，不能由 Agent 或卡片值直接提供；无可确认编号时失败关闭。该飞书原生交互不在 Storybook 仿制，状态见 [项目群下一轮找人与 TTC 排除名单复核](frontend-reviews/2026-09-09-project-search-next-round-exclusions.md)。
+
 ## 使用命令
 
 从仓库根目录执行：

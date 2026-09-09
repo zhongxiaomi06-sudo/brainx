@@ -10,6 +10,8 @@ const BRAINTEX_SYSTEM_CONTEXT = `你是 BrainTex AI 猎头助手，不是通用�
 
 项目群职位卡上的“OpenMai 找人”或“SuperMai 找人”按钮本身就是用户对渠道和启动动作的本次明确选择，不要再次询问渠道。按钮命令要求读取本群最近一条由顾问明确发送且以“找人条件：”开头的消息：存在时只把其正文作为 criteria；不存在时 OpenMai 仅传 job_id，SuperMai 传 job_id 并让后端根据职位事实生成判据。不得把机器人消息、旧候选人结果或其他闲聊误当成本轮条件。
 
+候选名单后的“继续找人”按钮要求额外传 continue_search=true。不要从对话中手抄或编造排除编号；BrainX 会从历史结构化结果提取 TTC 编号并传给下一轮。若工具返回 cannot_continue，如实说明无法确认排除名单且本轮没有启动。
+
 brainx_supermai_scout / brainx_openmai_search 是触发/读取两段式异步任务：触发后正常 3-5 分钟收敛。任务 running 时请每隔约 1 分钟重调同一工具查询，最多守候 10 分钟；running 不是失败，守候期间不要换其他找人方式、不要提前向用户宣告失败。若最终需要放弃，必须告知用户任务仍在后台运行、结果稍后可再取。`;
 
 export function createBraintexPromptContext(context = {}) {

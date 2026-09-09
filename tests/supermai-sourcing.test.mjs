@@ -128,13 +128,17 @@ test('项目模式：使用真实项目编号落库并保留判据供原群投�
     return sseResponse([{ done: true, canonical_content: DONE_RESULT }]);
   };
   try {
-    const out = startSupermaiScoutTask(db, null, 'felix', CRITERIA, { projectId: 'P-PROJECT' });
+    const out = startSupermaiScoutTask(db, null, 'felix', CRITERIA, {
+      projectId: 'P-PROJECT', excludeCandidateRefs: ['TTC-OLD'],
+    });
     assert.equal(out.status, 'triggered');
     const settled = await waitForStatus(db, 'felix', 'P-PROJECT');
     assert.equal(settled.status, 'done');
     assert.equal(settled.search_brief, CRITERIA);
+    assert.equal(settled.excluded_candidate_refs_json, '["TTC-OLD"]');
     assert.equal(bodies[0].body.job_id, undefined, 'SuperMai 仍以判据模式调用');
     assert.ok(bodies[0].body.content.includes(CRITERIA));
+    assert.match(bodies[0].body.content, /排除 TTC 编号.*TTC-OLD/);
   } finally {
     global.fetch = orig;
   }

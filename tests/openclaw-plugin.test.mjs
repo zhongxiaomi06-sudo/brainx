@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import { verifyPrincipalAssertion } from '../src/agent-gateway/assertion.js';
+import { createToolRegistry } from '../src/agent-gateway/tool-registry.js';
 import {
   BRAINX_OPENCLAW_TOOLS,
   createBrainxToolFactory,
@@ -67,9 +68,15 @@ test('项目群双找人入口支持可选条件且不接受身份或路由注�
   const supermai = BRAINX_OPENCLAW_TOOLS.find(({ name }) => name === 'brainx_supermai_scout');
   assert.deepEqual(openmai.parameters.required, ['job_id']);
   assert.equal(openmai.parameters.properties.criteria.maxLength, 2000);
+  assert.equal(openmai.parameters.properties.continue_search.type, 'boolean');
   assert.deepEqual(supermai.parameters.required, []);
-  assert.deepEqual(Object.keys(supermai.parameters.properties), ['job_id', 'criteria']);
+  assert.deepEqual(Object.keys(supermai.parameters.properties), ['job_id', 'criteria', 'continue_search']);
   assert.equal(supermai.parameters.additionalProperties, false);
+  const gateway = createToolRegistry();
+  assert.deepEqual(gateway.schema('brainx_openmai_search'), openmai.parameters,
+    '插件参数必须与 BrainX 网关白名单一致');
+  assert.deepEqual(gateway.schema('brainx_supermai_scout'), supermai.parameters,
+    '插件参数必须与 BrainX 网关白名单一致');
 });
 
 test('trusted principal rejects missing, inconsistent, non-Feishu, and forged private contexts', () => {
@@ -121,7 +128,7 @@ test('tool request is fixed to loopback and produces a BrainX-verifiable asserti
   const body = JSON.parse(calls[0].options.body);
   assert.equal(body.schema_version, 'agent_tool_request.v1');
   assert.deepEqual(body.client, {
-    plugin_version: '1.3.2', openclaw_version: '2026.7.1-2', model_ref: 'openai/gpt-5',
+    plugin_version: '1.3.3', openclaw_version: '2026.7.1-2', model_ref: 'openai/gpt-5',
   });
   const payload = verifyPrincipalAssertion(body.principal_assertion, {
     secret,

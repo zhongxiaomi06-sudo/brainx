@@ -7,6 +7,7 @@ import { startOpenmaiTask, getOpenmaiResult } from '../openmai-task.js';
 import { supermaiCriteriaKey, startSupermaiScoutTask } from '../supermai-sourcing.js';
 import { extractOpenmaiCandidates } from '../openmai-delivery.js';
 import { getPushPreferences } from '../push-preferences.js';
+import { nextSearchExclusions } from '../search-rounds.js';
 
 function fail(code) {
   throw Object.assign(new Error(code), { code });
@@ -228,6 +229,16 @@ function sharedProjectSearch(projectId, active, entry) {
   };
 }
 
+function missingExclusions(projectId, entry) {
+  return {
+    data: { entry, job_ref: projectId, status: 'cannot_continue',
+      excluded_candidate_refs: [] },
+    facts: [], inferences: [], recommendations: [],
+    unknowns: ['上一轮结果没有可确认的 TTC 候选编号；为避免重复推荐，本次未启动下一轮搜索'],
+    evidence_refs: [`project_search:${projectId}`],
+  };
+}
+
 /** OpenMai 找人（第 11 工具，2026-09-03）：纪律与承接路由一致——
  * 仅本人 ACCEPTED/COMPLETED 的职位可触发/读取（fail-closed，不泄露存在性）。
  * 费用门控：done 读缓存、running 报状态、其他才触发新任务（防重复费用）。 */
@@ -238,8 +249,9 @@ function openmaiSearch(db, args, principal) {
   // 职位本人可见但未接单：明确提醒接单入口（不泄露任何额外信息——可见性已校验）
   if (!['ACCEPTED', 'COMPLETED'].includes(st)) fail('JOB_NOT_ACCEPTED');
   const criteria = cleanSearchCriteria(args.criteria);
+  const continuing = args.continue_search === true;
   const cur = getOpenmaiResult(db, principal.consultantId, args.job_id) || {};
-  if (cur.status === 'done' || cur.status === 'running') {
+  if (cur.status === 'running' || (cur.status === 'done' && !continuing)) {
     return {
       data: { job_ref: args.job_id, status: cur.status, result_text: cur.result_text || null,
               started_at: cur.started_at || null, finished_at: cur.finished_at || null },
@@ -256,13 +268,18 @@ function openmaiSearch(db, args, principal) {
     };
   }
   const shared = activeProjectSearch(db, args.job_id);
-  if (shared) return sharedProjectSearch(args.job_id, shared, 'openmai');
+  if (shared?.search_status === 'RUNNING' || (shared && !continuing)) {
+    return sharedProjectSearch(args.job_id, shared, 'openmai');
+  }
+  const exclusions = continuing ? nextSearchExclusions(db, args.job_id) : [];
+  if (continuing && !exclusions.length) return missingExclusions(args.job_id, 'openmai');
   const out = startOpenmaiTask(db, null, principal.consultantId, args.job_id, {
-    searchBrief: criteria,
+    force: continuing, searchBrief: criteria, excludeCandidateRefs: exclusions,
   });
   markProjectSearch(db, args.job_id, out);
   return {
     data: { entry: 'openmai', job_ref: args.job_id, criteria: criteria || null,
+            continue_search: continuing, excluded_candidate_refs: exclusions,
             status: out.status || 'triggered', task_id: out.task_id || null,
             message: out.message || null,
             note: out.status === 'error' ? '找人任务未启动，请处理提示后重试'
@@ -279,6 +296,8 @@ function openmaiSearch(db, args, principal) {
  * 触发/读取两段式：首次调用触发任务返回 running，完成后同参数再调读取结果。 */
 function supermaiScout(db, args, principal) {
   const jobId = String(args.job_id || '').trim();
+  const continuing = args.continue_search === true;
+  if (continuing && !jobId) fail('INVALID_ARGUMENT');
   const extra = cleanSearchCriteria(args.criteria);
   const job = jobId ? db.prepare('SELECT * FROM job_facts WHERE project_id=?').get(jobId) : null;
   if (jobId && (!job || !jobVisibleTo(db, principal.consultantId, jobId))) fail('NOT_FOUND_OR_FORBIDDEN');
@@ -290,7 +309,7 @@ function supermaiScout(db, args, principal) {
   if (criteria.length < 5) fail('INVALID_ARGUMENT');
   const project_id = jobId || supermaiCriteriaKey(criteria);
   const cur = getOpenmaiResult(db, principal.consultantId, project_id) || {};
-  if (cur.status === 'done' || cur.status === 'running') {
+  if (cur.status === 'running' || (cur.status === 'done' && !continuing)) {
     const candidates = cur.status === 'done' ? extractOpenmaiCandidates(cur.result_text) : [];
     // NO_REPLY/空结果：OpenMai 对极窄判据可能零命中（返回占位符）——语义化为「未搜到」而非当成成功交付。
     const noReply = cur.status === 'done' && !candidates.length
@@ -311,13 +330,19 @@ function supermaiScout(db, args, principal) {
     };
   }
   const shared = jobId ? activeProjectSearch(db, jobId) : null;
-  if (shared) return sharedProjectSearch(jobId, shared, 'supermai');
+  if (shared?.search_status === 'RUNNING' || (shared && !continuing)) {
+    return sharedProjectSearch(jobId, shared, 'supermai');
+  }
+  const exclusions = continuing ? nextSearchExclusions(db, jobId) : [];
+  if (continuing && !exclusions.length) return missingExclusions(jobId, 'supermai');
   const out = startSupermaiScoutTask(db, null, principal.consultantId, criteria, {
-    projectId: jobId || null,
+    force: continuing, projectId: jobId || null, excludeCandidateRefs: exclusions,
   });
   if (jobId) markProjectSearch(db, jobId, out);
   return {
-    data: { entry: 'supermai', job_ref: jobId || null, criteria, status: out.status || 'triggered',
+    data: { entry: 'supermai', job_ref: jobId || null, criteria,
+            continue_search: continuing, excluded_candidate_refs: exclusions,
+            status: out.status || 'triggered',
             task_id: out.task_id || null, message: out.message || null,
             note: out.status === 'already_done'
               ? '同判据结果已存在，请再次调用本工具读取'

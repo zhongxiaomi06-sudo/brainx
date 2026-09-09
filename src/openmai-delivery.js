@@ -57,9 +57,11 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
   const needsInput = status === 'needs_input' || quality?.needsInput;
   const complete = success && quality.complete;
   const candidates = success ? extractOpenmaiCandidates(resultText) : [];
+  const searchRound = Math.max(1, Number(job.search_round || 1));
+  const roundLabel = searchRound > 1 ? `第 ${searchRound} 轮 · ` : '';
   const content = success
     ? (candidates.length
-      ? `**${job.company} · ${job.role}**\n\n本轮共找到 ${candidates.length} 位候选人。`
+      ? `**${job.company} · ${job.role}**\n\n${roundLabel}本轮共找到 ${candidates.length} 位候选人。`
         + (quality.message ? `\n\n> ⚠️ ${quality.message}` : '')
       : `**${job.company} · ${job.role}**\n\n${groupSafeOpenmaiText(resultText)}`)
     : `**${job.company} · ${job.role}**\n\n本轮候选人搜索失败：${groupSafeOpenmaiText(error, 500)}\n\n请修复连接后在工作台重试。`;
@@ -78,6 +80,7 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
     elements: [
       { tag: 'markdown', content },
       ...table,
+      ...(candidates.length ? [continueSearchActions(job)] : []),
       ...(!success || !candidates.length ? [{ tag: 'action', actions: [{ tag: 'button', type: 'primary',
         text: { tag: 'plain_text', content: success ? '打开工作台查看与评估' : '打开工作台处理' },
         multi_url: { url: target, pc_url: target, android_url: target, ios_url: target } }] }] : []),
@@ -85,6 +88,17 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
         content: '点击“查看人才”将打开 TTC 人才库详情页 · 不发送简历附件 · 候选人事实仍需顾问核验' }] },
     ],
   };
+}
+
+function continueSearchActions(job) {
+  const projectRef = String(job.project_id || '').trim().slice(0, 64);
+  const command = (entry, tool) => `为项目 ${projectRef} 使用 ${entry} 继续找人。读取本群最近一条由顾问明确发送的“找人条件：”作为可选补充条件；现在调用 ${tool}，传入 job_id=${projectRef} 和 continue_search=true。排除名单必须由 BrainX 根据历史 TTC 编号生成，不要自行编造，也不要再次询问找人方式。`;
+  return { tag: 'action', actions: [
+    { tag: 'button', type: 'primary', text: { tag: 'plain_text', content: 'OpenMai 继续找人' },
+      value: { text: command('OpenMai', 'brainx_openmai_search') } },
+    { tag: 'button', type: 'default', text: { tag: 'plain_text', content: 'SuperMai 继续找人' },
+      value: { text: command('SuperMai', 'brainx_supermai_scout') } },
+  ] };
 }
 
 function tableCell(content, weight, elements) {
@@ -224,7 +238,7 @@ export async function deliverOpenmaiResultsOnce(db, dependencies = {}) {
   const at = dependencies.at || now();
   failStaleOpenmaiTasks(db, at, dependencies.staleSearchMs || STALE_SEARCH_MS);
   const enqueued = enqueueOpenmaiDeliveries(db, at);
-  const rows = db.prepare(`SELECT d.*, r.result_text, r.error, j.company, j.role
+  const rows = db.prepare(`SELECT d.*, r.result_text, r.error, r.search_round, j.company, j.role
     FROM openmai_deliveries d
     JOIN openmai_results r ON r.task_id=d.task_id AND r.consultant_id=d.consultant_id
     JOIN job_facts j ON j.project_id=d.project_id

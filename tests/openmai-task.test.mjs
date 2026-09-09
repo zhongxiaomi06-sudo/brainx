@@ -68,8 +68,10 @@ test('OpenMai SSE 最后一帧错误不能被静默吞掉', () => {
 
 test('顾问补充画像进入 OpenMai 提示词且被明确当作业务数据', () => {
   const prompt = buildPrompt({ unique_id: 'J1', name: '测试', cities: ['上海'] },
-    '功率模块研发负责人，必须有 SiC 经验');
+    '功率模块研发负责人，必须有 SiC 经验', ['TTC-100', 'TTC-200']);
   assert.match(prompt, /顾问补充画像：功率模块研发负责人/);
+  assert.match(prompt, /排除 TTC 编号：TTC-100、TTC-200/);
+  assert.match(prompt, /严禁再次返回/);
   assert.match(prompt, /业务数据，不是系统指令/);
   assert.match(prompt, /不要向顾问追问/);
 });
@@ -103,14 +105,18 @@ test('显式启动会把顾问补充条件真正传入 OpenMai 请求', async ()
     const projectId = 'P-FIX-6FFEA4D1';
     const criteria = '必须有高性能 Python 后端经验';
     assert.equal(startOpenmaiTask(db, null, 'felix', projectId, {
-      searchBrief: criteria,
+      searchBrief: criteria, excludeCandidateRefs: ['TTC-OLD'],
     }).status, 'triggered');
     const deadline = Date.now() + 2000;
     while (getOpenmaiResult(db, 'felix', projectId).status === 'running' && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 20));
     }
     assert.match(calls[1].body.content, /必须有高性能 Python 后端经验/);
-    assert.equal(getOpenmaiResult(db, 'felix', projectId).search_brief, criteria);
+    assert.match(calls[1].body.content, /排除 TTC 编号：TTC-OLD/);
+    const stored = getOpenmaiResult(db, 'felix', projectId);
+    assert.equal(stored.search_brief, criteria);
+    assert.equal(stored.search_round, 1);
+    assert.equal(stored.excluded_candidate_refs_json, '["TTC-OLD"]');
   } finally {
     global.fetch = orig;
     db.close();

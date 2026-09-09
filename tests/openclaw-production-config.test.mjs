@@ -59,6 +59,7 @@ test('personal Feishu DMs get isolated dynamic agents and shared BrainX skills',
   assert.deepEqual(config.agents.defaults.skills, [
     'brainx-today', 'brainx-job', 'brainx-talent', 'brainx-match',
     'brainx-engagement-draft', 'brainx-interview-prep', 'brainx-review',
+    'brainx-sourcing-reloop', 'brainx-sourcing-openmai', 'brainx-sourcing-supermai',
   ]);
 });
 

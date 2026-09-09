@@ -186,3 +186,58 @@ test('并发防重：running 集合内同判据触发返回 running（不重复�
     global.fetch = orig;
   }
 });
+
+test('looksLikeSessionPollution：识别会话污染元回复，不误伤正常找人结果', async () => {
+  const { looksLikeSessionPollution } = await import('../src/openmai-result.js');
+  assert.equal(looksLikeSessionPollution('我这边没有可恢复的上一轮运行上下文：当前会话列表为空'), true);
+  assert.equal(looksLikeSessionPollution('我接上次进度：你在看职位 J5Z8J10 的岗匹人。'), true);
+  assert.equal(looksLikeSessionPollution('可见的历史任务只有：1. Lovart 2. FDE'), true);
+  assert.equal(looksLikeSessionPollution(''), false, '空文本不算污染（NO_REPLY 另有处理）');
+  assert.equal(looksLikeSessionPollution(DONE_RESULT), false, '正常候选人结果不误伤');
+  assert.equal(looksLikeSessionPollution('未找到匹配候选人，建议放宽条件'), false, '正常零命中不误伤');
+});
+
+test('会话污染自动重试：首次元回复自动重发，第二次成功则正常交付', async () => {
+  const db = seededDb();
+  const bodies = [];
+  const orig = global.fetch;
+  let calls = 0;
+  global.fetch = async (url, init = {}) => {
+    bodies.push({ url: String(url), body: init.body ? JSON.parse(init.body) : null });
+    calls += 1;
+    const content = calls === 1
+      ? '我这边没有可恢复的上一轮运行上下文：当前会话列表为空。'
+      : DONE_RESULT;
+    return sseResponse([{ done: true, message_id: 'm' + calls, canonical_content: content }]);
+  };
+  try {
+    const out = startSupermaiScoutTask(db, null, 'felix', CRITERIA);
+    assert.equal(out.status, 'triggered');
+    const settled = await waitForStatus(db, 'felix', supermaiCriteriaKey(CRITERIA));
+    assert.equal(settled.status, 'done', '污染回复自动重试后正常交付');
+    assert.ok(settled.result_text.includes('张三'));
+    assert.equal(bodies.length, 2, '恰好重试一次');
+    for (const b of bodies) {
+      assert.ok(b.body.content.includes('【会话隔离'), '每次调用都带会话隔离前言');
+      assert.ok(b.body.content.includes(CRITERIA), '判据仍然在场');
+    }
+  } finally {
+    global.fetch = orig;
+  }
+});
+
+test('会话污染二次重试仍元回复 → failed 关闭并明确报错，不交付垃圾', async () => {
+  const db = seededDb();
+  const orig = global.fetch;
+  const pollution = '我接上次进度：你在看职位 J5Z8J10 的岗匹人。';
+  global.fetch = async () => sseResponse([{ done: true, canonical_content: pollution }]);
+  try {
+    const out = startSupermaiScoutTask(db, null, 'felix', CRITERIA);
+    assert.equal(out.status, 'triggered');
+    const settled = await waitForStatus(db, 'felix', supermaiCriteriaKey(CRITERIA));
+    assert.equal(settled.status, 'failed');
+    assert.ok(settled.error.includes('会话上下文污染'), '错误信息点名污染');
+  } finally {
+    global.fetch = orig;
+  }
+});

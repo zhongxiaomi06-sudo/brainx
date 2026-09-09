@@ -45,3 +45,23 @@ export function assessOpenmaiCandidateBatch(value) {
         : null,
   };
 }
+
+/** OpenMai completions 会话状态跨调用污染的元回复特征（2026-09-09 实测两种形态：
+ * 「我接上次进度：你在看职位 J5Z8J10…」「没有可恢复的上一轮运行上下文…历史任务只有…」）。
+ * 特征：谈论会话/上下文/历史任务本身，而不是交付候选人。 */
+const POLLUTION_PATTERNS = [
+  /没有可恢复的.{0,12}上下文/,
+  /上一轮运行上下文/,
+  /(?:我)?接上次进度/,
+  /(?:可见|现有)的(?:历史|过往)任务只有/,
+  /会话列表为空/,
+  /(?:历史|之前|此前)(?:会话|对话|任务).{0,16}(?:上下文|继续|接着)/,
+];
+
+export function looksLikeSessionPollution(value) {
+  const text = String(value || '');
+  if (!text.trim()) return false;
+  if (CANDIDATE_BLOCK.test(text)) return false;
+  if (/候选人/.test(text) && /\|/.test(text)) return false;
+  return POLLUTION_PATTERNS.some((p) => p.test(text));
+}

@@ -11,7 +11,7 @@
  */
 import { now, uuid } from './db.js';
 import { getAuthorizedTtcJwt } from './ttcsdk/auth.js';
-import { assessOpenmaiCandidateBatch } from './openmai-result.js';
+import { assessOpenmaiCandidateBatch, looksLikeSessionPollution } from './openmai-result.js';
 import { normalizeExcludedCandidateRefs } from './search-rounds.js';
 
 const API_BASE = process.env.BRAINX_TTC_API_BASE || 'https://api.ttcadvisory.com';
@@ -107,12 +107,16 @@ export function buildPrompt(job, searchBrief = '', excludedCandidateRefs = []) {
 }
 
 /** 通用 OpenMai 对话调用：SSE 流式读取 + 异步轮询 + 持久化兜底。
- * jobId 可选：job 模式带 CRM job_id；criteria 模式（supermai-sourcing.js）不带。 */
+ * jobId 可选：job 模式带 CRM job_id；criteria 模式（supermai-sourcing.js）不带。
+ * 会话隔离前言（2026-09-09）：OpenMai completions 存在账号级会话状态跨调用污染
+ * （新任务被历史任务的上下文接管），每次调用显式声明独立会话。 */
+const SESSION_ISOLATION_PREAMBLE = '【会话隔离·最高优先级】本次调用是一次全新的独立任务，与你（OpenMai）在本账号下的任何历史对话、历史任务、会话记录和长期记忆无关。不要提及、总结、恢复或续接任何历史任务或历史上下文；只处理下面这条消息里的找人请求本身。\n\n';
+
 export async function callOpenmaiContent(jwt, content, { jobId } = {}) {
   const resp = await fetch(`${OPENMAI_BASE}/api/openmai/v1/completions`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json', Accept: 'text/event-stream' },
-    body: JSON.stringify(jobId ? { content, job_id: jobId } : { content }),
+    body: JSON.stringify(jobId ? { content: SESSION_ISOLATION_PREAMBLE + content, job_id: jobId } : { content: SESSION_ISOLATION_PREAMBLE + content }),
     signal: AbortSignal.timeout(OPENMAI_TIMEOUT_MS),
   });
   if (!resp.ok) {
@@ -232,7 +236,15 @@ export function startOpenmaiTask(db, bus, consultant_id, project_id, {
       const realId = row?.source_url && String(row.source_url).startsWith('ttc://job/')
         ? String(row.source_url).slice('ttc://job/'.length).trim() : project_id;
       const job = await fetchCrmJob(jwt, realId);
-      const result = await callOpenmai(jwt, job, brief, exclusions);
+      let result = await callOpenmai(jwt, job, brief, exclusions);
+      // 会话污染防护（2026-09-09）：拿到元回复自动重试一次，仍污染则失败关闭
+      if (looksLikeSessionPollution(result)) {
+        console.warn('[openmai] session pollution detected, retrying once:', task_id);
+        result = await callOpenmai(jwt, job, brief, exclusions);
+        if (looksLikeSessionPollution(result)) {
+          throw new Error('OpenMai 会话上下文污染：两次均返回与找人无关的元回复，请稍后重试');
+        }
+      }
       const resultStatus = assessOpenmaiCandidateBatch(result).needsInput ? 'needs_input' : 'done';
       settled = settleOpenmaiTask(db, { projectId: project_id, consultantId: consultant_id,
         taskId: task_id, status: resultStatus, resultText: result });

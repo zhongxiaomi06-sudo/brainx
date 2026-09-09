@@ -19,6 +19,7 @@ import { createHash } from 'node:crypto';
 import { now, uuid } from './db.js';
 import { getValidTtcJwt } from './ttcsdk/auth.js';
 import { callOpenmaiContent, settleOpenmaiTask as settleSupermaiTask } from './openmai-task.js';
+import { looksLikeSessionPollution } from './openmai-result.js';
 import { normalizeExcludedCandidateRefs } from './search-rounds.js';
 
 const running = new Set(); // `${key}|${consultant_id}`
@@ -104,7 +105,15 @@ export function startSupermaiScoutTask(db, bus, consultant_id, criteria, {
     let status = 'failed';
     let settled = false;
     try {
-      const result = await callOpenmaiContent(jwt, buildScoutPrompt(criteria, exclusions));
+      let result = await callOpenmaiContent(jwt, buildScoutPrompt(criteria, exclusions));
+      // 会话污染防护（2026-09-09）：拿到元回复自动重试一次，仍污染则失败关闭
+      if (looksLikeSessionPollution(result)) {
+        console.warn('[supermai] session pollution detected, retrying once:', task_id);
+        result = await callOpenmaiContent(jwt, buildScoutPrompt(criteria, exclusions));
+        if (looksLikeSessionPollution(result)) {
+          throw new Error('OpenMai 会话上下文污染：两次均返回与找人无关的元回复，请稍后重试');
+        }
+      }
       settled = settleSupermaiTask(db, { projectId: project_id, consultantId: consultant_id,
         taskId: task_id, status: 'done', resultText: result });
       status = 'done';

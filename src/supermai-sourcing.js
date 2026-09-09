@@ -35,10 +35,10 @@ export function buildScoutPrompt(criteria) {
     '请使用 SuperMai 找人能力在猎聘、脉脉等候选人渠道，搜索以下判据的 6-10 名匹配候选人：',
     `[找人判据] ${String(criteria || '').trim()}`,
     '每人必须给出姓名、当前公司/职位、匹配判断、推荐理由、风险或待核实项；没有证据的字段写“待核实”。',
-    '如果系统能取得候选人的真实 PDF，请提供可直接下载的 HTTPS 地址；不能取得时 resume_url 必须为 null，不得编造链接。',
+    '如候选人来自 TTC 人才库，必须给出 https://app.ttcadvisory.com/app/talent/<candidate_ref> 详情链接；不得发送或索取简历附件。',
     '在面向人的结果末尾追加下面格式的机器块，JSON 必须合法，且不要把电话或邮箱放入机器块：',
     '<!-- BRAINX_CANDIDATES_V1',
-    '{"candidates":[{"candidate_ref":"稳定候选编号","name":"姓名","evaluation":"一句话评估","resume_url":"https://受信地址/真实简历.pdf或null"}]}',
+    '{"candidates":[{"candidate_ref":"稳定候选编号","name":"姓名","role":"当前公司 / 职位","experience":"经验年限","city":"城市","education":"学历 / 院校","evaluation":"核心匹配点","score":"匹配度","talent_url":"https://app.ttcadvisory.com/app/talent/稳定候选编号或null"}]}',
     '-->',
   ].join('\n');
 }

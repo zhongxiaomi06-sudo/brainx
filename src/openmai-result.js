@@ -13,9 +13,16 @@ export function extractOpenmaiCandidates(value) {
       const rawRef = String(item?.candidate_ref || '');
       return {
         candidateRef: SAFE_CANDIDATE_REF.test(rawRef) ? rawRef : `candidate-${index + 1}`,
+        candidateRefValid: SAFE_CANDIDATE_REF.test(rawRef),
         name: String(item?.name || `候选人${index + 1}`).slice(0, 60),
+        role: String(item?.role || '当前岗位待核实').slice(0, 120),
+        experience: String(item?.experience || '待核实').slice(0, 40),
+        city: String(item?.city || '待核实').slice(0, 40),
+        education: String(item?.education || '待核实').slice(0, 80),
         evaluation: String(item?.evaluation || '待顾问核验').slice(0, 300),
+        score: String(item?.score || '—').slice(0, 20),
         resumeUrl: typeof item?.resume_url === 'string' ? item.resume_url : null,
+        talentUrl: typeof item?.talent_url === 'string' ? item.talent_url : null,
       };
     });
   } catch { return []; }

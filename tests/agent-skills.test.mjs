@@ -11,7 +11,7 @@ const TOOLS = new Set(['brainx_me_context', 'brainx_daily_brief', 'brainx_job_as
   'brainx_gap_questions', 'brainx_interview_prep', 'brainx_personal_review', 'brainx_run_status',
   'brainx_push_preferences', 'brainx_update_push_preferences', 'brainx_job_contacts',
   'brainx_candidate_contact', 'brainx_accept_job', 'brainx_start_candidate_search',
-  'brainx_record_job_progress', 'brainx_candidate_workflow', 'brainx_send_candidate_resume']);
+  'brainx_record_job_progress', 'brainx_candidate_workflow']);
 
 test('七个生产 Skill 只引用 Agent Gateway 白名单工具并统一决策口径', () => {
   for (const skill of SKILLS) {

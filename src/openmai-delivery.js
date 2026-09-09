@@ -1,9 +1,8 @@
 /** OpenMai 最新结果 → 原飞书项目群；持久队列、脱敏卡片、有限重试。 */
 import { randomUUID } from 'node:crypto';
 import { now } from './db.js';
-import { sendInteractiveCard, sendPdfFile, replyInteractiveCard } from './feishu-bot.js';
+import { sendInteractiveCard } from './feishu-bot.js';
 import { buildBrainxDeepLink, productionBaseUrl } from './brainx-deep-links.js';
-import { getAuthorizedTtcJwt } from './ttcsdk/auth.js';
 import { assessOpenmaiCandidateBatch, extractOpenmaiCandidates } from './openmai-result.js';
 
 const PHONE = /(?<!\d)(?:\+?86[-\s]?)?1[3-9]\d{9}(?!\d)/g;
@@ -38,81 +37,6 @@ export async function downloadResumePdf(url, jwt, options = {}) {
     throw new Error('RESUME_PDF_INVALID');
   }
   return bytes;
-}
-
-function isPermanentResumeError(error) {
-  return ['RESUME_URL_INVALID', 'RESUME_URL_NOT_TRUSTED', 'RESUME_PDF_INVALID', 'RESUME_PDF_TOO_LARGE']
-    .includes(error?.message);
-}
-
-export function buildCandidateTopicCard({ candidate, job, publicBaseUrl }) {
-  const baseUrl = productionBaseUrl(publicBaseUrl).href;
-  const target = buildBrainxDeepLink({ baseUrl, objectType: 'opportunity',
-    objectRef: job.project_id, candidateRef: candidate.candidateRef });
-  const name = groupSafeOpenmaiText(candidate.name, 60);
-  const evaluation = groupSafeOpenmaiText(candidate.evaluation, 1000);
-  return {
-    config: { wide_screen_mode: true },
-    header: { template: 'blue', title: { tag: 'plain_text', content: `候选人 · ${name}` } },
-    elements: [
-      { tag: 'markdown', content: `候选编号：${candidate.candidateRef}\n\n**AI 初评**\n${evaluation}` },
-      { tag: 'action', actions: [{ tag: 'button', type: 'primary',
-        text: { tag: 'plain_text', content: '打开候选人评估' },
-        multi_url: { url: target, pc_url: target, android_url: target, ios_url: target } }] },
-      { tag: 'note', elements: [{ tag: 'plain_text', content: candidate.resumeUrl
-        ? 'PDF 简历将回复在本话题 · 可在此让机器人记录联系与推进状态'
-        : '本轮未取得真实 PDF · 可在此让机器人记录联系与推进状态' }] },
-    ],
-  };
-}
-
-export function buildResumeUnavailableCard(candidate) {
-  return {
-    config: { wide_screen_mode: true },
-    header: { template: 'orange', title: { tag: 'plain_text', content: '简历附件待核验' } },
-    elements: [
-      { tag: 'markdown', content: `**${groupSafeOpenmaiText(candidate.name, 60)}** 的真实 PDF 未能通过安全下载或文件校验。` },
-      { tag: 'note', elements: [{ tag: 'plain_text',
-        content: '本候选人的评估已保留；请在工作台核对来源附件，不会阻断其他候选人投递。' }] },
-    ],
-  };
-}
-
-async function deliverCandidateTopics(db, row, dependencies) {
-  // 总览统一放在一张表格卡中；只有真实 PDF 需要独立话题承载附件。
-  const candidates = extractOpenmaiCandidates(row.result_text).filter((candidate) => candidate.resumeUrl);
-  if (candidates.length === 0) return 0;
-  const send = dependencies.sendInteractiveCard || sendInteractiveCard;
-  const withResume = candidates.some((candidate) => candidate.resumeUrl);
-  const jwt = withResume ? getAuthorizedTtcJwt(db, row.consultant_id, 'OPENMAI') : null;
-  if (withResume && !jwt) throw new Error('TTC_CREDENTIALS_REQUIRED_FOR_RESUME');
-  let sent = 0;
-  for (const [index, candidate] of candidates.entries()) {
-    const topic = await send({
-      target: row.chat_id,
-      card: buildCandidateTopicCard({ candidate, job: row, publicBaseUrl: dependencies.publicBaseUrl }),
-      idempotencyKey: `${row.delivery_id}-candidate-${index + 1}`,
-    });
-    sent++;
-    if (!candidate.resumeUrl) continue;
-    if (!topic.message_id) throw new Error('FEISHU_CANDIDATE_TOPIC_MESSAGE_ID_MISSING');
-    try {
-      const bytes = await downloadResumePdf(candidate.resumeUrl, jwt, dependencies);
-      await (dependencies.sendPdfFile || sendPdfFile)({
-        target: row.chat_id, data: bytes, fileName: `${candidate.name}-简历.pdf`,
-        idempotencyKey: `${row.delivery_id}-resume-${index + 1}`,
-        replyToMessageId: topic.message_id,
-      });
-    } catch (error) {
-      if (!isPermanentResumeError(error)) throw error;
-      await (dependencies.replyInteractiveCard || replyInteractiveCard)({
-        messageId: topic.message_id,
-        card: buildResumeUnavailableCard(candidate),
-        idempotencyKey: `${row.delivery_id}-resume-warning-${index + 1}`,
-      });
-    }
-  }
-  return sent;
 }
 
 export function groupSafeOpenmaiText(value, max = 6500) {
@@ -158,7 +82,7 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
         text: { tag: 'plain_text', content: success ? '打开工作台查看与评估' : '打开工作台处理' },
         multi_url: { url: target, pc_url: target, android_url: target, ios_url: target } }] }] : []),
       { tag: 'note', elements: [{ tag: 'plain_text',
-        content: '点击“发送简历”后机器人会实时查询 TTC 附件并发到本群 · 联系方式默认隐藏 · 候选人事实仍需顾问核验' }] },
+        content: '点击“查看人才”将打开 TTC 人才库详情页 · 不发送简历附件 · 候选人事实仍需顾问核验' }] },
     ],
   };
 }
@@ -173,29 +97,41 @@ function tableCell(content, weight, elements) {
 function candidateTableHeading() {
   return {
     tag: 'column_set', flex_mode: 'none', background_style: 'grey',
-    columns: [tableCell('候选人', 2), tableCell('AI 初评', 5)],
+    columns: [tableCell('候选人 / 当前岗位', 3), tableCell('经验 / 城市', 2),
+      tableCell('学历', 2), tableCell('核心匹配点', 5), tableCell('匹配度', 1), tableCell('操作', 2)],
   };
 }
 
+function ttcTalentUrl(candidate) {
+  if (candidate.talentUrl) {
+    try {
+      const target = new URL(candidate.talentUrl);
+      if (target.origin === 'https://app.ttcadvisory.com' && target.pathname.startsWith('/app/talent/')) {
+        return target.toString();
+      }
+    } catch { /* 使用候选编号回退。 */ }
+  }
+  if (candidate.candidateRefValid === false) return null;
+  return `https://app.ttcadvisory.com/app/talent/${encodeURIComponent(candidate.candidateRef)}`;
+}
+
 function candidateTableRow({ candidate, index, job, baseUrl }) {
-  const detailUrl = buildBrainxDeepLink({ baseUrl, objectType: 'opportunity',
-    objectRef: job.project_id, candidateRef: candidate.candidateRef });
-  const resumeButton = {
-    tag: 'button', type: 'primary', text: { tag: 'plain_text', content: '发送简历' },
-    value: { command: `请立即调用 brainx_send_candidate_resume，参数为 ${JSON.stringify({
-      job_id: job.project_id, candidate_ref: candidate.candidateRef, confirm: true,
-    })}。本次按钮点击即为发送确认；成功后只回复“简历已发送”。` },
-  };
+  void job;
+  void baseUrl;
+  const detailUrl = ttcTalentUrl(candidate);
+  const action = detailUrl ? [{ tag: 'button', type: 'primary',
+    text: { tag: 'plain_text', content: '查看人才' },
+    multi_url: { url: detailUrl, pc_url: detailUrl, android_url: detailUrl, ios_url: detailUrl } }]
+    : [{ tag: 'div', text: { tag: 'plain_text', content: '链接待核实' } }];
   return [
     { tag: 'column_set', flex_mode: 'none', background_style: 'default', columns: [
-      tableCell(`${index + 1}. ${groupSafeOpenmaiText(candidate.name, 60)}`, 2),
+      tableCell(`${index + 1}. ${groupSafeOpenmaiText(candidate.name, 60)}\n${groupSafeOpenmaiText(candidate.role, 120)}`, 3),
+      tableCell(`${groupSafeOpenmaiText(candidate.experience, 40)} · ${groupSafeOpenmaiText(candidate.city, 40)}`, 2),
+      tableCell(groupSafeOpenmaiText(candidate.education, 80), 2),
       tableCell(groupSafeOpenmaiText(candidate.evaluation, 300), 5),
+      tableCell(groupSafeOpenmaiText(candidate.score, 20), 1),
+      tableCell('', 2, action),
     ] },
-    { tag: 'action', actions: [
-        { tag: 'button', text: { tag: 'plain_text', content: '查看' },
-          multi_url: { url: detailUrl, pc_url: detailUrl, android_url: detailUrl, ios_url: detailUrl } },
-        resumeButton,
-      ] },
   ];
 }
 
@@ -307,7 +243,6 @@ export async function deliverOpenmaiResultsOnce(db, dependencies = {}) {
           resultText: row.result_text, error: row.error, publicBaseUrl: dependencies.publicBaseUrl }),
         idempotencyKey: row.delivery_id,
       });
-      if (row.result_status === 'done') await deliverCandidateTopics(db, row, dependencies);
       db.prepare(`UPDATE openmai_deliveries SET delivery_status='SENT', message_id=?, last_error=NULL,
         sent_at=?, updated_at=? WHERE delivery_id=?`).run(output.message_id || null, at, at, row.delivery_id);
       finishProjectDelivery(db, row, at);

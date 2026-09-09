@@ -282,7 +282,8 @@ function openmaiSearch(db, args, principal) {
             continue_search: continuing, excluded_candidate_refs: exclusions,
             status: out.status || 'triggered', task_id: out.task_id || null,
             message: out.message || null,
-            note: out.status === 'error' ? '找人任务未启动，请处理提示后重试'
+            note: out.status === 'error'
+              ? '找人任务未启动，请处理提示后重试；正常启动后 3-5 分钟收敛，请每隔约 1 分钟读取进度'
               : '找人任务已触发，正常 3-5 分钟收敛；结果会自动回到项目群。'
                 + '请每隔约 1 分钟再调本工具读取（最多 10 分钟），完成后完整呈现 result_text' },
     facts: [], inferences: [], recommendations: [], unknowns: [],
@@ -346,7 +347,8 @@ function supermaiScout(db, args, principal) {
             task_id: out.task_id || null, message: out.message || null,
             note: out.status === 'already_done'
               ? '同判据结果已存在，请再次调用本工具读取'
-              : out.status === 'error' ? '找人任务未启动，请处理提示后重试'
+              : out.status === 'error'
+                ? '找人任务未启动，请处理提示后重试；正常启动后 3-5 分钟收敛，请每隔约 1 分钟读取进度'
               : jobId ? '找人任务已触发，正常 3-5 分钟收敛；结果会自动回到项目群。'
                 + '请每隔约 1 分钟再调本工具读取（最多 10 分钟）'
                 : '找人任务已触发，正常 3-5 分钟收敛；请每隔约 1 分钟再调本工具读取（最多 10 分钟）' },

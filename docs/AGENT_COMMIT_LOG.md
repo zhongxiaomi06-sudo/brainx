@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-10｜fix(找人): 自建岗（pj_*）绑定 TTC 真身与判据降级——修工作台接单找人 4 连败（specs/012）
+
+- 根因：bot 按判据自建岗（job-extract 确认生成 `pj_<uuid>`）的 job_facts 行 source_url 为 NULL，OpenMai job 模式拿 pj_uuid 查 CRM 必然「职位不存在，或当前顾问无权查看该职位」（今日 felix 长角鹿科技×2 岗 4 连败）。
+- 修法（CRM 查无 JOB_NOT_FOUND 分支才触发；401/403/HTTP 错照抛不掩盖）：①显式 ttc://job/ 映射不变；②同 company+role 其他行有真身 → 自动绑定并回写本行 source_url，之后恒走 job 模式；③pj_* 自建岗无真身 → 判据降级：company/role/city/pipeline/hc 拼伪 job 走 buildPrompt，completions 不带 job_id，追加自建岗说明；④非 pj_（真 TTC id 无权限等）保持原报错语义。污染检测重试/排除名单/search_round 幂等/结果落库对两种模式统一生效。
+- 改动：`src/openmai-task.js`（fetchCrmJob 加 JOB_NOT_FOUND 标记 + 三级递进）；`tests/openmai-task.test.mjs` 新增 5 组用例（映射不变/自动绑定回写/判据降级/原报错保持/401 不降级）；`specs/012-selfbuilt-job-binding/`。无 migration、无插件改动。
+- 验证：专项 11/11 通过；full 门禁与生产部署见后续记录。
+
 ## 2026-09-10｜fix(接单): 确认话术固定「确认接【公司·职位】这个岗位吗？」+ 确认即接单（specs/011 修订B）
 
 - 上游：用户确认 SOP 方向，要求确认话术更明确、确认后直接执行。prompt.js 第 2/3 步改写：岗位理解最后一行固定问「确认接【公司·职位】这个岗位吗？」；用户回复确认/接吧/可以/嗯/就是这个等认可后立即调用 brainx_accept_job，不再问第二遍。

@@ -28,7 +28,9 @@ const BRAINTEX_SYSTEM_CONTEXT = `你是 BrainTex AI 猎头助手，不是通用�
 
 brainx_supermai_scout / brainx_openmai_search 是触发/读取两段式异步任务：触发后正常 3-5 分钟收敛，结果不会自动推送，必须由你守候查询。任务 running 时，两次查询之间必须间隔至少 60 秒（响应里的 elapsed_minutes 是已运行时长，供你判断还要等多久），最多守候 10 分钟；running 不是失败，守候期间不要换其他找人方式、不要提前向用户宣告失败、更不要承诺「设提醒/自动通知」——本环境没有通知工具，超时未完成就如实告知用户任务仍在后台运行、结果稍后查询即可。
 
-呈现候选人结果时必须原样保留 brainx_openmai_search / brainx_supermai_scout 返回的 result_text 里的「查看」链接（app.ttcadvisory.com/app/talent/PL…）：表格里加「详情」列放 [查看](链接)，不得因为表格列多就删掉链接。用户反馈「链接没有/打不开」时，正确做法是把原始链接补回去，而不是把链接删掉给「干净版本」。`;
+呈现候选人结果时必须原样保留 brainx_openmai_search / brainx_supermai_scout 返回的 result_text 里的「查看」链接（app.ttcadvisory.com/app/talent/PL…）：表格里加「详情」列放 [查看](链接)，不得因为表格列多就删掉链接。用户反馈「链接没有/打不开」时，正确做法是把原始链接补回去，而不是把链接删掉给「干净版本」。
+
+机器人被拉进一个还没绑定的群时会弹「绑定职位」卡。点「绑定我的职位」按钮本身就是用户对绑定动作的明确确认：先调用 brainx_bind_group_project（不带 job_id）取回顾问名下可绑职位清单，把它列成简短选项让用户挑——绝不让用户去找 job_id；用户选定后，用该 job_id 与 confirm=true 再次调用 brainx_bind_group_project 完成绑定。不要询问群号或职位编号，也不要假设职位。绑定成功后群里会自动出现找人卡，拉群指引会发到顾问私聊，不必再重复指引。`;
 
 export function createBraintexPromptContext(context = {}) {
   const channel = String(context.messageProvider || context.channel || '').toLowerCase();

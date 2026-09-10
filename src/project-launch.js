@@ -25,14 +25,16 @@ export class ProjectLaunchError extends Error {
 const fail = (status, code, message) => { throw new ProjectLaunchError(status, code, message); };
 const safeError = (error) => String(error?.message || error || '未知错误').slice(0, 240);
 
-function findBinding(db, consultantId, openId) {
+// specs/015：导出供 group-intake 复用——按顾问+open_id 解析飞书身份绑定。
+export function findBinding(db, consultantId, openId) {
   return db.prepare(`SELECT tenant_id, channel_account_id, feishu_app_key_hash
     FROM feishu_identity_bindings
     WHERE consultant_id=? AND open_id=? AND binding_status='ACTIVE'
     ORDER BY updated_at DESC LIMIT 1`).get(consultantId, openId);
 }
 
-function findProjectCollaboratorOpenIds(db, projectId, binding, ownerOpenId) {
+// specs/015：导出供 group-intake 复用——绑定旧群时算协作者 open_id。
+export function findProjectCollaboratorOpenIds(db, projectId, binding, ownerOpenId) {
   const rows = db.prepare(`SELECT DISTINCT c.open_id
     FROM job_memberships m
     JOIN consultants c ON c.consultant_id=m.consultant_id AND c.active=1
@@ -139,11 +141,13 @@ function saveFailure(db, launchId, code, message) {
     WHERE launch_id=?`).run(code, message, now(), launchId);
 }
 
-function activateGroup(db, { consultantId, projectId, chatId, openIds, binding }) {
+// specs/015：导出供 group-intake 复用——绑定旧群时把 PENDING_BINDING 行转 ACTIVE。
+export function activateGroup(db, { consultantId, projectId, chatId, openIds, binding }) {
   const at = now();
   registerChatContext(db, { chat_id: chatId, bot_mode: 'MENTION_ONLY', notes: `project:${projectId}` });
+  // 命中已登记的群范围（含 specs/015 待绑定态 PENDING_BINDING）：原地更新，不另起一行。
   const existing = db.prepare(`SELECT group_scope_id FROM agent_group_scopes
-    WHERE channel_account_id=? AND chat_id=? AND scope_status='ACTIVE'`).get(binding.channel_account_id, chatId);
+    WHERE channel_account_id=? AND chat_id=? AND scope_status IN ('ACTIVE','PENDING_BINDING')`).get(binding.channel_account_id, chatId);
   if (existing) {
     db.prepare(`UPDATE agent_group_scopes SET tenant_id=?, allowed_purposes_json=?,
       allowed_senders_json=?, project_refs_json=?, require_mention=1, updated_at=?

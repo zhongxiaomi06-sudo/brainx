@@ -85,6 +85,11 @@ export const AGENT_TOOL_ROWS = Object.freeze([
     stage: string({ maxLength: 40 }), summary: string({ maxLength: 1000 }),
     next_action_title: string({ maxLength: 240 }), next_due_at: string(), idempotency_key: string(), confirm: boolean(),
   }, ['job_id', 'action_id', 'kind', 'summary', 'next_action_title', 'next_due_at', 'idempotency_key', 'confirm']), projectKey: 'job_id' },
+  // specs/015：把旧群绑定到职位。群尚未登记 scope 时唯一可调的工具（groupIntakeBinding）；
+  // chat_id 取自身份上下文不可由参数传。job_id 可选——不传返回顾问可绑职位清单，传了+confirm 才绑定。
+  { name: 'brainx_bind_group_project', purpose: ['group_binding'], groupIntakeBinding: true, parameters: object({
+    job_id: string(), confirm: boolean(),
+  }, ['confirm']) },
   { name: 'brainx_candidate_workflow', purpose: ['candidate_action'], parameters: object({
     job_id: string(), candidate_ref: string(), action: string({ enum: ['ADD_TO_PROJECT', 'MARK_PREPARING',
       'RECORD_OUTREACH_SENT', 'RECORD_REPLIED', 'SUBMIT_TO_CLIENT', 'MOVE_TO_INTERVIEW',
@@ -153,6 +158,9 @@ export function createToolRegistry(options = {}) {
     },
     requiresP2p(name) {
       return rows.get(name)?.p2pOnly === true;
+    },
+    requiresIntakeBinding(name) {
+      return rows.get(name)?.groupIntakeBinding === true;
     },
     async execute(name, args, context) {
       const row = rows.get(name);

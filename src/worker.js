@@ -23,6 +23,7 @@ import { startOpenmaiDeliveryWorker } from './openmai-delivery.js';
 import { startProjectReminderWorker } from './project-reminder.js';
 import { startStageReminderWorker } from './stage-reminder.js';
 import { startOpenclawGroupRetryWorker } from './openclaw-group-retry.js';
+import { startGroupIntakeWorker } from './group-intake.js';
 
 /** 启动全部批处理任务。bus 由调用方给（嵌入=server.bus；独立=relayBus）。 */
 export function startWorkerTasks(db, bus) {
@@ -81,6 +82,12 @@ export function startWorkerTasks(db, bus) {
     handles.push(startOpenclawGroupRetryWorker(db));
     const iv = Number(process.env.BRAINX_OPENCLAW_RETRY_INTERVAL_MS || 600000) / 1000;
     console.log(`[worker] OpenClaw 群准入补偿已启动（间隔 ${iv}s，成功后节流重启 gateway）`);
+  }
+  // 机器人进旧群轮询：发现新群发「绑定职位」卡（specs/015）；BRAINX_GROUP_INTAKE_OFF=1 关闭
+  if (process.env.BRAINX_GROUP_INTAKE_OFF !== '1') {
+    startGroupIntakeWorker(db);
+    const iv = Number(process.env.BRAINX_GROUP_INTAKE_INTERVAL_MS || 600000) / 1000;
+    console.log(`[worker] 机器人进群轮询已启动（间隔 ${iv}s，首轮只基线不发卡）`);
   }
   return { stop: () => handles.forEach((h) => h?.stop?.()) };
 }

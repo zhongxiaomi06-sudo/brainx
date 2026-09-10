@@ -1821,3 +1821,11 @@
 
 - 改动：新增仓库级 `AGENTS.md`，规定第一性原理、Ponytail 最小实现原则、共享工作区互斥等待、即时提交、中文记录及上传前检查流程；新增本提交记录文件。
 - 验证：检查文件内容、Git 差异和工作区状态。
+
+## 2026-09-10｜feat(进群): 机器人进旧群自动发「绑定职位」卡 + 绑定后发拉群指引/防滥用提醒（specs/015）
+
+- 用户拍板做 specs/015，并要求「验证结束后发给顾问一个卡片提醒如何拉群，提醒不要拉太多群，不然消息会炸」。外部群用户决定不做（删）。
+- 实现：①migration 0050 bot_chat_intake（chat_id PK, status SEEN/CARD_SENT/BOUND/SKIPPED）；②feishu-bot 增 listBotChats（GET /open-apis/im/v1/chats 翻页）；③src/group-intake.js：startGroupIntakeWorker 首轮只基线不发卡（避免轰炸历史群含死群 oc_5494e54），新群登记 chat_context+openclaw 白名单+发「绑定职位」卡；bindGroupToProject 激活群范围+回填 chat_id+群里发找人卡+顾问私聊发拉群指引/防滥用提醒；④authorization 增 allowIntakeBinding 特例：未登记群只放行 brainx_bind_group_project（靠 bot_chat_intake 卡口+已登记顾问身份），不动 authorizeGroup 安全逻辑；⑤新工具 brainx_bind_group_project（job_id 可选——不传列职位、传了+confirm 才绑定，chat_id 取自 principal 不可参数传）；⑥openclaw 插件 1.4.0 同步（runtime.js/plugin.json/prompt.js）；⑦prompt.js 增绑定流程指引。
+- 设计取舍：不建 PENDING_BINDING scope 行，用 groupIntakeBinding 工具标记等价且更简单（spec §3.3 已改）。
+- 测试：tests/group-intake.test.mjs 9 组（基线/新群/死群/授权/bind 列/bind 激活/重复绑定/卡片/注册表）；后端全量 663/663（受影响断言：工具数 24→25、契约 fixture 加项、插件版本 1.3.9→1.4.0）。
+- 部署：待跑 full 门禁后 SSH 直推 + 插件副本 cp 到 /var/lib/brainx/.openclaw/extensions/brainx-openclaw/（chown brainx）+ 重启三服务 + 生产 openclaw.json tools.allow 加 brainx_bind_group_project。

@@ -1,8 +1,10 @@
 # 015 — 机器人进旧群自动发「绑定职位」卡（设计稿，待拍板）
 
-状态：Design（未实现，2026-09-10）
-上游：用户 2026-09-10 需求「可以把机器人拉到旧群，拉进去第一件事也是弹出卡片开始找人」。
+状态：Implementing（2026-09-10，用户拍板）
+上游：用户 2026-09-10 需求「可以把机器人拉到旧群，拉进去第一件事也是弹出卡片开始找人」+「验证结束后发给顾问一个卡片提醒如何拉群，提醒不要拉太多群，不然消息会炸」。
 关联：[014 项目群卡片动作](../014-launch-card-actions/spec.md)、[013 拉群即见卡](../013-launch-card-first/spec.md)。
+
+> **范围调整（2026-09-10）**：外部群不做了（用户决定）。本规格只做「机器人进旧群自动发绑定职位卡 + 绑定后发拉群指引/防滥用提醒」。外部群相关条目已删除。
 
 ## 1. 问题
 
@@ -48,14 +50,16 @@ CREATE TABLE IF NOT EXISTS bot_chat_intake (
 
 ### 3.3 待绑定态的授权（关键设计）
 
-`src/agent-gateway/authorization.js`：当 scope 的 `scope_status='PENDING_BINDING'` 时，
+**采用 `groupIntakeBinding` 工具标记，不建 PENDING_BINDING scope 行**（比原设计更简单、不动 `authorizeGroup` 安全逻辑）：
 
-- **放宽 sender 检查为「群内任意成员」**——入群时不知道谁会来绑定，必须放行；
-- **但只允许 `group_binding` 这一个 purpose**，其他一切照旧拒绝；
-- 绑定成功后把 scope 改为 `ACTIVE`，写入 `allowed_senders`（绑定人 + 项目成员）、`project_refs`（该职位）、完整 purposes，等同于 014 的建群登记。
+- `brainx_bind_group_project` 在 tool-registry 标记 `groupIntakeBinding: true`、purpose `group_binding`、非 p2pOnly、不要求 project 范围。
+- `authorization.js`：当 `options.allowIntakeBinding` 为真时，群内放行条件收窄为——①`resolveBinding` 通过（说话人是已登记顾问，这一步本身就把外人挡住）；②该 `chat_id` 在 `bot_chat_intake` 且 `status IN ('CARD_SENT','SEEN')`（即机器人主动接管过的群，不是随便一个群）；③`projectRef` 为 null。**完全跳过 `authorizeGroup`**，不查 `agent_group_scopes`。
+- 其余一切工具没有这个标记 → 在未登记群里仍走 `authorizeGroup` → 找不到 ACTIVE scope → `NOT_FOUND_OR_FORBIDDEN`。**效果与 PENDING_BINDING 等价：未绑定时只有 bind 能调，绑完才有全部能力。**
+- 绑定后 `activateGroup` 创建 ACTIVE scope（复用 014 的 GROUP_PURPOSES + 协作者 open_id + project_refs），此后该群走正常授权。
 
-新增工具 `brainx_bind_group_project({ job_id })`，purpose `group_binding`，群内可用、不要求项目范围，
-`chat_id` 取自 `principal.chatId`（不能由参数传，防止越权绑定别人的群）。绑定后按 014 的规则补发找人卡。
+`agent_group_scopes.scope_status` 不新增 `PENDING_BINDING` 取值；`bot_chat_intake.status` 的 CARD_SENT 就是「待绑定」语义。
+
+绑定工具 `chat_id` 取自 `principal.chatId`（不能由参数传，防越权绑别人的群）；`job_id` 可选——不传时返回顾问名下可绑职位清单让他选，传了 + `confirm:true` 才真正绑定。
 
 ### 3.4 卡片内容
 
@@ -71,17 +75,27 @@ CREATE TABLE IF NOT EXISTS bot_chat_intake (
 
 ### 3.5 同时要做的事
 
-发现新群时还要：`registerChatContext`、`ensureOpenClawGroupAllowed`（否则群内消息 openclaw 不收）。
-这两步与 013 的补偿 worker 同一套函数，复用即可。
+发现新群时还要：`registerChatContext`、`ensureOpenClawGroupAllowed(chat_id, [])`（senders 空——顾问已在全局 `groupSenderAllowFrom`，无需再加）。
+这两步与 013 的补偿 worker 同一套函数，复用即可。**不建 PENDING_BINDING scope 行**（见 3.3）。
 
-## 4. 外部群（阶段二另一半，需要你操作）
+## 4. 绑定后发拉群指引 + 防滥用提醒（用户新增要求）
 
-- 机器人能在外部群工作，前提是**飞书开放平台开启「对外共享」**：开发者后台 → 应用 → 版本管理与发布 → 对外共享 → 允许机器人被添加到外部群中使用（需企业认证或个人实名认证）。**这一步我无法代做**，需要你登录操作。
-- 未开启时，顾问把外部人（如曾老师）拉进已有机器人的群，机器人会失效/被移除，报 `232033`。
-- 开启后代码侧要做的：`createProjectChat` 时若职位登记了外部成员 open_id 就带上（群自动变外部群）；拿 `232033` 则回退内部群并记 `error_code`。
-- 外部成员 open_id 只能等对方主动与机器人单聊后才能拿到，所以**拉外部人这件事仍由顾问自己在飞书里做**（你已确认）。
+绑定成功后，**私聊**给该顾问发一张指引卡（p2p，不是群内，避免污染客户群）：
 
-## 5. 风险与开关
+- 标题：BrainTex 拉群使用指引
+- 正文：
+  - 你已把群「{chatName}」绑定到职位 {company·role}，现在可以在群里点按钮找人了。
+  - **如何拉群**：在飞书任意群 → 群设置 → 群机器人 → 添加应用 → 选「BrainTex」。机器人进群后会自动弹「绑定职位」卡，选职位即可开始找人。
+  - ⚠️ **不要拉太多群**：每个群机器人都会处理消息、按职位找人，群太多会让消息过载、token 成本飙升。**只给当前在做的职位建群**，做完的群可移除机器人。
+- 按钮：「打开工作台」。
+
+这一步在 `bindGroupToProject` 里完成，与找人卡一起发（找人卡发到群里，指引卡发到顾问私聊）。
+
+## 5. 外部群
+
+**不做了**（用户 2026-09-10 决定）。本规格不涉及外部群、对外共享、外部成员 open_id 登记。
+
+## 6. 风险与开关
 
 | 风险 | 应对 |
 |---|---|
@@ -91,12 +105,13 @@ CREATE TABLE IF NOT EXISTS bot_chat_intake (
 | 轮询频率与权限 | 默认 10 分钟；`im:chat` 权限需在开放平台确认已开通 |
 | 死群干扰 | 复用 `chat_contexts.enabled`，已禁用的群直接 `SKIPPED` |
 
-## 6. 工作量与验收
+## 7. 工作量与验收
 
-工作量约：1 个 migration（0050）+ 3 个模块改动（`group-intake.js` 新、`authorization.js`、`tool-registry.js` 新工具）+ `worker.js` 挂载 + 2 组新测试 + 文档。
+工作量约：1 个 migration（0050）+ feishu-bot 增 listBotChats + 2 个模块（`group-intake.js` 新、`authorization.js` 改）+ 1 个新工具 + openclaw 插件同步（runtime.js + openclaw.plugin.json + 插件副本 cp）+ prompt 指引 + 3 组测试 + 文档。
 
 验收：
 1. 把机器人拉进一个新群 → 10 分钟内群里出现「绑定职位」卡；已存在的老群不会被轰炸。
-2. 在卡上点「绑定我的职位」→ 机器人列出顾问名下职位 → 选定后 scope 变 ACTIVE 并补发找人卡。
-3. 未绑定时在该群调用其它工具（如 `brainx_candidate_shortlist`）仍被拒。
-4. `npm run verify`（full）通过。
+2. 在卡上点「绑定我的职位」→ 机器人列出顾问名下职位 → 选定后 scope 变 ACTIVE、群里出现找人卡、顾问私聊收到拉群指引+防滥用提醒。
+3. 未绑定时在该群调用其它工具（如 `brainx_candidate_shortlist`）仍被拒；绑定后才能用。
+4. 指引卡包含「如何拉群」和「不要拉太多群」两条。
+5. `npm run verify`（full）通过。

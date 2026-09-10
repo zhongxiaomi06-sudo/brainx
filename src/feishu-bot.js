@@ -150,7 +150,37 @@ export async function sendInteractiveCard({
   return { message_id: sendBody.data?.message_id || null };
 }
 
-/** 把互动卡片作为幂等话题回复；用于候选人附件异常等局部状态，不污染群主时间线。 */
+/** 列出机器人当前所在的全部群（specs/015 入群轮询用）。翻页直到 has_more=false。 */
+export async function listBotChats({
+  appId, appSecret, fetchImpl = globalThis.fetch, timeoutMs = 15_000, pageSize = 50,
+} = {}) {
+  ({ appId, appSecret } = feishuCredentials(appId, appSecret));
+  if (!appId || !appSecret) throw new Error('FEISHU_BOT_CREDENTIALS_MISSING');
+  const token = await getTenantAccessToken({ appId, appSecret, fetchImpl, timeoutMs });
+  const chats = [];
+  let pageToken = '';
+  let guard = 0;
+  do {
+    if (++guard > 200) break; // 防御性翻页上限
+    const query = `page_size=${pageSize}&user_id_type=open_id`
+      + (pageToken ? `&page_token=${encodeURIComponent(pageToken)}` : '');
+    const response = await fetchImpl(
+      `${FEISHU_BASE}/open-apis/im/v1/chats?${query}`,
+      { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(timeoutMs) },
+    );
+    const body = await readJson(response, 'FEISHU_CHATS_RESPONSE_INVALID');
+    if (response.ok === false || body.code !== 0) {
+      throw new Error(`FEISHU_CHATS_FAILED: ${safeMessage(body, body.code ?? 'unknown')}`);
+    }
+    for (const item of body.data?.items || []) {
+      chats.push({ chat_id: item.chat_id, name: item.name || '', chat_mode: item.chat_mode || null });
+    }
+    pageToken = body.data?.has_more ? (body.data?.page_token || '') : '';
+  } while (pageToken);
+  return chats;
+}
+
+
 export async function replyInteractiveCard({
   messageId,
   card,

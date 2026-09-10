@@ -1,7 +1,7 @@
 import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
 
 const GATEWAY_URL = 'http://127.0.0.1:3102/internal/v1/agent/tools';
-const PLUGIN_VERSION = '1.3.9';
+const PLUGIN_VERSION = '1.4.0';
 const OPENCLAW_VERSION = '2026.7.1-2';
 const string = (extra = {}) => ({ type: 'string', minLength: 1, maxLength: 512, ...extra });
 const integer = (minimum, maximum) => ({ type: 'integer', minimum, maximum });
@@ -48,6 +48,10 @@ export const BRAINX_OPENCLAW_TOOLS = Object.freeze([
     ] }), note: string({ maxLength: 1000 }), confirm: boolean(),
   }, ['job_id', 'candidate_ref', 'action', 'confirm']),
   description: '经用户确认后把授权候选人加入项目、发送人才卡、管理共享重点名单、创建候选人决策群，并记录后续阶段。' },
+  { name: 'brainx_bind_group_project', purpose: () => 'group_binding', parameters: object({
+    job_id: string(), confirm: boolean(),
+  }, ['confirm']),
+  description: '把当前群绑定到一个职位（specs/015，仅用于机器人被拉进旧群后激活该群）。chat_id 取自身份上下文，不要传。不传 job_id 时返回顾问名下可绑定职位清单让其选择；传 job_id 且 confirm=true 才完成绑定，绑定后群里会出现找人卡。' },
 ]);
 
 function canonicalJson(value) {

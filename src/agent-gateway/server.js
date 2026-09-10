@@ -135,6 +135,7 @@ export function createAgentGatewayServer(config) {
         projectRef: config.registry.projectRef(toolName, body.arguments),
         requireProjectScope: config.registry.requiresGroupProject(toolName),
         requireP2p: config.registry.requiresP2p(toolName),
+        allowIntakeBinding: config.registry.requiresIntakeBinding(toolName),
       });
       authorizeAgentRun(config.db, runId, principal);
       consumeRateLimit(config.db, principal, toolName, {

@@ -4,6 +4,7 @@ import { jobVisibleTo } from '../visibility.js';
 import { startOpenmaiTask } from '../openmai-task.js';
 import { getPushPreferences, updatePushPreferences } from '../push-preferences.js';
 import { buildProjectLaunchCard, workflowDueAt } from '../project-launch.js';
+import { bindGroupToProject, listBindableJobs } from '../group-intake.js';
 
 function fail(code) {
   throw Object.assign(new Error(code), { code });
@@ -96,6 +97,43 @@ function recordJobProgress(db, args, principal) {
 }
 
 /**
+ * specs/015：把旧群绑定到职位。chat_id 取自 principal（不可由参数传，防越权）。
+ * job_id 可选：不传返回顾问名下可绑职位清单让模型呈现给顾问选；传了 + confirm=true 才绑定。
+ * 绑定由 bindGroupToProject 完成激活范围、回填 chat_id、发找人卡与拉群指引卡。
+ */
+async function bindGroupProject(db, args, principal, sendCardFn) {
+  if (!args.job_id) {
+    const jobs = listBindableJobs(db, principal.consultantId);
+    return {
+      data: { bindable_jobs: jobs },
+      facts: jobs.map((job) => ({ job_ref: job.project_id, company: job.company, role: job.role })),
+      inferences: [], recommendations: [],
+      unknowns: jobs.length ? [] : ['你名下暂无可绑定职位，可先把 JD 粘贴到本群，或在工作台接单后再来绑定。'],
+      evidence_refs: ['consultant:bindable_jobs'],
+      next_allowed_actions: ['brainx_bind_group_project', 'brainx_submit_job_jd'],
+    };
+  }
+  requireConfirmation(args);
+  requireVisible(db, principal, args.job_id);
+  try {
+    const result = await bindGroupToProject(db, {
+      consultantId: principal.consultantId, projectId: args.job_id, chatId: principal.chatId,
+      publicBaseUrl: process.env.BRAINX_BASE_URL, sendCardFn,
+    });
+    return {
+      data: { bound: true, project_id: result.project_id, chat_id: result.chat_id, state: result.state },
+      facts: [{ job_ref: result.project_id, bound_chat: result.chat_id, state: result.state }],
+      inferences: [], recommendations: [],
+      unknowns: ['群已绑定，现在可以点找人按钮开始找人；拉群指引已发到你的私聊。'],
+      evidence_refs: [`group_intake:${result.chat_id}`, `job_facts:${result.project_id}`],
+      next_allowed_actions: ['brainx_openmai_search', 'brainx_candidate_shortlist', 'brainx_supermai_scout'],
+    };
+  } catch (error) {
+    fail(error.code || 'BIND_FAILED');
+  }
+}
+
+/**
  * specs/014：群内接单成功后把「接单卡」换成「找人卡」。
  * 不换的话顾问手上那张卡还停在接单按钮，点第二次只会报错（york 22:14 之后的死循环）。
  * 发卡是 best-effort：失败不得回滚已经成功的接单。
@@ -151,5 +189,7 @@ export function createActionToolHandlers({ db, startSearchFn, sendCardFn } = {})
     },
     brainx_start_candidate_search: (args, context) => startSearchForJob(db, args, context.principal, startSearch),
     brainx_record_job_progress: (args, context) => recordJobProgress(db, args, context.principal),
+    // specs/015：旧群绑定职位。chat_id 取自 principal；job_id 可选——不传列职位，传了+confirm 绑定。
+    brainx_bind_group_project: async (args, context) => bindGroupProject(db, args, context.principal, sendCardFn),
   };
 }

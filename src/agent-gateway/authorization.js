@@ -62,6 +62,17 @@ function authorizeGroup(db, payload, binding, projectRef) {
   if (projectRef !== null && !projects.includes(projectRef)) fail();
 }
 
+/**
+ * specs/015：旧群绑定工具的特例放行。群尚未登记 agent_group_scopes，靠 bot_chat_intake
+ * 卡口（机器人主动接管过、状态为 CARD_SENT/SEEN 且未 BOUND）+ 已登记顾问身份放行。
+ * 只此一个工具（brainx_bind_group_project）走这条路；绑定后群有了 ACTIVE scope 即转正常。
+ */
+function authorizeIntakeBinding(db, payload, binding) {
+  const intake = db.prepare(`SELECT status FROM bot_chat_intake WHERE chat_id=?`).get(payload.chat_id);
+  if (!intake || !['SEEN', 'CARD_SENT'].includes(intake.status)) fail();
+  if (payload.purpose !== 'group_binding') fail();
+}
+
 export function authorizePrincipal(db, payload, options = {}) {
   if (!db || !payload || payload.channel !== 'feishu'
       || !validText(payload.account_id) || !validText(payload.requester_sender_id)
@@ -77,6 +88,8 @@ export function authorizePrincipal(db, payload, options = {}) {
   if (options.requireP2p && payload.chat_type !== 'p2p') fail();
   if (payload.chat_type === 'p2p') {
     if (payload.chat_id !== payload.requester_sender_id) fail();
+  } else if (options.allowIntakeBinding) {
+    authorizeIntakeBinding(db, payload, binding);
   } else {
     if (options.requireProjectScope && projectRef === null) fail();
     authorizeGroup(db, payload, binding, projectRef);

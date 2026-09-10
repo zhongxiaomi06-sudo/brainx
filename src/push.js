@@ -42,17 +42,20 @@ export function buildDailyCard({ consultant_name, consultant_id, run, items, ite
   items.slice(0, limit).forEach((r, i) => {
     const j = r.job;
     const hot = j.priority === 'HIGH' ? '🔥 ' : ''; // 重点高优（还做吗结构化，0007 起）
+    const opportunityUrl = buildBrainxDeepLink({ baseUrl, objectType: 'opportunity', objectRef: j.project_id });
+    const launchUrl = consultant_id && quickLink(baseUrl, consultant_id, j.project_id, 'launch', now());
     els.push({ tag: 'markdown', content:
       `**${medals[i]} ${hot}${j.role}**\n${j.company}${j.city ? ' · ' + j.city : ''} · ${REL_LABEL[j.relation] || j.relation}\n`
       + `\`Fit ${dim(r, 'direction')}  Activity ${dim(r, 'activity')}  Evidence ${Math.round(r.evidence_coverage * 100)}\`\n`
       + `综合 **${r.score}** 分 · 置信${{ HIGH: '高', MEDIUM: '中', LOW: '低' }[r.confidence_band]} · ${ACTION_LABEL[r.action]}\n`
       + `**依据**：${(r.reasons || []).slice(0, 2).join('；') || '暂无充分依据'}\n`
       + `**风险**：${(r.risks || []).slice(0, 2).join('；') || '暂无显著风险'}\n`
-      + `**下一步**：${r.action === 'RECOMMEND_ACCEPT' ? '打开职位，确认接单后自动启动找人' : '打开职位，补齐关键信息后再判断'}` });
-    const actions = [
-      btn(r.action === 'RECOMMEND_ACCEPT' ? '接单与启动找人' : '联系人与推进', buildBrainxDeepLink({ baseUrl, objectType: 'opportunity', objectRef: j.project_id }), 'primary'),
-      btn('回放', buildBrainxDeepLink({ baseUrl, objectType: 'replay', objectRef: r.decision_id })),
-    ];
+      + `**下一步**：${launchUrl ? '点击“接单并建群”，群内再选择找人方式' : '打开职位，在工作台确认接单并建群'}` });
+    const actions = launchUrl
+      ? [btn('接单并建群', launchUrl, 'primary'), btn('查看职位', opportunityUrl),
+        btn('回放', buildBrainxDeepLink({ baseUrl, objectType: 'replay', objectRef: r.decision_id }))]
+      : [btn('打开职位', opportunityUrl, 'primary'),
+        btn('回放', buildBrainxDeepLink({ baseUrl, objectType: 'replay', objectRef: r.decision_id }))];
     // 一键反馈（F2）：签名当日有效；未配置密钥时 quickLink 返 null，按钮不渲染
     const ignoreUrl = consultant_id && quickLink(baseUrl, consultant_id, j.project_id, 'ignore', now());
     if (ignoreUrl) actions.push(btn('✕ 忽略', ignoreUrl, 'danger'));

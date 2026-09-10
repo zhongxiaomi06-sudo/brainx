@@ -1,8 +1,8 @@
-/** quickfb.js — 推送卡片一键反馈（2026-08-24 F2）。
+/** quickfb.js — 推送卡片签名一键动作（忽略、接单并建群）。
  *
  * 背景：卡片按钮历来是纯 URL 深链（打开工作台才能操作），顾问不登录 UI 就
- * 没有任何反馈入口 → 反馈表几乎全空、算法无标签可学。一键链接把“忽略”
- * 直接做进卡片按钮，点开即写入统一职位排除事实。
+ * 没有任何反馈入口。一键链接把“忽略”和“接单并建群”直接做进卡片按钮；
+ * 后者复用既有权限、确认、幂等建群和接单链路，不自动发起收费找人任务。
  *
  * 安全：链接带 HMAC-SHA256 签名（consultant|project|action|day），密钥走
  * env BRAINX_FEEDBACK_SECRET；当日/次日双窗口校验（跨时区点击宽容）。
@@ -10,7 +10,7 @@
  */
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
-export const QUICK_ACTIONS = { ignore: '忽略' };
+export const QUICK_ACTIONS = { ignore: '忽略', launch: '接单并建群' };
 
 const secret = () => process.env.BRAINX_FEEDBACK_SECRET || '';
 

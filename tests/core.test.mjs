@@ -169,9 +169,11 @@ test('结果反馈：关联推荐 + 幂等', () => {
 });
 
 test('推送卡片：结构合法 + 三段信号 + 深链；同 run 重复推 SKIPPED', async () => {
+  const savedSecret = process.env.BRAINX_FEEDBACK_SECRET;
+  process.env.BRAINX_FEEDBACK_SECRET = 'test-secret-for-daily-card';
   const run = latestRun(db, CID);
   const c = commitmentSummary(db, CID);
-  const card = buildDailyCard({ consultant_name: 'Felix 黄鑫', run: run.run,
+  const card = buildDailyCard({ consultant_name: 'Felix 黄鑫', consultant_id: CID, run: run.run,
     items: run.items, commitments: c, sync: { complete: 1 }, snapshot_id: run.run.snapshot_id,
     publicBaseUrl: 'https://base.yorkteam.cn' });
   // legacy v1 卡片（schema 2.0 已移除 action 标签，实测 ErrCode 200861）
@@ -180,7 +182,9 @@ test('推送卡片：结构合法 + 三段信号 + 深链；同 run 重复推 SK
   const text = JSON.stringify(card);
   assert.match(text, /Fit /);
   assert.match(text, /BrainTex · 今日职位推荐/);
-  assert.match(text, /联系人与推进|接单与启动找人/);
+  assert.match(text, /接单并建群/);
+  assert.match(text, /action=launch/);
+  assert.match(text, /查看职位/);
   assert.match(text, /https:\/\/base\.yorkteam\.cn\/\?open=opportunity%3A/);
   const r1 = await pushCard(db, { consultant_id: CID, kind: 'DAILY_TOP3', run_id: run.run.run_id,
                             card, target: 'oc_test', send: false });
@@ -190,6 +194,8 @@ test('推送卡片：结构合法 + 三段信号 + 深链；同 run 重复推 SK
   assert.equal(r2.status, 'SKIPPED_DUPLICATE');
   const n = db.prepare(`SELECT COUNT(*) n FROM push_log WHERE consultant_id=? AND kind='DAILY_TOP3'`).get(CID).n;
   assert.equal(n, 1); // 同 run 永远只有一条成功记录
+  if (savedSecret === undefined) delete process.env.BRAINX_FEEDBACK_SECRET;
+  else process.env.BRAINX_FEEDBACK_SECRET = savedSecret;
 });
 
 test('推送：FAILED 行可重发——更新同一 push_id，不新增行', async () => {

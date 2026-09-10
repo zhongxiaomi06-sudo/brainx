@@ -95,6 +95,7 @@
 - [候选人事实与 shortlist 数据契约](2026-09-03-candidate-data-contracts.md)：`candidate_fact_v1`、`candidate_match_bundle_v1`、reloop 真实数据转换、人才/职位双授权、固定飞书文案、MCP PoC 暴露条件及当前未完成项的唯一施工说明。
 - [候选人保留与项目共享上下文复核](frontend-reviews/2026-09-09-candidate-focus-context.md)：飞书候选行“保留”、项目级重点名单、后续群问答读取与安全边界。
 - [重点关注并发送人才卡复核](frontend-reviews/2026-09-10-candidate-focus-share-card.md)：候选行统一重点关注、共享上下文与人才卡同步投放边界。
+- [每日推荐卡一键接单并建群复核](frontend-reviews/2026-09-10-daily-card-quick-launch.md)：推荐卡签名确认、自动加入项目、接单、幂等建群和不自动找人的边界。
 - [候选人 Offer 决策群复核](frontend-reviews/2026-09-09-candidate-decision-group.md)：重点候选人独立建群、原项目群摘要迁移、群准入与幂等边界。
 - [候选卡片与对话建群复核](frontend-reviews/2026-09-09-candidate-card-conversation-group.md)：逐行发送人才卡、移除建群按钮、自然语言建群与自动重点名单边界。
 - [候选人 Offer 决策报告](2026-09-10-candidate-offer-report.md)：决策群首卡、飞书云文档版式、`/report` 更新、安全与真实验收边界。

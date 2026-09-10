@@ -5,6 +5,7 @@ const ID = /^(?:ou|oc)_[A-Za-z0-9_-]+$/;
 const REQUIRED_SOURCING_TOOLS = Object.freeze([
   'brainx_openmai_search',
   'brainx_supermai_scout',
+  'brainx_candidate_report',
 ]);
 
 function requireKeys(source, names, file, errors) {
@@ -29,6 +30,8 @@ export function validateRuntimeConfig({ agent = {}, worker = {}, openclaw = {} }
     'BRAINX_AGENT_FEISHU_APP_KEYS_JSON', 'BRAINX_AGENT_ADMIN_ID', 'BRAINX_AGENT_ADMIN_ALLOWLIST',
     'BRAINX_DB', 'BRAINX_MYSQL_HOST', 'BRAINX_MYSQL_DATABASE', 'BRAINX_MYSQL_USER',
     'BRAINX_MYSQL_PASSWORD', 'BRAINX_MYSQL_SSL',
+    'BRAINX_FEISHU_CREDENTIALS_FROM_OPENCLAW', 'BRAINX_OPENCLAW_CONFIG_PATH',
+    'BRAINX_FEISHU_DOC_BASE_URL',
   ], 'agent.env', errors);
   requireKeys(worker, [
     'BRAINX_DB', 'BRAINX_BASE_URL', 'BRAINX_FEISHU_APP_ID', 'BRAINX_FEISHU_APP_SECRET',
@@ -79,6 +82,23 @@ export function validateRuntimeConfig({ agent = {}, worker = {}, openclaw = {} }
   } catch { if (openclaw.BRAINX_BASE_URL) errors.push('openclaw.env:BRAINX_BASE_URL:INVALID'); }
   if (openclaw.BRAINX_FEISHU_APP_ID && !/^cli_[A-Za-z0-9]+$/.test(openclaw.BRAINX_FEISHU_APP_ID)) {
     errors.push('openclaw.env:BRAINX_FEISHU_APP_ID:INVALID');
+  }
+  if (agent.BRAINX_FEISHU_CREDENTIALS_FROM_OPENCLAW
+      && agent.BRAINX_FEISHU_CREDENTIALS_FROM_OPENCLAW !== '1') {
+    errors.push('agent.env:BRAINX_FEISHU_CREDENTIALS_FROM_OPENCLAW:INVALID');
+  }
+  if (agent.BRAINX_OPENCLAW_CONFIG_PATH && !agent.BRAINX_OPENCLAW_CONFIG_PATH.startsWith('/')) {
+    errors.push('agent.env:BRAINX_OPENCLAW_CONFIG_PATH:INVALID');
+  }
+  try {
+    const docUrl = new URL(agent.BRAINX_FEISHU_DOC_BASE_URL);
+    if (docUrl.protocol !== 'https:' || !docUrl.hostname.endsWith('.feishu.cn')) {
+      errors.push('agent.env:BRAINX_FEISHU_DOC_BASE_URL:INVALID');
+    }
+  } catch {
+    if (agent.BRAINX_FEISHU_DOC_BASE_URL) {
+      errors.push('agent.env:BRAINX_FEISHU_DOC_BASE_URL:INVALID');
+    }
   }
 
   const people = Array.from({ length: 7 }, (_, index) =>

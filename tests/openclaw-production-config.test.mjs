@@ -157,6 +157,9 @@ test('Agent env template uses the exact variable names consumed by runtime', asy
   assert.match(template, /^BRAINX_AGENT_FEISHU_APP_KEYS_JSON=/m);
   assert.match(template, /^BRAINX_AGENT_ADMIN_ID=/m);
   assert.match(template, /^BRAINX_AGENT_ADMIN_ALLOWLIST=/m);
+  assert.match(template, /^BRAINX_FEISHU_CREDENTIALS_FROM_OPENCLAW=1$/m);
+  assert.match(template, /^BRAINX_OPENCLAW_CONFIG_PATH=\//m);
+  assert.match(template, /^BRAINX_FEISHU_DOC_BASE_URL=https:\/\/.+\.feishu\.cn$/m);
   assert.doesNotMatch(template, /^BRAINX_AGENT_AUDIT_SECRET=/m);
   assert.doesNotMatch(template, /^BRAINX_DB_PATH=/m);
   assert.match(template, /^BRAINX_MYSQL_USER=brainx_agent_readonly$/m);

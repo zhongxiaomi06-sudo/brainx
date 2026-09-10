@@ -18,6 +18,7 @@
 - 联系方式和邮箱在迁移摘要、群消息与报告中统一隐藏；不写简历原文。
 - 生成报告是外部写入，按钮或 `/report` 构成本次明确确认，工具仍要求 `confirm=true`。
 - 生产启用前必须为机器人应用发布飞书文档权限，并在 Agent Gateway 环境设置租户 HTTPS 基址 `BRAINX_FEISHU_DOC_BASE_URL`。缺任一条件均显式失败，不回退成伪链接。
+- 生产启动预检同时要求 Agent Gateway 能从受保护的 OpenClaw 配置读取同一机器人凭据、配置绝对路径及合法的 `*.feishu.cn` HTTPS 租户基址，并确认 OpenClaw 工具策略包含 `brainx_candidate_report`。
 
 ## 验收边界
 

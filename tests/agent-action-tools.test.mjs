@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { openDb } from '../src/db.js';
 import { runSync } from '../src/sync.js';
 import { createActionToolHandlers } from '../src/agent-gateway/tools-actions.js';
+import { recommend } from '../src/recommend.js';
 
 function fixture() {
   const db = openDb(':memory:');
@@ -48,43 +49,54 @@ test('职位负责人只返回业务身份和可联系状态，不泄露 chat_id
   assert.equal(JSON.stringify(result).includes('oc_secret'), false);
 });
 
-test('确认接单会建立行动并自动启动找人，重复键保持幂等', () => {
+test('确认接单会建立行动但不自动消耗找人渠道，重复键保持幂等', () => {
   const { db, jobId, handlers, searches, context } = fixture();
   const due = new Date(Date.now() + 2 * 86400000).toISOString();
   const args = { job_id: jobId, goal: '本周确认职位画像并找到首批候选人',
     action_title: '确认硬性条件', due_at: due, idempotency_key: 'agent:accept:1', confirm: true };
   const first = handlers.brainx_accept_job(args, context);
   assert.equal(first.data.state, 'ACCEPTED');
-  assert.equal(searches.length, 1);
-  assert.ok(first.unknowns.some((u) => u.includes('异步启动') && u.includes('正在找人')
-    && u.includes('自动发到项目群') && u.includes('结束本轮')),
-  '项目找人启动后必须立即给出可见状态，并由 worker 自动回群');
-  assert.ok(first.unknowns.every((u) => !u.includes('每隔约 1 分钟')),
-    '项目搜索不得再指引模型原地轮询');
+  assert.equal(searches.length, 0, '接单阶段不得自动选择并消耗 OpenMai');
+  assert.equal(first.data.search, undefined);
   assert.ok(first.next_allowed_actions.includes('brainx_openmai_search'),
-    '接单后应把 openmai_search 列为下一步允许动作');
+    '接单后允许用户在项目群另选 OpenMai');
   const again = handlers.brainx_accept_job(args, context);
   assert.equal(again.data.state, 'ACCEPTED');
   assert.equal(db.prepare(`SELECT COUNT(*) n FROM decision_events WHERE idempotency_key='agent:accept:1'`).get().n, 1);
 });
 
-test('接单触发的找人状态分支注入对应取回指引（already_done/error）', () => {
+test('仅在推荐池可见的职位，点击接单时先自动加入本人项目', () => {
+  const { db, jobId, handlers, context } = fixture();
+  recommend(db, 'felix', { top: 10 });
+  db.prepare('DELETE FROM job_memberships WHERE consultant_id=? AND project_id=?').run('felix', jobId);
+  assert.equal(db.prepare(`SELECT COUNT(*) count FROM recommendations
+    WHERE consultant_id=? AND project_id=?`).get('felix', jobId).count > 0, true);
+  const out = handlers.brainx_accept_job({ job_id: jobId, confirm: true }, context);
+  assert.equal(out.data.state, 'ACCEPTED');
+  assert.equal(db.prepare(`SELECT relation FROM job_memberships
+    WHERE consultant_id=? AND project_id=? AND valid_to IS NULL`).get('felix', jobId).relation, 'MY_JOB');
+});
+
+test('接单建群成功与失败均如实回传，且不回滚已经完成的接单', async () => {
   const due = new Date(Date.now() + 2 * 86400000).toISOString();
   const args = (jobId, key) => ({ job_id: jobId, goal: '找到首批候选人',
     action_title: '启动找人', due_at: due, idempotency_key: key, confirm: true });
 
   const done = fixture();
-  const dOut = createActionToolHandlers({ db: done.db, startSearchFn: () => ({ status: 'already_done' }) })
+  const dOut = await createActionToolHandlers({ db: done.db,
+    acceptLaunchFn: async () => ({ launch: { status: 'READY' } }) })
     .brainx_accept_job(args(done.jobId, 'agent:accept:done'), done.context);
   assert.equal(dOut.data.state, 'ACCEPTED');
-  assert.ok(dOut.unknowns.some((u) => u.includes('brainx_openmai_search') && u.includes('完成结果')),
-    '已有人选结果时应指引取回而非重新触发费用');
+  assert.deepEqual(dOut.data.project_group, { ready: true });
+  assert.match(dOut.unknowns.join(''), /项目群已就绪/);
 
   const failed = fixture();
-  const fOut = createActionToolHandlers({ db: failed.db, startSearchFn: () => ({ status: 'error', message: '凭证失效，请重扫' }) })
+  const fOut = await createActionToolHandlers({ db: failed.db,
+    acceptLaunchFn: async () => { throw Object.assign(new Error('飞书暂不可用'), { code: 'FEISHU_DOWN' }); } })
     .brainx_accept_job(args(failed.jobId, 'agent:accept:failed'), failed.context);
-  assert.ok(fOut.unknowns.some((u) => u.includes('凭证失效，请重扫')),
-    '启动失败要透传具体原因，不能静默装作成功');
+  assert.equal(fOut.data.state, 'ACCEPTED');
+  assert.deepEqual(fOut.data.project_group, { ready: false, code: 'FEISHU_DOWN' });
+  assert.match(fOut.unknowns.join(''), /项目群创建失败.*飞书暂不可用/);
 });
 
 test('接单最小参数只需 job_id + confirm，默认值由服务端生成（specs/011）', () => {

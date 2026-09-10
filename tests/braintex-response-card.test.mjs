@@ -58,9 +58,10 @@ test('职位推荐被整理为逐职位分析和可执行按钮，不再只是�
   const buttonGroups = result.payload.presentation.blocks.filter(({ type }) => type === 'buttons');
   assert.equal(buttonGroups[0].buttons[0].label, '查看职位');
   assert.equal(buttonGroups[0].buttons[0].url, 'https://brainx.example.com/?open=opportunity%3AJTQTOTR');
-  assert.equal(buttonGroups[0].buttons[1].label, '联系人与推进');
-  assert.match(buttonGroups[0].buttons[1].action.command, /职位 JTQTOTR/);
-  assert.match(buttonGroups[0].buttons[1].action.command, /明确确认/);
+  assert.equal(buttonGroups[0].buttons[1].label, '接单并建群');
+  assert.match(buttonGroups[0].buttons[1].action.command, /brainx_accept_job/);
+  assert.match(buttonGroups[0].buttons[1].action.command, /不要再次询问/);
+  assert.equal(buttonGroups[0].buttons[2].label, '联系人与推进');
   assert.equal(buttonGroups.at(-1).buttons[0].label, '调整每日推荐');
 });
 
@@ -77,7 +78,8 @@ test('模型使用公司职位分行格式时仍生成逐职位按钮', () => {
 
   const buttonGroups = result.payload.presentation.blocks.filter(({ type }) => type === 'buttons');
   assert.equal(buttonGroups[0].buttons[0].url, 'https://brainx.example.com/?open=opportunity%3AJTQTOTR');
-  assert.equal(buttonGroups[0].buttons[1].label, '联系人与推进');
+  assert.equal(buttonGroups[0].buttons[1].label, '接单并建群');
+  assert.equal(buttonGroups[0].buttons[2].label, '联系人与推进');
 });
 
 test('TTC 候选结果清除转义乱码并改为行内人才库按钮', () => {

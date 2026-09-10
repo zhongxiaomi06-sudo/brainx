@@ -6,6 +6,7 @@ import { createJobFactsToolHandlers } from './tools-job-facts.js';
 import { createJdSubmitToolHandlers } from './tools-jd-submit.js';
 import { createCandidateReportToolHandlers } from '../candidate-report.js';
 import { sendInteractiveCard } from '../feishu-bot.js';
+import { launchRecruitingWorkflow } from '../project-launch.js';
 
 const BANNED_ARGUMENTS = new Set([
   'tenant_id', 'consultant_id', 'sender', 'open_id', 'scope', 'sql', 'url', 'command', 'file',
@@ -175,7 +176,8 @@ export function createProductionToolRegistry({ db, talentDependencies = {}, acti
   const jobs = createJobToolHandlers({ db });
   // specs/014：默认接上飞书发卡通道，用于接单成功后把接单卡换成找人卡；
   // 未配置飞书凭证时 sendInteractiveCard 抛错，已由 sendAcceptedCard 兜底吞掉。
-  const actions = createActionToolHandlers({ db, sendCardFn: sendInteractiveCard, ...actionDependencies });
+  const actions = createActionToolHandlers({ db, sendCardFn: sendInteractiveCard,
+    acceptLaunchFn: launchRecruitingWorkflow, ...actionDependencies });
   const candidateActions = createCandidateActionToolHandlers({ db, ...talentDependencies });
   const jobFacts = createJobFactsToolHandlers({ db });
   const jdSubmit = createJdSubmitToolHandlers({ db });

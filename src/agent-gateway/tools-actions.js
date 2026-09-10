@@ -4,6 +4,7 @@ import { jobVisibleTo } from '../visibility.js';
 import { startOpenmaiTask } from '../openmai-task.js';
 import { getPushPreferences, updatePushPreferences } from '../push-preferences.js';
 import { buildProjectLaunchCard, workflowDueAt } from '../project-launch.js';
+import { confirmMembership } from '../membership.js';
 
 function fail(code) {
   throw Object.assign(new Error(code), { code });
@@ -25,9 +26,14 @@ function safeAction(action) {
     status: action.status, source: action.source, updated_at: action.updated_at };
 }
 
-function acceptJob(db, args, principal, startSearch) {
+function acceptJob(db, args, principal) {
   requireConfirmation(args);
   requireVisible(db, principal, args.job_id);
+  const membership = confirmMembership(db, principal.consultantId, args.job_id, {
+    relation: 'MY_JOB',
+    idempotency_key: `bot:accept:${principal.consultantId}:${args.job_id}:membership`,
+  });
+  if (!membership.ok) fail(membership.status === 404 ? 'NOT_FOUND_OR_FORBIDDEN' : 'INVALID_ARGUMENT');
   // specs/011：goal/action_title/due_at/idempotency_key 服务端兜底——模型只传 job_id + confirm
   // 即可完成接单（york 案例：6 必填参数超出模型契约遵循能力，导致 09-01 以来 0 次成功调用）。
   const result = acceptCommitment(db, principal.consultantId, args.job_id, {
@@ -37,24 +43,10 @@ function acceptJob(db, args, principal, startSearch) {
     idempotency_key: args.idempotency_key || `bot:accept:${principal.consultantId}:${args.job_id}`,
   });
   if (!result.ok) fail(result.status === 404 ? 'NOT_FOUND_OR_FORBIDDEN' : 'INVALID_ARGUMENT');
-  let search = null;
-  if (!result.already || result.state === 'ACCEPTED') {
-    search = startSearch(db, principal.consultantId, args.job_id);
-  }
-  const unknowns = [];
-  // 项目搜索由投递 worker 自动回群；工具只要求模型给出即时可见状态后结束本轮。
-  if (search?.status === 'triggered') {
-    unknowns.push('候选人搜索已异步启动。立即回复顾问“正在找人，通常需要 3-5 分钟，完成后候选人会自动发到项目群”并结束本轮；'
-      + '除非顾问之后明确询问进度，不要原地轮询。');
-  } else if (search?.status === 'already_done') {
-    unknowns.push('该岗位已有完成结果，用 brainx_openmai_search(job_id) 取回并呈现给顾问。');
-  } else if (search?.status === 'error') {
-    unknowns.push(`候选人搜索暂未启动：${search.message || '请稍后重试'}。`);
-  }
   return {
-    data: { job_ref: args.job_id, state: result.state, active_action: safeAction(result.active_action), search },
+    data: { job_ref: args.job_id, state: result.state, active_action: safeAction(result.active_action) },
     facts: [{ job_ref: args.job_id, state: result.state }],
-    inferences: [], recommendations: [], unknowns,
+    inferences: [], recommendations: [], unknowns: [],
     evidence_refs: [`engagement:${args.job_id}`, `action:${result.active_action?.action_id || 'none'}`],
     next_allowed_actions: ['brainx_openmai_search', 'brainx_run_status', 'brainx_record_job_progress'],
   };
@@ -116,7 +108,8 @@ function sendAcceptedCard(db, jobId, sendCard) {
   }
 }
 
-export function createActionToolHandlers({ db, startSearchFn, sendCardFn } = {}) {
+export function createActionToolHandlers({ db, startSearchFn, sendCardFn, acceptLaunchFn,
+  projectLaunchDependencies = {} } = {}) {
   const startSearch = startSearchFn || ((store, consultantId, jobId, options) => (
     startOpenmaiTask(store, null, consultantId, jobId, options)
   ));
@@ -143,9 +136,24 @@ export function createActionToolHandlers({ db, startSearchFn, sendCardFn } = {})
       next_allowed_actions: ['brainx_job_assessment'] };
     },
     brainx_accept_job: (args, context) => {
-      const out = acceptJob(db, args, context.principal, startSearch);
-      sendAcceptedCard(db, args.job_id, sendCardFn);
-      return out;
+      const out = acceptJob(db, args, context.principal);
+      if (typeof acceptLaunchFn !== 'function') {
+        sendAcceptedCard(db, args.job_id, sendCardFn);
+        return out;
+      }
+      return Promise.resolve(acceptLaunchFn(db, null, context.principal.consultantId, args.job_id, {
+        confirm: true,
+        idempotency_key: `bot-accept-launch:${context.principal.consultantId}:${args.job_id}`,
+      }, projectLaunchDependencies)).then((launched) => {
+        out.data.project_group = { ready: launched?.launch?.status === 'READY' };
+        out.facts.push({ job_ref: args.job_id, project_group_ready: out.data.project_group.ready });
+        out.unknowns.push('项目群已就绪；请返回飞书项目群选择 OpenMai、Reloop 或 SuperMai，再开始找人。');
+        return out;
+      }).catch((error) => {
+        out.data.project_group = { ready: false, code: error.code || 'PROJECT_LAUNCH_FAILED' };
+        out.unknowns.push(`职位已接单，但项目群创建失败：${String(error.message || error).slice(0, 200)}。请稍后重试接单建群。`);
+        return out;
+      });
     },
     brainx_start_candidate_search: (args, context) => startSearchForJob(db, args, context.principal, startSearch),
     brainx_record_job_progress: (args, context) => recordJobProgress(db, args, context.principal),

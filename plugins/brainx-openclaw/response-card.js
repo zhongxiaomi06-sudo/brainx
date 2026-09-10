@@ -88,6 +88,10 @@ function handlingCommand(job) {
   return `请处理职位 ${job.projectId || `${job.company} ${job.role}`}：先读取职位负责人和当前状态，展示联系人；再询问我是只核验、接单并启动找人，还是暂不处理。任何写入都要等我本次明确确认。`;
 }
 
+function acceptLaunchCommand(job) {
+  return `[BRAINTEX_ACCEPT_LAUNCH] 为项目 ${job.projectId} 接单并建群。现在直接调用 brainx_accept_job，参数为 { "job_id": "${job.projectId}", "confirm": true }；这个按钮就是我的本次明确确认，不要再次询问。接单成功后不要自动找人，提示我回到新建的项目群选择找人渠道。`;
+}
+
 function recommendationBlocks(recommendation, workbenchUrl) {
   const blocks = [];
   if (recommendation.intro) blocks.push({ type: 'text', text: recommendation.intro.slice(0, 600) });
@@ -109,6 +113,12 @@ function recommendationBlocks(recommendation, workbenchUrl) {
     const detailUrl = jobDeepLink(workbenchUrl, job.projectId);
     const buttons = [];
     if (detailUrl) buttons.push({ label: '查看职位', url: detailUrl, priority: 50, style: 'primary' });
+    if (job.projectId) buttons.push({
+      label: '接单并建群',
+      action: { type: 'command', command: acceptLaunchCommand(job) },
+      priority: 45,
+      style: detailUrl ? 'default' : 'primary',
+    });
     buttons.push({
       label: detailUrl ? '联系人与推进' : '查看联系人',
       action: { type: 'command', command: handlingCommand(job) },
@@ -179,7 +189,7 @@ export function formatBrainxReplyPayload(event, context = {}) {
     : genericBlocks(payload.text, workbenchUrl);
   blocks.push({
     type: 'context',
-    text: '依据当前已授权数据生成；查看联系人是只读动作，接单、启动找人或改变状态前会再次请你确认。',
+    text: '依据当前已授权数据生成；“接单并建群”按钮代表本次明确确认，找人渠道仍需在项目群内选择。',
   });
   return {
     payload: {

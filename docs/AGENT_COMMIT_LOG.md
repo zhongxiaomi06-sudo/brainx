@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-10｜feat(权限): 白名单扩至九位顾问——开通 hiroshi/miya（代码同步）
+
+- 背景：生产侧已完成 hiroshi（Hiroshi 张浩）、miya（Miya 门姝妍）的四层开通（env 槽位 8/9、openclaw.json 双数组、consultants 行、身份绑定 ACTIVE、TTC 凭证从 Reloop 登录态回收验证通过），readiness 9/9。本次同步本地仓库代码到九槽位。
+- 改动：`src/runtime-preflight.js` 白名单槽位数 7→9；`tests/runtime-preflight.test.mjs` 循环上界同步；`tests/openclaw-production-config.test.mjs` allowedPeople 扩至九人 + env 模板断言改九后缀；`tests/oauth.test.mjs` 花名册计数 8→10；`tests/mcp.test.mjs` 花名册 ID 列表补 hiroshi/miya；`fixtures/roster.json` 追加 hiroshi/miya 条目（保持 CRLF）；`deploy/openclaw/openclaw.env.example` 与 `deploy/openclaw/openclaw.production.json` 补 `_8`/`_9` 占位。
+- 验证：oauth / mcp / runtime-preflight / openclaw-production-config 四个专项 22/22 通过；生产模板 JSON 合法。
+
 ## 2026-09-10｜feat(提醒): 项目轻量提醒——群内静默 72h 自动唤醒卡（specs/009）
 
 - 功能：项目群连续 72h（可配）无任何操作后，worker 主动在项目群发一张轻量提醒卡：询问项目是否继续、本轮推人目标（读 ACCEPTED goal）与时间节点（当前行动 title + due_at），并引导顾问直接在群里回复修正目标/时间、回复「暂停」暂不打扰。上下文全部读 SQLite，零 LLM 成本。

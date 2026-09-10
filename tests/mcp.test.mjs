@@ -65,7 +65,7 @@ test('MCP：initialize → tools/list → tools/call 全链', async () => {
     // 花名册（openDb 自动播种）
     const cons = await c.call('tools/call', { name: 'brainx_consultants', arguments: {} });
     const roster = JSON.parse(cons.result.content[0].text);
-    assert.deepEqual(roster.map((x) => x.consultant_id), ['felix', 'frankie', 'linda', 'mia', 'otto', 'shanon', 'wendy', 'york']);
+    assert.deepEqual(roster.map((x) => x.consultant_id), ['felix', 'frankie', 'hiroshi', 'linda', 'mia', 'miya', 'otto', 'shanon', 'wendy', 'york']);
     assert.equal(roster[0].open_id, undefined); // open_id 不出 MCP
 
     // 空库工作台：EMPTY 同步态

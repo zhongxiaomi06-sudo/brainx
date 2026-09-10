@@ -174,7 +174,9 @@
         "${BRAINX_FEISHU_ALLOWED_OPEN_ID_4}",
         "${BRAINX_FEISHU_ALLOWED_OPEN_ID_5}",
         "${BRAINX_FEISHU_ALLOWED_OPEN_ID_6}",
-        "${BRAINX_FEISHU_ALLOWED_OPEN_ID_7}"
+        "${BRAINX_FEISHU_ALLOWED_OPEN_ID_7}",
+        "${BRAINX_FEISHU_ALLOWED_OPEN_ID_8}",
+        "${BRAINX_FEISHU_ALLOWED_OPEN_ID_9}"
       ],
       "groupPolicy": "allowlist",
       "groupAllowFrom": [
@@ -189,7 +191,9 @@
         "${BRAINX_FEISHU_ALLOWED_OPEN_ID_4}",
         "${BRAINX_FEISHU_ALLOWED_OPEN_ID_5}",
         "${BRAINX_FEISHU_ALLOWED_OPEN_ID_6}",
-        "${BRAINX_FEISHU_ALLOWED_OPEN_ID_7}"
+        "${BRAINX_FEISHU_ALLOWED_OPEN_ID_7}",
+        "${BRAINX_FEISHU_ALLOWED_OPEN_ID_8}",
+        "${BRAINX_FEISHU_ALLOWED_OPEN_ID_9}"
       ],
       "requireMention": true,
       "accounts": {

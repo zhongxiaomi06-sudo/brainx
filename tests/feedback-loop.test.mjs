@@ -189,10 +189,10 @@ test('推荐卡一键接单：自动加入项目、幂等建群和接单，但�
       WHERE consultant_id='felix' AND project_id=?`).get(projectId).state, 'ACCEPTED');
     assert.equal(launchDb.prepare('SELECT status FROM project_launches WHERE project_id=?')
       .get(projectId).status, 'READY');
-    assert.deepEqual(calls.map((call) => call[0]), ['create', 'allow', 'send']);
+    assert.deepEqual(calls.map((call) => call[0]), ['create', 'send', 'allow']);
     const second = await fetch(link);
     assert.equal(second.status, 200);
-    assert.deepEqual(calls.map((call) => call[0]), ['create', 'allow', 'send'], '重复点击不重复建群或发卡');
+    assert.deepEqual(calls.map((call) => call[0]), ['create', 'send', 'allow'], '重复点击不重复建群或发卡');
   } finally {
     await new Promise((resolve) => server.close(resolve));
     launchDb.close();

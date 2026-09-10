@@ -38,3 +38,9 @@
 2. 显式传全参数行为与旧版一致（回归）。
 3. web ACCEPT 成功后响应含 `project_launch`；无飞书凭证环境下该字段为 ok:false 且接单仍 200。
 4. 插件声明与网关注册 required 一致为 ['job_id','confirm']；openclaw-plugin 版本断言更新。
+
+## 4. 修订 A（2026-09-10 晚）：接单 SOP——用户全程不碰参数
+
+- 上游：用户反馈「现在的接单很不稳定，大家不想找参数」——减参解决了模型写参数的问题，但用户仍可能被要求报 job_id。
+- 全局系统提示（plugins/brainx-openclaw/prompt.js）新增三步接单 SOP：①定位唯一职位（本轮推荐/简报映射，brainx_daily_brief 兜底，对不上列选项让用户挑，绝不让用户找参数）②先给两三句岗位理解（公司·职位·城市·HC·匹配分·风险/缺口）再明确求确认，用户认可即视为确认 ③brainx_accept_job 仅 { job_id, confirm: true }，其余服务端生成；无法唯一定位或未确认不得调用。
+- 三个 sourcing skill「接单（一句话完成）」节同步改写为「接单流程（用户不碰参数）」；PLUGIN_VERSION 1.3.7→1.3.8；openclaw-plugin 测试增 SOP 断言。

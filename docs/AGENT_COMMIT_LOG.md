@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-10｜feat(接单): 接单 SOP 进全局提示——用户全程不碰参数（specs/011 修订 A）
+
+- 上游：用户反馈「接单很不稳定，大家不想找参数」。减参后模型仍可能让用户报 job_id；本次把「理解岗位→接单」做成三步 SOP 写进 openclaw 全局系统提示（prompt.js，所有飞书会话生效）。
+- SOP：①定位唯一职位（本轮推荐/简报映射，brainx_daily_brief 兜底，对不上列选项，绝不让用户找参数）→ ②两三句岗位理解（公司·职位·城市·HC·匹配分·风险/缺口）+ 明确求确认，用户认可即视为确认 → ③brainx_accept_job 仅 { job_id, confirm: true }；无法唯一定位或未确认不得调用。
+- 三个 sourcing skill 接单节同步改写；PLUGIN_VERSION 1.3.7→1.3.8；openclaw-plugin 测试增 5 条 SOP 断言。
+- 验证：相关测试 17/17；quick 16/16；prompt.js + skills 生产同步 + openclaw-brainx 重启 + 冒烟。
+
 ## 2026-09-10｜fix(部署): specs/011 生产部署 + brainx.service 补挂飞书凭证
 
 - 部署：full 门禁 24/24（CODEBUDDY_SAFE_DELETE_ENABLED=0）；GitHub push 42941ce；SSH 直推 deploy-tmp + ff-only 合并；插件副本同步 v1.3.7（备份 runtime.js.bak-1.3.6-20260910）；三个 sourcing skill 同步到 /var/lib/brainx/.openclaw/skills/；重启四服务全 active。

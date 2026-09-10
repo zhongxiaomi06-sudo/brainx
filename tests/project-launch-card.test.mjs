@@ -4,12 +4,18 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { openDb } from '../src/db.js';
+import { openDb, now } from '../src/db.js';
+import { runSync } from '../src/sync.js';
+import { confirmMembership } from '../src/membership.js';
 import { buildProjectLaunchCard } from '../src/project-launch.js';
+import { createActionToolHandlers } from '../src/agent-gateway/tools-actions.js';
 import { createToolRegistry } from '../src/agent-gateway/tool-registry.js';
 import { bindIdentity, grantGroupScope } from '../src/agent-gateway/admin.js';
 import { authorizePrincipal, hashFeishuAppKey } from '../src/agent-gateway/authorization.js';
 
+// 卡片里的「打开职位工作台」链接需要 https base URL；仓库 .env 会把它设成 127.0.0.1，
+// 这里强制覆盖，避免 productionBaseUrl 抛 BRAINX_BASE_URL_INVALID 导致补卡静默不发。
+process.env.BRAINX_BASE_URL = 'https://base.yorkteam.cn';
 const APP_HASH = hashFeishuAppKey('cli_brainx_014');
 const NOW = '2026-09-10T12:00:00.000Z';
 const BASE = 'https://base.yorkteam.cn/';
@@ -146,4 +152,53 @@ test('migration 0049：存量群 scope 幂等补齐 job_action', () => {
   assert.equal(db.prepare(
     'SELECT allowed_purposes_json p FROM agent_group_scopes WHERE group_scope_id=?').get('scope-dirty').p,
   'not-json');
+});
+
+function acceptDb(withLaunch = true) {
+  const db = openDb(':memory:');
+  runSync(db, { source: 'test', consultant_id: 'felix', payload: {
+    as_of: now(), jobs: [{ project_id: 'P-ACC', company: '海马云', role: '产品经理', city: '上海',
+      pipeline: '待推荐', hc: 2, active_state: 'OPEN', source_url: null, captured_at: now() }],
+  } });
+  confirmMembership(db, 'felix', 'P-ACC', { relation: 'MY_JOB', idempotency_key: 'acc-membership' });
+  if (withLaunch) {
+    db.prepare(`INSERT INTO project_launches
+      (launch_id,consultant_id,project_id,idempotency_key,status,current_step,chat_id,created_at,updated_at)
+      VALUES ('launch-acc','felix','P-ACC','acc-key','READY','READY','oc_acc',?,?)`).run(now(), now());
+  }
+  return db;
+}
+
+const acceptIn = (db, sendCardFn) => createActionToolHandlers({
+  db, startSearchFn: () => ({ status: 'already_done' }), sendCardFn,
+}).brainx_accept_job({ job_id: 'P-ACC', confirm: true },
+  { principal: { consultantId: 'felix', purpose: 'job_action' } });
+
+test('接单成功后自动补一张找人卡，卡片不再停在接单按钮', async () => {
+  const db = acceptDb();
+  const sent = [];
+  const out = acceptIn(db, async (input) => { sent.push(input); return { message_id: 'om_acc' }; });
+  assert.equal(out.data.state, 'ACCEPTED');
+  await new Promise((resolve) => { setTimeout(resolve, 20); });
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].target, 'oc_acc');
+  assert.equal(sent[0].idempotencyKey, 'accepted-card:P-ACC:oc_acc');
+  assert.deepEqual(sent[0].card.elements.flatMap((e) => e.actions || []).map((a) => a.text.content),
+    ['OpenMai 找人', 'Reloop 找人', 'SuperMai 找人', '按条件找人', '打开职位工作台']);
+  db.close();
+});
+
+test('接单补卡是 best-effort：没有项目群或发卡失败都不影响接单结果', async () => {
+  const noChat = acceptDb(false);
+  let calls = 0;
+  const out = acceptIn(noChat, async () => { calls += 1; return { message_id: 'om_x' }; });
+  assert.equal(out.data.state, 'ACCEPTED');
+  assert.equal(calls, 0);
+  noChat.close();
+
+  const db = acceptDb();
+  const failing = acceptIn(db, async () => { throw new Error('FEISHU_SEND_FAILED'); });
+  assert.equal(failing.data.state, 'ACCEPTED', '发卡失败不得回滚已成功的接单');
+  await new Promise((resolve) => { setTimeout(resolve, 20); });
+  db.close();
 });

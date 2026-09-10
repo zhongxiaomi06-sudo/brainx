@@ -7,6 +7,7 @@
 - 已知限制与应对：openclaw 飞书插件不解析卡片 `form_value`（dist 全仓无该字段，card action 只把按钮 `value.text` 合成文本消息），输入值可能丢失 → 按钮指令自带三级兜底（卡片输入值 → 群里最近一条「找人条件：」→ 职位事实），并明确「不要再询问找人方式」，填了不生效也不会卡死。后续可自建长连接直接消费 `card.action.trigger` 彻底解决。
 - 改动文件：src/agent-gateway/tool-registry.js、src/project-launch.js、migrations/0049_group_scope_job_action.sql（新）、tests/project-launch-card.test.mjs（新，5 组）、tests/project-launch.test.mjs（断言同步）、tests/framework.test.mjs（迁移清单 50→51）、docs/README.md、specs/014（spec/plan/tasks）。
 - 验证：新增专项 5/5 通过；后端全量 `npm test` 651/651 通过；full 门禁 24/24 通过。
+- 追加二（同线）：**接单成功后自动补一张找人卡**。只放开群内接单还不够——顾问手上那张未接单卡点完「接单」后仍停在接单按钮，点第二次就报错，等于又回到死循环。`createActionToolHandlers` 增 `sendCardFn`，接单成功后按 `project_launches.chat_id` 补发 ACCEPTED 版卡片（三找人按钮 + 输入框），uuid `accepted-card:<job>:<chat>` 幂等；发卡失败只静默，不回滚已成功的接单。
 - 追加（同线）：`launch-redeliver` 增 `--force true`——群已 READY 时默认幂等跳过，卡片结构或承接状态变了要重发时必须强制；force 不重建群、只发新卡并换新的发送幂等键（否则飞书按 uuid 去重导致「补发了但没收到」）。改动：src/project-launch.js（READY 早返回加 force 判断 + card uuid 后缀）、bin/brainx-agent-admin.mjs（透传 force）、tests/project-launch.test.mjs（新增 force 用例，12/12）。
 - 阶段二（待飞书后台开启「对外共享」）：默认建外部群 + `232033` 回退；外部联系人 open_id 登记；订阅 `im.chat.members:bot_access` 实现机器人进旧群自动发「绑定职位」卡。
 

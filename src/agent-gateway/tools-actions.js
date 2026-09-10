@@ -3,7 +3,7 @@ import { currentState } from '../engagement.js';
 import { jobVisibleTo } from '../visibility.js';
 import { startOpenmaiTask } from '../openmai-task.js';
 import { getPushPreferences, updatePushPreferences } from '../push-preferences.js';
-import { workflowDueAt } from '../project-launch.js';
+import { buildProjectLaunchCard, workflowDueAt } from '../project-launch.js';
 
 function fail(code) {
   throw Object.assign(new Error(code), { code });
@@ -95,7 +95,30 @@ function recordJobProgress(db, args, principal) {
   };
 }
 
-export function createActionToolHandlers({ db, startSearchFn } = {}) {
+/**
+ * specs/014：群内接单成功后把「接单卡」换成「找人卡」。
+ * 不换的话顾问手上那张卡还停在接单按钮，点第二次只会报错（york 22:14 之后的死循环）。
+ * 发卡是 best-effort：失败不得回滚已经成功的接单。
+ */
+function sendAcceptedCard(db, jobId, sendCard) {
+  if (typeof sendCard !== 'function') return;
+  try {
+    const launch = db.prepare(`SELECT chat_id FROM project_launches
+      WHERE project_id=? AND status='READY' AND chat_id IS NOT NULL`).get(jobId);
+    if (!launch) return;
+    const job = db.prepare('SELECT * FROM job_facts WHERE project_id=?').get(jobId);
+    if (!job) return;
+    Promise.resolve(sendCard({
+      target: launch.chat_id,
+      card: buildProjectLaunchCard(job, { state: 'ACCEPTED' }),
+      idempotencyKey: `accepted-card:${jobId}:${launch.chat_id}`,
+    })).catch(() => {});
+  } catch {
+    // 发卡失败不影响接单结果
+  }
+}
+
+export function createActionToolHandlers({ db, startSearchFn, sendCardFn } = {}) {
   const startSearch = startSearchFn || ((store, consultantId, jobId, options) => (
     startOpenmaiTask(store, null, consultantId, jobId, options)
   ));
@@ -121,7 +144,11 @@ export function createActionToolHandlers({ db, startSearchFn } = {}) {
       unknowns: job.owner_name ? [] : ['职位负责人尚未同步'], evidence_refs: [`job_fact:${args.job_id}`],
       next_allowed_actions: ['brainx_job_assessment'] };
     },
-    brainx_accept_job: (args, context) => acceptJob(db, args, context.principal, startSearch),
+    brainx_accept_job: (args, context) => {
+      const out = acceptJob(db, args, context.principal, startSearch);
+      sendAcceptedCard(db, args.job_id, sendCardFn);
+      return out;
+    },
     brainx_start_candidate_search: (args, context) => startSearchForJob(db, args, context.principal, startSearch),
     brainx_record_job_progress: (args, context) => recordJobProgress(db, args, context.principal),
   };

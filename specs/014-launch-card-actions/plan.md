@@ -9,6 +9,10 @@
 | migrations/0049_group_scope_job_action.sql | 存量 ACTIVE 群 scope 幂等追加 `job_action`（`json_insert` + `NOT EXISTS`，脏 JSON/非 ACTIVE 行跳过） |
 | tests/project-launch-card.test.mjs | 新增：卡片分岔、指令兜底、群内接单放行、存量群拒绝、migration 幂等 |
 | tests/project-launch.test.mjs | 断言更新为「未接单只给接单按钮」 |
+| src/agent-gateway/tools-actions.js | 接单成功后按 `project_launches.chat_id` 补发 ACCEPTED 版卡片（best-effort，不回滚接单） |
+| src/agent-gateway/tool-registry.js | `createProductionToolRegistry` 默认注入 `sendCardFn: sendInteractiveCard` |
+| bin/brainx-agent-admin.mjs | `launch-redeliver --force true`：群已 READY 时强制重发（卡片结构/承接状态变了） |
+| src/project-launch.js | READY 早返回加 force 判断；force 时发卡 uuid 带时间戳 |
 | tests/framework.test.mjs | 迁移清单 50→51、列表补 0049 |
 
 ## 关键设计决策

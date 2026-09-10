@@ -5,7 +5,8 @@
 - 上游事故：20:01 york 工作台接单 JPTLM25（韬润半导体-业务助理）自动拉群，群建成功（oc_baf49b…）但**卡片没发**（message_id 空），launch 卡在 POST_JOB=OPENCLAW_GROUP_ALLOWLIST_FAILED；顾问 46 秒后退单，20:02:59 群内发言机器人无响应（openclaw 日志 `not in groupAllowFrom`）。手工重放准入一次即成功 → 瞬时故障被硬前置放大成整条链路报废。
 - 修法：①`launchProject` 顺序改为「建群 → **发卡** → 准入(best-effort) → 事务置 READY」，准入失败只标 PENDING，不再废掉链路；②新增 `migrations/0048` 存 openclaw_status/attempts/error，存量行默认 PENDING 可被补捡；③新增 `src/openclaw-group-retry.js` 每 10 分钟重放 PENDING，成功后按 15 分钟节流 `systemctl restart openclaw-brainx`（白名单不热生效）；④runner 失败带 exit code + stderr 末行，CLI 超时 12s→20s，落库错误不再只有笼统 code；⑤`bin/brainx-agent-admin.mjs` 增 `launch-redeliver` 补发入口；⑥卡片文案补「机器人正在接入本群，如按钮暂无响应请稍候再点」。
 - 改动文件：src/project-launch.js、src/openclaw-group-status.js（新）、src/openclaw-group-retry.js（新）、src/personal-model-config.js、src/worker.js、bin/brainx-agent-admin.mjs、migrations/0048、tests/project-launch-openclaw.test.mjs（新）、tests/project-launch.test.mjs（契约变更同步）、tests/framework.test.mjs（迁移清单 48→50）、docs/README.md、specs/013。
-- 验证：专项 8/8 + project-launch/openclaw/personal-model/accept-launch 25/25 通过；full 门禁见后续记录。
+- 验证：专项 8/8 + project-launch/openclaw/personal-model/accept-launch 25/25 通过；full 门禁 24/24 通过。
+- 部署与冒烟（21:36-21:38）：代码 SSH 直推 `deploy-tmp` → ff-only 合并（GitHub 本机 SSL 超时，走 47.110.93.137）；migration 0048 已应用；重启 brainx + brainx-worker（补偿任务日志已出现）；`launch-redeliver` 补发 york/JPTLM25 → 卡片 `om_x100b651f64d928b0b1f6588bd3fd900` 已发出、launch READY、openclaw_status=OK、agent_group_scopes 登记 `["JPTLM25"]`、白名单含 oc_baf49b、job_facts.chat_id 已回填；openclaw-brainx 重启后 ws ready（openclaw.json 属主保持 brainx，runAs 生效）。
 
 ## 2026-09-10｜fix(找人): 自建岗（pj_*）绑定 TTC 真身与判据降级——修工作台接单找人 4 连败（specs/012）
 

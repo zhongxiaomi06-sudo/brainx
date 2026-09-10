@@ -5,4 +5,4 @@
 - [x] T3 补偿 worker（重放 + 节流重启 gateway）+ worker.js 挂载
 - [x] T4 admin launch-redeliver 补发入口
 - [x] T5 测试 tests/project-launch-openclaw.test.mjs
-- [ ] T6 npm run verify（full）+ commit + 生产部署 + 补发 york 卡片 + 冒烟
+- [x] T6 npm run verify（full）+ commit + 生产部署 + 补发 york 卡片 + 冒烟

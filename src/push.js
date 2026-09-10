@@ -123,7 +123,7 @@ export function syncAlertKey(at = now()) {
   return `syncalert:${cst.toISOString().slice(0, 10)}`;
 }
 
-export async function pushCard(db, { consultant_id, kind, run_id, card, target, send = false }) {
+export async function pushCard(db, { consultant_id, kind, run_id, card, target, send = false, sendImpl } = {}) {
   const rid = run_id ?? '';
   const dup = db.prepare(`SELECT push_id, status FROM push_log
     WHERE consultant_id=? AND kind=? AND run_id=?`).get(consultant_id, kind, rid);
@@ -134,10 +134,15 @@ export async function pushCard(db, { consultant_id, kind, run_id, card, target, 
   }
   let status = 'SENT', message_id = null, error = null;
   if (send) {
+    const deliver = sendImpl || sendInteractiveCard;
     try {
-      if ((process.env.BRAINX_FEISHU_APP_ID || process.env.LARK_APP_ID)
+      if (sendImpl) {
+        // 调用方显式注入发送实现（测试/幂等投递）：跳过凭证检查直接使用
+        const out = await deliver({ target, card });
+        message_id = out.message_id;
+      } else if ((process.env.BRAINX_FEISHU_APP_ID || process.env.LARK_APP_ID)
           && (process.env.BRAINX_FEISHU_APP_SECRET || process.env.LARK_APP_SECRET)) {
-        const out = await sendInteractiveCard({ target, card });
+        const out = await deliver({ target, card });
         message_id = out.message_id;
       } else {
         // 兼容旧环境：未配置直连凭证时仍可使用 lark-cli profile。

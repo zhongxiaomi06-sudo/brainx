@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-10｜merge(main): 合并九人白名单与项目提醒
+
+- 合并：纳入远端 `main` 的 hiroshi/miya 白名单槽位、项目群静默 72 小时提醒和 ISO 时间兼容修复。
+- 保留：本分支的 Offer 报告、候选人重点关注、同事开工自检和单人开通手册全部保留；冲突仅出现在提交记录，已合并两边历史。
+- 验证：合并完成后重跑完整门禁，结果以本条后续验证记录与门禁报告为准。
+
 ## 2026-09-10｜feat(权限): 增加单人开通计划与 Agent 手册
 
 - 管理入口：增加 `onboarding-plan --account mia --consultant <id>` 只读命令，将单人花名册身份、OpenClaw 白名单、Gateway 绑定和 TTC/OpenMai 权限分层呈现，并指明负责角色和下一步。
@@ -50,7 +56,18 @@
 - 交互：OpenMai 候选行把“发送卡片”和“□ 保留”合并为“重点关注”，一次完成收藏语义、项目共享上下文写入和人才卡投放。
 - 安全：只有职位唯一项目群会同步收到人才卡；卡片不含联系方式、简历原文或 PDF，TTC 链接仍由登录与权限控制，重复点击复用确定性消息 UUID。
 - 验证：候选表格、重点名单、发卡、来源群、自然语言建群和插件提示专项 27/27 通过。
+## 2026-09-10｜feat(权限): 白名单扩至九位顾问——开通 hiroshi/miya（代码同步）
 
+- 背景：生产侧已完成 hiroshi（Hiroshi 张浩）、miya（Miya 门姝妍）的四层开通（env 槽位 8/9、openclaw.json 双数组、consultants 行、身份绑定 ACTIVE、TTC 凭证从 Reloop 登录态回收验证通过），readiness 9/9。本次同步本地仓库代码到九槽位。
+- 改动：`src/runtime-preflight.js` 白名单槽位数 7→9；`tests/runtime-preflight.test.mjs` 循环上界同步；`tests/openclaw-production-config.test.mjs` allowedPeople 扩至九人 + env 模板断言改九后缀；`tests/oauth.test.mjs` 花名册计数 8→10；`tests/mcp.test.mjs` 花名册 ID 列表补 hiroshi/miya；`fixtures/roster.json` 追加 hiroshi/miya 条目（保持 CRLF）；`deploy/openclaw/openclaw.env.example` 与 `deploy/openclaw/openclaw.production.json` 补 `_8`/`_9` 占位。
+- 验证：oauth / mcp / runtime-preflight / openclaw-production-config 四个专项 22/22 通过；生产模板 JSON 合法。
+
+## 2026-09-10｜feat(提醒): 项目轻量提醒——群内静默 72h 自动唤醒卡（specs/009）
+
+- 功能：项目群连续 72h（可配）无任何操作后，worker 主动在项目群发一张轻量提醒卡：询问项目是否继续、本轮推人目标（读 ACCEPTED goal）与时间节点（当前行动 title + due_at），并引导顾问直接在群里回复修正目标/时间、回复「暂停」暂不打扰。上下文全部读 SQLite，零 LLM 成本。
+- 规则：只提醒 ACCEPTED 项目；冷却 7 天（push_log kind=PROJECT_REMINDER 周键幂等）；发送窗口 09:00–21:00 CST，窗口外跳过不补发；`BRAINX_PROJECT_REMINDER_OFF=1` 可关。
+- 改动：新建 `src/project-reminder.js`（筛选/卡片/扫描 worker）与 `tests/project-reminder.test.mjs`（6 例）；`worker.js` 挂载；`push.js#pushCard` 增加可注入 `sendImpl`（默认行为不变）；规格三件套 `specs/009-lightweight-project-reminder/`。
+- 验证：专项 6/6、后端全量 627/627 通过；full 门禁见后续记录。
 ## 2026-09-09｜feat(候选人): 改为发送人才卡并支持对话建群
 
 - 交互：OpenMai 候选表格收紧为每行“发送卡片”和“□ 保留”，删除“为 TA 建决策群”；操作列缩窄并简化表头。“发送卡片”通过受控动作在当前项目群投放独立人才卡，卡内直接提供 TTC 人才库链接。

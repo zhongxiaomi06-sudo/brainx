@@ -1,7 +1,7 @@
 import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
 
 const GATEWAY_URL = 'http://127.0.0.1:3102/internal/v1/agent/tools';
-const PLUGIN_VERSION = '1.3.6';
+const PLUGIN_VERSION = '1.3.7';
 const OPENCLAW_VERSION = '2026.7.1-2';
 const string = (extra = {}) => ({ type: 'string', minLength: 1, maxLength: 512, ...extra });
 const integer = (minimum, maximum) => ({ type: 'integer', minimum, maximum });
@@ -31,7 +31,7 @@ export const BRAINX_OPENCLAW_TOOLS = Object.freeze([
   { name: 'brainx_update_push_preferences', purpose: () => 'preferences', parameters: object({ times: array(string({ pattern: '^(?:[01]\\d|2[0-3]):[0-5]\\d$' })), job_count: integer(1, 10), enabled: boolean(), confirm: boolean() }, ['confirm']), description: '按用户自然语言要求更新每天推荐时间和职位数量；执行前复述设置并取得确认。' },
   { name: 'brainx_job_contacts', purpose: () => 'job_contact', parameters: object({ job_id: string() }, ['job_id']), description: '读取授权职位的负责人姓名和可联系状态。' },
   { name: 'brainx_candidate_contact', purpose: () => 'candidate_contact', parameters: object({ candidate_ref: string(), reason: string({ maxLength: 240 }) }, ['candidate_ref', 'reason']), description: '仅在私聊中按业务理由读取已单独授权候选人的联系方式。' },
-  { name: 'brainx_accept_job', purpose: () => 'job_action', parameters: object({ job_id: string(), goal: string({ maxLength: 240 }), action_title: string({ maxLength: 240 }), due_at: string(), idempotency_key: string(), confirm: boolean() }, ['job_id', 'goal', 'action_title', 'due_at', 'idempotency_key', 'confirm']), description: '经用户确认后正式接单、建立首个行动并自动启动找人。' },
+  { name: 'brainx_accept_job', purpose: () => 'job_action', parameters: object({ job_id: string(), goal: string({ maxLength: 240 }), action_title: string({ maxLength: 240 }), due_at: string(), idempotency_key: string(), confirm: boolean() }, ['job_id', 'confirm']), description: '经用户确认后正式接单、建立首个行动并自动启动找人。只需 job_id 与 confirm=true，目标/首条行动/截止时间/幂等键由服务端自动生成。' },
   { name: 'brainx_start_candidate_search', purpose: () => 'job_action', parameters: object({ job_id: string(), force: boolean(), confirm: boolean() }, ['job_id', 'confirm']), description: '经用户确认后为已接单职位启动或重新启动自动找人。' },
   { name: 'brainx_record_job_progress', purpose: () => 'job_action', parameters: object({
     job_id: string(), action_id: string(), kind: string({ enum: ['PROGRESS', 'STAGE', 'BLOCKED'] }),

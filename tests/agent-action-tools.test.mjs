@@ -84,6 +84,31 @@ test('接单触发的找人状态分支注入对应取回指引（already_done/e
     '启动失败要透传具体原因，不能静默装作成功');
 });
 
+test('接单最小参数只需 job_id + confirm，默认值由服务端生成（specs/011）', () => {
+  const { db, jobId, handlers, context } = fixture();
+  const first = handlers.brainx_accept_job({ job_id: jobId, confirm: true }, context);
+  assert.equal(first.data.state, 'ACCEPTED');
+  const action = db.prepare(`SELECT title, goal, due_at, idempotency_key FROM commitment_actions
+    WHERE consultant_id='felix' AND project_id=?`).get(jobId);
+  assert.equal(action.title, '启动候选人搜索并跟进交付');
+  assert.equal(action.goal, '完成候选人搜索、筛选与匹配评估');
+  assert.ok(action.due_at, '截止时间应自动生成');
+  assert.equal(action.idempotency_key, `bot:accept:felix:${jobId}:action`);
+  // 同参重复调用：确定性幂等键命中 already 分支，不产生第二条行动
+  const again = handlers.brainx_accept_job({ job_id: jobId, confirm: true }, context);
+  assert.equal(again.data.state, 'ACCEPTED');
+  assert.equal(db.prepare(`SELECT COUNT(*) n FROM commitment_actions
+    WHERE consultant_id='felix' AND project_id=?`).get(jobId).n, 1);
+  // 显式传参仍然优先于默认值（旧用法回归）
+  const other = fixture();
+  other.handlers.brainx_accept_job({ job_id: other.jobId, goal: '本周出首批名单',
+    action_title: '确认硬性条件', idempotency_key: 'agent:accept:legacy', confirm: true }, other.context);
+  const legacy = other.db.prepare(`SELECT title, goal FROM commitment_actions
+    WHERE idempotency_key='agent:accept:legacy:action'`).get();
+  assert.equal(legacy.title, '确认硬性条件');
+  assert.equal(legacy.goal, '本周出首批名单');
+});
+
 test('机器人可记录进展并建立下一行动', () => {
   const { jobId, handlers, context } = fixture();
   const due = new Date(Date.now() + 2 * 86400000).toISOString();

@@ -147,7 +147,7 @@ function ensureSingleProjectLaunch(db, projectId) {
   if (count > 1) fail(409, 'PROJECT_CHAT_CONFLICT', '该职位存在多个历史项目群，请管理员核对后再继续');
 }
 
-function workflowDueAt() {
+export function workflowDueAt() {
   const value = new Date(Date.now() + 2 * 86400000);
   value.setHours(18, 0, 0, 0);
   return value.toISOString();

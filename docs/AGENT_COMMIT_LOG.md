@@ -1,5 +1,14 @@
 # Agent Commit 记录
 
+## 2026-09-10｜feat(接单): accept_job 减参 + skill 接单模板 + web 接单自动拉群（specs/011）
+
+- 背景：york 机器人会话诊断——09-01 以来 brainx_accept_job 网关调用 0 次，根因是 6 必填参数超出模型契约遵循能力；「接单直接拉群」代码已存在但生产 project_launches 全空。
+- 减参：accept_job 必填收敛为 job_id+confirm，goal/action_title/due_at/idempotency_key 服务端兜底（workflowDueAt 自 project-launch.js 导出；幂等键 bot:accept:<顾问>:<职位> 确定性幂等）；tool-registry 与插件 runtime 声明同步，PLUGIN_VERSION 1.3.6→1.3.7。
+- 拉群：新建 src/accept-launch.js（postAcceptSideEffects 编排：触发找人 + best-effort launchProject，幂等键 web-accept-launch:<顾问>:<职位>，失败不阻塞接单、错误随 project_launch 透出）；server.js engagement 路由接入，行数 651→649（baseline 同步收紧）。
+- skill：三个 sourcing skill 增「接单（一句话完成）」节，给两参调用示例并要求顾问明确确认。
+- 测试：agent-action-tools 增最小参数/幂等/旧用法回归；新建 tests/accept-launch.test.mjs（HTTP 级：拉群成功 READY+职位挂群、飞书故障不阻塞接单）；openclaw-plugin 版本断言 1.3.7。
+- 验证：相关测试 45/45；verify:quick 16/16 通过；full 门禁与生产部署见后续记录。
+
 ## 2026-09-10｜feat(提醒): 每日分阶段推进提醒——私聊提醒链（specs/010）
 
 - 功能：顾问个人每日私聊提醒链，与 specs/009 群内静默唤醒互补。三阶段判定全部读库零 LLM 成本：A 没接单→「今天想看什么岗位吗」（每人每天 1 张）；B 接单未找人→「现在想找人吗」（openmai_results 无行，接单自动启动失败的兜底，按项目逐条）；C 找人未推进→「要找新的人吗」（有找人结果但无 job_outcomes/决策群，按项目逐条）。

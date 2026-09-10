@@ -73,7 +73,7 @@ export const AGENT_TOOL_ROWS = Object.freeze([
   { name: 'brainx_accept_job', purpose: ['job_action'], p2pOnly: true, parameters: object({
     job_id: string(), goal: string({ maxLength: 240 }), action_title: string({ maxLength: 240 }),
     due_at: string(), idempotency_key: string(), confirm: boolean(),
-  }, ['job_id', 'goal', 'action_title', 'due_at', 'idempotency_key', 'confirm']), projectKey: 'job_id' },
+  }, ['job_id', 'confirm']), projectKey: 'job_id' },
   { name: 'brainx_start_candidate_search', purpose: ['job_action'], p2pOnly: true, parameters: object({
     job_id: string(), force: boolean(), confirm: boolean(),
   }, ['job_id', 'confirm']), projectKey: 'job_id' },

@@ -3,6 +3,7 @@ import { currentState } from '../engagement.js';
 import { jobVisibleTo } from '../visibility.js';
 import { startOpenmaiTask } from '../openmai-task.js';
 import { getPushPreferences, updatePushPreferences } from '../push-preferences.js';
+import { workflowDueAt } from '../project-launch.js';
 
 function fail(code) {
   throw Object.assign(new Error(code), { code });
@@ -27,11 +28,13 @@ function safeAction(action) {
 function acceptJob(db, args, principal, startSearch) {
   requireConfirmation(args);
   requireVisible(db, principal, args.job_id);
+  // specs/011：goal/action_title/due_at/idempotency_key 服务端兜底——模型只传 job_id + confirm
+  // 即可完成接单（york 案例：6 必填参数超出模型契约遵循能力，导致 09-01 以来 0 次成功调用）。
   const result = acceptCommitment(db, principal.consultantId, args.job_id, {
-    goal: args.goal,
-    action_title: args.action_title,
-    due_at: args.due_at,
-    idempotency_key: args.idempotency_key,
+    goal: args.goal || '完成候选人搜索、筛选与匹配评估',
+    action_title: args.action_title || '启动候选人搜索并跟进交付',
+    due_at: args.due_at || workflowDueAt(),
+    idempotency_key: args.idempotency_key || `bot:accept:${principal.consultantId}:${args.job_id}`,
   });
   if (!result.ok) fail(result.status === 404 ? 'NOT_FOUND_OR_FORBIDDEN' : 'INVALID_ARGUMENT');
   let search = null;

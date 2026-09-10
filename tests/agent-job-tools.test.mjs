@@ -272,10 +272,17 @@ test('找人任务 running/触发响应内嵌守候纪律（2026-09-09 事故：
   assert.ok(guard.includes('3-5 分钟'), 'running 响应写明收敛时长');
   assert.ok(guard.includes('最多守候 10 分钟'), 'running 响应写明守候上限');
   assert.ok(guard.includes('不要尝试 read/exec'), 'running 响应禁止尝试被禁工具');
+  // 2026-09-10 晚 wendy 会话教训：1-2 秒连打 40 次后放弃守候 + 虚假承诺设提醒
+  assert.ok(guard.includes('间隔至少 60 秒'), 'running 响应硬性规定查询间隔');
+  assert.ok(guard.includes('已运行'), 'running 响应带已运行时长锚点');
+  assert.ok(typeof running.data.elapsed_seconds === 'number' && running.data.elapsed_seconds >= 0,
+    'running 响应 data 带 elapsed_seconds');
+  assert.ok(guard.includes('不要向顾问承诺'), 'running 响应禁止承诺自动通知/设提醒');
 
   // 触发响应同样带守候纪律
   db.prepare(`DELETE FROM openmai_results WHERE project_id=?`).run(key);
   const triggered = await handlers.brainx_supermai_scout({ criteria }, context('felix', 'candidate_review'));
   assert.ok(triggered.data.note.includes('3-5 分钟'), '触发响应写明收敛时长');
   assert.ok(triggered.data.note.includes('每隔约 1 分钟'), '触发响应写明轮询节奏');
+  assert.ok(!triggered.data.note.includes('自动回到'), '触发响应不再承诺结果自动回群（bot 路径无通知）');
 });

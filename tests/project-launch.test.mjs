@@ -42,15 +42,16 @@ test('项目启动：建群、投放职位、绑定项目并激活群 Agent 范�
   assert.equal(result.launch.chat_id, 'oc_launch');
   assert.equal(calls[0][1].ownerOpenId.startsWith('ou_'), true);
   assert.deepEqual(calls[0][1].memberOpenIds, [calls[0][1].ownerOpenId]);
-  assert.deepEqual(calls[1], ['allow', 'oc_launch', [calls[0][1].ownerOpenId]]);
-  assert.equal(calls[2][1].target, 'oc_launch');
-  const searchButtons = calls[2][1].card.elements
+  // specs/013：卡片先发（calls[1]=send），OpenClaw 准入降为后置（calls[2]=allow）
+  assert.equal(calls[1][1].target, 'oc_launch');
+  assert.deepEqual(calls[2], ['allow', 'oc_launch', [calls[0][1].ownerOpenId]]);
+  const searchButtons = calls[1][1].card.elements
     .flatMap((element) => element.actions || []).filter((button) => button.value?.text);
   assert.deepEqual(searchButtons.map((button) => button.text.content), ['OpenMai 找人', 'SuperMai 找人']);
   assert.match(searchButtons[0].value.text, /brainx_openmai_search/);
   assert.match(searchButtons[1].value.text, /brainx_supermai_scout/);
   assert.ok(searchButtons.every((button) => button.value.text.includes(`项目 ${PID}`)));
-  assert.match(calls[2][1].card.elements[1].content, /找人条件：/);
+  assert.match(calls[1][1].card.elements[1].content, /找人条件：/);
   assert.equal(db.prepare('SELECT chat_id FROM job_facts WHERE project_id=?').get(PID).chat_id, 'oc_launch');
   assert.equal(db.prepare('SELECT enabled FROM chat_contexts WHERE chat_id=?').get('oc_launch').enabled, 1);
   const scope = db.prepare('SELECT * FROM agent_group_scopes WHERE chat_id=?').get('oc_launch');
@@ -169,7 +170,7 @@ test('项目启动：群已创建但投放失败时重试复用原群', async ()
   db.close();
 });
 
-test('项目启动：OpenClaw 群准入失败时不发职位卡，重试复用原群并补齐准入', async () => {
+test('项目启动：OpenClaw 群准入失败也先把职位卡发出去并标 PENDING（specs/013）', async () => {
   const db = readyDb();
   let creates = 0;
   let allows = 0;
@@ -183,16 +184,19 @@ test('项目启动：OpenClaw 群准入失败时不发职位卡，重试复用�
     },
     sendInteractiveCard: async () => { sends++; return { message_id: 'om_allowed' }; },
   };
-  await assert.rejects(launchProject(db, 'felix', PID, { idempotency_key: 'allow-1' }, deps),
-    (error) => error.code === 'OPENCLAW_GROUP_ALLOWLIST_FAILED');
+  const first = await launchProject(db, 'felix', PID, { idempotency_key: 'allow-1' }, deps);
+  assert.equal(first.launch.status, 'READY', '准入失败不再废掉整条链路');
   assert.equal(creates, 1);
-  assert.equal(sends, 0);
-  assert.equal(db.prepare('SELECT chat_id FROM project_launches').get().chat_id, 'oc_allow_retry');
-  const retried = await launchProject(db, 'felix', PID, { idempotency_key: 'allow-2' }, deps);
-  assert.equal(retried.launch.status, 'READY');
-  assert.equal(creates, 1);
-  assert.equal(allows, 2);
-  assert.equal(sends, 1);
+  assert.equal(sends, 1, '卡片先发：顾问拉完群必须立刻看到职位卡');
+  assert.equal(first.openclaw.status, 'PENDING');
+  const row = db.prepare('SELECT * FROM project_launches').get();
+  assert.equal(row.chat_id, 'oc_allow_retry');
+  assert.equal(row.message_id, 'om_allowed');
+  assert.equal(row.openclaw_status, 'PENDING');
+  assert.match(row.openclaw_error, /OPENCLAW_GROUP_ALLOWLIST_FAILED/);
+  const again = await launchProject(db, 'felix', PID, { idempotency_key: 'allow-2' }, deps);
+  assert.equal(again.already, true);
+  assert.equal(sends, 1, '已 READY 的群不得重复发卡；准入由补偿任务重放');
   db.close();
 });
 

@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-10｜fix(拉群): 拉群后必须立刻见卡——OpenClaw 群准入降级为后置补偿（specs/013）
+
+- 上游事故：20:01 york 工作台接单 JPTLM25（韬润半导体-业务助理）自动拉群，群建成功（oc_baf49b…）但**卡片没发**（message_id 空），launch 卡在 POST_JOB=OPENCLAW_GROUP_ALLOWLIST_FAILED；顾问 46 秒后退单，20:02:59 群内发言机器人无响应（openclaw 日志 `not in groupAllowFrom`）。手工重放准入一次即成功 → 瞬时故障被硬前置放大成整条链路报废。
+- 修法：①`launchProject` 顺序改为「建群 → **发卡** → 准入(best-effort) → 事务置 READY」，准入失败只标 PENDING，不再废掉链路；②新增 `migrations/0048` 存 openclaw_status/attempts/error，存量行默认 PENDING 可被补捡；③新增 `src/openclaw-group-retry.js` 每 10 分钟重放 PENDING，成功后按 15 分钟节流 `systemctl restart openclaw-brainx`（白名单不热生效）；④runner 失败带 exit code + stderr 末行，CLI 超时 12s→20s，落库错误不再只有笼统 code；⑤`bin/brainx-agent-admin.mjs` 增 `launch-redeliver` 补发入口；⑥卡片文案补「机器人正在接入本群，如按钮暂无响应请稍候再点」。
+- 改动文件：src/project-launch.js、src/openclaw-group-status.js（新）、src/openclaw-group-retry.js（新）、src/personal-model-config.js、src/worker.js、bin/brainx-agent-admin.mjs、migrations/0048、tests/project-launch-openclaw.test.mjs（新）、tests/project-launch.test.mjs（契约变更同步）、tests/framework.test.mjs（迁移清单 48→50）、docs/README.md、specs/013。
+- 验证：专项 8/8 + project-launch/openclaw/personal-model/accept-launch 25/25 通过；full 门禁见后续记录。
+
 ## 2026-09-10｜fix(找人): 自建岗（pj_*）绑定 TTC 真身与判据降级——修工作台接单找人 4 连败（specs/012）
 
 - 根因：bot 按判据自建岗（job-extract 确认生成 `pj_<uuid>`）的 job_facts 行 source_url 为 NULL，OpenMai job 模式拿 pj_uuid 查 CRM 必然「职位不存在，或当前顾问无权查看该职位」（今日 felix 长角鹿科技×2 岗 4 连败）。

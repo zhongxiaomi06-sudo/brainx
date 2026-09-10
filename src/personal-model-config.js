@@ -52,7 +52,7 @@ export function createOpenClawRunner(options = {}) {
   const bin = options.bin || process.env.BRAINX_OPENCLAW_BIN || '/usr/local/bin/openclaw';
   const stateDir = options.stateDir || process.env.BRAINX_OPENCLAW_STATE_DIR || '/var/lib/brainx/.openclaw';
   const configPath = options.configPath || process.env.BRAINX_OPENCLAW_CONFIG_PATH || `${stateDir}/openclaw.json`;
-  const timeoutMs = options.timeoutMs || 12_000;
+  const timeoutMs = Number(process.env.BRAINX_OPENCLAW_TIMEOUT_MS || options.timeoutMs || 20_000);
   const maxOutputBytes = options.maxOutputBytes || 64 * 1024;
   const spawnImpl = options.spawnImpl || spawn;
   const runAs = options.runAs ?? process.env.BRAINX_OPENCLAW_RUN_AS ?? '';
@@ -92,13 +92,16 @@ export function createOpenClawRunner(options = {}) {
         child.stdout.on('data', collect('stdout'));
         child.stderr.on('data', collect('stderr'));
         child.on('error', (error) => finish(new PersonalModelError('OPENCLAW_UNAVAILABLE', { cause: error })));
+        // specs/013：失败必须带出 exit code 与 stderr 末行，否则业务层只能看到一个笼统 code。
         child.on('close', (code) => {
           if (code === 0) finish(null, { stdout, stderr });
-          else finish(new PersonalModelError('OPENCLAW_COMMAND_FAILED'));
+          else finish(new PersonalModelError('OPENCLAW_COMMAND_FAILED',
+            { cause: { exitCode: code, stderr: stderr.slice(-400) } }));
         });
         timer = setTimeout(() => {
           child.kill('SIGKILL');
-          finish(new PersonalModelError('OPENCLAW_TIMEOUT'));
+          finish(new PersonalModelError('OPENCLAW_TIMEOUT',
+            { cause: { stderr: stderr.slice(-400) } }));
         }, timeoutMs);
         child.stdin.write(stdin);
         child.stdin.end();

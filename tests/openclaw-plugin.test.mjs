@@ -65,6 +65,12 @@ test('BrainTex prompt routes natural-language job recommendations to authorized 
   assert.match(prompt, /发送卡片.*SEND_TALENT_CARD/s);
   assert.match(prompt, /为这个人建群.*CREATE_DECISION_GROUP/s);
   assert.match(prompt, /消息本身就是.*明确确认/);
+  // 2026-09-10 晚 wendy 会话教训：呈现纪律（保留查看链接）+ 轮询间隔硬约束 + 禁止虚假承诺提醒
+  assert.match(prompt, /不得因为表格列多就删掉链接/);
+  assert.match(prompt, /把原始链接补回去/);
+  assert.match(prompt, /间隔至少 60 秒/);
+  assert.match(prompt, /不要承诺.*设提醒/s);
+  assert.match(prompt, /结果不会自动推送/);
   assert.equal(createBraintexPromptContext({ messageProvider: 'telegram' }), undefined);
 });
 

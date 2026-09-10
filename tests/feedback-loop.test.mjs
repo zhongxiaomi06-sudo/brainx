@@ -76,7 +76,9 @@ test('F2: 未配置密钥 → quickLink=null、verify=503（fail-closed）', () 
 
 test('F2: 签名往返；篡改/过期被拒', () => {
   process.env.BRAINX_FEEDBACK_SECRET = 'test-secret-64';
-  const link = quickLink('http://x', 'mia', 'P1', 'ignore', '2026-08-24T01:00:00Z');
+  const link = quickLink('http://x/', 'mia', 'P1', 'ignore', '2026-08-24T01:00:00Z');
+  assert.match(link, /^http:\/\/x\/api\/v1\/feedback\/quick\?/);
+  assert.doesNotMatch(link, /x\/\/api/);
   const p = Object.fromEntries(new URL(link).searchParams);
   assert.equal(verifyQuick(p, '2026-08-24T02:00:00Z').ok, true);
   assert.equal(verifyQuick(p, '2026-08-25T02:00:00Z').ok, true, '次日仍有效');

@@ -22,7 +22,7 @@ export function quickLink(baseUrl, cid, pid, action, dayIso) {
   if (!secret() || !QUICK_ACTIONS[action]) return null;
   const day = dayIso.slice(0, 10);
   const q = new URLSearchParams({ consultant: cid, project: pid, action, day, sig: sig(cid, pid, action, day) });
-  return `${baseUrl}/api/v1/feedback/quick?${q}`;
+  return `${String(baseUrl).replace(/\/+$/, '')}/api/v1/feedback/quick?${q}`;
 }
 
 /** 校验请求参数。today 为服务器当天 ISO（now()）；放行当天与前一天（推送常在夜间点击）。 */

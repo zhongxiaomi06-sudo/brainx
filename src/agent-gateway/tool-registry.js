@@ -70,7 +70,9 @@ export const AGENT_TOOL_ROWS = Object.freeze([
   { name: 'brainx_candidate_contact', purpose: ['candidate_contact'], p2pOnly: true, parameters: object({
     candidate_ref: string(), reason: string({ maxLength: 240 }),
   }, ['candidate_ref', 'reason']) },
-  { name: 'brainx_accept_job', purpose: ['job_action'], p2pOnly: true, parameters: object({
+  // specs/014：项目群内可以直接接单（群必须登记该项目、说话人是项目成员），
+  // 不再 p2pOnly —— 卡片把顾问引向群里接单，却在这里把他挡回去导致死循环（york 案例）。
+  { name: 'brainx_accept_job', purpose: ['job_action'], groupRequiresProject: true, parameters: object({
     job_id: string(), goal: string({ maxLength: 240 }), action_title: string({ maxLength: 240 }),
     due_at: string(), idempotency_key: string(), confirm: boolean(),
   }, ['job_id', 'confirm']), projectKey: 'job_id' },

@@ -45,13 +45,14 @@ test('项目启动：建群、投放职位、绑定项目并激活群 Agent 范�
   // specs/013：卡片先发（calls[1]=send），OpenClaw 准入降为后置（calls[2]=allow）
   assert.equal(calls[1][1].target, 'oc_launch');
   assert.deepEqual(calls[2], ['allow', 'oc_launch', [calls[0][1].ownerOpenId]]);
-  const searchButtons = calls[1][1].card.elements
+  // specs/014：未接单时卡片只给「接单」按钮，不给出会导致 JOB_NOT_ACCEPTED 的找人按钮
+  const buttons = calls[1][1].card.elements
     .flatMap((element) => element.actions || []).filter((button) => button.value?.text);
-  assert.deepEqual(searchButtons.map((button) => button.text.content), ['OpenMai 找人', 'SuperMai 找人']);
-  assert.match(searchButtons[0].value.text, /brainx_openmai_search/);
-  assert.match(searchButtons[1].value.text, /brainx_supermai_scout/);
-  assert.ok(searchButtons.every((button) => button.value.text.includes(`项目 ${PID}`)));
-  assert.match(calls[1][1].card.elements[1].content, /找人条件：/);
+  assert.deepEqual(buttons.map((button) => button.text.content), ['接单']);
+  assert.match(buttons[0].value.text, /brainx_accept_job/);
+  assert.match(buttons[0].value.text, /"confirm": true/);
+  assert.ok(buttons[0].value.text.includes(`项目 ${PID}`));
+  assert.match(calls[1][1].card.elements[1].content, /尚未接单/);
   assert.equal(db.prepare('SELECT chat_id FROM job_facts WHERE project_id=?').get(PID).chat_id, 'oc_launch');
   assert.equal(db.prepare('SELECT enabled FROM chat_contexts WHERE chat_id=?').get('oc_launch').enabled, 1);
   const scope = db.prepare('SELECT * FROM agent_group_scopes WHERE chat_id=?').get('oc_launch');

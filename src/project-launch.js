@@ -10,7 +10,8 @@ import { ttcOpenmaiAuthStatus } from './ttcsdk/auth.js';
 import { ensureOpenClawProjectGroup } from './openclaw-group-access.js';
 import { ensureAccessWithStatus } from './openclaw-group-status.js';
 
-const GROUP_PURPOSES = ['job_review', 'candidate_review', 'candidate_action', 'interview_prep'];
+// specs/014：群内放行接单（job_action）——未接单时找人被拒，卡片又让人在群里接单，必须自洽。
+const GROUP_PURPOSES = ['job_review', 'job_action', 'candidate_review', 'candidate_action', 'interview_prep'];
 
 export class ProjectLaunchError extends Error {
   constructor(status, code, message) {
@@ -79,31 +80,57 @@ export function projectLaunchPreflight(db, consultantId, projectId, {
   return { ready: blockers.length === 0, blockers, job, membership: membership?.relation || null, binding };
 }
 
-export function buildProjectLaunchCard(job, { publicBaseUrl } = {}) {
+export function buildProjectLaunchCard(job, { publicBaseUrl, state = null } = {}) {
   const baseUrl = productionBaseUrl(publicBaseUrl).href;
   const detailUrl = buildBrainxDeepLink({ baseUrl, objectType: 'opportunity', objectRef: job.project_id });
   const facts = [job.city, job.hc == null ? null : `HC ${job.hc}`, job.pipeline].filter(Boolean).join(' · ');
   const projectRef = String(job.project_id || '').trim().slice(0, 64);
+  const accepted = String(state || '').toUpperCase() === 'ACCEPTED';
   const openmaiCommand = `为项目 ${projectRef} 使用 OpenMai 找人。读取本群最近一条由顾问明确发送的“找人条件：”作为补充条件；如果没有，就只根据职位事实自动找人。现在直接调用 brainx_openmai_search，不要再次询问找人方式。`;
+  const reloopCommand = `为项目 ${projectRef} 使用 Reloop 内部人才库找人。读取本群最近一条由顾问明确发送的“找人条件：”作为补充条件；现在直接调用 brainx_candidate_shortlist，把候选人整理成清单，不要再次询问找人方式。`;
   const supermaiCommand = `为项目 ${projectRef} 使用 SuperMai 找人。读取本群最近一条由顾问明确发送的“找人条件：”作为补充条件；如果没有，就根据职位事实自动生成判据。现在直接调用 brainx_supermai_scout，不要再次询问找人方式。`;
+  // 卡片输入框的值经 openclaw 回传时可能丢失（插件不解析 form_value），
+  // 因此指令必须自带兜底：拿不到输入值就退回“找人条件：”或职位事实，不得卡住。
+  const criteriaCommand = `为项目 ${projectRef} 按补充条件找人。优先使用卡片输入框里顾问填写的条件；如果你没有拿到输入值，就读取本群最近一条由顾问明确发送的“找人条件：”；两者都没有则只根据职位事实找人。现在直接调用 brainx_openmai_search，不要再次询问找人方式。`;
+  const acceptCommand = `为项目 ${projectRef} 接单。现在直接调用 brainx_accept_job，参数为 { "job_id": "${projectRef}", "confirm": true }，不要再询问职位编号或二次确认。`;
+  const searchActions = [
+    { tag: 'button', type: 'primary', text: { tag: 'plain_text', content: 'OpenMai 找人' },
+      value: { text: openmaiCommand } },
+    { tag: 'button', type: 'default', text: { tag: 'plain_text', content: 'Reloop 找人' },
+      value: { text: reloopCommand } },
+    { tag: 'button', type: 'default', text: { tag: 'plain_text', content: 'SuperMai 找人' },
+      value: { text: supermaiCommand } },
+  ];
+  const acceptActions = [
+    { tag: 'button', type: 'primary', text: { tag: 'plain_text', content: '接单' },
+      value: { text: acceptCommand } },
+  ];
+  const elements = [
+    { tag: 'markdown', content: `**${job.role}**\n${facts || '职位基础信息待补充'}\n\n`
+      + `项目编号：${job.project_id}\n负责人：${job.consultant_name}` },
+    { tag: 'markdown', content: accepted
+      ? '**机器人已进入项目群，职位已接单**\n点按钮开始找人；也可以先在群里发送“找人条件：……”，再点「按条件找人」。'
+      : '**机器人已进入项目群，该职位尚未接单**\n先点「接单」才能开始找人。机器人正在接入本群，如按钮暂无响应请稍候再点。' },
+    { tag: 'action', actions: accepted ? searchActions : acceptActions },
+  ];
+  if (accepted) {
+    elements.push({
+      tag: 'input', name: 'criteria', required: false,
+      placeholder: { tag: 'plain_text', content: '补充找人条件（可留空，例如：必须有半导体行业背景）' },
+    });
+    elements.push({ tag: 'action', actions: [
+      { tag: 'button', type: 'primary', text: { tag: 'plain_text', content: '按条件找人' },
+        value: { text: criteriaCommand } },
+    ] });
+  }
+  elements.push({ tag: 'action', actions: [{
+    tag: 'button', type: 'default', text: { tag: 'plain_text', content: '打开职位工作台' },
+    multi_url: { url: detailUrl, pc_url: detailUrl, android_url: detailUrl, ios_url: detailUrl },
+  }] });
   return {
     config: { wide_screen_mode: true },
     header: { template: 'blue', title: { tag: 'plain_text', content: `BrainTex 项目 · ${job.company}` } },
-    elements: [
-      { tag: 'markdown', content: `**${job.role}**\n${facts || '职位基础信息待补充'}\n\n`
-        + `项目编号：${job.project_id}\n负责人：${job.consultant_name}` },
-      { tag: 'markdown', content: '**机器人已进入项目群**\n候选人搜索尚未启动。可先在群里发送“找人条件：……”再点击按钮；不补充则根据职位信息自动找人。\n机器人正在接入本群，如按钮暂无响应请稍候再点。' },
-      { tag: 'action', actions: [
-        { tag: 'button', type: 'primary', text: { tag: 'plain_text', content: 'OpenMai 找人' },
-          value: { text: openmaiCommand } },
-        { tag: 'button', type: 'default', text: { tag: 'plain_text', content: 'SuperMai 找人' },
-          value: { text: supermaiCommand } },
-      ] },
-      { tag: 'action', actions: [{
-        tag: 'button', type: 'primary', text: { tag: 'plain_text', content: '打开职位工作台' },
-        multi_url: { url: detailUrl, pc_url: detailUrl, android_url: detailUrl, ios_url: detailUrl },
-      }] },
-    ],
+    elements,
   };
 }
 
@@ -264,7 +291,8 @@ export async function launchProject(db, consultantId, projectId, input = {}, dep
     // 失败只标 PENDING（由 openclaw-group-retry 补偿），不再废掉整条链路。
     const sent = await sendCard({
       target: chatId,
-      card: buildProjectLaunchCard(preflight.job, { publicBaseUrl: dependencies.publicBaseUrl }),
+      card: buildProjectLaunchCard(preflight.job, { publicBaseUrl: dependencies.publicBaseUrl,
+        state: currentState(db, consultantId, projectId).state }),
       idempotencyKey: `${launch.launch_id}-job`,
     });
     const openclaw = await ensureAccessWithStatus(allowOpenClawGroup, chatId, collaboratorOpenIds);

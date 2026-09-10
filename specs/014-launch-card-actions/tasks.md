@@ -18,4 +18,4 @@
 - [ ] T9 默认建外部群 + `232033` 回退内部群
 - [ ] T10 外部联系人 open_id 登记（单聊事件）
 - [ ] T11 订阅 `im.chat.members:bot_access`：机器人进旧群自动发「绑定职位」卡
-- [ ] T12 自建长连接消费 `card.action.trigger` 的 `form_value`，让输入框真正生效
+- [x] T12 原生 `form_submit` + 受管 OpenClaw 兼容桥消费 `form_value.criteria`，让输入框真正生效（待真机验收）

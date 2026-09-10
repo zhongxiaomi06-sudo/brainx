@@ -9,7 +9,7 @@
 ## 首次安装
 
 1. 将已验收 commit 部署到 `/opt/brainx`，安装 Node 依赖并构建前端。
-2. 安装并锁定 OpenClaw `2026.7.1-2`，执行 `sudo deploy/openclaw/install.sh --check`。`--apply` 会锁定安装官方飞书插件 `@openclaw/feishu@2026.7.1` 和仓库内 BrainX 插件。
+2. 安装并锁定 OpenClaw `2026.7.1-2`，执行 `sudo deploy/openclaw/install.sh --check`。`--apply` 会锁定安装官方飞书插件 `@openclaw/feishu@2026.7.1`、对其应用版本锁定的 BrainX 表单兼容桥，并安装仓库内 BrainX 插件。
 3. 执行 `--apply`，然后在 `/etc/brainx/agent.env`、`worker.env` 与 `openclaw.env` 替换全部占位值；文件保持 `0640 root:brainx`。启动服务前必须执行 `sudo deploy/openclaw/install.sh --validate` 并得到 `ok=true`。Gateway 使用人才库只读账号，确定性 worker 使用独立最小 DML 账号。
 4. 运行 SQLite/RDS additive migration；先做 RDS 备份和只读健康检查，再执行写迁移。
 5. 先用 `brainx-agent-admin readiness --account mia` 查看逐人就绪层；单人新增或故障时先运行 `onboarding-plan --account mia --consultant <id>`，再用 `bind-roster` 从已核验花名册建立 Gateway 身份。群、sender、purpose 与项目范围仍需显式登记。Otto 已离职：保留历史审计，但 `consultants.active=0` 且不得存在 ACTIVE 身份绑定。
@@ -55,7 +55,7 @@ Gateway、OpenClaw、业务 worker 和可选 integration worker 都在 systemd `
 - OpenClaw 只负责对话和窄工具编排；`brainx-worker` 写入账本与草稿，职位权威事实必须由顾问通过 `brainx_review_job_fact` 显式确认。
 - 主题和技术账号命名放在数据链路稳定后切换；切换时必须迁移 ACTIVE binding/group scope 并保留真实操作者不变。
 
-功能首页验收详见 [BrainTex 飞书功能首页与新用户指引](2026-09-03-braintex-feishu-home.md)。当前锁定版飞书插件不支持自定义 bot-added 回复，不得通过改安装目录或启动第二条同应用 WS 连接绕过。
+功能首页验收详见 [BrainTex 飞书功能首页与新用户指引](2026-09-03-braintex-feishu-home.md)。当前锁定版飞书插件不支持自定义 bot-added 回复，不得手工修改安装目录或启动第二条同应用 WS 连接绕过。唯一例外是安装器受管的 `form_value` 窄兼容桥：它校验固定版本和源码形状，未知状态失败关闭。
 
 ## 日常运维
 

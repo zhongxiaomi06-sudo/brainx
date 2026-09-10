@@ -18,7 +18,7 @@
 ## 关键设计决策
 
 1. **只放开接单，不放开其他写操作。** `brainx_start_candidate_search`、`brainx_record_job_progress`、`brainx_me_context` 等仍 `p2pOnly`。群内可写面收窄到「接单」这一个动作，其余仍需私聊/工作台。
-2. **卡片不依赖 `form_value`。** openclaw 飞书插件不解析输入框内容（dist 全仓无该字段，card action 只把按钮 `value.text` 合成文本消息）。因此按钮指令自带三级兜底：卡片输入值 → 群里最近一条「找人条件：」→ 职位事实。填了不生效也不会卡在追问。
+2. **卡片表单通过受管兼容桥回传。** `input` 与 `form_submit` 组成飞书原生表单；安装器只给固定 `@openclaw/feishu@2026.7.1` 应用幂等窄补丁，把 `form_value.criteria` 追加为结构化 `[BRAINTEX_CARD_FORM]`。版本或源码形状变化即失败关闭，不启动第二条同应用 WebSocket。
 3. **卡片不承诺结果。** 按钮指令只要求「现在直接调用 X 工具」，不写「自动推送/自动通知」。
 4. **存量群靠 migration 0049 补齐**，不改 `grantGroupScope` 的默认 purposes，避免新建群的默认授权面变化。
 

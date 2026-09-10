@@ -43,6 +43,7 @@ for required_file in \
   "$BRAINX_DEPLOY_ROOT/deploy/openclaw/brainx-agent.env.example" \
   "$BRAINX_DEPLOY_ROOT/deploy/openclaw/brainx-worker.env.example" \
   "$BRAINX_DEPLOY_ROOT/deploy/openclaw/openclaw.env.example" \
+  "$BRAINX_DEPLOY_ROOT/deploy/openclaw/patch-feishu-form.mjs" \
   "$BRAINX_DEPLOY_ROOT/plugins/brainx-openclaw/package.json" \
   "$BRAINX_DEPLOY_ROOT/deploy/systemd/brainx-agent-gateway.service" \
   "$BRAINX_DEPLOY_ROOT/deploy/systemd/brainx-worker.service" \
@@ -126,11 +127,16 @@ install_plugin() {
   run_openclaw plugins install --force "$@" "$plugin_spec"
 }
 
-if ! run_openclaw plugins inspect feishu --json 2>/dev/null | \
-  node -e 'let s="";process.stdin.on("data",c=>s+=c).on("end",()=>{process.exit(JSON.parse(s).plugin?.version===process.argv[1]?0:1)})' \
-  2026.7.1; then
+FEISHU_PLUGIN_ROOT="$BRAINX_OPENCLAW_STATE/extensions/feishu"
+if [[ ! -f "$FEISHU_PLUGIN_ROOT/package.json" ]] || ! \
+  node -e 'const p=require(process.argv[1]);process.exit(p.name==="@openclaw/feishu"&&p.version===process.argv[2]?0:1)' \
+  "$FEISHU_PLUGIN_ROOT/package.json" 2026.7.1; then
   install_plugin @openclaw/feishu@2026.7.1 --pin
 fi
+# OpenClaw 2026.7.1 的飞书通道会丢弃 form_value。只给固定版本、固定源码形状
+# 应用仓库内的窄补丁；版本或文件形状变化即 fail-closed，避免静默破坏第三方插件。
+node "$BRAINX_DEPLOY_ROOT/deploy/openclaw/patch-feishu-form.mjs" --apply "$FEISHU_PLUGIN_ROOT"
+node "$BRAINX_DEPLOY_ROOT/deploy/openclaw/patch-feishu-form.mjs" --check "$FEISHU_PLUGIN_ROOT"
 install_plugin "$BRAINX_PLUGIN_ARCHIVE"
 systemctl daemon-reload
 if systemctl is-active --quiet openclaw-brainx; then

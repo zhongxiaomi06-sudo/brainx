@@ -49,3 +49,10 @@
 - [项目群等待选择找人方式复核](2026-09-09-project-search-method-waiting.md)
 - [OpenClaw 招聘闭环](../2026-09-03-openclaw-recruiting-loop.md)
 - [内部 Storybook 组件库](../storybook-component-library.md)
+
+## 后续状态更新（2026-09-11）
+
+- 正式项目卡已把输入框和「按条件找人」改为同一个飞书原生 `form` / `form_submit`，提交动作显式标记 `brainx_form=true`。
+- 本轮 BrainX OpenClaw 插件目标版本为 `1.3.11`。
+- 锁定版飞书插件仍不会原生透传 `form_value`；仓库安装器现以固定版本、固定源码形状和幂等标记应用窄兼容桥，只提取最多 2000 字的 `criteria`，并以 `[BRAINTEX_CARD_FORM]` JSON 进入同一轮 Agent 上下文。普通消息、普通卡片和其他表单不受影响。
+- 自动测试已覆盖卡片结构、字段边界、兼容桥幂等与上游源码漂移失败关闭；目前仍是“正式代码已接入、未发布、真机待验证”，桌面端/手机端真实输入、空输入和重复提交均不能提前标为通过。

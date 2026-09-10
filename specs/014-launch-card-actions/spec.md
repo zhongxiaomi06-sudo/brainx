@@ -1,6 +1,6 @@
 # 014 — 项目群内直接接单与找人卡片
 
-状态：Implemented（阶段一，2026-09-10）
+状态：Implemented（阶段一 + 表单回传，2026-09-11）
 上游：york 2026-09-10 晚间会话（生产 openclaw 会话 `18cd0bc9…` + 群 `oc_baf49b…` 消息）。
 
 ## 1. 事实
@@ -32,9 +32,9 @@
 - 状态行：显示当前承接状态（未接单 / 已接单）。
 - 未接单：只给「接单」主按钮，文案说明接单后才能找人。
 - 已接单：给三个找人按钮 —— **OpenMai 找人**（外部寻访）、**Reloop 找人**（内部人才库，`brainx_candidate_shortlist`）、**SuperMai 找人**（判据寻访）。
-- 条件输入：卡片放 `input`（name `criteria`）+「按条件找人」按钮；指令要求「输入框有值就用它，否则读群里最近一条『找人条件：』，都没有就按职位事实」。
-  - **已知限制**：openclaw 飞书插件不解析 `form_value`（插件 dist 全仓无该字段，card action 只把按钮 `value.text` 合成 text 消息）。因此输入值可能丢失 → 指令含兜底路径，填了没生效时机器人会退回「找人条件：」/职位事实，不会卡死。
-  - 后续可选：brainx 自建长连接订阅 `card.action.trigger` 直接消费 `form_value`（不依赖 openclaw）。
+- 条件输入：卡片使用原生 `form`，其中 `criteria` 输入框与 `form_submit`「按条件找人」按钮属于同一表单。
+- 锁定版 `@openclaw/feishu@2026.7.1` 原生会丢弃 `action.form_value`。生产安装器在版本与源码形状双重校验后应用 BrainX 窄兼容桥，只对 `value.brainx_form=true` 的卡片提取最多 2000 字的 `criteria`，以 `[BRAINTEX_CARD_FORM]` JSON 交给 Agent；普通卡片和普通消息不变。
+- 插件版本、文件数量或目标源码块变化时安装立即失败关闭；不得在服务器手工修改插件文件，也不为同一应用启动第二条 WebSocket。
 - 保留「打开职位工作台」按钮。
 
 ### 2.3 外部群（阶段二前置，代码先备好）
@@ -66,3 +66,4 @@
 3. 存量项目群 scope 的 purposes 含 `job_action`。
 4. `registry.requiresP2p('brainx_accept_job') === false` 且 `requiresGroupProject(...) === true`。
 5. npm run verify（full）通过。
+6. 表单提交动作携带 `brainx_form=true`；兼容桥能保留 `form_value.criteria`，重复应用幂等，未知插件源码形状失败关闭。

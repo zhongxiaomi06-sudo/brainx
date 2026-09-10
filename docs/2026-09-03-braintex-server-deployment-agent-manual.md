@@ -17,7 +17,7 @@
 3. 不把 `.env`、`/etc/brainx/*.env`、`data/.secret`、数据库备份或日志发到聊天、Git、PR 或工单。
 4. 不更新锁定版本，不另选 OpenClaw/飞书插件版本，不把 stdio MCP PoC 当生产身份方案。
 5. 不开放 Shell、SQL、文件、浏览器、网络搜索、会话派生、消息代发、建群或飞书文档工具。
-6. 不修改已安装第三方插件目录，不为同一飞书应用再启动第二条 WebSocket 长连接。
+6. 不手工修改已安装第三方插件目录，不为同一飞书应用再启动第二条 WebSocket 长连接。仅允许安装器对锁定版飞书插件应用仓库内受测、可重复验证的 `form_value` 窄兼容桥。
 7. 任一步失败就保持失败关闭；不得用演示数据、Mia 的身份或更大权限“先跑起来”。
 8. 只有完整自动门禁、真实飞书正向/负向验收和异机测试均通过，才可以报告“已上线”。
 
@@ -150,6 +150,8 @@ sudo deploy/openclaw/install.sh --apply
 
 - `@openclaw/feishu@2026.7.1`；
 - 仓库内 `@brainx/openclaw-plugin@1.0.0`。
+
+安装官方飞书插件后，安装器会运行 `deploy/openclaw/patch-feishu-form.mjs`：只在包名、版本和两个目标源码块完全匹配时保留 BrainX 表单的 `form_value.criteria`，随后立即以 `--check` 复核。任何漂移都会中止安装；不得跳过检查或手工仿制该补丁。
 
 同时安装 `brainx-today`、`brainx-job`、`brainx-talent`、`brainx-match`、`brainx-engagement-draft`、`brainx-interview-prep`、`brainx-review` 七个生产 Skill。其余仓库 Skill 不进入首批生产，避免把历史工具名或更宽能力一起带入。
 

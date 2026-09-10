@@ -24,9 +24,13 @@ const JOB = {
   city: '上海', hc: 2, pipeline: '待推荐', consultant_name: 'Felix',
 };
 
-const buttonsOf = (card) => card.elements
-  .flatMap((element) => element.actions || [])
-  .filter((button) => button.value?.text);
+const descendants = (elements) => elements.flatMap((element) => [
+  element,
+  ...descendants(element.elements || []),
+  ...(element.actions || []),
+]);
+const buttonsOf = (card) => descendants(card.elements)
+  .filter((element) => element.tag === 'button' && element.value?.text);
 
 test('卡片：已接单给三个找人按钮 + 条件输入框，未接单只给接单按钮', () => {
   const accepted = buildProjectLaunchCard(JOB, { publicBaseUrl: BASE, state: 'ACCEPTED' });
@@ -46,24 +50,31 @@ test('卡片：已接单给三个找人按钮 + 条件输入框，未接单只�
     assert.ok(command.includes(`项目 ${JOB.project_id}`), command);
     assert.match(command, /不要再?询问|不要再次询问/);
   }
-  const input = accepted.elements.find((element) => element.tag === 'input');
+  const form = accepted.elements.find((element) => element.tag === 'form');
+  assert.equal(form.name, 'project_search_form');
+  const input = form.elements.find((element) => element.tag === 'input');
   assert.equal(input.name, 'criteria');
   assert.equal(input.required, false);
+  const submit = form.elements.find((element) => element.tag === 'button');
+  assert.equal(submit.action_type, 'form_submit');
+  assert.equal(submit.name, 'submit_project_search');
+  assert.equal(submit.value.brainx_form, true);
   assert.match(accepted.elements[1].content, /已接单/);
 
   const pending = buildProjectLaunchCard(JOB, { publicBaseUrl: BASE, state: 'NEW' });
   assert.deepEqual(buttonsOf(pending).map((b) => b.text.content), ['接单']);
   assert.match(buttonsOf(pending)[0].value.text, /brainx_accept_job/);
   assert.match(buttonsOf(pending)[0].value.text, /"confirm": true/);
-  assert.equal(pending.elements.some((element) => element.tag === 'input'), false);
+  assert.equal(descendants(pending.elements).some((element) => element.tag === 'input'), false);
   assert.match(pending.elements[1].content, /尚未接单/);
 });
 
-test('卡片：找人指令自带兜底，输入框值丢失也不会卡在追问', () => {
+test('卡片：表单指令只读取结构化 criteria 并传给 OpenMai', () => {
   const card = buildProjectLaunchCard(JOB, { publicBaseUrl: BASE, state: 'ACCEPTED' });
   const criteria = buttonsOf(card).at(-1).value.text;
-  assert.match(criteria, /如果没有?拿到输入值|没有拿到输入值/);
-  assert.match(criteria, /找人条件/);
+  assert.match(criteria, /BRAINTEX_CARD_FORM/);
+  assert.match(criteria, /criteria/);
+  assert.match(criteria, /原样作为 brainx_openmai_search/);
   // 未接单卡片必须出现接入提示，避免顾问以为按钮坏了
   assert.match(buildProjectLaunchCard(JOB, { publicBaseUrl: BASE, state: 'NEW' }).elements[1].content,
     /按钮暂无响应|稍候/);
@@ -188,7 +199,8 @@ test('接单成功后自动补一张找人卡，卡片不再停在接单按钮',
   assert.equal(sent.length, 1);
   assert.equal(sent[0].target, 'oc_acc');
   assert.equal(sent[0].idempotencyKey, 'accepted-card:P-ACC:oc_acc');
-  assert.deepEqual(sent[0].card.elements.flatMap((e) => e.actions || []).map((a) => a.text.content),
+  assert.deepEqual(descendants(sent[0].card.elements)
+    .filter((element) => element.tag === 'button').map((button) => button.text.content),
     ['OpenMai 找人', 'Reloop 找人', 'SuperMai 找人', '按条件找人', '打开职位工作台']);
   db.close();
 });

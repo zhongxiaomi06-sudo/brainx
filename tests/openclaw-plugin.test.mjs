@@ -60,6 +60,9 @@ test('BrainTex prompt routes natural-language job recommendations to authorized 
   assert.match(prompt, /不得凭常识编造职位方向/);
   assert.match(prompt, /OpenMai 找人.*SuperMai 找人/s);
   assert.match(prompt, /找人条件：/);
+  assert.match(prompt, /只是在保存下一次搜索的可选条件/);
+  assert.match(prompt, /不得在这条消息上调用任何找人工具/);
+  assert.match(prompt, /否则会与随后按钮形成重复付费任务/);
   assert.match(prompt, /按钮本身就是.*明确选择/);
   assert.match(prompt, /KEEP_FOR_REVIEW/);
   assert.match(prompt, /focused_candidates/);

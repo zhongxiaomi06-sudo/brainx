@@ -59,6 +59,10 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
   const candidates = success ? extractOpenmaiCandidates(resultText) : [];
   const searchRound = Math.max(1, Number(job.search_round || 1));
   const roundLabel = searchRound > 1 ? `第 ${searchRound} 轮 · ` : '';
+  const readyTitle = searchRound > 1 ? `BrainTex · 第 ${searchRound} 轮候选人已就绪`
+    : 'BrainTex · 首轮候选人已就绪';
+  const partialTitle = searchRound > 1 ? `BrainTex · 第 ${searchRound} 轮候选人不足`
+    : 'BrainTex · 首轮候选人不足';
   const content = success
     ? (candidates.length
       ? `**${job.company} · ${job.role}**\n\n${roundLabel}本轮共找到 ${candidates.length} 位候选人。`
@@ -74,9 +78,9 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
   return {
     config: { wide_screen_mode: true },
     header: { template: complete ? 'green' : success ? 'orange' : 'red', title: { tag: 'plain_text',
-      content: complete ? 'BrainTex · 首轮候选人已就绪'
+      content: complete ? readyTitle
         : needsInput ? 'BrainTex · 请补充岗位画像'
-          : success ? 'BrainTex · 首轮候选人不足' : 'BrainTex · 候选人搜索失败' } },
+          : success ? partialTitle : 'BrainTex · 候选人搜索失败' } },
     elements: [
       { tag: 'markdown', content },
       ...table,

@@ -119,6 +119,7 @@
 - [候选人保留与项目共享上下文复核](2026-09-09-candidate-focus-context.md)
 - [候选人 Offer 决策群复核](2026-09-09-candidate-decision-group.md)
 - [候选卡片与对话建群复核](2026-09-09-candidate-card-conversation-group.md)
+- [重点关注并发送人才卡复核](2026-09-10-candidate-focus-share-card.md)
 - [OpenMai 候选人表格卡复审](2026-09-08-openmai-candidate-table.md)
 - [加入项目动作反馈与真实数据复核](2026-08-30-project-action-feedback.md)
 - [跟进操作区与暂不考虑确认层复核](2026-08-30-engagement-action-layout.md)

@@ -85,7 +85,7 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
         text: { tag: 'plain_text', content: success ? '打开工作台查看与评估' : '打开工作台处理' },
         multi_url: { url: target, pc_url: target, android_url: target, ios_url: target } }] }] : []),
       { tag: 'note', elements: [{ tag: 'plain_text',
-        content: '“发送卡片”会在群里投放带 TTC 链接的人才卡 · “保留”会加入项目共同重点名单' }] },
+        content: '“重点关注”会加入项目共同重点名单，并立即在群里投放带 TTC 链接的人才卡' }] },
     ],
   };
 }
@@ -134,26 +134,16 @@ function keepCandidateAction(job, candidate) {
   const command = `把项目 ${projectRef} 的候选人 ${candidate.candidateRef} 标记为重点关注。`
     + '这个按钮就是我的明确确认：现在调用 brainx_candidate_workflow，'
     + `传入 job_id=${projectRef}、candidate_ref=${candidate.candidateRef}、`
-    + 'action=KEEP_FOR_REVIEW、confirm=true。成功后告诉群里“☑ 已保留”，'
-    + '并说明此人已进入本项目共享上下文；不要发送简历。';
-  return { tag: 'button', type: 'default', text: { tag: 'plain_text', content: '□ 保留' },
-    value: { text: command } };
-}
-
-function candidateCardAction(job, candidate) {
-  const projectRef = String(job.project_id || '').trim().slice(0, 64);
-  const command = `把项目 ${projectRef} 的候选人 ${candidate.candidateRef} 作为一张人才卡片发到当前群。`
-    + '这个按钮就是我的明确确认：现在调用 brainx_candidate_workflow，'
-    + `传入 job_id=${projectRef}、candidate_ref=${candidate.candidateRef}、`
-    + 'action=SEND_TALENT_CARD、confirm=true。人才卡必须包含 TTC 人才库链接；不要发送简历附件。';
-  return { tag: 'button', type: 'primary', text: { tag: 'plain_text', content: '发送卡片' },
+    + 'action=KEEP_FOR_REVIEW、confirm=true。成功后告诉群里“☑ 已重点关注”，'
+    + '并说明此人已进入本项目共享上下文，同时已发送人才卡；不要发送简历。';
+  return { tag: 'button', type: 'primary', text: { tag: 'plain_text', content: '重点关注' },
     value: { text: command } };
 }
 
 function candidateTableRow({ candidate, index, job, baseUrl }) {
   void baseUrl;
   const detailUrl = ttcTalentUrl(candidate);
-  const action = detailUrl ? [candidateCardAction(job, candidate)]
+  const action = detailUrl ? []
     : [{ tag: 'div', text: { tag: 'plain_text', content: '链接待核实' } }];
   if (candidate.candidateRefValid !== false) {
     action.push(keepCandidateAction(job, candidate));

@@ -151,7 +151,18 @@ export function createCandidateActionToolHandlers({
           jobId: args.job_id, candidateRef: args.candidate_ref,
           sourceTaskId: discovered?.sourceTaskId || null, candidateSnapshot: discovered,
         }, args.action === 'KEEP_FOR_REVIEW');
-        return { data: row, facts: [{ candidate_ref: args.candidate_ref,
+        let talentCardStatus = 'not_requested';
+        if (args.action === 'KEEP_FOR_REVIEW' && isSourceProjectGroup(db, context.principal, args.job_id)) {
+          const candidate = discovered || focusedCandidate || { candidateRef: args.candidate_ref };
+          const key = createHash('sha256')
+            .update(`${args.job_id}\0${args.candidate_ref}\0${context.principal.chatId}`)
+            .digest('hex').slice(0, 32);
+          await sendInteractiveCardFn({ target: context.principal.chatId,
+            card: candidateShareCard(args.job_id, args.candidate_ref, candidate),
+            idempotencyKey: `candidate-card-${key}` });
+          talentCardStatus = 'sent';
+        }
+        return { data: { ...row, talent_card_status: talentCardStatus }, facts: [{ candidate_ref: args.candidate_ref,
           project_focus: row.focus_status === 'FOCUSED' }], inferences: [], recommendations: [], unknowns: [],
         evidence_refs: [`candidate_focus:${args.job_id}:${args.candidate_ref}`],
         next_allowed_actions: row.focus_status === 'FOCUSED'

@@ -46,9 +46,10 @@ export function reminderWeekKey(at = now()) {
   return monday.toISOString().slice(0, 10);
 }
 
-/** 是否处于发送窗口（09:00–21:00 CST）。纯函数。 */
+/** 是否处于发送窗口（09:00–21:00 CST）。纯函数；接受 Date 或 ISO 字符串。 */
 export function inSendWindow(at = new Date()) {
-  const hour = new Date(at.getTime() + 8 * 3600 * 1000).getUTCHours();
+  const ms = at instanceof Date ? at.getTime() : Date.parse(at);
+  const hour = new Date(ms + 8 * 3600 * 1000).getUTCHours();
   return hour >= 9 && hour < 21;
 }
 

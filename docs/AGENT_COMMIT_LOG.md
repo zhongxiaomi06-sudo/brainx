@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-10｜feat(提醒): 项目轻量提醒——群内静默 72h 自动唤醒卡（specs/009）
+
+- 功能：项目群连续 72h（可配）无任何操作后，worker 主动在项目群发一张轻量提醒卡：询问项目是否继续、本轮推人目标（读 ACCEPTED goal）与时间节点（当前行动 title + due_at），并引导顾问直接在群里回复修正目标/时间、回复「暂停」暂不打扰。上下文全部读 SQLite，零 LLM 成本。
+- 规则：只提醒 ACCEPTED 项目；冷却 7 天（push_log kind=PROJECT_REMINDER 周键幂等）；发送窗口 09:00–21:00 CST，窗口外跳过不补发；`BRAINX_PROJECT_REMINDER_OFF=1` 可关。
+- 改动：新建 `src/project-reminder.js`（筛选/卡片/扫描 worker）与 `tests/project-reminder.test.mjs`（6 例）；`worker.js` 挂载；`push.js#pushCard` 增加可注入 `sendImpl`（默认行为不变）；规格三件套 `specs/009-lightweight-project-reminder/`。
+- 验证：专项 6/6、后端全量 627/627 通过；full 门禁见后续记录。
+
 ## 2026-09-09｜feat(候选人): 改为发送人才卡并支持对话建群
 
 - 交互：OpenMai 候选表格收紧为每行“发送卡片”和“□ 保留”，删除“为 TA 建决策群”；操作列缩窄并简化表头。“发送卡片”通过受控动作在当前项目群投放独立人才卡，卡内直接提供 TTC 人才库链接。

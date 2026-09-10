@@ -167,6 +167,9 @@ test('项目已有共享找人任务时另一位顾问选择渠道不会重复�
   assert.equal(out.data.status, 'running');
   assert.equal(out.data.shared, true);
   assert.equal(out.data.task_id, 'task-owner');
+  assert.match(out.unknowns.join(''), /正在找人/);
+  assert.match(out.unknowns.join(''), /自动发到本群/);
+  assert.doesNotMatch(out.unknowns.join(''), /每隔约 1 分钟/);
   assert.equal(db.prepare(`SELECT COUNT(*) count FROM openmai_results
     WHERE consultant_id='mia' AND project_id=?`).get(projectId).count, 0);
 });

@@ -49,6 +49,9 @@ test('项目启动：建群、投放职位、绑定项目并激活群 Agent 范�
   assert.deepEqual(searchButtons.map((button) => button.text.content), ['OpenMai 找人', 'SuperMai 找人']);
   assert.match(searchButtons[0].value.text, /brainx_openmai_search/);
   assert.match(searchButtons[1].value.text, /brainx_supermai_scout/);
+  assert.ok(searchButtons.every((button) => button.value.text.startsWith('[BRAINTEX_SEARCH_START]')));
+  assert.ok(searchButtons.every((button) => button.value.text.includes('正在找人')));
+  assert.ok(searchButtons.every((button) => button.value.text.includes('结束本轮')));
   assert.ok(searchButtons.every((button) => button.value.text.includes(`项目 ${PID}`)));
   assert.match(calls[2][1].card.elements[1].content, /找人条件：/);
   assert.equal(db.prepare('SELECT chat_id FROM job_facts WHERE project_id=?').get(PID).chat_id, 'oc_launch');

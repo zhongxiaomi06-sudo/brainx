@@ -244,8 +244,8 @@ function sharedProjectSearch(projectId, active, entry) {
       task_id: active.search_task_id, shared: true },
     facts: [], inferences: [], recommendations: [],
     unknowns: active.search_status === 'RUNNING'
-      ? ['该项目已有找人任务进行中，结果不会自动推送——请每隔约 1 分钟用 brainx_openmai_search(job_id) 查询，'
-         + '完成后把候选人完整呈现给顾问（保留「查看」链接）']
+      ? ['该项目已有找人任务进行中。立即回复顾问“正在找人，通常需要 3-5 分钟，完成后候选人会自动发到本群”并结束本轮；'
+         + '除非顾问之后明确询问进度，不要原地轮询']
       : [],
     evidence_refs: [`project_search:${active.search_task_id || projectId}`],
   };
@@ -265,13 +265,17 @@ function missingExclusions(projectId, entry) {
  * 后放弃守候并虚假承诺「设提醒」，导致结果躺库 31 分钟无人交付。修复：
  * ①响应带已运行时长（给模型耐心锚点）②硬性规定查询间隔 ≥60 秒
  * ③禁止承诺任何自动通知/提醒（bot 路径没有通知工具，bus=null）。 */
-function pollDiscipline(startedAt, entry) {
+function pollDiscipline(startedAt, entry, autoDeliver = false) {
   const elapsed = startedAt ? Math.max(0, Math.round((Date.now() - Date.parse(startedAt)) / 1000)) : null;
   const mins = elapsed == null ? null : Math.floor(elapsed / 60);
   return {
     elapsed_seconds: elapsed,
     elapsed_minutes: mins,
-    discipline: `找人任务进行中（${entry}），${mins != null ? `已运行 ${mins} 分钟、` : ''}正常 3-5 分钟收敛——`
+    discipline: autoDeliver
+      ? `项目找人任务进行中（${entry}），${mins != null ? `已运行 ${mins} 分钟、` : ''}正常 3-5 分钟收敛。`
+        + '立即回复顾问“正在找人，完成后候选人会自动发到本群”并结束本轮；除非顾问之后明确询问进度，'
+        + '不要原地连续轮询，也不要切换其他找人方式。'
+      : `找人任务进行中（${entry}），${mins != null ? `已运行 ${mins} 分钟、` : ''}正常 3-5 分钟收敛——`
       + '两次查询之间必须间隔至少 60 秒，禁止连续快速调用本工具；最多守候 10 分钟，'
       + '若本任务由 continue_search=true 启动，轮询时必须改传 continue_search=false 或省略，绝不能再次传 true；'
       + '期间不要切换其他找人方式、不要尝试 read/exec 等文件工具（本环境不可用）。'
@@ -293,7 +297,7 @@ function openmaiSearch(db, args, principal) {
   const continuing = args.continue_search === true;
   const cur = getOpenmaiResult(db, principal.consultantId, args.job_id) || {};
   if (cur.status === 'running' || (cur.status === 'done' && !continuing)) {
-    const disc = cur.status === 'running' ? pollDiscipline(cur.started_at, 'openmai') : null;
+    const disc = cur.status === 'running' ? pollDiscipline(cur.started_at, 'openmai', true) : null;
     return {
       data: { job_ref: args.job_id, status: cur.status, result_text: cur.result_text || null,
               started_at: cur.started_at || null, finished_at: cur.finished_at || null,
@@ -323,10 +327,9 @@ function openmaiSearch(db, args, principal) {
             status: out.status || 'triggered', task_id: out.task_id || null,
             message: out.message || null,
             note: out.status === 'error'
-              ? '找人任务未启动，请处理提示后重试；正常启动后 3-5 分钟收敛，请每隔约 1 分钟读取进度'
-              : '找人任务已触发，正常 3-5 分钟收敛；结果不会自动推送——请每隔约 1 分钟（间隔至少 60 秒）'
-                + '调用本工具读取（最多守候 10 分钟）；如果本次 continue_search=true，轮询必须改为 false 或省略，'
-                + '完成后把 result_text 完整呈现给顾问（保留「查看」链接）' },
+              ? '找人任务未启动，请处理提示后重试'
+              : '找人任务已触发。立即回复顾问“正在找人，通常需要 3-5 分钟，完成后候选人会自动发到本群”并结束本轮；'
+                + '除非顾问之后明确询问进度，不要原地轮询' },
     facts: [], inferences: [], recommendations: [], unknowns: [],
     evidence_refs: [`openmai:${out.task_id || args.job_id}`],
   };
@@ -353,7 +356,7 @@ function supermaiScout(db, args, principal) {
   const cur = getOpenmaiResult(db, principal.consultantId, project_id) || {};
   if (cur.status === 'running' || (cur.status === 'done' && !continuing)) {
     const candidates = cur.status === 'done' ? extractOpenmaiCandidates(cur.result_text) : [];
-    const disc = cur.status === 'running' ? pollDiscipline(cur.started_at, 'supermai') : null;
+    const disc = cur.status === 'running' ? pollDiscipline(cur.started_at, 'supermai', Boolean(jobId)) : null;
     // NO_REPLY/空结果：OpenMai 对极窄判据可能零命中（返回占位符）——语义化为「未搜到」而非当成成功交付。
     const noReply = cur.status === 'done' && !candidates.length
       && ['NO_REPLY', ''].includes(String(cur.result_text || '').trim());
@@ -390,9 +393,8 @@ function supermaiScout(db, args, principal) {
               ? '同判据结果已存在，请再次调用本工具读取'
               : out.status === 'error'
                 ? '找人任务未启动，请处理提示后重试；正常启动后 3-5 分钟收敛，请每隔约 1 分钟读取进度'
-              : jobId ? '找人任务已触发，正常 3-5 分钟收敛；结果不会自动推送——请每隔约 1 分钟（间隔至少 60 秒）'
-                + '调用本工具读取（最多守候 10 分钟）；如果本次 continue_search=true，轮询必须改为 false 或省略，'
-                + '完成后把 result_text 完整呈现给顾问（保留「查看」链接）'
+              : jobId ? '找人任务已触发。立即回复顾问“正在找人，通常需要 3-5 分钟，完成后候选人会自动发到本群”并结束本轮；'
+                + '除非顾问之后明确询问进度，不要原地轮询'
                 : '找人任务已触发，正常 3-5 分钟收敛；请每隔约 1 分钟（间隔至少 60 秒）再调本工具读取'
                 + '（最多守候 10 分钟），完成后完整呈现 result_text（保留「查看」链接）' },
     facts: [], inferences: [], recommendations: [], unknowns: [],

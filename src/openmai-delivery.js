@@ -96,7 +96,7 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
 
 function continueSearchActions(job) {
   const projectRef = String(job.project_id || '').trim().slice(0, 64);
-  const command = (entry, tool) => `为项目 ${projectRef} 使用 ${entry} 继续找人。读取本群最近一条由顾问明确发送的“找人条件：”作为可选补充条件；现在第一次调用 ${tool}，传入 job_id=${projectRef} 和 continue_search=true。任务 running 后的轮询必须把 continue_search 改为 false 或省略，同一次按钮任务绝不能再次传 true。排除名单必须由 BrainX 根据历史 TTC 编号生成，不要自行编造，也不要再次询问找人方式。`;
+  const command = (entry, tool) => `[BRAINTEX_SEARCH_START] 为项目 ${projectRef} 使用 ${entry} 继续找人。读取本群最近一条由顾问明确发送的“找人条件：”作为可选补充条件；现在第一次调用 ${tool}，传入 job_id=${projectRef} 和 continue_search=true。任务返回 running/triggered 后立即回复“正在继续找人，完成后候选人会自动发到本群”并结束本轮，不要原地轮询。后续若顾问主动询问进度，查询时必须把 continue_search 改为 false 或省略，同一次按钮任务绝不能再次传 true。排除名单必须由 BrainX 根据历史 TTC 编号生成，不要自行编造，也不要再次询问找人方式。`;
   return { tag: 'action', actions: [
     { tag: 'button', type: 'primary', text: { tag: 'plain_text', content: 'OpenMai 继续找人' },
       value: { text: command('OpenMai', 'brainx_openmai_search') } },

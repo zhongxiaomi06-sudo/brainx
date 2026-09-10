@@ -1,7 +1,7 @@
 import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
 
 const GATEWAY_URL = 'http://127.0.0.1:3102/internal/v1/agent/tools';
-const PLUGIN_VERSION = '1.3.6';
+const PLUGIN_VERSION = '1.3.7';
 const OPENCLAW_VERSION = '2026.7.1-2';
 const string = (extra = {}) => ({ type: 'string', minLength: 1, maxLength: 512, ...extra });
 const integer = (minimum, maximum) => ({ type: 'integer', minimum, maximum });
@@ -48,6 +48,9 @@ export const BRAINX_OPENCLAW_TOOLS = Object.freeze([
     ] }), note: string({ maxLength: 1000 }), confirm: boolean(),
   }, ['job_id', 'candidate_ref', 'action', 'confirm']),
   description: '经用户确认后把授权候选人加入项目、发送人才卡、管理共享重点名单、创建候选人决策群，并记录后续阶段。' },
+  { name: 'brainx_candidate_report', purpose: () => 'candidate_review', parameters: object({
+    mode: string({ enum: ['GENERATE', 'REGENERATE'] }), confirm: boolean(),
+  }, ['mode', 'confirm']), description: '在当前候选人 Offer 决策群生成或更新飞书云文档报告。' },
 ]);
 
 function canonicalJson(value) {

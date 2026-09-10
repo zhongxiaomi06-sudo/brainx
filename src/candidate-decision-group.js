@@ -45,15 +45,21 @@ function sourceContext(db, sourceChatId, candidate) {
 
 function contextCard(job, candidate, summary) {
   const ttcUrl = `https://app.ttcadvisory.com/app/talent/${encodeURIComponent(candidate.candidate_ref)}`;
+  const generate = `请生成当前候选人的 Offer 决策报告。调用 brainx_candidate_report，mode=GENERATE，confirm=true。`;
+  const update = `请结合本群最新内容更新当前候选人的 Offer 决策报告。调用 brainx_candidate_report，mode=REGENERATE，confirm=true。`;
   return { config: { wide_screen_mode: true },
     header: { template: 'purple', title: { tag: 'plain_text', content: 'BrainTex · 候选人 Offer 决策群' } },
     elements: [
       { tag: 'markdown', content: `**${safe(candidate.name || candidate.candidate_ref, 80)} × ${safe(job.role, 120)}**\n${safe(job.company, 120)} · 项目 ${safe(job.project_id, 80)}` },
       { tag: 'markdown', content: `**从原项目群迁移的上下文摘要**\n${summary}` },
       { tag: 'markdown', content: '**本群讨论目标**\n核实关键风险，并决定：继续评估、进入面试、准备 Offer 或不推进。' },
-      { tag: 'action', actions: [{ tag: 'button', type: 'primary', text: { tag: 'plain_text', content: '查看 TTC 人才' },
-        multi_url: { url: ttcUrl, pc_url: ttcUrl, android_url: ttcUrl, ios_url: ttcUrl } }] },
-      { tag: 'note', elements: [{ tag: 'plain_text', content: '本群不展示联系方式或简历原文；机器人回答会读取该项目的重点候选上下文。' }] },
+      { tag: 'action', actions: [
+        { tag: 'button', type: 'primary', text: { tag: 'plain_text', content: '查看 TTC 人才' },
+          multi_url: { url: ttcUrl, pc_url: ttcUrl, android_url: ttcUrl, ios_url: ttcUrl } },
+        { tag: 'button', text: { tag: 'plain_text', content: '生成报告' }, value: { text: generate } },
+        { tag: 'button', text: { tag: 'plain_text', content: '更新报告' }, value: { text: update } },
+      ] },
+      { tag: 'note', elements: [{ tag: 'plain_text', content: '本群不展示联系方式或简历原文；有新讨论或电话纪要后也可发送 /report 更新报告。' }] },
     ] };
 }
 

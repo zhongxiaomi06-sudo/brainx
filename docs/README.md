@@ -95,6 +95,8 @@
 - [重点关注并发送人才卡复核](frontend-reviews/2026-09-10-candidate-focus-share-card.md)：候选行统一重点关注、共享上下文与人才卡同步投放边界。
 - [候选人 Offer 决策群复核](frontend-reviews/2026-09-09-candidate-decision-group.md)：重点候选人独立建群、原项目群摘要迁移、群准入与幂等边界。
 - [候选卡片与对话建群复核](frontend-reviews/2026-09-09-candidate-card-conversation-group.md)：逐行发送人才卡、移除建群按钮、自然语言建群与自动重点名单边界。
+- [候选人 Offer 决策报告](2026-09-10-candidate-offer-report.md)：决策群首卡、飞书云文档版式、`/report` 更新、安全与真实验收边界。
+- [Offer 决策群首卡与报告复核](frontend-reviews/2026-09-10-candidate-offer-report.md)：三个首卡动作、上下文迁移和发布/真机状态。
 - [BrainX × OpenClaw AI 猎头工作流产品需求文档](prd-2026-09-02-openclaw-ai-recruiting-workflow.md)：当前阶段权威开发基线；基于代码审计和官方能力，定义 OpenClaw 主 Agent、飞书最小权限、BrainX 窄网关、人才授权、简历事实、匹配、施工阶段和发布门禁。
 - [历史：BrainX 飞书 AI 猎头副驾驶产品需求文档](prd-2026-09-01-feishu-ai-consultant-copilot.md)：主 Agent 调整前的 Codex 方案和用户研究，仅作历史参考。
 - [历史：BrainX Codex Agent 职责与权限规范](codex-agent-responsibilities-and-permissions.md)：旧 Codex 方案的权限、审批和沙箱研究；不得据此向 OpenClaw 开放工具。

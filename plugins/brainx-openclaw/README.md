@@ -23,3 +23,5 @@
 候选表格每行只提供“重点关注”。它通过 `KEEP_FOR_REVIEW` 写入项目共享重点名单，并在来源项目群幂等投放一张带 TTC 人才库链接的人才卡；后续项目群问答从 `brainx_candidate_shortlist.focused_candidates` 读取，不依赖易丢失的模型会话记忆。明确取消时使用 `REMOVE_FROM_REVIEW`。
 
 候选表格不再显示“为 TA 建决策群”。顾问在项目群自然语言说“为这个人建群”或点名候选人要求建决策群，即构成 `CREATE_DECISION_GROUP` 的本次明确确认；候选人未保留时 BrainX 会先自动加入重点名单。指代不唯一时 Agent 只追问候选人姓名，不猜测。
+
+候选人 Offer 决策群首卡提供“查看 TTC 人才”“生成报告”“更新报告”。首次生成和更新都由 `brainx_candidate_report` 从当前已登记群反查唯一候选人；群内 `/report` 等价于更新报告，会把新记录的文字讨论写入新版本飞书云文档。生产需配置租户 HTTPS 基址并发布飞书文档权限。

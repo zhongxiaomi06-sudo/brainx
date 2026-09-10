@@ -4,6 +4,7 @@ import { createActionToolHandlers } from './tools-actions.js';
 import { createCandidateActionToolHandlers } from './tools-candidate-actions.js';
 import { createJobFactsToolHandlers } from './tools-job-facts.js';
 import { createJdSubmitToolHandlers } from './tools-jd-submit.js';
+import { createCandidateReportToolHandlers } from '../candidate-report.js';
 
 const BANNED_ARGUMENTS = new Set([
   'tenant_id', 'consultant_id', 'sender', 'open_id', 'scope', 'sql', 'url', 'command', 'file',
@@ -91,6 +92,9 @@ export const AGENT_TOOL_ROWS = Object.freeze([
   { name: 'brainx_send_candidate_resume', purpose: ['candidate_action'], parameters: object({
     job_id: string(), candidate_ref: string(), confirm: boolean(),
   }, ['job_id', 'candidate_ref', 'confirm']), projectKey: 'job_id' },
+  { name: 'brainx_candidate_report', purpose: ['candidate_review'], parameters: object({
+    mode: string({ enum: ['GENERATE', 'REGENERATE'] }), confirm: boolean(),
+  }, ['mode', 'confirm']) },
 ]);
 
 export class AgentToolError extends Error {
@@ -163,16 +167,20 @@ export function createToolRegistry(options = {}) {
   });
 }
 
-export function createProductionToolRegistry({ db, talentDependencies = {}, actionDependencies = {} }) {
+export function createProductionToolRegistry({ db, talentDependencies = {}, actionDependencies = {},
+  reportDependencies = {} }) {
   const jobs = createJobToolHandlers({ db });
   const actions = createActionToolHandlers({ db, ...actionDependencies });
   const candidateActions = createCandidateActionToolHandlers({ db, ...talentDependencies });
   const jobFacts = createJobFactsToolHandlers({ db });
   const jdSubmit = createJdSubmitToolHandlers({ db });
+  const reports = createCandidateReportToolHandlers({ db, ...reportDependencies });
   const talent = createTalentToolHandlers({
     db, // 供 shortlist 空结果溯源（区分「OpenMai 找人岗」与「未授权岗」，2026-09-04 wendy 案例）
     ...talentDependencies,
     jobGapHandler: jobs.brainx_gap_questions,
   });
-  return createToolRegistry({ handlers: { ...jobs, ...talent, ...actions, ...candidateActions, ...jobFacts, ...jdSubmit } });
+  return createToolRegistry({ handlers: {
+    ...jobs, ...talent, ...actions, ...candidateActions, ...jobFacts, ...jdSubmit, ...reports,
+  } });
 }

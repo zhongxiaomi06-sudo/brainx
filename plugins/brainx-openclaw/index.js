@@ -1,6 +1,6 @@
 import { definePluginEntry } from 'openclaw/plugin-sdk/plugin-entry';
 
-import { createBraintexHomeCommand } from './onboarding.js';
+import { createBraintexHomeCommand, createCandidateReportCommand } from './onboarding.js';
 import { BRAINX_OPENCLAW_TOOLS, createBrainxToolFactory } from './runtime.js';
 import { formatBrainxReplyPayload } from './response-card.js';
 import { createBraintexPromptContext } from './prompt.js';
@@ -11,6 +11,7 @@ export default definePluginEntry({
   description: 'Least-privilege recruiting decision tools for Feishu consultants.',
   register(api) {
     api.registerCommand(createBraintexHomeCommand());
+    api.registerCommand(createCandidateReportCommand());
     api.on('before_prompt_build', (_event, context) => {
       const prependSystemContext = createBraintexPromptContext(context);
       return prependSystemContext ? { prependSystemContext } : undefined;

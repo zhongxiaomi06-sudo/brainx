@@ -46,6 +46,11 @@ test('重点候选人建群并迁移脱敏上下文，重复点击不重复建�
   assert.match(first.context_summary, /Python 能力不错/);
   assert.doesNotMatch(first.context_summary, /13800138000/);
   assert.match(calls.find(([kind]) => kind === 'send')[1].card.elements[2].content, /准备 Offer/);
+  const actions = calls.find(([kind]) => kind === 'send')[1].card.elements[3].actions;
+  assert.deepEqual(actions.map((action) => action.text.content), ['查看 TTC 人才', '生成报告', '更新报告']);
+  assert.match(actions[1].value.text, /brainx_candidate_report.*GENERATE/);
+  assert.match(actions[2].value.text, /brainx_candidate_report.*REGENERATE/);
+  assert.match(calls.find(([kind]) => kind === 'send')[1].card.elements[4].elements[0].content, /\/report/);
   assert.equal(db.prepare("SELECT notes FROM chat_contexts WHERE chat_id='oc_candidate'").get().notes,
     `candidate-decision:${jobId}:TTC-100`);
   assert.equal(db.prepare("SELECT COUNT(*) n FROM agent_group_scopes WHERE chat_id='oc_candidate'").get().n, 1);

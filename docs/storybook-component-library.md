@@ -53,7 +53,7 @@ BrainTex 每日推荐卡不在 Storybook 复制飞书组件；条数来自本人
 
 OpenMai 候选人总览同样不在 React Storybook 伪造飞书组件。正式投递使用飞书 Card 2.0 原生列布局：筛选条件用纯文字，候选人按姓名与岗位、经验与城市、学历、核心匹配、匹配度和操作形成整洁表格，每行最右侧只提供“重点关注”。该动作把候选人写入项目共享重点名单，并在来源项目群幂等投放一张带 TTC 人才库链接的人才卡；决策群改由顾问自然语言明确要求后触发。两条路径均不发送简历附件。自动测试负责结构、链接、写入和幂等契约，视觉及动作以真实飞书预览为准，见 [重点关注并发送人才卡复核](frontend-reviews/2026-09-10-candidate-focus-share-card.md)。
 
-候选人 Offer 决策群首卡和飞书云文档报告也不在 React Storybook 仿制。首卡提供查看 TTC 人才、生成报告、更新报告；群内 `/report` 复用更新能力。自动测试覆盖脱敏上下文、按钮命令、版本和文档块，真实布局、scope 与回调状态见 [Offer 决策群首卡与报告复核](frontend-reviews/2026-09-10-candidate-offer-report.md)。
+候选人 Offer 决策群首卡和飞书云文档报告也不在 React Storybook 仿制。首卡按候选概览、项目匹配、原群证据、待核实项组织，并提供查看 TTC 人才、生成报告、更新报告；群内 `/report` 复用更新能力。自动测试覆盖脱敏上下文、非指令证据标记、按钮命令、版本和文档块，真实布局、scope 与回调状态见 [Offer 决策群首卡与报告复核](frontend-reviews/2026-09-10-candidate-offer-report.md)。
 
 岗位画像输入使用 React Storybook 的“业务组件/OpenMai 岗位画像输入”场景覆盖：验证 `needs_input` 提示、输入框和提交动作。飞书的“请补充岗位画像”橙卡仍以原生客户端验收，不在 Storybook 复制。
 

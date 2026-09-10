@@ -1,0 +1,26 @@
+[Unit]
+Description=Brain X 职位决策工作台
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/brainx
+# 飞书应用凭证（web 接单自动拉群 specs/011 依赖 BRAINX_FEISHU_APP_ID/SECRET）；
+# 该文件键面安全：无 BRAINX_DEV_AUTH、无 BRAINX_EMBED_WORKER，不会改变登录旁路与批处理归属。
+EnvironmentFile=/etc/brainx/openclaw.env
+ExecStart=/usr/bin/node /opt/brainx/src/server.js
+Environment=HOME=/root
+Environment=BRAINX_PORT=3101
+Environment=BRAINX_HOST=127.0.0.1
+Environment=BRAINX_BASE_URL=https://base.yorkteam.cn
+Environment=BRAINX_BRIDGE_INTERVAL_MS=180000
+Environment=BRAINX_FRONTEND_PORT=4322
+Environment=BRAINX_FRONTEND_HOST=127.0.0.1
+# 注意：Environment= 在 EnvironmentFile 之后生效（可覆盖文件值）；BRAINX_EMBED_WORKER=0 必须保留
+Environment=BRAINX_EMBED_WORKER=0
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

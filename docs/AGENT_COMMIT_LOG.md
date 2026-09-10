@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-10｜fix(部署): specs/011 生产部署 + brainx.service 补挂飞书凭证
+
+- 部署：full 门禁 24/24（CODEBUDDY_SAFE_DELETE_ENABLED=0）；GitHub push 42941ce；SSH 直推 deploy-tmp + ff-only 合并；插件副本同步 v1.3.7（备份 runtime.js.bak-1.3.6-20260910）；三个 sourcing skill 同步到 /var/lib/brainx/.openclaw/skills/；重启四服务全 active。
+- 冒烟：openclaw skills 10/65 ready（含 3 个 sourcing）；registry required=['job_id','confirm'] 与插件副本双侧一致；gateway 无错误日志。
+- 关键修复：brainx.service 原本没有任何 EnvironmentFile，web 接单拉群的 launchProject 会因 FEISHU_BOT_CREDENTIALS_MISSING 被 preflight 拦截（.env 里 BRAINX_DEV_AUTH=1，不能整文件挂载）。改为挂 /etc/brainx/openclaw.env（键面无 DEV_AUTH/EMBED_WORKER，安全），进程已确认拿到 BRAINX_FEISHU_APP_ID。
+- 验证：felix/JBHKHAX 只读 preflight ready=true blockers=[]（未真建群，避免副作用）；补仓库模板 deploy/systemd/brainx.service。
+
 ## 2026-09-10｜feat(接单): accept_job 减参 + skill 接单模板 + web 接单自动拉群（specs/011）
 
 - 背景：york 机器人会话诊断——09-01 以来 brainx_accept_job 网关调用 0 次，根因是 6 必填参数超出模型契约遵循能力；「接单直接拉群」代码已存在但生产 project_launches 全空。

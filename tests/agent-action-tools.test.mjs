@@ -56,8 +56,11 @@ test('确认接单会建立行动并自动启动找人，重复键保持幂等',
   const first = handlers.brainx_accept_job(args, context);
   assert.equal(first.data.state, 'ACCEPTED');
   assert.equal(searches.length, 1);
-  assert.ok(first.unknowns.some((u) => u.includes('brainx_openmai_search') && u.includes('异步启动')),
-    '找人启动后必须指引模型用 openmai_search 取回结果交付');
+  assert.ok(first.unknowns.some((u) => u.includes('异步启动') && u.includes('正在找人')
+    && u.includes('自动发到项目群') && u.includes('结束本轮')),
+  '项目找人启动后必须立即给出可见状态，并由 worker 自动回群');
+  assert.ok(first.unknowns.every((u) => !u.includes('每隔约 1 分钟')),
+    '项目搜索不得再指引模型原地轮询');
   assert.ok(first.next_allowed_actions.includes('brainx_openmai_search'),
     '接单后应把 openmai_search 列为下一步允许动作');
   const again = handlers.brainx_accept_job(args, context);

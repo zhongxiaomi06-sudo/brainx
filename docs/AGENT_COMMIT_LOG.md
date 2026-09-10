@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-10｜feat(提醒): 每日分阶段推进提醒——私聊提醒链（specs/010）
+
+- 功能：顾问个人每日私聊提醒链，与 specs/009 群内静默唤醒互补。三阶段判定全部读库零 LLM 成本：A 没接单→「今天想看什么岗位吗」（每人每天 1 张）；B 接单未找人→「现在想找人吗」（openmai_results 无行，接单自动启动失败的兜底，按项目逐条）；C 找人未推进→「要找新的人吗」（有找人结果但无 job_outcomes/决策群，按项目逐条）。
+- 纪律：CST 工作日 12:30 后首周期发送（21:00 停止，窗口内补发覆盖重启）；项目静默 >24h 才提醒（刚接单/刚找人不打扰）；push_preferences.enabled=false 全阶段跳过；push_log 日键幂等（stage:<phase>:<project|->:<CST日键>），FAILED 下轮重试；BRAINX_STAGE_REMINDER_OFF=1 总开关。
+- 改动：新建 `src/stage-reminder.js`（188 行，纯函数+worker）与 `tests/stage-reminder.test.mjs`（6 组用例）；`worker.js` 挂载；复用 `lastProjectActivityAt`（009）与 pushCard 幂等语义；规格三件套 `specs/010-stage-reminder/`。无 migration、无插件改动。
+- 验证：专项 6/6、verify:quick 16/16 通过；full 门禁与生产部署见后续记录。
+
 ## 2026-09-10｜feat(权限): 白名单扩至九位顾问——开通 hiroshi/miya（代码同步）
 
 - 背景：生产侧已完成 hiroshi（Hiroshi 张浩）、miya（Miya 门姝妍）的四层开通（env 槽位 8/9、openclaw.json 双数组、consultants 行、身份绑定 ACTIVE、TTC 凭证从 Reloop 登录态回收验证通过），readiness 9/9。本次同步本地仓库代码到九槽位。

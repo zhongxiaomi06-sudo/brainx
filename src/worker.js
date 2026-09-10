@@ -21,6 +21,7 @@ import { relayBus } from './worker-relay.js';
 import { intakeAllConsultants } from './resume-intake.js';
 import { startOpenmaiDeliveryWorker } from './openmai-delivery.js';
 import { startProjectReminderWorker } from './project-reminder.js';
+import { startStageReminderWorker } from './stage-reminder.js';
 
 /** 启动全部批处理任务。bus 由调用方给（嵌入=server.bus；独立=relayBus）。 */
 export function startWorkerTasks(db, bus) {
@@ -47,6 +48,12 @@ export function startWorkerTasks(db, bus) {
   if (process.env.BRAINX_PROJECT_REMINDER_OFF !== '1') {
     handles.push(startProjectReminderWorker(db));
     console.log('[worker] 项目轻量提醒已启动（静默 72h 唤醒，09-21 CST 窗口）');
+  }
+
+  // 每日分阶段推进提醒：私聊 DM（specs/010）；BRAINX_STAGE_REMINDER_OFF=1 关闭
+  if (process.env.BRAINX_STAGE_REMINDER_OFF !== '1') {
+    handles.push(startStageReminderWorker(db));
+    console.log('[worker] 每日阶段提醒已启动（工作日 12:30 CST 后首周期，按项目逐条）');
   }
 
   // 简历文件入口：飞书群/私聊的 PDF/DOCX → 解析入库（BRAINX_RESUME_INTAKE_OFF=1 关闭）

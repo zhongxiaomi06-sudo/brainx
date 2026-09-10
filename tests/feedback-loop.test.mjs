@@ -67,11 +67,44 @@ test('F1: owner 不在花名册 → 不落行；他人策展行不被冲掉', ()
 
 // —— F2：一键反馈签名 ——
 test('F2: 未配置密钥 → quickLink=null、verify=503（fail-closed）', () => {
-  const saved = process.env.BRAINX_FEEDBACK_SECRET;
-  delete process.env.BRAINX_FEEDBACK_SECRET;
-  assert.equal(quickLink('http://x', 'mia', 'P1', 'ignore', now()), null);
-  assert.equal(verifyQuick({ consultant: 'mia', project: 'P1', action: 'ignore', day: '2026-08-24', sig: 'x' }, now()).status, 503);
-  if (saved) process.env.BRAINX_FEEDBACK_SECRET = saved;
+  const keys = ['BRAINX_FEEDBACK_SECRET', 'BRAINX_ALLOW_HTTP_LOOPBACK',
+    'BRAINX_DEV_AUTH', 'BRAINX_BASE_URL'];
+  const saved = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
+  try {
+    keys.forEach((key) => delete process.env[key]);
+    assert.equal(quickLink('http://x', 'mia', 'P1', 'ignore', now()), null);
+    assert.equal(verifyQuick({ consultant: 'mia', project: 'P1', action: 'ignore', day: '2026-08-24', sig: 'x' }, now()).status, 503);
+  } finally {
+    for (const key of keys) {
+      if (saved[key] === undefined) delete process.env[key];
+      else process.env[key] = saved[key];
+    }
+  }
+});
+
+test('F2: 明确的本地回环环境使用稳定派生签名，公网地址仍禁止降级', () => {
+  const keys = ['BRAINX_FEEDBACK_SECRET', 'BRAINX_ALLOW_HTTP_LOOPBACK',
+    'BRAINX_DEV_AUTH', 'BRAINX_BASE_URL'];
+  const saved = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
+  try {
+    delete process.env.BRAINX_FEEDBACK_SECRET;
+    process.env.BRAINX_ALLOW_HTTP_LOOPBACK = '1';
+    process.env.BRAINX_DEV_AUTH = 'stable-local-auth-secret';
+    process.env.BRAINX_BASE_URL = 'http://127.0.0.1:3000/';
+    const link = quickLink(process.env.BRAINX_BASE_URL, 'dykes', 'P1', 'launch', '2026-09-10T01:00:00Z');
+    assert.ok(link);
+    const params = Object.fromEntries(new URL(link).searchParams);
+    assert.equal(verifyQuick(params, '2026-09-10T02:00:00Z').ok, true);
+    process.env.BRAINX_DEV_AUTH = 'rotated-local-auth-secret';
+    assert.equal(verifyQuick(params, '2026-09-10T02:00:00Z').status, 403);
+    process.env.BRAINX_BASE_URL = 'https://brainx.example.com';
+    assert.equal(quickLink(process.env.BRAINX_BASE_URL, 'dykes', 'P1', 'launch', '2026-09-10T01:00:00Z'), null);
+  } finally {
+    for (const key of keys) {
+      if (saved[key] === undefined) delete process.env[key];
+      else process.env[key] = saved[key];
+    }
+  }
 });
 
 test('F2: 签名往返；篡改/过期被拒', () => {

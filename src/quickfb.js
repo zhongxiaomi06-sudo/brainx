@@ -12,7 +12,19 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 
 export const QUICK_ACTIONS = { ignore: '忽略', launch: '接单并建群' };
 
-const secret = () => process.env.BRAINX_FEEDBACK_SECRET || '';
+function localDerivedSecret() {
+  if (process.env.BRAINX_ALLOW_HTTP_LOOPBACK !== '1' || !process.env.BRAINX_DEV_AUTH) return '';
+  try {
+    const host = new URL(process.env.BRAINX_BASE_URL || '').hostname;
+    if (!['127.0.0.1', 'localhost', '::1'].includes(host)) return '';
+  } catch { return ''; }
+  return createHmac('sha256', process.env.BRAINX_DEV_AUTH)
+    .update('brainx-feedback-v1', 'utf8').digest('hex');
+}
+
+// 正式环境必须显式配置独立密钥；只有明确开启的本机回环开发环境，才从已有
+// 本地登录密钥做域隔离派生，避免每次重启临时换钥导致当天已发卡片全部失效。
+const secret = () => process.env.BRAINX_FEEDBACK_SECRET || localDerivedSecret();
 
 const sig = (cid, pid, action, day) =>
   createHmac('sha256', secret()).update(`${cid}|${pid}|${action}|${day}`).digest('hex').slice(0, 24);

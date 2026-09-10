@@ -82,7 +82,7 @@ docker run --rm -p 3300:3000 --env-file .env -v brainx-test-data:/app/data brain
 | `BRAINX_FRONTEND_PORT` | 前端子进程端口，默认 4321 |
 | `BRAINX_MYSQL_*` | 阿里云 RDS 人才库连接 |
 | `BRAINX_FEISHU_*` | 飞书应用与授权配置 |
-| `BRAINX_FEEDBACK_SECRET` | 每日推荐卡“接单并建群/忽略”的 HMAC 密钥；缺失时安全降级为打开工作台 |
+| `BRAINX_FEEDBACK_SECRET` | 每日推荐卡“接单并建群/忽略”的 HMAC 密钥；正式环境必须独立、持久配置。仅在显式允许 HTTP 回环且基址为本机时，可从 `BRAINX_DEV_AUTH` 稳定派生；其他缺失场景安全降级为打开工作台 |
 | `BRAINX_LLM_*` | 服务端统一模型配置；密钥不得下发浏览器 |
 
 ## 上线安全清单

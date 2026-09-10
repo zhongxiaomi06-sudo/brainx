@@ -11,4 +11,4 @@
 - [x] T9 deploy/openclaw/openclaw.production.json tools.allow + 契约 fixture
 - [x] T10 测试 tests/group-intake.test.mjs 9 组 + 受影响断言同步（663/663）
 - [x] T11 文档 spec/plan/tasks + docs/README + AGENT_COMMIT_LOG
-- [ ] T12 npm run verify（full）+ commit + 生产部署（含插件副本同步）+ 冒烟
+- [x] T12 npm run verify（full，24/24）+ commit + 生产部署（插件副本已同步、openclaw.json 已加白名单）+ 冒烟（迁移应用、worker 启动首轮基线、注册表 25 工具、openclaw ready 无未知工具警告）

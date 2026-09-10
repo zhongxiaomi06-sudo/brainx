@@ -243,7 +243,8 @@ export async function launchProject(db, consultantId, projectId, input = {}, dep
   }
   ensureSingleProjectLaunch(db, projectId);
   let launch = getProjectLaunch(db, consultantId, projectId);
-  if (launch?.status === 'READY') return { ok: true, already: true, launch };
+  // specs/014：force 用于「卡片内容变了，要按当前状态重发一张」——群不重建，只重发卡 + 重试准入。
+  if (launch?.status === 'READY' && input.force !== true) return { ok: true, already: true, launch };
   if (launch && launch.consultant_id !== consultantId) {
     fail(409, 'PROJECT_LAUNCH_IN_PROGRESS', '该职位的项目群正由其他协作者创建，请稍后重试');
   }
@@ -293,7 +294,9 @@ export async function launchProject(db, consultantId, projectId, input = {}, dep
       target: chatId,
       card: buildProjectLaunchCard(preflight.job, { publicBaseUrl: dependencies.publicBaseUrl,
         state: currentState(db, consultantId, projectId).state }),
-      idempotencyKey: `${launch.launch_id}-job`,
+      idempotencyKey: input.force === true
+        ? `${launch.launch_id}-job-redeliver-${Date.now()}`
+        : `${launch.launch_id}-job`,
     });
     const openclaw = await ensureAccessWithStatus(allowOpenClawGroup, chatId, collaboratorOpenIds);
     db.exec('BEGIN');

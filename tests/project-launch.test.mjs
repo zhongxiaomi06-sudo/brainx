@@ -319,3 +319,32 @@ test('寻访启动：飞书投递耗尽后重新进入项目也不自动重试',
   assert.equal(out.launch.search_status, 'FAILED');
   db.close();
 });
+
+test('项目启动：force 重发卡片——不重建群，只按当前状态补一张新卡（specs/014）', async () => {
+  const db = readyDb();
+  let creates = 0;
+  const keys = [];
+  const sends = [];
+  const deps = {
+    appConfigured: true, publicBaseUrl: 'https://base.yorkteam.cn/',
+    createProjectChat: async () => { creates++; return { chat_id: 'oc_redeliver', name: '补发群' }; },
+    ensureOpenClawGroupAllowed: async () => {},
+    sendInteractiveCard: async (input) => { keys.push(input.idempotencyKey); sends.push(input); return { message_id: 'om_new' }; },
+  };
+  await launchProject(db, 'felix', PID, { idempotency_key: 'rd-1' }, deps);
+  assert.equal(creates, 1);
+  assert.equal(sends.length, 1);
+
+  const again = await launchProject(db, 'felix', PID, { idempotency_key: 'rd-2' }, deps);
+  assert.equal(again.already, true);
+  assert.equal(sends.length, 1, '默认幂等：已 READY 不重复发卡');
+
+  const forced = await launchProject(db, 'felix', PID, { idempotency_key: 'rd-3', force: true }, deps);
+  assert.equal(forced.already, false);
+  assert.equal(creates, 1, 'force 不重建群');
+  assert.equal(sends.length, 2);
+  assert.equal(sends[1].target, 'oc_redeliver');
+  assert.notEqual(keys[1], keys[0], 'force 必须换新的发送幂等键，否则飞书会按 uuid 去重');
+  assert.equal(db.prepare('SELECT chat_id FROM project_launches WHERE project_id=?').get(PID).chat_id, 'oc_redeliver');
+  db.close();
+});

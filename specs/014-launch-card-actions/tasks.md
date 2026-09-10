@@ -11,7 +11,7 @@
 - [x] T7 `launch-redeliver --force`：群已 READY 也能按当前状态重发卡片
 - [x] T8 测试：tests/project-launch-card.test.mjs 7 组；project-launch（force，12+1）/ framework 断言同步
 - [x] T9 文档：spec/plan/tasks + docs/README.md + docs/AGENT_COMMIT_LOG.md
-- [ ] T10 npm run verify（full）+ commit + 生产部署 + 冒烟（群内接单 + 补发卡片）
+- [x] T10 npm run verify（full，24/24）+ commit + 生产部署 + 冒烟（群内接单 + 补发卡片）
 
 ## 阶段二（待飞书后台开启对外共享）
 

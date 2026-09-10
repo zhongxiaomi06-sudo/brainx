@@ -179,7 +179,8 @@ test('migrations：schema_migrations 逐文件记账，重开不重跑', () => {
                           '0044_openmai_search_brief.sql', '0045_openmai_search_rounds.sql',
                           '0046_project_candidate_focus.sql', '0047_candidate_decision_groups.sql',
                           '0048_project_launch_openclaw_status.sql',
-                          '0049_group_scope_job_action.sql', '0050_candidate_reports.sql']);
+                          '0049_group_scope_job_action.sql', '0050_candidate_reports.sql',
+                          '0051_bot_chat_intake.sql']);
 });
 
 const TMPDB = join(tmpdir(), `brainx-fw-${process.pid}.db`);
@@ -215,7 +216,7 @@ test('migrations：旧库 user_version=2 兼容——前 2 个文件标记已应
   legacy.close();
   const reopened = openDb(TMPDB);
   const rows = reopened.prepare('SELECT name FROM schema_migrations ORDER BY name').all().map((r) => r.name);
-  assert.equal(rows.length, 52); // 全部迁移文件记账（0001...0050）
+  assert.equal(rows.length, 53); // 全部迁移文件记账（0000...0051）
   assert.equal(reopened.prepare(`SELECT COUNT(*) n FROM decision_events
     WHERE event_type='RECOMMENDED'`).get().n, 0, '历史机器推荐轨迹已清理');
   assert.equal(reopened.prepare(`SELECT COUNT(*) n FROM decision_events

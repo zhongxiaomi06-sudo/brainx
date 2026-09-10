@@ -41,7 +41,7 @@ curl -fsS http://127.0.0.1:3102/internal/v1/agent/health
 curl -fsS https://base.yorkteam.cn/api/v1/meta/guard
 ```
 
-然后由六名在职灰度顾问完成私聊、白名单群 @、跨人负向读取、候选敏感字段扫描和手机/异机 HTTPS 深链。当前批准 23 个窄工具，包含 OpenMai / SuperMai 搜索、本人待确认草稿列表和显式草稿裁决；未知群、撤权用户、跨项目和重复 nonce 必须失败。
+然后由六名在职灰度顾问完成私聊、白名单群 @、跨人负向读取、候选敏感字段扫描和手机/异机 HTTPS 深链。当前批准 26 个窄工具，包含 OpenMai / SuperMai 搜索、本人待确认草稿列表、显式草稿裁决和当前群职位绑定；未知群、撤权用户、跨项目和重复 nonce 必须失败。
 
 Gateway 健康响应必须同时满足 `status=ready`、`authorization.status=ready`、`configured_accounts>=1` 和 `bound_identities>=1`。缺 App 映射时进程拒绝启动；只有数据库和工具目录正常、但没有匹配当前 App key 的 ACTIVE 身份时返回 503 `not_ready`，不得把它当成可服务状态。
 
@@ -55,7 +55,7 @@ Gateway、OpenClaw、业务 worker 和可选 integration worker 都在 systemd `
 - OpenClaw 只负责对话和窄工具编排；`brainx-worker` 写入账本与草稿，职位权威事实必须由顾问通过 `brainx_review_job_fact` 显式确认。
 - 主题和技术账号命名放在数据链路稳定后切换；切换时必须迁移 ACTIVE binding/group scope 并保留真实操作者不变。
 
-功能首页验收详见 [BrainTex 飞书功能首页与新用户指引](2026-09-03-braintex-feishu-home.md)。当前锁定版飞书插件不支持自定义 bot-added 回复，不得手工修改安装目录或启动第二条同应用 WS 连接绕过。唯一例外是安装器受管的 `form_value` 窄兼容桥：它校验固定版本和源码形状，未知状态失败关闭。
+功能首页验收详见 [BrainTex 飞书功能首页与新用户指引](2026-09-03-braintex-feishu-home.md)。当前锁定版飞书插件不支持自定义 bot-added 回复，不得手工修改安装目录或启动第二条同应用 WS 连接绕过；新群接管由业务 worker 通过官方群列表 REST 接口完成。唯一例外是安装器受管的 `form_value` 窄兼容桥：它只透传 BrainX 表单的 `criteria` 与 `job_id`，并校验固定版本和源码形状，未知状态失败关闭。
 
 ## 日常运维
 
@@ -68,6 +68,7 @@ Gateway、OpenClaw、业务 worker 和可选 integration worker 都在 systemd `
 - 任务租约过期会被同类 handler 重新领取；费用或尝试次数到上限后进入 FAILED，不无限消耗模型额度。
 - 发飞书前重新校验授权；撤权同时取消未发送 outbox 并失效缓存/索引。
 - 自动项目群必须同时存在于 OpenClaw `channels.feishu.groupAllowFrom` 和 BrainX `agent_group_scopes`；前者负责入口准入，后者负责 sender、purpose、project 的数据权限。只登记其中一层都不算可用。
+- 新增机器人到已有群依赖 `brainx-worker` 群列表轮询。首次上线只建立群基线；之后新群先获得只允许 `group_binding` 的最小 scope 和一次绑定卡，已绑定顾问提交本人已承接/共享职位后才升级为项目群。多飞书账号必须显式设置 `BRAINX_GROUP_INTAKE_ACCOUNT_ID`；缺 `im:chat` 权限、身份映射不唯一或 worker 停止都会让接管延迟或失败。
 - OpenMai 回群依赖 `brainx-worker.service` 中的持久投递消费者；`brainx-integration-worker.service` 不运行这段代码。项目长期停在 RUNNING 时先核对前者，不得用启动后者作为替代修复。
 - API 重启遗留的 OpenMai RUNNING 记录超过一小时后由业务 worker 自动转为可恢复失败并回群提示；这是防重复计费边界。不得把阈值改成自动重跑，也不得直接把数据库状态手工改成 DONE。
 - 人才同步只在所有分页成功后推进游标；文档 schema 不合格进入 NEEDS_REVIEW，扫描件进入 OCR_REQUIRED。

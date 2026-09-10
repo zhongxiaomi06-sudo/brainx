@@ -59,6 +59,8 @@ OpenMai 候选人总览同样不在 React Storybook 伪造飞书组件。正式�
 
 项目群启动状态为“建群后等待选择找人方式”：正式工作台不再把建群描述为自动启动 OpenMai，后端也不会在建群阶段检查 TTC 凭证或发起搜索。飞书原生项目卡片现已接入“OpenMai 找人”和“SuperMai 找人”两个真实按钮；顾问也可在同卡片的原生表单填写条件并点「按条件找人」，受管兼容桥只把该表单的 `criteria` 交给 Agent，留空则按职位事实自动生成。按钮点击后由 OpenClaw 插件直接向当前群发送可见的“正在找人”文字状态，随后异步结果由 BrainX worker 回群；该原生消息行为不在 React Storybook 复制。自动测试已覆盖表单与兼容桥，真实视觉和桌面端/手机端回调仍以飞书客户端验收为准。状态见 [项目群双找人入口与可选条件复核](frontend-reviews/2026-09-09-project-search-method-buttons.md)。
 
+已有群首次接管卡也是飞书原生 Card 2.0，不在 React Storybook 复制。业务 worker 首轮只建立现有群基线，之后发现的新群得到一次必填项目编号表单；受管兼容桥只透传 `job_id`，绑定工具从可信当前群上下文取得 chat，不接收客户端传入的 `chat_id`。自动测试覆盖分页、基线、单卡、最小授权、越权拒绝和绑定后项目卡；真实视觉、`im:chat` 权限和桌面/手机回调见 [已有群首次接管与职位绑定复核](frontend-reviews/2026-09-11-existing-group-intake.md)。
+
 候选结果卡在表格之后提供“OpenMai 继续找人”和“SuperMai 继续找人”。按钮只表达渠道与继续动作，历史 TTC 编号由 BrainX 从结构化结果提取、累计并传入下一轮，不能由 Agent 或卡片值直接提供；无可确认编号时失败关闭。`找人条件：……` 群消息只保存下一轮条件，不能在按钮前自行调用找人工具；同一按钮任务只有首次启动传 `continue_search=true`，轮询强制改为 `false` 或省略；卡片大标题按真实 `search_round` 显示“首轮”或“第 N 轮”。该飞书原生交互不在 Storybook 仿制，状态见 [项目群下一轮找人与 TTC 排除名单复核](frontend-reviews/2026-09-09-project-search-next-round-exclusions.md)。
 
 ## 使用命令

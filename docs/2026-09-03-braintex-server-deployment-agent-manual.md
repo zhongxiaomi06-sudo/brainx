@@ -151,7 +151,7 @@ sudo deploy/openclaw/install.sh --apply
 - `@openclaw/feishu@2026.7.1`；
 - 仓库内 `@brainx/openclaw-plugin@1.0.0`。
 
-安装官方飞书插件后，安装器会运行 `deploy/openclaw/patch-feishu-form.mjs`：只在包名、版本和两个目标源码块完全匹配时保留 BrainX 表单的 `form_value.criteria`，随后立即以 `--check` 复核。任何漂移都会中止安装；不得跳过检查或手工仿制该补丁。
+安装官方飞书插件后，安装器会运行 `deploy/openclaw/patch-feishu-form.mjs`：只在包名、版本和两个目标源码块完全匹配时保留 BrainX 表单的 `form_value.criteria` 与 `form_value.job_id`，随后立即以 `--check` 复核。任何漂移都会中止安装；不得跳过检查或手工仿制该补丁。
 
 同时安装 `brainx-today`、`brainx-job`、`brainx-talent`、`brainx-match`、`brainx-engagement-draft`、`brainx-interview-prep`、`brainx-review` 七个生产 Skill。其余仓库 Skill 不进入首批生产，避免把历史工具名或更宽能力一起带入。
 
@@ -353,7 +353,7 @@ exit
 
 新顾问被加入 allowlist 和身份绑定后，管理员应告诉他：在 BrainTex 私聊输入 `/brainx` 打开功能首页；群里必须 @机器人；所有判断只基于他有权数据；外发和业务写入仍由顾问确认。
 
-当前官方飞书插件虽能收到 `im.chat.member.bot.added_v1`，但锁定版本只记日志，没有自定义欢迎回调。因此“刚添加机器人便自动弹卡”尚未完成。不要改第三方安装目录实现临时补丁；当前可靠入口是 `/brainx`，后续应通过官方扩展点或自有通道层补齐同源欢迎卡。
+锁定版飞书插件仍不提供自定义 bot-added 回调；BrainX 不增加第二条 WebSocket，而由 `brainx-worker` 默认每 10 分钟分页读取机器人所在群列表。首次启用只建立基线，之后的新群收到一次“绑定现有群”卡；绑定前 scope 只开放 `group_binding`，绑定成功才升级为完整项目权限并发送项目卡。部署时必须配置 `BRAINX_GROUP_INTAKE_ACCOUNT_ID`（多账号必填）、`BRAINX_GROUP_INTAKE_INTERVAL_MS`，并确认应用已发布 `im:chat` 权限。正式代码尚未完成目标环境真机验收，不得仅凭自动测试宣称线上可用。
 
 ## 14. 常见故障决策表
 

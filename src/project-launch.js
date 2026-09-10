@@ -32,7 +32,7 @@ function findBinding(db, consultantId, openId) {
     ORDER BY updated_at DESC LIMIT 1`).get(consultantId, openId);
 }
 
-function findProjectCollaboratorOpenIds(db, projectId, binding, ownerOpenId) {
+export function projectCollaboratorOpenIds(db, projectId, binding, ownerOpenId) {
   const rows = db.prepare(`SELECT DISTINCT c.open_id
     FROM job_memberships m
     JOIN consultants c ON c.consultant_id=m.consultant_id AND c.active=1
@@ -142,7 +142,7 @@ function saveFailure(db, launchId, code, message) {
     WHERE launch_id=?`).run(code, message, now(), launchId);
 }
 
-function activateGroup(db, { consultantId, projectId, chatId, openIds, binding }) {
+export function activateProjectGroup(db, { projectId, chatId, openIds, binding }) {
   const at = now();
   registerChatContext(db, { chat_id: chatId, bot_mode: 'MENTION_ONLY', notes: `project:${projectId}` });
   const existing = db.prepare(`SELECT group_scope_id FROM agent_group_scopes
@@ -271,7 +271,7 @@ export async function launchProject(db, consultantId, projectId, input = {}, dep
   const createChat = dependencies.createProjectChat || createProjectChat;
   const sendCard = dependencies.sendInteractiveCard || sendInteractiveCard;
   const allowOpenClawGroup = dependencies.ensureOpenClawGroupAllowed || ensureOpenClawProjectGroup;
-  const collaboratorOpenIds = findProjectCollaboratorOpenIds(
+  const collaboratorOpenIds = projectCollaboratorOpenIds(
     db, projectId, preflight.binding, preflight.job.consultant_open_id,
   );
   let chatId = launch.chat_id;
@@ -304,7 +304,7 @@ export async function launchProject(db, consultantId, projectId, input = {}, dep
     const openclaw = await ensureAccessWithStatus(allowOpenClawGroup, chatId, collaboratorOpenIds);
     db.exec('BEGIN');
     try {
-      activateGroup(db, { consultantId, projectId, chatId,
+      activateProjectGroup(db, { projectId, chatId,
         openIds: collaboratorOpenIds, binding: preflight.binding });
       db.prepare('UPDATE job_facts SET chat_id=?, updated_at=? WHERE project_id=?')
         .run(chatId, now(), projectId);

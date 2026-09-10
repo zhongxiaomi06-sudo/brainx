@@ -7,6 +7,7 @@ import { createJdSubmitToolHandlers } from './tools-jd-submit.js';
 import { createCandidateReportToolHandlers } from '../candidate-report.js';
 import { sendInteractiveCard } from '../feishu-bot.js';
 import { launchRecruitingWorkflow } from '../project-launch.js';
+import { createGroupBindingToolHandlers } from './tools-group-binding.js';
 
 const BANNED_ARGUMENTS = new Set([
   'tenant_id', 'consultant_id', 'sender', 'open_id', 'scope', 'sql', 'url', 'command', 'file',
@@ -99,6 +100,9 @@ export const AGENT_TOOL_ROWS = Object.freeze([
   { name: 'brainx_candidate_report', purpose: ['candidate_review'], parameters: object({
     mode: string({ enum: ['GENERATE', 'REGENERATE'] }), confirm: boolean(),
   }, ['mode', 'confirm']) },
+  { name: 'brainx_bind_group_project', purpose: ['group_binding'], parameters: object({
+    job_id: string(),
+  }, ['job_id']) },
 ]);
 
 export class AgentToolError extends Error {
@@ -172,7 +176,7 @@ export function createToolRegistry(options = {}) {
 }
 
 export function createProductionToolRegistry({ db, talentDependencies = {}, actionDependencies = {},
-  reportDependencies = {} }) {
+  reportDependencies = {}, groupBindingDependencies = {} }) {
   const jobs = createJobToolHandlers({ db });
   // specs/014：默认接上飞书发卡通道，用于接单成功后把接单卡换成找人卡；
   // 未配置飞书凭证时 sendInteractiveCard 抛错，已由 sendAcceptedCard 兜底吞掉。
@@ -182,12 +186,13 @@ export function createProductionToolRegistry({ db, talentDependencies = {}, acti
   const jobFacts = createJobFactsToolHandlers({ db });
   const jdSubmit = createJdSubmitToolHandlers({ db });
   const reports = createCandidateReportToolHandlers({ db, ...reportDependencies });
+  const groupBinding = createGroupBindingToolHandlers({ db, ...groupBindingDependencies });
   const talent = createTalentToolHandlers({
     db, // 供 shortlist 空结果溯源（区分「OpenMai 找人岗」与「未授权岗」，2026-09-04 wendy 案例）
     ...talentDependencies,
     jobGapHandler: jobs.brainx_gap_questions,
   });
   return createToolRegistry({ handlers: {
-    ...jobs, ...talent, ...actions, ...candidateActions, ...jobFacts, ...jdSubmit, ...reports,
+    ...jobs, ...talent, ...actions, ...candidateActions, ...jobFacts, ...jdSubmit, ...reports, ...groupBinding,
   } });
 }

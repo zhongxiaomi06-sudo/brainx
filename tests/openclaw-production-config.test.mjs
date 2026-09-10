@@ -114,8 +114,10 @@ test('systemd units keep internal services on one host and load secrets from pro
   assert.match(installer, /config patch --file/);
   assert.doesNotMatch(installer, /config unset.*agents\.defaults\.model/);
   assert.doesNotMatch(installer, /install[^\n]+openclaw\.production\.json[^\n]+openclaw\.json/);
-  assert.match(installer, /plugins inspect feishu --json/);
-  assert.match(installer, /plugin\?\.version===process\.argv\[1\]/);
+  assert.match(installer, /FEISHU_PLUGIN_ROOT="\$BRAINX_OPENCLAW_STATE\/extensions\/feishu"/);
+  assert.match(installer, /p\.name==="@openclaw\/feishu"&&p\.version===process\.argv\[2\]/);
+  assert.match(installer, /patch-feishu-form\.mjs" --apply "\$FEISHU_PLUGIN_ROOT"/);
+  assert.match(installer, /patch-feishu-form\.mjs" --check "\$FEISHU_PLUGIN_ROOT"/);
   assert.match(installer, /\. \/etc\/brainx\/openclaw\.env; set \+a; exec "\$0" "\$@"/);
   assert.match(installer, /@openclaw\/feishu@2026\.7\.1/);
   assert.match(installer, /plugins\/brainx-openclaw\/package\.json/);
@@ -150,6 +152,12 @@ test('OpenClaw env template provides nine consultants and three groups', async (
     assert.match(template, new RegExp(`^BRAINX_FEISHU_ALLOWED_CHAT_ID_${suffix}=`, 'm'));
   }
   assert.doesNotMatch(template, /^BRAINX_FEISHU_ALLOWED_(OPEN|CHAT)_ID=/m);
+});
+
+test('worker env template enables bounded group intake polling for one Feishu account', async () => {
+  const template = await readFile(new URL('deploy/openclaw/brainx-worker.env.example', root), 'utf8');
+  assert.match(template, /^BRAINX_GROUP_INTAKE_ACCOUNT_ID=mia$/m);
+  assert.match(template, /^BRAINX_GROUP_INTAKE_INTERVAL_MS=600000$/m);
 });
 
 test('Agent env template uses the exact variable names consumed by runtime', async () => {

@@ -20,6 +20,7 @@ test('独立 worker 进程启动后保持存活，SIGTERM 干净退出', { timeo
       BRAINX_DB: join(dir, 'test.db'),
       BRAINX_ENV_FILE: join(dir, '.env.missing'), // 不加载仓库 .env，隔离外部副作用
       BRAINX_BRIDGE_OFF: '1',                      // 关掉桥接（网络），只验保活机理
+      BRAINX_GROUP_INTAKE_OFF: '1',                // 关掉群列表轮询（网络）
     },
     stdio: ['ignore', 'pipe', 'ignore'],
   });

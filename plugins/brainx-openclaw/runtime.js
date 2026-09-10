@@ -1,7 +1,7 @@
 import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
 
 const GATEWAY_URL = 'http://127.0.0.1:3102/internal/v1/agent/tools';
-const PLUGIN_VERSION = '1.3.11';
+const PLUGIN_VERSION = '1.3.12';
 const OPENCLAW_VERSION = '2026.7.1-2';
 const string = (extra = {}) => ({ type: 'string', minLength: 1, maxLength: 512, ...extra });
 const integer = (minimum, maximum) => ({ type: 'integer', minimum, maximum });
@@ -51,6 +51,9 @@ export const BRAINX_OPENCLAW_TOOLS = Object.freeze([
   { name: 'brainx_candidate_report', purpose: () => 'candidate_review', parameters: object({
     mode: string({ enum: ['GENERATE', 'REGENERATE'] }), confirm: boolean(),
   }, ['mode', 'confirm']), description: '在当前候选人 Offer 决策群生成或更新飞书云文档报告。' },
+  { name: 'brainx_bind_group_project', purpose: () => 'group_binding', parameters: object({
+    job_id: string(),
+  }, ['job_id']), description: '把机器人当前所在的待绑定群绑定到本人已有项目；群 ID 只取运行时可信上下文。' },
 ]);
 
 function canonicalJson(value) {

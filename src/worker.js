@@ -23,6 +23,7 @@ import { startOpenmaiDeliveryWorker } from './openmai-delivery.js';
 import { startProjectReminderWorker } from './project-reminder.js';
 import { startStageReminderWorker } from './stage-reminder.js';
 import { startOpenclawGroupRetryWorker } from './openclaw-group-retry.js';
+import { startGroupIntakeWorker } from './group-intake.js';
 
 /** 启动全部批处理任务。bus 由调用方给（嵌入=server.bus；独立=relayBus）。 */
 export function startWorkerTasks(db, bus) {
@@ -81,6 +82,12 @@ export function startWorkerTasks(db, bus) {
     handles.push(startOpenclawGroupRetryWorker(db));
     const iv = Number(process.env.BRAINX_OPENCLAW_RETRY_INTERVAL_MS || 600000) / 1000;
     console.log(`[worker] OpenClaw 群准入补偿已启动（间隔 ${iv}s，成功后节流重启 gateway）`);
+  }
+  // 机器人被人工拉进已有群：轮询发现后发最小权限绑定卡（首轮仅建基线）。
+  if (process.env.BRAINX_GROUP_INTAKE_OFF !== '1') {
+    handles.push(startGroupIntakeWorker(db));
+    const iv = Number(process.env.BRAINX_GROUP_INTAKE_INTERVAL_MS || 600000) / 1000;
+    console.log(`[worker] 新群接管已启动（间隔 ${iv}s，首轮仅建基线）`);
   }
   return { stop: () => handles.forEach((h) => h?.stop?.()) };
 }

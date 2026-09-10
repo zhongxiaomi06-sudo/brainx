@@ -45,7 +45,7 @@ test('plugin package and manifest declare exactly the approved tools', () => {
   assert.deepEqual(manifest.contracts.commands, ['brainx', 'report']);
   assert.deepEqual(manifest.contracts.tools, fixture.allowed_tools);
   assert.deepEqual(BRAINX_OPENCLAW_TOOLS.map(({ name }) => name), fixture.allowed_tools);
-  assert.equal(new Set(manifest.contracts.tools).size, 24);
+  assert.equal(new Set(manifest.contracts.tools).size, 25);
   assert.ok(!manifest.contracts.tools.includes('brainx_send_candidate_resume'));
   for (const tool of BRAINX_OPENCLAW_TOOLS) {
     assert.equal(tool.parameters.additionalProperties, false);
@@ -170,7 +170,7 @@ test('tool request is fixed to loopback and produces a BrainX-verifiable asserti
   const body = JSON.parse(calls[0].options.body);
   assert.equal(body.schema_version, 'agent_tool_request.v1');
   assert.deepEqual(body.client, {
-    plugin_version: '1.3.11', openclaw_version: '2026.7.1-2', model_ref: 'openai/gpt-5',
+    plugin_version: '1.3.12', openclaw_version: '2026.7.1-2', model_ref: 'openai/gpt-5',
   });
   const payload = verifyPrincipalAssertion(body.principal_assertion, {
     secret,

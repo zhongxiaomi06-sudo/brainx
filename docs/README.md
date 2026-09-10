@@ -33,7 +33,7 @@
 | 飞书群聊工作流、BrainTex 机器人、事件/卡片回调或信息鉴权分工 | [BrainTex 群聊工作流技术 PRD](prd-2026-09-01-braintex-group-workflow.md)、[Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) |
 | **拉群后卡片没弹出来、OpenClaw 群准入失败、要补发职位卡或排查"群建了但机器人不响应"** | **[拉群即见卡规格](../specs/013-launch-card-first/spec.md)**（卡片先发 + 准入降级 best-effort + 补偿重放 + 节流重启 gateway + launch-redeliver 补发）、[OpenClaw 多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md) |
 | **群内接单被拒、卡片没有找人按钮、要在项目群里直接接单或按条件找人** | **[项目群卡片动作规格](../specs/014-launch-card-actions/spec.md)**（群内接单放开、卡片按承接状态分岔、OpenMai/Reloop/SuperMai 三按钮 + 条件输入框、存量群 scope 补齐 job_action）、[拉群即见卡规格](../specs/013-launch-card-first/spec.md) |
-| **机器人被拉进已有群后没反应、想让它自动发「绑定职位」卡、或要开外部群让外部人进群** | **[机器人进群接管设计稿](../specs/015-group-intake/spec.md)**（设计阶段：轮询发现新群 + 待绑定态授权 + 绑定职位卡；外部群需先在飞书开放平台开启「对外共享」） |
+| **机器人被拉进已有群后没反应、想让它自动发「绑定职位」卡、或要开外部群让外部人进群** | **[机器人进群接管规格](../specs/015-group-intake/spec.md)**（正式代码：轮询发现新群 + 最小绑定权限 + 职位编号表单；尚未发布和真机验证；外部群仍需在飞书开放平台开启「对外共享」） |
 | 每日派单、对话推荐或工作台如何统一接单建群 | [三入口统一接单并建群](../specs/016-unified-accept-launch/spec.md)（点击即确认、职位唯一群、群内再选找人渠道） |
 | OpenClaw 壳子、Skill 编写、飞书渠道接入或外部 Agent 边界 | [OpenClaw 壳子 + 自写 Skill 架构](2026-09-02-openclaw-shell-architecture.md)、[复用与自建边界及权限需求 PRD](prd-2026-09-01-reuse-selfbuild-boundary.md) |
 | DataClaw 交流会索取清单、接口谈判或外部 Agent 边界 | [OpenClaw 壳子 + 自写 Skill 架构](2026-09-02-openclaw-shell-architecture.md)、[DataClaw 集成交流会历史底稿](2026-09-02-dataclaw-integration-brief.md) |
@@ -99,6 +99,7 @@
 - [候选人事实与 shortlist 数据契约](2026-09-03-candidate-data-contracts.md)：`candidate_fact_v1`、`candidate_match_bundle_v1`、reloop 真实数据转换、人才/职位双授权、固定飞书文案、MCP PoC 暴露条件及当前未完成项的唯一施工说明。
 - [候选人保留与项目共享上下文复核](frontend-reviews/2026-09-09-candidate-focus-context.md)：飞书候选行“保留”、项目级重点名单、后续群问答读取与安全边界。
 - [重点关注并发送人才卡复核](frontend-reviews/2026-09-10-candidate-focus-share-card.md)：候选行统一重点关注、共享上下文与人才卡同步投放边界。
+- [已有群首次接管与职位绑定复核](frontend-reviews/2026-09-11-existing-group-intake.md)：首轮基线、新群绑定卡、最小授权与项目卡接续状态。
 - [每日推荐卡一键接单并建群复核](frontend-reviews/2026-09-10-daily-card-quick-launch.md)：推荐卡签名确认、自动加入项目、接单、幂等建群和不自动找人的边界。
 - [候选人 Offer 决策群复核](frontend-reviews/2026-09-09-candidate-decision-group.md)：重点候选人独立建群、原项目群摘要迁移、群准入与幂等边界。
 - [候选卡片与对话建群复核](frontend-reviews/2026-09-09-candidate-card-conversation-group.md)：逐行发送人才卡、移除建群按钮、自然语言建群与自动重点名单边界。

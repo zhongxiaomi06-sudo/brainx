@@ -58,6 +58,12 @@ function authorizeGroup(db, payload, binding, projectRef) {
   const purposes = parseStringArray(scopes[0].allowed_purposes_json);
   const senders = parseStringArray(scopes[0].allowed_senders_json);
   const projects = parseStringArray(scopes[0].project_refs_json);
+  const pendingBinding = purposes.length === 1 && purposes[0] === 'group_binding'
+    && senders.length === 0 && projects.length === 0;
+  if (pendingBinding) {
+    if (payload.purpose !== 'group_binding' || projectRef !== null) fail();
+    return;
+  }
   if (!purposes.includes(payload.purpose) || !senders.includes(payload.requester_sender_id)) fail();
   if (projectRef !== null && !projects.includes(projectRef)) fail();
 }

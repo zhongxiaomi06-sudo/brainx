@@ -34,11 +34,13 @@ test('兼容桥把飞书 form_value 保留到卡片动作对象', () => {
   assert.equal(patchCardActionParser(patched), patched, '重复应用必须幂等');
 });
 
-test('兼容桥只给显式 BrainX 表单附加清洗后的 criteria', () => {
+test('兼容桥只给显式 BrainX 表单附加白名单字段', () => {
   const patched = patchCardActionFallback(fallbackFixture);
   assert.match(patched, /actionValue\.brainx_form !== true/);
   assert.match(patched, /formValue\.criteria/);
+  assert.match(patched, /formValue\.job_id/);
   assert.match(patched, /trim\(\)\.slice\(0, 2e3\)/);
+  assert.match(patched, /trim\(\)\.slice\(0, 128\)/);
   assert.match(patched, /BRAINTEX_CARD_FORM/);
   assert.equal(patchCardActionFallback(patched), patched, '重复应用必须幂等');
 });

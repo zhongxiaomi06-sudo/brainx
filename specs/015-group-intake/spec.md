@@ -1,6 +1,6 @@
-# 015 — 机器人进旧群自动发「绑定职位」卡（设计稿，待拍板）
+# 015 — 机器人进旧群自动发「绑定职位」卡
 
-状态：Design（未实现，2026-09-10）
+状态：Implemented（正式代码已接入，未发布、未完成飞书真机验证，2026-09-11）
 上游：用户 2026-09-10 需求「可以把机器人拉到旧群，拉进去第一件事也是弹出卡片开始找人」。
 关联：[014 项目群卡片动作](../014-launch-card-actions/spec.md)、[013 拉群即见卡](../013-launch-card-first/spec.md)。
 
@@ -15,7 +15,7 @@ openclaw 不在 `groupAllowFrom` 里 → 机器人完全不响应；`agent_group
 1. **不为同一飞书应用启动第二条事件长连接**（`docs/2026-09-03-braintex-feishu-home.md` 明确决定）。
 2. **openclaw 飞书插件对 `im.chat.member.bot.added_v1` 只记日志**，没有自定义处理口（`docs/2026-09-03-braintex-server-deployment-agent-manual.md` §347）。
 3. 不在仓库里改第三方安装目录里的代码。
-4. 卡片输入框的 `form_value` 拿不到（见 014 §2.2），卡片能给的东西有限。
+4. 锁定版渠道原本会丢弃 `form_value`；安装器现通过版本和源码形状双校验的 V2 窄兼容桥，仅透传 BrainX 表单的 `criteria` 与 `job_id`，漂移时失败关闭。
 
 结论：**入群感知只能靠轮询机器人所在群列表**（`GET /open-apis/im/v1/chats`，tenant_access_token，需 `im:chat` 权限），不能靠事件。
 
@@ -27,15 +27,15 @@ openclaw 不在 `groupAllowFrom` 里 → 机器人完全不响应；`agent_group
 
 - `listBotChats()`：`GET /open-apis/im/v1/chats?page_size=50&user_id_type=open_id`，翻 `has_more/page_token`。
 - `startGroupIntakeWorker(db, opts)`：默认每 10 分钟一轮（`BRAINX_GROUP_INTAKE_INTERVAL_MS`），`BRAINX_GROUP_INTAKE_OFF=1` 关闭，挂在 `src/worker.js`。
-- **首轮只做基线**：`bot_chat_intake` 表为空时，把当前所有群全部记成 `SEEN` 且**不发卡**——否则一上线就会给历史上所有群（含死群 oc_5494e54）轰炸一遍。之后新出现的群才走发卡流程。
+- **首轮只做基线**：尚未建立基线时，把当前所有群全部记成 `BASELINED` 且**不发卡**——否则一上线就会给历史群轰炸一遍。之后新出现的群才走发卡流程。
 
-### 3.2 数据模型（migration 0050）
+### 3.2 数据模型（migration 0051）
 
 ```sql
 CREATE TABLE IF NOT EXISTS bot_chat_intake (
   chat_id       TEXT PRIMARY KEY,
   chat_name     TEXT,
-  status        TEXT NOT NULL DEFAULT 'SEEN',   -- SEEN | CARD_SENT | BOUND | SKIPPED
+  status        TEXT NOT NULL,                  -- BASELINED | PENDING | CARD_SENT | BOUND | SKIPPED
   first_seen_at TEXT NOT NULL,
   card_sent_at  TEXT,
   project_id    TEXT,
@@ -43,14 +43,14 @@ CREATE TABLE IF NOT EXISTS bot_chat_intake (
 );
 ```
 
-`agent_group_scopes` 新增一种状态 `PENDING_BINDING`（已有 `scope_status` 字段，无需改表）：
-`allowed_purposes_json = ['group_binding']`、`allowed_senders_json = []`、`project_refs_json = []`。
+为兼容 `agent_group_scopes.scope_status` 既有约束，待绑定群仍使用 `ACTIVE`，但能力被收窄为：
+`allowed_purposes_json = ['group_binding']`、`allowed_senders_json = []`、`project_refs_json = []`。授权层把这一组精确字段识别为待绑定范围，而不是普通 ACTIVE 项目群。
 
 ### 3.3 待绑定态的授权（关键设计）
 
-`src/agent-gateway/authorization.js`：当 scope 的 `scope_status='PENDING_BINDING'` 时，
+`src/agent-gateway/authorization.js`：当 ACTIVE scope 的 purpose 精确等于 `['group_binding']`、sender/project 均为空时，
 
-- **放宽 sender 检查为「群内任意成员」**——入群时不知道谁会来绑定，必须放行；
+- **只放宽 scope 内的 sender 列表检查**；入口仍要求发送人已有 ACTIVE 飞书身份绑定，所以只有已开通 BrainTex 的顾问能够绑定；
 - **但只允许 `group_binding` 这一个 purpose**，其他一切照旧拒绝；
 - 绑定成功后把 scope 改为 `ACTIVE`，写入 `allowed_senders`（绑定人 + 项目成员）、`project_refs`（该职位）、完整 purposes，等同于 014 的建群登记。
 
@@ -61,13 +61,10 @@ CREATE TABLE IF NOT EXISTS bot_chat_intake (
 
 进群即发（只发一次，`bot_chat_intake.status` 从 `SEEN` → `CARD_SENT`）：
 
-> **我是 BrainTex 机器人**
-> 这个群还没绑定职位，所以我暂时无法在这里找人。请任选一种方式：
-> 1. 把 JD 直接粘贴到本群；
-> 2. 点下方按钮，从你名下的职位里选一个。
+> **BrainTex · 绑定现有群**
+> 机器人已进入本群，但尚未绑定职位。绑定前不会读取项目数据或启动找人。请输入工作台里的项目编号；绑定成功后会自动发职位卡。
 
-按钮：「绑定我的职位」（指令：调用 `brainx_bind_group_project`，先用 `brainx_job_list` 列出顾问名下职位让他选；拿不到就请他把 JD 贴到群里）＋「打开工作台」。
-不做下拉选择——`form_value` 拿不到（约束 4），下拉点了没反应比按钮更糟。
+卡片提供必填的“项目编号”输入框和「绑定职位」按钮；V2 兼容桥只把提交的 `job_id` 交给 Agent，Agent 立即调用 `brainx_bind_group_project`，不接受卡片 JSON 中的其他指令，也不索取 `chat_id`。另提供「打开工作台查编号」深链。
 
 ### 3.5 同时要做的事
 
@@ -87,16 +84,16 @@ CREATE TABLE IF NOT EXISTS bot_chat_intake (
 |---|---|
 | 首轮轰炸历史群 | 首轮只做基线不发卡 |
 | 轮询拉到无关群（公司大群等） | 只发一次卡；群主可在群里说「退下」置 `SKIPPED`（可选） |
-| `PENDING_BINDING` 放宽 sender | 只放行 `group_binding` 单一 purpose，绑定后立即收紧为正常 scope |
+| 待绑定 ACTIVE scope 的 sender 数组为空 | 身份层仍要求 ACTIVE 顾问绑定；scope 只允许 `group_binding`，绑定后立即升级为正常项目 scope |
 | 轮询频率与权限 | 默认 10 分钟；`im:chat` 权限需在开放平台确认已开通 |
 | 死群干扰 | 复用 `chat_contexts.enabled`，已禁用的群直接 `SKIPPED` |
 
 ## 6. 工作量与验收
 
-工作量约：1 个 migration（0050）+ 3 个模块改动（`group-intake.js` 新、`authorization.js`、`tool-registry.js` 新工具）+ `worker.js` 挂载 + 2 组新测试 + 文档。
+已实现：migration `0051`、`src/group-intake.js`、授权层、生产工具目录、worker 挂载、受管表单桥 V2 和专项回归。
 
 验收：
 1. 把机器人拉进一个新群 → 10 分钟内群里出现「绑定职位」卡；已存在的老群不会被轰炸。
-2. 在卡上点「绑定我的职位」→ 机器人列出顾问名下职位 → 选定后 scope 变 ACTIVE 并补发找人卡。
+2. 输入本人已承接/共享职位编号并点「绑定职位」→ scope 升级为完整项目范围并补发找人卡。
 3. 未绑定时在该群调用其它工具（如 `brainx_candidate_shortlist`）仍被拒。
 4. `npm run verify`（full）通过。

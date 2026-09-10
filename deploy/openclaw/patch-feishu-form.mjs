@@ -5,7 +5,8 @@ import { fileURLToPath } from 'node:url';
 
 const SUPPORTED_PACKAGE = '@openclaw/feishu';
 const SUPPORTED_VERSION = '2026.7.1';
-const MARKER = 'BRAINX_FORM_VALUE_BRIDGE_V1';
+const LEGACY_MARKER = 'BRAINX_FORM_VALUE_BRIDGE_V1';
+const MARKER = 'BRAINX_FORM_VALUE_BRIDGE_V2';
 
 function replaceOnce(source, before, after, label) {
   const first = source.indexOf(before);
@@ -17,6 +18,7 @@ function replaceOnce(source, before, after, label) {
 
 export function patchCardActionParser(source) {
   if (source.includes(MARKER)) return source;
+  if (source.includes(LEGACY_MARKER)) return source.replaceAll(LEGACY_MARKER, MARKER);
   let next = replaceOnce(source,
     'const actionValue = action.value;\n\tconst openMessageId =',
     `const actionValue = action.value;\n\tconst actionFormValue = action.form_value; // ${MARKER}\n\tconst openMessageId =`,
@@ -30,6 +32,12 @@ export function patchCardActionParser(source) {
 
 export function patchCardActionFallback(source) {
   if (source.includes(MARKER)) return source;
+  if (source.includes(LEGACY_MARKER)) {
+    const legacy = `\t\tconst criteria = typeof formValue.criteria === "string" ? formValue.criteria.trim().slice(0, 2e3) : "";
+\t\tif (!criteria) return text;
+\t\treturn \`\${text}\\n\\n[BRAINTEX_CARD_FORM] \${JSON.stringify({ criteria })}\`; // ${LEGACY_MARKER}`;
+    return replaceOnce(source, legacy, formProjectionSource(), 'legacy form bridge');
+  }
   const before = `function buildFeishuCardActionTextFallback(event) {
 \tconst actionValue = event.action.value;
 \tif (isRecord$1(actionValue)) {
@@ -45,9 +53,7 @@ export function patchCardActionFallback(source) {
 \t\tif (!isRecord$1(actionValue) || actionValue.brainx_form !== true) return text;
 \t\tconst formValue = event.action.form_value;
 \t\tif (!isRecord$1(formValue)) return text;
-\t\tconst criteria = typeof formValue.criteria === "string" ? formValue.criteria.trim().slice(0, 2e3) : "";
-\t\tif (!criteria) return text;
-\t\treturn \`\${text}\\n\\n[BRAINTEX_CARD_FORM] \${JSON.stringify({ criteria })}\`; // ${MARKER}
+${formProjectionSource()}
 \t};
 \tif (isRecord$1(actionValue)) {
 \t\tif (typeof actionValue.text === "string") return appendBrainxFormValue(actionValue.text);
@@ -57,6 +63,16 @@ export function patchCardActionFallback(source) {
 \treturn String(actionValue);
 }`;
   return replaceOnce(source, before, after, 'card action fallback');
+}
+
+function formProjectionSource() {
+  return `\t\tconst submitted = {};
+\t\tconst criteria = typeof formValue.criteria === "string" ? formValue.criteria.trim().slice(0, 2e3) : "";
+\t\tconst jobId = typeof formValue.job_id === "string" ? formValue.job_id.trim().slice(0, 128) : "";
+\t\tif (criteria) submitted.criteria = criteria;
+\t\tif (jobId) submitted.job_id = jobId;
+\t\tif (Object.keys(submitted).length === 0) return text;
+\t\treturn \`\${text}\\n\\n[BRAINTEX_CARD_FORM] \${JSON.stringify(submitted)}\`; // ${MARKER}`;
 }
 
 function distFile(pluginRoot, prefix) {

@@ -22,6 +22,7 @@ import { intakeAllConsultants } from './resume-intake.js';
 import { startOpenmaiDeliveryWorker } from './openmai-delivery.js';
 import { startProjectReminderWorker } from './project-reminder.js';
 import { startStageReminderWorker } from './stage-reminder.js';
+import { startOpenclawGroupRetryWorker } from './openclaw-group-retry.js';
 
 /** 启动全部批处理任务。bus 由调用方给（嵌入=server.bus；独立=relayBus）。 */
 export function startWorkerTasks(db, bus) {
@@ -73,6 +74,13 @@ export function startWorkerTasks(db, bus) {
     timer.unref?.();
     handles.push({ stop: () => clearInterval(timer) });
     console.log(`[worker] 简历文件入口已启动（间隔 ${iv / 1000}s）`);
+  }
+
+  // OpenClaw 群准入补偿：卡片已发但准入失败的群定时重试（specs/013）；BRAINX_OPENCLAW_RETRY_OFF=1 关闭
+  if (process.env.BRAINX_OPENCLAW_RETRY_OFF !== '1') {
+    handles.push(startOpenclawGroupRetryWorker(db));
+    const iv = Number(process.env.BRAINX_OPENCLAW_RETRY_INTERVAL_MS || 600000) / 1000;
+    console.log(`[worker] OpenClaw 群准入补偿已启动（间隔 ${iv}s，成功后节流重启 gateway）`);
   }
   return { stop: () => handles.forEach((h) => h?.stop?.()) };
 }

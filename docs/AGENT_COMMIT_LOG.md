@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-10｜merge(main): 合并拉群先发卡与准入补偿
+
+- 合并：纳入远端 `main@d7e9a78` 的“建群后先发职位卡、OpenClaw 群准入失败后台补偿”链路，保留本分支的找人即时文字状态、候选人重点关注和 Offer 报告能力。
+- 迁移：远端 `0048_project_launch_openclaw_status.sql` 已有部署记录，因此将尚未进入主线的候选报告迁移顺延为 `0049_candidate_reports.sql`，保证两项迁移都会执行。
+- 验证：冲突专项和完整门禁在合并提交后重新执行，结果以后续新鲜报告为准。
+
 ## 2026-09-10｜test(找人): 对齐项目自动回群断言
 
 - 调整：把接单工具的历史“模型轮询取回”断言更新为“立即显示正在找人、结束本轮、worker 自动回项目群”，与已经存在的投递链路保持一致。
@@ -117,6 +123,14 @@
 - 交互：OpenMai 候选行把“发送卡片”和“□ 保留”合并为“重点关注”，一次完成收藏语义、项目共享上下文写入和人才卡投放。
 - 安全：只有职位唯一项目群会同步收到人才卡；卡片不含联系方式、简历原文或 PDF，TTC 链接仍由登录与权限控制，重复点击复用确定性消息 UUID。
 - 验证：候选表格、重点名单、发卡、来源群、自然语言建群和插件提示专项 27/27 通过。
+## 2026-09-10｜fix(拉群): 拉群后必须立刻见卡——OpenClaw 群准入降级为后置补偿（specs/013）
+
+- 上游事故：20:01 york 工作台接单 JPTLM25（韬润半导体-业务助理）自动拉群，群建成功（oc_baf49b…）但**卡片没发**（message_id 空），launch 卡在 POST_JOB=OPENCLAW_GROUP_ALLOWLIST_FAILED；顾问 46 秒后退单，20:02:59 群内发言机器人无响应（openclaw 日志 `not in groupAllowFrom`）。手工重放准入一次即成功 → 瞬时故障被硬前置放大成整条链路报废。
+- 修法：①`launchProject` 顺序改为「建群 → **发卡** → 准入(best-effort) → 事务置 READY」，准入失败只标 PENDING，不再废掉链路；②新增 `migrations/0048` 存 openclaw_status/attempts/error，存量行默认 PENDING 可被补捡；③新增 `src/openclaw-group-retry.js` 每 10 分钟重放 PENDING，成功后按 15 分钟节流 `systemctl restart openclaw-brainx`（白名单不热生效）；④runner 失败带 exit code + stderr 末行，CLI 超时 12s→20s，落库错误不再只有笼统 code；⑤`bin/brainx-agent-admin.mjs` 增 `launch-redeliver` 补发入口；⑥卡片文案补「机器人正在接入本群，如按钮暂无响应请稍候再点」。
+- 改动文件：src/project-launch.js、src/openclaw-group-status.js（新）、src/openclaw-group-retry.js（新）、src/personal-model-config.js、src/worker.js、bin/brainx-agent-admin.mjs、migrations/0048、tests/project-launch-openclaw.test.mjs（新）、tests/project-launch.test.mjs（契约变更同步）、tests/framework.test.mjs（迁移清单 48→50）、docs/README.md、specs/013。
+- 验证：专项 8/8 + project-launch/openclaw/personal-model/accept-launch 25/25 通过；full 门禁 24/24 通过。
+- 部署与冒烟（21:36-21:38）：代码 SSH 直推 `deploy-tmp` → ff-only 合并（GitHub 本机 SSL 超时，走 47.110.93.137）；migration 0048 已应用；重启 brainx + brainx-worker（补偿任务日志已出现）；`launch-redeliver` 补发 york/JPTLM25 → 卡片 `om_x100b651f64d928b0b1f6588bd3fd900` 已发出、launch READY、openclaw_status=OK、agent_group_scopes 登记 `["JPTLM25"]`、白名单含 oc_baf49b、job_facts.chat_id 已回填；openclaw-brainx 重启后 ws ready（openclaw.json 属主保持 brainx，runAs 生效）。
+
 ## 2026-09-10｜fix(找人): 自建岗（pj_*）绑定 TTC 真身与判据降级——修工作台接单找人 4 连败（specs/012）
 
 - 根因：bot 按判据自建岗（job-extract 确认生成 `pj_<uuid>`）的 job_facts 行 source_url 为 NULL，OpenMai job 模式拿 pj_uuid 查 CRM 必然「职位不存在，或当前顾问无权查看该职位」（今日 felix 长角鹿科技×2 岗 4 连败）。

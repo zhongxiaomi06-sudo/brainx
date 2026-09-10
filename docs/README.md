@@ -31,6 +31,7 @@
 | spec-kit、规格驱动开发或 constitution 修订 | [规范驱动研发流程](standards/SPEC_DRIVEN_WORKFLOW.md)、[多 Agent 协作准则](../AGENTS.md) |
 | 参考代码镜像、开源仓库学习或外部设计对照 | [参考代码本地镜像清单](standards/REFERENCE_REPOS.md)、[全景架构与技术施工蓝图](architecture-2026-09-01-full-blueprint.md) |
 | 飞书群聊工作流、BrainTex 机器人、事件/卡片回调或信息鉴权分工 | [BrainTex 群聊工作流技术 PRD](prd-2026-09-01-braintex-group-workflow.md)、[Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) |
+| **拉群后卡片没弹出来、OpenClaw 群准入失败、要补发职位卡或排查"群建了但机器人不响应"** | **[拉群即见卡规格](../specs/013-launch-card-first/spec.md)**（卡片先发 + 准入降级 best-effort + 补偿重放 + 节流重启 gateway + launch-redeliver 补发）、[OpenClaw 多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md) |
 | OpenClaw 壳子、Skill 编写、飞书渠道接入或外部 Agent 边界 | [OpenClaw 壳子 + 自写 Skill 架构](2026-09-02-openclaw-shell-architecture.md)、[复用与自建边界及权限需求 PRD](prd-2026-09-01-reuse-selfbuild-boundary.md) |
 | DataClaw 交流会索取清单、接口谈判或外部 Agent 边界 | [OpenClaw 壳子 + 自写 Skill 架构](2026-09-02-openclaw-shell-architecture.md)、[DataClaw 集成交流会历史底稿](2026-09-02-dataclaw-integration-brief.md) |
 | **BrainX 下游交付、MCP server 工具契约、接口打包或部署** | **[BrainX 下游交付文档](2026-09-02-brainx-mcp-deliverable.md)**（用户职责边界内）、[OpenClaw 壳子架构 §6 接口挂载](2026-09-02-openclaw-shell-architecture.md) |

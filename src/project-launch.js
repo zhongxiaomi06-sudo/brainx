@@ -8,6 +8,7 @@ import { acceptCommitment } from './commitment.js';
 import { currentState } from './engagement.js';
 import { ttcOpenmaiAuthStatus } from './ttcsdk/auth.js';
 import { ensureOpenClawProjectGroup } from './openclaw-group-access.js';
+import { ensureAccessWithStatus } from './openclaw-group-status.js';
 
 const GROUP_PURPOSES = ['job_review', 'candidate_review', 'candidate_action', 'interview_prep'];
 
@@ -91,7 +92,7 @@ export function buildProjectLaunchCard(job, { publicBaseUrl } = {}) {
     elements: [
       { tag: 'markdown', content: `**${job.role}**\n${facts || '职位基础信息待补充'}\n\n`
         + `项目编号：${job.project_id}\n负责人：${job.consultant_name}` },
-      { tag: 'markdown', content: '**机器人已进入项目群**\n候选人搜索尚未启动。可先在群里发送“找人条件：……”再点击按钮；不补充则根据职位信息自动找人。' },
+      { tag: 'markdown', content: '**机器人已进入项目群**\n候选人搜索尚未启动。可先在群里发送“找人条件：……”再点击按钮；不补充则根据职位信息自动找人。\n机器人正在接入本群，如按钮暂无响应请稍候再点。' },
       { tag: 'action', actions: [
         { tag: 'button', type: 'primary', text: { tag: 'plain_text', content: 'OpenMai 找人' },
           value: { text: openmaiCommand } },
@@ -259,12 +260,14 @@ export async function launchProject(db, consultantId, projectId, input = {}, dep
         chatId, created.name, now(), launch.launch_id,
       );
     }
-    await allowOpenClawGroup(chatId, collaboratorOpenIds);
+    // specs/013：卡片是拉群的产物，先发；OpenClaw 群准入降级为 best-effort，
+    // 失败只标 PENDING（由 openclaw-group-retry 补偿），不再废掉整条链路。
     const sent = await sendCard({
       target: chatId,
       card: buildProjectLaunchCard(preflight.job, { publicBaseUrl: dependencies.publicBaseUrl }),
       idempotencyKey: `${launch.launch_id}-job`,
     });
+    const openclaw = await ensureAccessWithStatus(allowOpenClawGroup, chatId, collaboratorOpenIds);
     db.exec('BEGIN');
     try {
       activateGroup(db, { consultantId, projectId, chatId,
@@ -272,12 +275,13 @@ export async function launchProject(db, consultantId, projectId, input = {}, dep
       db.prepare('UPDATE job_facts SET chat_id=?, updated_at=? WHERE project_id=?')
         .run(chatId, now(), projectId);
       db.prepare(`UPDATE project_launches SET status='READY', current_step='READY', message_id=?,
-        error_code=NULL, error_message=NULL, updated_at=? WHERE launch_id=?`).run(
-        sent.message_id || null, now(), launch.launch_id,
-      );
+        openclaw_status=?, openclaw_error=?, openclaw_attempts=openclaw_attempts+1,
+        openclaw_updated_at=?, error_code=NULL, error_message=NULL, updated_at=? WHERE launch_id=?`)
+        .run(sent.message_id || null, openclaw.status, openclaw.error,
+          now(), now(), launch.launch_id);
       db.exec('COMMIT');
     } catch (error) { db.exec('ROLLBACK'); throw error; }
-    return { ok: true, already: false, launch: getProjectLaunch(db, consultantId, projectId) };
+    return { ok: true, already: false, openclaw, launch: getProjectLaunch(db, consultantId, projectId) };
   } catch (error) {
     const code = error.code || (chatId ? 'FEISHU_JOB_POST_FAILED' : 'FEISHU_CHAT_CREATE_FAILED');
     saveFailure(db, launch.launch_id, code, safeError(error));

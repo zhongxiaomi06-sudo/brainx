@@ -7,6 +7,7 @@ import {
   bindRosterIdentities, getRecruitingReadiness, getConsultantOnboardingPlan,
 } from '../src/agent-gateway/admin.js';
 import { grantSharedTtcCredential, revokeSharedTtcCredential } from '../src/ttcsdk/auth.js';
+import { launchProject } from '../src/project-launch.js';
 
 function flags(argv) {
   const result = {};
@@ -92,6 +93,16 @@ if (command === 'bind-identity') {
   requireAdmin();
   if (input.confirm !== 'true') throw new Error('CONFIRM_REQUIRED');
   result = { revoked: revokeSharedTtcCredential(db, input.grantee, 'OPENMAI') };
+} else if (command === 'launch-redeliver') {
+  // specs/013：群已建但卡片没发出来时重放（跳过建群 → 补发卡片 → 重试准入），幂等
+  try {
+    result = await launchProject(db, input.consultant, input.project, {
+      idempotency_key: input['idempotency-key'] || `redeliver:${input.consultant}:${input.project}`,
+    }, {});
+  } catch (error) {
+    result = { ok: false, code: error.code || 'PROJECT_LAUNCH_FAILED',
+      message: String(error.message).slice(0, 300) };
+  }
 } else {
   throw new Error('命令：readiness | onboarding-plan | bind-roster | bind-identity | revoke-identity | grant-group | revoke-group | grant-ttc-openmai | revoke-ttc-openmai');
 }

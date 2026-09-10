@@ -24,7 +24,8 @@ import { saveUserTokens, tokenStatus } from './feishu.js';
 import { jobVisibleTo } from './visibility.js';
 import { relationOf } from './relations.js';
 import { projectRoutes } from './project-routes.js';
-import { startOpenmaiTask, getOpenmaiResult } from './openmai-task.js';
+import { postAcceptSideEffects } from './accept-launch.js';
+import { getOpenmaiResult } from './openmai-task.js';
 import { openmaiRoutes } from './openmai-routes.js';
 import { radarPayload, clientRows } from './radar.js';
 import { ttcFieldReportForSync } from './ttc-field-report.js';
@@ -388,11 +389,8 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       const out = b.action === 'ACCEPT' ? acceptCommitment(db, cid, id, b)
         : b.action === 'RELEASE' ? releaseCommitment(db, cid, id, b)
         : engage(db, cid, id, b.action, b);
-      // 接单自动触发 OpenMai 找人（接单 → 异步找人 → SSE 定向回传；防重/费用控制在任务模块内）
-      if (out.ok && out.state === 'ACCEPTED' && b?.action === 'ACCEPT') {
-        try { out.openmai = startOpenmaiTask(db, bus, cid, id); }
-        catch (e) { out.openmai = { status: 'error', message: String(e.message).slice(0, 200) }; }
-      }
+      // 接单成功后副作用编排（触发找人 + 接单直接拉群，specs/011）见 accept-launch.js
+      await postAcceptSideEffects(db, bus, deps, cid, id, b, out);
       json(res, out.ok ? 200 : (out.status || 409), out);
     },
 

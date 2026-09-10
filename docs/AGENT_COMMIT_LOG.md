@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-10｜merge(main): 合并接单 SOP 与分阶段提醒
+
+- 合并：纳入远端 `main@8bf17fa` 的两参数接单、固定确认话术、接单后自动拉群、生产凭证挂载和每日分阶段提醒。
+- 保留：本分支的一键接单卡、Offer 报告、重点关注、继续找人排除与轮询修复全部保留；插件版本采用主线较新的 `1.3.9`。
+- 验证：冲突相关专项与上传前完整门禁在合并提交后重新执行，结果以后续新鲜报告为准。
+
 ## 2026-09-10｜fix(找人): 区分继续搜索启动与轮询
 
 - 根因：完整 OpenClaw 日志证明同一张“继续找人”卡只有一次点击；Agent 首次以 `continue_search=true` 启动第 2 轮，完成后仍用同一参数轮询，后端按契约把第二次 `true` 解释为再开一轮，因此自动产生第 3 轮。
@@ -81,6 +87,41 @@
 - 交互：OpenMai 候选行把“发送卡片”和“□ 保留”合并为“重点关注”，一次完成收藏语义、项目共享上下文写入和人才卡投放。
 - 安全：只有职位唯一项目群会同步收到人才卡；卡片不含联系方式、简历原文或 PDF，TTC 链接仍由登录与权限控制，重复点击复用确定性消息 UUID。
 - 验证：候选表格、重点名单、发卡、来源群、自然语言建群和插件提示专项 27/27 通过。
+## 2026-09-10｜fix(接单): 确认话术固定「确认接【公司·职位】这个岗位吗？」+ 确认即接单（specs/011 修订B）
+
+- 上游：用户确认 SOP 方向，要求确认话术更明确、确认后直接执行。prompt.js 第 2/3 步改写：岗位理解最后一行固定问「确认接【公司·职位】这个岗位吗？」；用户回复确认/接吧/可以/嗯/就是这个等认可后立即调用 brainx_accept_job，不再问第二遍。
+- 三个 sourcing skill 同步；PLUGIN_VERSION 1.3.8→1.3.9；openclaw-plugin 断言更新（确认话术 + 禁止二次确认）。
+
+## 2026-09-10｜feat(接单): 接单 SOP 进全局提示——用户全程不碰参数（specs/011 修订 A）
+
+- 上游：用户反馈「接单很不稳定，大家不想找参数」。减参后模型仍可能让用户报 job_id；本次把「理解岗位→接单」做成三步 SOP 写进 openclaw 全局系统提示（prompt.js，所有飞书会话生效）。
+- SOP：①定位唯一职位（本轮推荐/简报映射，brainx_daily_brief 兜底，对不上列选项，绝不让用户找参数）→ ②两三句岗位理解（公司·职位·城市·HC·匹配分·风险/缺口）+ 明确求确认，用户认可即视为确认 → ③brainx_accept_job 仅 { job_id, confirm: true }；无法唯一定位或未确认不得调用。
+- 三个 sourcing skill 接单节同步改写；PLUGIN_VERSION 1.3.7→1.3.8；openclaw-plugin 测试增 5 条 SOP 断言。
+- 验证：相关测试 17/17；quick 16/16；prompt.js + skills 生产同步 + openclaw-brainx 重启 + 冒烟。
+
+## 2026-09-10｜fix(部署): specs/011 生产部署 + brainx.service 补挂飞书凭证
+
+- 部署：full 门禁 24/24（CODEBUDDY_SAFE_DELETE_ENABLED=0）；GitHub push 42941ce；SSH 直推 deploy-tmp + ff-only 合并；插件副本同步 v1.3.7（备份 runtime.js.bak-1.3.6-20260910）；三个 sourcing skill 同步到 /var/lib/brainx/.openclaw/skills/；重启四服务全 active。
+- 冒烟：openclaw skills 10/65 ready（含 3 个 sourcing）；registry required=['job_id','confirm'] 与插件副本双侧一致；gateway 无错误日志。
+- 关键修复：brainx.service 原本没有任何 EnvironmentFile，web 接单拉群的 launchProject 会因 FEISHU_BOT_CREDENTIALS_MISSING 被 preflight 拦截（.env 里 BRAINX_DEV_AUTH=1，不能整文件挂载）。改为挂 /etc/brainx/openclaw.env（键面无 DEV_AUTH/EMBED_WORKER，安全），进程已确认拿到 BRAINX_FEISHU_APP_ID。
+- 验证：felix/JBHKHAX 只读 preflight ready=true blockers=[]（未真建群，避免副作用）；补仓库模板 deploy/systemd/brainx.service。
+
+## 2026-09-10｜feat(接单): accept_job 减参 + skill 接单模板 + web 接单自动拉群（specs/011）
+
+- 背景：york 机器人会话诊断——09-01 以来 brainx_accept_job 网关调用 0 次，根因是 6 必填参数超出模型契约遵循能力；「接单直接拉群」代码已存在但生产 project_launches 全空。
+- 减参：accept_job 必填收敛为 job_id+confirm，goal/action_title/due_at/idempotency_key 服务端兜底（workflowDueAt 自 project-launch.js 导出；幂等键 bot:accept:<顾问>:<职位> 确定性幂等）；tool-registry 与插件 runtime 声明同步，PLUGIN_VERSION 1.3.6→1.3.7。
+- 拉群：新建 src/accept-launch.js（postAcceptSideEffects 编排：触发找人 + best-effort launchProject，幂等键 web-accept-launch:<顾问>:<职位>，失败不阻塞接单、错误随 project_launch 透出）；server.js engagement 路由接入，行数 651→649（baseline 同步收紧）。
+- skill：三个 sourcing skill 增「接单（一句话完成）」节，给两参调用示例并要求顾问明确确认。
+- 测试：agent-action-tools 增最小参数/幂等/旧用法回归；新建 tests/accept-launch.test.mjs（HTTP 级：拉群成功 READY+职位挂群、飞书故障不阻塞接单）；openclaw-plugin 版本断言 1.3.7。
+- 验证：相关测试 45/45；verify:quick 16/16 通过；full 门禁与生产部署见后续记录。
+
+## 2026-09-10｜feat(提醒): 每日分阶段推进提醒——私聊提醒链（specs/010）
+
+- 功能：顾问个人每日私聊提醒链，与 specs/009 群内静默唤醒互补。三阶段判定全部读库零 LLM 成本：A 没接单→「今天想看什么岗位吗」（每人每天 1 张）；B 接单未找人→「现在想找人吗」（openmai_results 无行，接单自动启动失败的兜底，按项目逐条）；C 找人未推进→「要找新的人吗」（有找人结果但无 job_outcomes/决策群，按项目逐条）。
+- 纪律：CST 工作日 12:30 后首周期发送（21:00 停止，窗口内补发覆盖重启）；项目静默 >24h 才提醒（刚接单/刚找人不打扰）；push_preferences.enabled=false 全阶段跳过；push_log 日键幂等（stage:<phase>:<project|->:<CST日键>），FAILED 下轮重试；BRAINX_STAGE_REMINDER_OFF=1 总开关。
+- 改动：新建 `src/stage-reminder.js`（188 行，纯函数+worker）与 `tests/stage-reminder.test.mjs`（6 组用例）；`worker.js` 挂载；复用 `lastProjectActivityAt`（009）与 pushCard 幂等语义；规格三件套 `specs/010-stage-reminder/`。无 migration、无插件改动。
+- 验证：专项 6/6、verify:quick 16/16 通过；full 门禁与生产部署见后续记录。
+
 ## 2026-09-10｜feat(权限): 白名单扩至九位顾问——开通 hiroshi/miya（代码同步）
 
 - 背景：生产侧已完成 hiroshi（Hiroshi 张浩）、miya（Miya 门姝妍）的四层开通（env 槽位 8/9、openclaw.json 双数组、consultants 行、身份绑定 ACTIVE、TTC 凭证从 Reloop 登录态回收验证通过），readiness 9/9。本次同步本地仓库代码到九槽位。

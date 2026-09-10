@@ -15,7 +15,7 @@ test('BrainTex 首页覆盖顾问核心工作入口和推荐设置', () => {
     '今天先做什么', '推荐值得做的职位', '为职位找候选人',
     '判断一个职位', '看跟进建议', '生成个人复盘',
   ]);
-  assert.deepEqual(labels.slice(6, 8), ['设置每日推荐', '配置我的模型']);
+  assert.deepEqual(labels.slice(6, 9), ['设置每日推荐', '检查我的开工状态', '配置我的模型']);
   assert.equal(buttons.find(({ label }) => label === '配置我的模型').url,
     'https://brainx.example.com/?settings=model');
   assert.equal(buttons.at(-1).url, 'https://brainx.example.com/');
@@ -43,4 +43,6 @@ test('BrainTex /brainx 命令不调用模型，未授权时拒绝', async () => 
   const denied = await command.handler({ channel: 'feishu', isAuthorizedSender: false });
   assert.equal(denied.isError, true);
   assert.equal(denied.presentation, undefined);
+  assert.match(denied.text, /管理员/);
+  assert.match(denied.text, /不要.*API Key/);
 });

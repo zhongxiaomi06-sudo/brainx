@@ -28,6 +28,10 @@ const ACTIONS = Object.freeze([
     label: '设置每日推荐',
     command: '请先读取我的每日推荐设置，再问我想每天几点、每次推荐多少个职位；复述新设置并在我确认后保存。',
   },
+  {
+    label: '检查我的开工状态',
+    command: '请调用 brainx_me_context 检查我的 BrainTex 开工状态，按机器人与身份、职位数据、OpenMai 找人、每日推荐四项给出简洁结论；未就绪项只说明该联系谁处理，不要索要 open_id、token 或 API Key。',
+  },
 ]);
 
 function safeWorkbenchUrl(value) {
@@ -49,13 +53,13 @@ export function createBraintexHomePresentation({ publicBaseUrl } = {}) {
       type: 'text',
       text: '我是你的 AI 猎头助手。我会读取你已授权的职位、人才和进展数据，先给判断，再给可执行的下一步。',
     },
-    { type: 'context', text: '点一个入口开始，也可以像和同事说话一样直接提问。' },
+    { type: 'context', text: '第一次使用：先点“检查我的开工状态” → 看今日职位 → 选中职位后启动项目群和找人。也可以像和同事说话一样直接提问。' },
     { type: 'divider' },
     { type: 'buttons', buttons: ACTIONS.slice(0, 2).map(toButton) },
     { type: 'buttons', buttons: ACTIONS.slice(2, 4).map(toButton) },
     { type: 'buttons', buttons: ACTIONS.slice(4, 6).map(toButton) },
     { type: 'buttons', buttons: [
-      ...ACTIONS.slice(6).map(toButton),
+      ...ACTIONS.slice(6, 8).map(toButton),
       ...(modelSettingsUrl ? [{ label: '配置我的模型', url: modelSettingsUrl, priority: 90 }] : []),
     ] },
   ];
@@ -68,7 +72,7 @@ export function createBraintexHomePresentation({ publicBaseUrl } = {}) {
   }
   blocks.push({
     type: 'context',
-    text: '机器人可读授权职位负责人；接单、启动找人、保存设置和记录进展会先确认。每位顾问的模型和密钥独立配置，群聊不会借用个人密钥。输入 /brainx 回到这里。',
+    text: '公司默认模型已由服务器统一提供，不需要在聊天里发 API Key。接单、启动找人、保存设置和记录进展会先确认；群里必须 @ 机器人。输入 /brainx 随时回到这里。',
   });
   return { title: 'BrainTex · 你的 AI 猎头助手', tone: 'info', blocks };
 }
@@ -93,7 +97,10 @@ export function createBraintexHomeCommand({ publicBaseUrl = process.env.BRAINX_B
     requireAuth: true,
     handler: async (ctx) => {
       if (ctx.channel !== 'feishu' || !ctx.isAuthorizedSender) {
-        return { text: '当前账号暂未获得 BrainTex 使用权限。', isError: true };
+        return {
+          text: '当前账号暂未获得 BrainTex 使用权限。请联系 BrainTex 管理员从已核验花名册为你开通；不要在聊天里发送 open_id、TTC 凭证或 API Key。',
+          isError: true,
+        };
       }
       return {
         text: '选择一个功能开始，或直接告诉我你想解决的问题。',

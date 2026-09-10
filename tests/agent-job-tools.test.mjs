@@ -26,6 +26,19 @@ test('me context 与 daily brief 只读取当前顾问并提供证据/未知', a
   const me = await handlers.brainx_me_context({}, context('felix', 'self_context'));
   assert.equal(me.data.consultant_ref, 'self');
   assert.equal(me.data.display_name, 'Felix 黄鑫');
+  assert.deepEqual(me.data.onboarding, {
+    bot_identity: 'ready',
+    job_recommendations: 'ready',
+    openmai_search: 'action_required',
+    daily_recommendations: 'ready',
+    daily_times: ['07:00', '19:00'],
+    daily_job_count: 3,
+    blockers: [{
+      code: 'OPENMAI_ACCESS_MISSING', owner: 'BrainTex 管理员',
+      action: '核验并授权团队 TTC/OpenMai 凭证',
+    }],
+  });
+  assert.equal(JSON.stringify(me).includes('credential_owner_consultant_id'), false);
   const brief = await handlers.brainx_daily_brief({ limit: 3 }, context('felix', 'daily_brief'));
   assert.ok(brief.facts.length > 0);
   assert.ok(brief.facts.length <= 3);

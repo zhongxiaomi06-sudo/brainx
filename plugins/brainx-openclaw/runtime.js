@@ -1,7 +1,7 @@
 import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
 
 const GATEWAY_URL = 'http://127.0.0.1:3102/internal/v1/agent/tools';
-const PLUGIN_VERSION = '1.3.7';
+const PLUGIN_VERSION = '1.3.8';
 const OPENCLAW_VERSION = '2026.7.1-2';
 const string = (extra = {}) => ({ type: 'string', minLength: 1, maxLength: 512, ...extra });
 const integer = (minimum, maximum) => ({ type: 'integer', minimum, maximum });
@@ -12,7 +12,7 @@ const object = (properties, required = []) => ({
 });
 
 export const BRAINX_OPENCLAW_TOOLS = Object.freeze([
-  { name: 'brainx_me_context', purpose: () => 'self_context', parameters: object({}), description: '读取当前顾问本人脱敏工作上下文。' },
+  { name: 'brainx_me_context', purpose: () => 'self_context', parameters: object({}), description: '读取当前顾问本人脱敏工作上下文和开工就绪状态；可用于首次使用自检。' },
   { name: 'brainx_daily_brief', purpose: () => 'daily_brief', parameters: object({ date: string({ pattern: '^\\d{4}-\\d{2}-\\d{2}$' }), limit: integer(1, 10) }), description: '读取当前顾问今日优先事项与依据。' },
   { name: 'brainx_job_assessment', purpose: () => 'job_review', parameters: object({ job_id: string() }, ['job_id']), description: '判断授权职位是否值得投入并返回证据。' },
   { name: 'brainx_candidate_shortlist', purpose: () => 'candidate_review', parameters: object({ job_id: string(), page_token: string(), limit: integer(1, 5) }, ['job_id']), description: '读取授权职位的脱敏候选人 shortlist。' },

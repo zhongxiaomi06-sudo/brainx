@@ -47,7 +47,7 @@
 
 飞书卡片对象深链不新增视觉组件，复用完整工作台、`JobDetailCard` 和真实数据入口三态的既有 Storybook。生产代码只接受 HTTPS 基址，职位与回放在正式数据加载并完成 Web 会话鉴权后打开；候选引用只用于预填对话问题。深链不携带 consultant、tenant、open_id、token 或 scope，也不能替代后端对象权限检查。接入状态见[飞书卡片 HTTPS 深链接入记录](frontend-reviews/2026-09-03-feishu-card-deep-links.md)。
 
-BrainTex 飞书功能首页不在 React Storybook 里复制一套仿真卡片；仓库输出 OpenClaw 通用 `presentation`，由锁定版官方飞书渠道生成真实卡片 2.0。因此 Storybook 状态保持“未开始”，视觉验收必须在真实飞书客户端完成，自动测试只验证内容、按钮命令、HTTPS 和授权边界。状态见 [BrainTex 飞书功能首页审核记录](frontend-reviews/2026-09-03-braintex-feishu-home.md)。
+BrainTex 飞书功能首页不在 React Storybook 里复制一套仿真卡片；仓库输出 OpenClaw 通用 `presentation`，由锁定版官方飞书渠道生成真实卡片 2.0。因此 Storybook 状态保持“未开始”，视觉验收必须在真实飞书客户端完成，自动测试只验证内容、首次开工指引、脱敏就绪状态、按钮命令、HTTPS 和授权边界。状态见 [BrainTex 飞书功能首页审核记录](frontend-reviews/2026-09-03-braintex-feishu-home.md)。
 
 BrainTex 每日推荐卡不在 Storybook 复制飞书组件；条数来自本人配置，正文组织为结论、依据、风险和下一步，URL 只负责打开已鉴权的正式工作台。2026-09-03 已在目标飞书验证原生互动卡；普通自然语言回复的 `presentation` typed hook 已实现，但当前锁定版 Feishu 自动回复路径没有传入该 hook，仍需升级或修复后再验收。候选 Case 专页尚未设计，不能把底层状态工具记为前端完成。状态见 [BrainTex 富卡片与业务闭环审核记录](frontend-reviews/2026-09-03-braintex-rich-cards-loop.md)。
 

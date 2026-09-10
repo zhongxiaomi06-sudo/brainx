@@ -8,6 +8,7 @@ import { supermaiCriteriaKey, startSupermaiScoutTask } from '../supermai-sourcin
 import { extractOpenmaiCandidates } from '../openmai-delivery.js';
 import { getPushPreferences } from '../push-preferences.js';
 import { nextSearchExclusions } from '../search-rounds.js';
+import { ttcOpenmaiAuthStatus } from '../ttcsdk/auth.js';
 
 function fail(code) {
   throw Object.assign(new Error(code), { code });
@@ -68,6 +69,12 @@ function meContext(db, principal) {
       SUM(CASE WHEN state='ACCEPTED' THEN 1 ELSE 0 END) accepted,
       COUNT(*) total
     FROM current_engagement WHERE consultant_id=?`).get(principal.consultantId);
+  const latest = latestRun(db, principal.consultantId, { hideEngaged: true });
+  const search = ttcOpenmaiAuthStatus(db, principal.consultantId);
+  const push = getPushPreferences(db, principal.consultantId);
+  const blockers = [];
+  if (!latest) blockers.push({ code: 'JOB_RECOMMENDATION_MISSING', owner: '运营管理员', action: '先同步职位并完成一轮正式推荐计算' });
+  if (!search.connected) blockers.push({ code: 'OPENMAI_ACCESS_MISSING', owner: 'BrainTex 管理员', action: '核验并授权团队 TTC/OpenMai 凭证' });
   return {
     data: {
       consultant_ref: 'self',
@@ -75,8 +82,22 @@ function meContext(db, principal) {
       profile_keywords: principal.chatType === 'p2p' ? consultant.profile_keywords || [] : [],
       accepted_count: Number(counts.accepted || 0),
       engaged_count: Number(counts.total || 0),
+      onboarding: {
+        bot_identity: 'ready',
+        job_recommendations: latest ? 'ready' : 'action_required',
+        openmai_search: search.connected ? 'ready' : 'action_required',
+        daily_recommendations: push?.enabled ? 'ready' : 'disabled',
+        daily_times: push?.times || [],
+        daily_job_count: push?.job_count || 0,
+        blockers,
+      },
     },
-    facts: [], inferences: [], recommendations: [], unknowns: [], evidence_refs: ['consultant:self'],
+    facts: [], inferences: [], recommendations: blockers.map((item) => ({
+      action: item.action, owner: item.owner,
+    })),
+    unknowns: blockers.map((item) => item.code),
+    evidence_refs: ['consultant:self', 'consultant_preferences:self',
+      ...(latest ? [`decision_run:${latest.run.run_id}`] : [])],
   };
 }
 

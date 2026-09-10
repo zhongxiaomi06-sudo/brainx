@@ -75,7 +75,12 @@ async function fetchCrmJob(jwt, jobId) {
     unique_ids: [jobId], summary_chars: 1200,
   });
   const job = data?.jobs?.[0];
-  if (!job) throw new Error('职位不存在，或当前顾问无权查看该职位');
+  if (!job) {
+    // specs/012：查无真身用结构化标记与 401/403/HTTP 错区分（只有 NOT_FOUND 允许绑定/降级）
+    const e = new Error('职位不存在，或当前顾问无权查看该职位');
+    e.code = 'JOB_NOT_FOUND';
+    throw e;
+  }
   return job;
 }
 
@@ -230,13 +235,45 @@ export function startOpenmaiTask(db, bus, consultant_id, project_id, {
     let status = 'failed';
     let settled = false;
     try {
-      // P-FIX 占位职位（CSV/Bitable 源）：source_url 记录了 TTC 真身（ttc://job/<unique_id>）→ 用真身查 CRM；
-      // 无真身的纯占位（feishu://base 源）TTC 查无 → 报"职位不存在"属预期（历史数据无 ATS 映射）
-      const row = db.prepare('SELECT source_url FROM job_facts WHERE project_id=?').get(project_id);
-      const realId = row?.source_url && String(row.source_url).startsWith('ttc://job/')
-        ? String(row.source_url).slice('ttc://job/'.length).trim() : project_id;
-      const job = await fetchCrmJob(jwt, realId);
-      let result = await callOpenmai(jwt, job, brief, exclusions);
+      // P-FIX 占位职位（CSV/Bitable 源）：source_url 记录了 TTC 真身（ttc://job/<unique_id>）→ 用真身查 CRM。
+      // specs/012 三级递进（只影响 CRM 查无 JOB_NOT_FOUND 分支；401/403/HTTP 错一律照抛，不得掩盖凭证问题）：
+      //   ① 显式映射 → job 模式（不变）；② pj_* 自建岗且同公司同名岗位已有真身 → 自动绑定（回写 source_url）；
+      //   ③ pj_* 自建岗无真身 → 判据降级（不带 job_id，company/role/pipeline 拼判据）；④ 非自建岗保持原报错。
+      const row = db.prepare('SELECT company, role, city, pipeline, hc, source_url FROM job_facts WHERE project_id=?').get(project_id);
+      const mappedId = row?.source_url && String(row.source_url).startsWith('ttc://job/')
+        ? String(row.source_url).slice('ttc://job/'.length).trim() : null;
+      const selfBuilt = row != null && !mappedId && project_id.startsWith('pj_');
+      let job = null;
+      try {
+        job = await fetchCrmJob(jwt, mappedId || project_id);
+      } catch (e) {
+        if (e?.code !== 'JOB_NOT_FOUND' || !selfBuilt) throw e;
+        const twin = db.prepare(`SELECT source_url FROM job_facts
+          WHERE project_id != ? AND company = ? AND role = ? AND source_url LIKE 'ttc://job/%'
+          ORDER BY updated_at DESC LIMIT 1`).get(project_id, row.company, row.role);
+        if (twin?.source_url) {
+          job = await fetchCrmJob(jwt, String(twin.source_url).slice('ttc://job/'.length).trim());
+          db.prepare('UPDATE job_facts SET source_url=?, updated_at=? WHERE project_id=?')
+            .run(twin.source_url, now(), project_id);
+        }
+        // 无同名真身：job 保持 null → 走判据降级
+      }
+      let result;
+      if (job) {
+        result = await callOpenmai(jwt, job, brief, exclusions);
+      } else {
+        const pseudoJob = {
+          unique_id: project_id,
+          name: row.role || '',
+          cities: row.city ? [row.city] : [],
+          salary: '',
+          analytics_summary: [row.company ? `公司：${row.company}` : null, row.pipeline,
+            row.hc ? `HC：${row.hc}` : null].filter(Boolean).join('；'),
+          description_summary: '',
+        };
+        result = await callOpenmaiContent(jwt, buildPrompt(pseudoJob, brief, exclusions)
+          + '\n【自建岗说明】该职位为 BrainX 自建岗，没有 TTC ATS 编号；请严格按上面的公司、岗位与画像判据找人，不得以缺少职位描述为由停止。', {});
+      }
       // 会话污染防护（2026-09-09）：拿到元回复自动重试一次，仍污染则失败关闭
       if (looksLikeSessionPollution(result)) {
         console.warn('[openmai] session pollution detected, retrying once:', task_id);

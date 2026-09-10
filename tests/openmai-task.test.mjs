@@ -122,3 +122,152 @@ test('显式启动会把顾问补充条件真正传入 OpenMai 请求', async ()
     db.close();
   }
 });
+
+// ===== specs/012 自建岗绑定与判据降级 =====
+
+function seedJobFacts(db, projectId, { company, role, sourceUrl = null, city = '杭州' } = {}) {
+  const syncId = db.prepare('SELECT sync_id FROM sync_runs ORDER BY rowid DESC LIMIT 1').get().sync_id;
+  db.prepare(`INSERT INTO job_facts
+    (project_id, company, role, city, pipeline, hc, active_state, source_url, captured_at, sync_id, raw_json, updated_at)
+    VALUES (?,?,?,?,?,?, 'OPEN', ?, ?, ?, '{}', ?)`)
+    .run(projectId, company, role, city, '岗位核心快照', 1, sourceUrl, syncId, syncId, syncId);
+}
+
+function mockFetch(calls, { crmJobs, completionsFail = false } = {}) {
+  return async (url, init = {}) => {
+    calls.push({ url: String(url), body: init.body ? JSON.parse(init.body) : null });
+    if (String(url).includes('/api/crm/v1/openmai/jobs/detail')) {
+      const jobs = crmJobs || [];
+      return new Response(JSON.stringify({ code: 0, data: { jobs } }), { status: 200 });
+    }
+    if (completionsFail) return new Response('server error', { status: 500 });
+    const stream = new ReadableStream({
+      start(c) {
+        c.enqueue(new TextEncoder().encode('data: {"done":true,"canonical_content":"候选人结果"}\n\n'));
+        c.close();
+      },
+    });
+    return new Response(stream, { status: 200 });
+  };
+}
+
+async function runToSettled(db, consultantId, projectId) {
+  assert.equal(startOpenmaiTask(db, null, consultantId, projectId, { searchBrief: '测试判据' }).status, 'triggered');
+  const deadline = Date.now() + 2000;
+  while (getOpenmaiResult(db, consultantId, projectId).status === 'running' && Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 20));
+  }
+}
+
+test('specs/012 显式映射路径不变：P-FIX 带 ttc://job/ 真身照旧 job 模式', async () => {
+  const db = openDb(':memory:');
+  runSync(db, { source: 'fixture', consultant_id: 'felix' });
+  saveTtcToken(db, 'felix', JWT, { userName: 'F', personId: 'p', expiresAt: '2099-01-01T00:00:00.000Z' });
+  seedJobFacts(db, 'P-FIX-MAP01', { company: '甲公司', role: '测试', sourceUrl: 'ttc://job/J-MAPPED' });
+  const calls = [];
+  const orig = global.fetch;
+  global.fetch = mockFetch(calls, { crmJobs: [{ unique_id: 'J-MAPPED', name: '测试' }] });
+  try {
+    await runToSettled(db, 'felix', 'P-FIX-MAP01');
+    assert.equal(calls[0].body.unique_ids[0], 'J-MAPPED', '用映射真身查 CRM');
+    assert.equal(calls[1].body.job_id, 'J-MAPPED', 'completions 带 CRM job_id');
+    assert.equal(getOpenmaiResult(db, 'felix', 'P-FIX-MAP01').status, 'done');
+  } finally { global.fetch = orig; db.close(); }
+});
+
+test('specs/012 自建岗命中同公司同名真身 → 自动绑定（回写 source_url）并走 job 模式', async () => {
+  const db = openDb(':memory:');
+  runSync(db, { source: 'fixture', consultant_id: 'felix' });
+  saveTtcToken(db, 'felix', JWT, { userName: 'F', personId: 'p', expiresAt: '2099-01-01T00:00:00.000Z' });
+  seedJobFacts(db, 'pj_aaa', { company: '长角鹿科技', role: '国内商业化负责人', sourceUrl: null });
+  seedJobFacts(db, 'P-FIX-TWIN1', { company: '长角鹿科技', role: '国内商业化负责人', sourceUrl: 'ttc://job/J-REAL' });
+  const calls = [];
+  const orig = global.fetch;
+  global.fetch = mockFetch(calls, { crmJobs: [] }); // pj_aaa 首查无 → 走绑定；仅真身可查到
+  const origFetch = global.fetch;
+  global.fetch = async (url, init = {}) => {
+    const body = init.body ? JSON.parse(init.body) : null;
+    calls.push({ url: String(url), body });
+    if (String(url).includes('/api/crm/v1/openmai/jobs/detail')) {
+      const hit = body?.unique_ids?.[0] === 'J-REAL'
+        ? [{ unique_id: 'J-REAL', name: '国内商业化负责人' }] : [];
+      return new Response(JSON.stringify({ code: 0, data: { jobs: hit } }), { status: 200 });
+    }
+    return origFetch(url, init);
+  };
+  try {
+    await runToSettled(db, 'felix', 'pj_aaa');
+    const detail = calls.filter((c) => c.url.includes('jobs/detail'));
+    const completions = calls.filter((c) => c.url.includes('/completions'));
+    assert.equal(detail.length, 2, '先查 pj_id（查无）再用真身查');
+    assert.equal(detail[0].body.unique_ids[0], 'pj_aaa');
+    assert.equal(detail[1].body.unique_ids[0], 'J-REAL', '绑定后用真身查 CRM');
+    assert.equal(completions[0].body.job_id, 'J-REAL', 'job 模式带 CRM job_id');
+    assert.equal(db.prepare('SELECT source_url FROM job_facts WHERE project_id=?').get('pj_aaa').source_url,
+      'ttc://job/J-REAL', '绑定回写 source_url');
+    assert.equal(getOpenmaiResult(db, 'felix', 'pj_aaa').status, 'done');
+  } finally { global.fetch = orig; db.close(); }
+});
+
+test('specs/012 自建岗无真身 → 判据降级：completions 不带 job_id，prompt 含公司/岗位/自建岗说明', async () => {
+  const db = openDb(':memory:');
+  runSync(db, { source: 'fixture', consultant_id: 'felix' });
+  saveTtcToken(db, 'felix', JWT, { userName: 'F', personId: 'p', expiresAt: '2099-01-01T00:00:00.000Z' });
+  seedJobFacts(db, 'pj_bbb', { company: '长角鹿科技', role: '海外投放负责人' });
+  const calls = [];
+  const orig = global.fetch;
+  global.fetch = mockFetch(calls, { crmJobs: [] }); // CRM 查无 + 无同名真身
+  try {
+    await runToSettled(db, 'felix', 'pj_bbb');
+    assert.ok(calls.every((c) => !c.url.includes('/api/crm/v1/openmai/jobs/detail') || c.body.unique_ids[0] === 'pj_bbb'),
+      '首次尝试用 pj_id 查 CRM');
+    const completions = calls.filter((c) => c.url.includes('/completions'));
+    assert.equal(completions.length, 1);
+    assert.equal(completions[0].body.job_id, undefined, '判据模式不带 job_id');
+    assert.match(completions[0].body.content, /长角鹿科技/);
+    assert.match(completions[0].body.content, /海外投放负责人/);
+    assert.match(completions[0].body.content, /岗位核心快照/, 'pipeline 画像进 prompt');
+    assert.match(completions[0].body.content, /自建岗说明/);
+    assert.equal(getOpenmaiResult(db, 'felix', 'pj_bbb').status, 'done', '结果照常落库');
+  } finally { global.fetch = orig; db.close(); }
+});
+
+test('specs/012 非 pj_ 岗位 CRM 查无 → 保持原报错语义', async () => {
+  const db = openDb(':memory:');
+  runSync(db, { source: 'fixture', consultant_id: 'felix' });
+  saveTtcToken(db, 'felix', JWT, { userName: 'F', personId: 'p', expiresAt: '2099-01-01T00:00:00.000Z' });
+  seedJobFacts(db, 'J-GHOST1', { company: '乙公司', role: '不存在岗', sourceUrl: null });
+  const calls = [];
+  const orig = global.fetch;
+  global.fetch = mockFetch(calls, { crmJobs: [] });
+  try {
+    await runToSettled(db, 'felix', 'J-GHOST1');
+    const stored = getOpenmaiResult(db, 'felix', 'J-GHOST1');
+    assert.equal(stored.status, 'failed');
+    assert.match(stored.error, /职位不存在，或当前顾问无权查看该职位/);
+    assert.equal(calls.filter((c) => c.url.includes('/completions')).length, 0, '不降级、不调 completions');
+  } finally { global.fetch = orig; db.close(); }
+});
+
+test('specs/012 CRM 凭证失效（401）→ 不降级，报凭证错误', async () => {
+  const db = openDb(':memory:');
+  runSync(db, { source: 'fixture', consultant_id: 'felix' });
+  saveTtcToken(db, 'felix', JWT, { userName: 'F', personId: 'p', expiresAt: '2099-01-01T00:00:00.000Z' });
+  seedJobFacts(db, 'pj_ccc', { company: '丙公司', role: '测试岗' });
+  const calls = [];
+  const orig = global.fetch;
+  global.fetch = async (url) => {
+    calls.push({ url: String(url) });
+    if (String(url).includes('/api/crm/v1/openmai/jobs/detail')) {
+      return new Response(JSON.stringify({ code: 99991672, msg: 'token invalid' }), { status: 401 });
+    }
+    return new Response('{}', { status: 200 });
+  };
+  try {
+    await runToSettled(db, 'felix', 'pj_ccc');
+    const stored = getOpenmaiResult(db, 'felix', 'pj_ccc');
+    assert.equal(stored.status, 'failed');
+    assert.match(stored.error, /TTC 凭证失效/);
+    assert.equal(calls.filter((c) => c.url.includes('/completions')).length, 0, '凭证错误绝不降级');
+  } finally { global.fetch = orig; db.close(); }
+});

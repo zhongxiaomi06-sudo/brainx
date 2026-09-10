@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-11｜merge(main): 同步群内接单与三渠道项目卡
+
+- 合并：纳入远端 `main@6b7c9a0` 的群内受控接单、按承接状态分岔的项目卡、接单后补发找人卡、强制补发命令和旧群接管设计稿，同时保留本分支的找人即时文字状态、候选人重点关注与 Offer 报告。
+- 冲突处理：OpenMai、SuperMai 和按条件找人继续携带即时状态标记与“worker 自动回群、Agent 不原地轮询”纪律；Reloop 维持同步内部人才库入口。远端已部署的 `0049_group_scope_job_action.sql` 保留原编号，本分支尚未进入主线的候选报告迁移顺延为 `0050_candidate_reports.sql`，避免迁移编号重复。
+- 验证：合并专项、迁移回归和快速门禁在提交前执行；结果见本条后续提交证据。
+
 ## 2026-09-10｜test(拉群): 对齐推荐卡先发卡顺序
 
 - 调整：推荐卡一键接单回归同步远端新契约，明确调用顺序为“建群 → 发职位卡 → OpenClaw 准入”，防止准入瞬时失败再次吞掉职位卡。
@@ -128,6 +134,24 @@
 - 交互：OpenMai 候选行把“发送卡片”和“□ 保留”合并为“重点关注”，一次完成收藏语义、项目共享上下文写入和人才卡投放。
 - 安全：只有职位唯一项目群会同步收到人才卡；卡片不含联系方式、简历原文或 PDF，TTC 链接仍由登录与权限控制，重复点击复用确定性消息 UUID。
 - 验证：候选表格、重点名单、发卡、来源群、自然语言建群和插件提示专项 27/27 通过。
+## 2026-09-10｜docs(项目群): 机器人进旧群自动发「绑定职位」卡设计稿（specs/015，未实现）
+
+- 背景：用户提出「把机器人拉到旧群，拉进去第一件事也是弹卡片开始找人」。当前只有「工作台接单→系统建群」才发卡，旧群拉机器人后 openclaw 无白名单、agent_group_scopes 无记录 → 完全不响应。
+- 设计要点：①受既有约束（不开第二条长连接、插件对 `im.chat.member.bot.added_v1` 只记日志、不改第三方安装目录）→ **入群感知只能轮询 `GET /open-apis/im/v1/chats`**；②首轮只做基线不发卡，避免上线即轰炸历史群（含死群 oc_5494e54）；③migration 0050 建 `bot_chat_intake`；④新增 `agent_group_scopes.scope_status='PENDING_BINDING'` 待绑定态——sender 放宽为群内任意成员但**只放行 `group_binding` 单一 purpose**，绑定成功后收紧为正常 scope；⑤新工具 `brainx_bind_group_project`（chat_id 取自 principal，不可由参数传）绑定后补发找人卡。
+- 外部群部分：需用户本人在飞书开放平台开启「对外共享」（助理工号无法代操作）；开启后建群带外部成员 open_id、`232033` 回退内部群。
+- 交付：specs/015-group-intake/spec.md（设计稿）+ docs/README.md 路由登记。**等用户拍板后再实现。**
+
+## 2026-09-10｜feat(项目群): 群内直接接单 + 卡片按承接状态分岔（OpenMai/Reloop/SuperMai + 条件输入）（specs/014 阶段一）
+
+- 上游事故：22:14 york 点卡片「OpenMai 继续找人」→ `JOB_NOT_ACCEPTED`，机器人回「可以在这里说帮我接单」；22:23 他照做说「帮我接单」→ `brainx_accept_job` 返回 `NOT_FOUND_OR_FORBIDDEN`，机器人只能让他去私聊/工作台。**根因不是故障，是设计自相矛盾**：卡片把顾问引向群内接单，但 `brainx_accept_job` 声明 `p2pOnly: true`，且项目群 scope 的 purposes 不含 `job_action`。
+- 修法：①`brainx_accept_job` 改 `groupRequiresProject: true`（仍要求群已登记 + 说话人在 allowed_senders + job 属于该群 project_refs + `confirm: true`），只放开这一个工具，`start_candidate_search`/`record_job_progress`/`me_context` 等保持 p2pOnly，不放大群内写面；②`GROUP_PURPOSES` 增 `job_action`；③migration `0049` 用 `json_insert` + `NOT EXISTS` 给存量 ACTIVE 群 scope 幂等补齐 `job_action`（脏 JSON/非 ACTIVE 行跳过）；④`buildProjectLaunchCard(job, { state })` 按承接状态分岔——未接单只给「接单」主按钮（避免再出现点找人被 JOB_NOT_ACCEPTED 打回），已接单给 OpenMai / Reloop（`brainx_candidate_shortlist`，此前卡片缺内部人才库入口）/ SuperMai 三按钮 + `criteria` 输入框 +「按条件找人」；⑤发卡处按 `currentState` 传状态。
+- 已知限制与应对：openclaw 飞书插件不解析卡片 `form_value`（dist 全仓无该字段，card action 只把按钮 `value.text` 合成文本消息），输入值可能丢失 → 按钮指令自带三级兜底（卡片输入值 → 群里最近一条「找人条件：」→ 职位事实），并明确「不要再询问找人方式」，填了不生效也不会卡死。后续可自建长连接直接消费 `card.action.trigger` 彻底解决。
+- 改动文件：src/agent-gateway/tool-registry.js、src/project-launch.js、migrations/0049_group_scope_job_action.sql（新）、tests/project-launch-card.test.mjs（新，5 组）、tests/project-launch.test.mjs（断言同步）、tests/framework.test.mjs（迁移清单 50→51）、docs/README.md、specs/014（spec/plan/tasks）。
+- 验证：新增专项 5/5 通过；后端全量 `npm test` 651/651 通过；full 门禁 24/24 通过。
+- 追加二（同线）：**接单成功后自动补一张找人卡**。只放开群内接单还不够——顾问手上那张未接单卡点完「接单」后仍停在接单按钮，点第二次就报错，等于又回到死循环。`createActionToolHandlers` 增 `sendCardFn`，接单成功后按 `project_launches.chat_id` 补发 ACCEPTED 版卡片（三找人按钮 + 输入框），uuid `accepted-card:<job>:<chat>` 幂等；发卡失败只静默，不回滚已成功的接单。
+- 追加（同线）：`launch-redeliver` 增 `--force true`——群已 READY 时默认幂等跳过，卡片结构或承接状态变了要重发时必须强制；force 不重建群、只发新卡并换新的发送幂等键（否则飞书按 uuid 去重导致「补发了但没收到」）。改动：src/project-launch.js（READY 早返回加 force 判断 + card uuid 后缀）、bin/brainx-agent-admin.mjs（透传 force）、tests/project-launch.test.mjs（新增 force 用例，12/12）。
+- 阶段二（待飞书后台开启「对外共享」）：默认建外部群 + `232033` 回退；外部联系人 open_id 登记；订阅 `im.chat.members:bot_access` 实现机器人进旧群自动发「绑定职位」卡。
+
 ## 2026-09-10｜fix(拉群): 拉群后必须立刻见卡——OpenClaw 群准入降级为后置补偿（specs/013）
 
 - 上游事故：20:01 york 工作台接单 JPTLM25（韬润半导体-业务助理）自动拉群，群建成功（oc_baf49b…）但**卡片没发**（message_id 空），launch 卡在 POST_JOB=OPENCLAW_GROUP_ALLOWLIST_FAILED；顾问 46 秒后退单，20:02:59 群内发言机器人无响应（openclaw 日志 `not in groupAllowFrom`）。手工重放准入一次即成功 → 瞬时故障被硬前置放大成整条链路报废。

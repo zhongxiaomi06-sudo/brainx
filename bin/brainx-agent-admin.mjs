@@ -98,6 +98,8 @@ if (command === 'bind-identity') {
   try {
     result = await launchProject(db, input.consultant, input.project, {
       idempotency_key: input['idempotency-key'] || `redeliver:${input.consultant}:${input.project}`,
+      // specs/014：force 重发一张卡片（卡片结构或承接状态变了时用），默认幂等跳过
+      force: input.force === 'true',
     }, {});
   } catch (error) {
     result = { ok: false, code: error.code || 'PROJECT_LAUNCH_FAILED',

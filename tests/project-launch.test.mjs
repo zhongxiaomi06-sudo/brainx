@@ -45,16 +45,14 @@ test('项目启动：建群、投放职位、绑定项目并激活群 Agent 范�
   // specs/013：卡片先发（calls[1]=send），OpenClaw 准入降为后置（calls[2]=allow）
   assert.equal(calls[1][1].target, 'oc_launch');
   assert.deepEqual(calls[2], ['allow', 'oc_launch', [calls[0][1].ownerOpenId]]);
-  const searchButtons = calls[1][1].card.elements
+  // specs/014：未接单时卡片只给「接单」按钮，不给出会导致 JOB_NOT_ACCEPTED 的找人按钮
+  const buttons = calls[1][1].card.elements
     .flatMap((element) => element.actions || []).filter((button) => button.value?.text);
-  assert.deepEqual(searchButtons.map((button) => button.text.content), ['OpenMai 找人', 'SuperMai 找人']);
-  assert.match(searchButtons[0].value.text, /brainx_openmai_search/);
-  assert.match(searchButtons[1].value.text, /brainx_supermai_scout/);
-  assert.ok(searchButtons.every((button) => button.value.text.startsWith('[BRAINTEX_SEARCH_START]')));
-  assert.ok(searchButtons.every((button) => button.value.text.includes('正在找人')));
-  assert.ok(searchButtons.every((button) => button.value.text.includes('结束本轮')));
-  assert.ok(searchButtons.every((button) => button.value.text.includes(`项目 ${PID}`)));
-  assert.match(calls[1][1].card.elements[1].content, /找人条件：/);
+  assert.deepEqual(buttons.map((button) => button.text.content), ['接单']);
+  assert.match(buttons[0].value.text, /brainx_accept_job/);
+  assert.match(buttons[0].value.text, /"confirm": true/);
+  assert.ok(buttons[0].value.text.includes(`项目 ${PID}`));
+  assert.match(calls[1][1].card.elements[1].content, /尚未接单/);
   assert.equal(db.prepare('SELECT chat_id FROM job_facts WHERE project_id=?').get(PID).chat_id, 'oc_launch');
   assert.equal(db.prepare('SELECT enabled FROM chat_contexts WHERE chat_id=?').get('oc_launch').enabled, 1);
   const scope = db.prepare('SELECT * FROM agent_group_scopes WHERE chat_id=?').get('oc_launch');
@@ -319,5 +317,34 @@ test('寻访启动：飞书投递耗尽后重新进入项目也不自动重试',
   assert.equal(searchCalls, 0);
   assert.equal(out.search.status, 'awaiting_method');
   assert.equal(out.launch.search_status, 'FAILED');
+  db.close();
+});
+
+test('项目启动：force 重发卡片——不重建群，只按当前状态补一张新卡（specs/014）', async () => {
+  const db = readyDb();
+  let creates = 0;
+  const keys = [];
+  const sends = [];
+  const deps = {
+    appConfigured: true, publicBaseUrl: 'https://base.yorkteam.cn/',
+    createProjectChat: async () => { creates++; return { chat_id: 'oc_redeliver', name: '补发群' }; },
+    ensureOpenClawGroupAllowed: async () => {},
+    sendInteractiveCard: async (input) => { keys.push(input.idempotencyKey); sends.push(input); return { message_id: 'om_new' }; },
+  };
+  await launchProject(db, 'felix', PID, { idempotency_key: 'rd-1' }, deps);
+  assert.equal(creates, 1);
+  assert.equal(sends.length, 1);
+
+  const again = await launchProject(db, 'felix', PID, { idempotency_key: 'rd-2' }, deps);
+  assert.equal(again.already, true);
+  assert.equal(sends.length, 1, '默认幂等：已 READY 不重复发卡');
+
+  const forced = await launchProject(db, 'felix', PID, { idempotency_key: 'rd-3', force: true }, deps);
+  assert.equal(forced.already, false);
+  assert.equal(creates, 1, 'force 不重建群');
+  assert.equal(sends.length, 2);
+  assert.equal(sends[1].target, 'oc_redeliver');
+  assert.notEqual(keys[1], keys[0], 'force 必须换新的发送幂等键，否则飞书会按 uuid 去重');
+  assert.equal(db.prepare('SELECT chat_id FROM project_launches WHERE project_id=?').get(PID).chat_id, 'oc_redeliver');
   db.close();
 });

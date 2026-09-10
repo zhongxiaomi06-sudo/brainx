@@ -226,6 +226,7 @@ ${JSON.stringify({ candidates: [
   assert.deepEqual(continueActions[0].actions.map((button) => button.text.content),
     ['OpenMai 继续找人', 'SuperMai 继续找人']);
   assert.ok(continueActions[0].actions.every((button) => button.value.text.includes('continue_search=true')));
+  assert.ok(continueActions[0].actions.every((button) => button.value.text.includes('continue_search 改为 false')));
   assert.ok(continueActions[0].actions.every((button) => button.value.text.includes('BrainX')));
   assert.doesNotMatch(JSON.stringify(card), /"content":"发送简历"|brainx_send_candidate_resume/);
 });

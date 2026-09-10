@@ -273,6 +273,7 @@ function pollDiscipline(startedAt, entry) {
     elapsed_minutes: mins,
     discipline: `找人任务进行中（${entry}），${mins != null ? `已运行 ${mins} 分钟、` : ''}正常 3-5 分钟收敛——`
       + '两次查询之间必须间隔至少 60 秒，禁止连续快速调用本工具；最多守候 10 分钟，'
+      + '若本任务由 continue_search=true 启动，轮询时必须改传 continue_search=false 或省略，绝不能再次传 true；'
       + '期间不要切换其他找人方式、不要尝试 read/exec 等文件工具（本环境不可用）。'
       + '结果就绪后必须把 result_text 完整呈现给顾问（保留每个候选人的「查看」链接）。'
       + '不要向顾问承诺任何「自动通知/设提醒」——本环境没有这类工具，超时未完成就如实告知顾问稍后再查。',
@@ -324,7 +325,8 @@ function openmaiSearch(db, args, principal) {
             note: out.status === 'error'
               ? '找人任务未启动，请处理提示后重试；正常启动后 3-5 分钟收敛，请每隔约 1 分钟读取进度'
               : '找人任务已触发，正常 3-5 分钟收敛；结果不会自动推送——请每隔约 1 分钟（间隔至少 60 秒）'
-                + '调用本工具读取（最多守候 10 分钟），完成后把 result_text 完整呈现给顾问（保留「查看」链接）' },
+                + '调用本工具读取（最多守候 10 分钟）；如果本次 continue_search=true，轮询必须改为 false 或省略，'
+                + '完成后把 result_text 完整呈现给顾问（保留「查看」链接）' },
     facts: [], inferences: [], recommendations: [], unknowns: [],
     evidence_refs: [`openmai:${out.task_id || args.job_id}`],
   };
@@ -389,7 +391,8 @@ function supermaiScout(db, args, principal) {
               : out.status === 'error'
                 ? '找人任务未启动，请处理提示后重试；正常启动后 3-5 分钟收敛，请每隔约 1 分钟读取进度'
               : jobId ? '找人任务已触发，正常 3-5 分钟收敛；结果不会自动推送——请每隔约 1 分钟（间隔至少 60 秒）'
-                + '调用本工具读取（最多守候 10 分钟），完成后把 result_text 完整呈现给顾问（保留「查看」链接）'
+                + '调用本工具读取（最多守候 10 分钟）；如果本次 continue_search=true，轮询必须改为 false 或省略，'
+                + '完成后把 result_text 完整呈现给顾问（保留「查看」链接）'
                 : '找人任务已触发，正常 3-5 分钟收敛；请每隔约 1 分钟（间隔至少 60 秒）再调本工具读取'
                 + '（最多守候 10 分钟），完成后完整呈现 result_text（保留「查看」链接）' },
     facts: [], inferences: [], recommendations: [], unknowns: [],

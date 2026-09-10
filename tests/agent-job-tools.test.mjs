@@ -287,6 +287,7 @@ test('找人任务 running/触发响应内嵌守候纪律（2026-09-09 事故：
   assert.ok(guard.includes('不要尝试 read/exec'), 'running 响应禁止尝试被禁工具');
   // 2026-09-10 晚 wendy 会话教训：1-2 秒连打 40 次后放弃守候 + 虚假承诺设提醒
   assert.ok(guard.includes('间隔至少 60 秒'), 'running 响应硬性规定查询间隔');
+  assert.ok(guard.includes('continue_search=false'), '继续找人轮询必须撤掉新一轮启动标记');
   assert.ok(guard.includes('已运行'), 'running 响应带已运行时长锚点');
   assert.ok(typeof running.data.elapsed_seconds === 'number' && running.data.elapsed_seconds >= 0,
     'running 响应 data 带 elapsed_seconds');

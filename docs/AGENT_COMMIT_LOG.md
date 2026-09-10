@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-10｜docs(项目群): 机器人进旧群自动发「绑定职位」卡设计稿（specs/015，未实现）
+
+- 背景：用户提出「把机器人拉到旧群，拉进去第一件事也是弹卡片开始找人」。当前只有「工作台接单→系统建群」才发卡，旧群拉机器人后 openclaw 无白名单、agent_group_scopes 无记录 → 完全不响应。
+- 设计要点：①受既有约束（不开第二条长连接、插件对 `im.chat.member.bot.added_v1` 只记日志、不改第三方安装目录）→ **入群感知只能轮询 `GET /open-apis/im/v1/chats`**；②首轮只做基线不发卡，避免上线即轰炸历史群（含死群 oc_5494e54）；③migration 0050 建 `bot_chat_intake`；④新增 `agent_group_scopes.scope_status='PENDING_BINDING'` 待绑定态——sender 放宽为群内任意成员但**只放行 `group_binding` 单一 purpose**，绑定成功后收紧为正常 scope；⑤新工具 `brainx_bind_group_project`（chat_id 取自 principal，不可由参数传）绑定后补发找人卡。
+- 外部群部分：需用户本人在飞书开放平台开启「对外共享」（助理工号无法代操作）；开启后建群带外部成员 open_id、`232033` 回退内部群。
+- 交付：specs/015-group-intake/spec.md（设计稿）+ docs/README.md 路由登记。**等用户拍板后再实现。**
+
 ## 2026-09-10｜feat(项目群): 群内直接接单 + 卡片按承接状态分岔（OpenMai/Reloop/SuperMai + 条件输入）（specs/014 阶段一）
 
 - 上游事故：22:14 york 点卡片「OpenMai 继续找人」→ `JOB_NOT_ACCEPTED`，机器人回「可以在这里说帮我接单」；22:23 他照做说「帮我接单」→ `brainx_accept_job` 返回 `NOT_FOUND_OR_FORBIDDEN`，机器人只能让他去私聊/工作台。**根因不是故障，是设计自相矛盾**：卡片把顾问引向群内接单，但 `brainx_accept_job` 声明 `p2pOnly: true`，且项目群 scope 的 purposes 不含 `job_action`。

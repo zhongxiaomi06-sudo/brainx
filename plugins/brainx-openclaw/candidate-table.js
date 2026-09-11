@@ -56,22 +56,6 @@ function safeTtcTalentUrl(value) {
   return null;
 }
 
-function cell(content, weight = 1, elements) {
-  return {
-    tag: 'column', width: 'weighted', weight, vertical_align: 'center',
-    elements: elements || [{ tag: 'div', text: { tag: 'plain_text', content } }],
-  };
-}
-
-function tableHeader() {
-  return {
-    tag: 'column_set', flex_mode: 'none', background_style: 'grey', columns: [
-      cell('候选人 / 当前岗位', 3), cell('经验 / 城市', 2), cell('学历', 2),
-      cell('核心匹配点', 5), cell('匹配度', 1), cell('操作', 3),
-    ],
-  };
-}
-
 function candidateRefFromUrl(value) {
   try {
     const url = new URL(value);
@@ -84,7 +68,9 @@ function candidateRefFromUrl(value) {
 
 function callbackButton(label, command) {
   return { tag: 'button', type: 'default', text: { tag: 'plain_text', content: label },
-    behaviors: [{ type: 'callback', value: { text: command } }] };
+    behaviors: [{ type: 'callback', value: {
+      oc: 'ocf1', k: 'quick', a: 'feishu.payload.button', q: command,
+    } }] };
 }
 
 function screeningCommand(candidateRef) {
@@ -101,20 +87,22 @@ function demoFavoriteCommand(candidateRef) {
 
 function candidateRow(candidate) {
   const candidateRef = candidateRefFromUrl(candidate.url);
-  const action = candidate.url ? [
+  const actions = candidate.url ? [
     { tag: 'button', type: 'primary', text: { tag: 'plain_text', content: '查看人才' },
       behaviors: [{ type: 'open_url', default_url: candidate.url }] },
     callbackButton('初筛通过', screeningCommand(candidateRef)),
     callbackButton('收藏', demoFavoriteCommand(candidateRef)),
-  ] : [{ tag: 'div', text: { tag: 'plain_text', content: '链接待核实' } }];
-  return {
-    tag: 'column_set', flex_mode: 'none', background_style: 'default', columns: [
-      cell(`${candidate.name}\n${candidate.role}`, 3),
-      cell([candidate.experience, candidate.city].filter(Boolean).join(' · ') || '待核实', 2),
-      cell(candidate.education || '待核实', 2), cell(candidate.match || '待核实', 5),
-      cell(candidate.score || '—', 1), cell('', 3, action),
-    ],
-  };
+  ] : [];
+  const facts = [
+    `**${candidate.name}｜${candidate.role}**`,
+    [candidate.experience, candidate.city, candidate.education].filter(Boolean).join(' · ')
+      || '基础信息待核实',
+    `匹配点：${candidate.match || '待核实'}${candidate.score ? ` · 匹配度 ${candidate.score}` : ''}`,
+  ];
+  return [
+    { tag: 'markdown', content: facts.join('\n') },
+    ...(actions.length ? actions : [{ tag: 'markdown', content: '链接待核实' }]),
+  ];
 }
 
 export function parseCandidateTableReply(value) {
@@ -162,7 +150,9 @@ export function parseCandidateTableReply(value) {
     header: { template: 'blue', title: { tag: 'plain_text', content: title } },
     body: { elements: [
       ...(intro ? [{ tag: 'div', text: { tag: 'plain_text', content: intro } }] : []),
-      tableHeader(), ...candidates.map(candidateRow),
+      ...candidates.flatMap((candidate, index) => [
+        ...(index ? [{ tag: 'hr' }] : []), ...candidateRow(candidate),
+      ]),
       { tag: 'div', text: { tag: 'plain_text', content: '“初筛通过”会发送标准人才卡；“收藏”仅显示确认，不写入人才库。' } },
     ] },
   };

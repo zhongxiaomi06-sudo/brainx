@@ -118,18 +118,22 @@ test('TTC 候选结果清除转义乱码并为每人提供查看、初筛通过�
   const result = formatBrainxReplyPayload({ kind: 'final', channel: 'feishu', payload: { text } });
   const card = result.payload.channelData.feishu.card;
   assert.equal(card.schema, '2.0');
-  const rows = card.body.elements.filter((element) => element.tag === 'column_set');
-  assert.equal(rows.length, 3, '一行表头加两行候选人');
-  assert.equal(rows[1].columns[0].elements[0].text.content, '张三\n百度 / 测试开发');
-  const firstActions = rows[1].columns.at(-1).elements;
+  const summaries = card.body.elements.filter((element) => element.tag === 'markdown'
+    && /\*\*.*｜.*\*\*/.test(element.content));
+  assert.equal(summaries.length, 2, '每名候选人都有独立摘要');
+  assert.match(summaries[0].content, /张三｜百度 \/ 测试开发/);
+  const actions = card.body.elements.filter((element) => element.tag === 'button');
+  assert.equal(actions.length, 6, '每名候选人紧跟三个顶层动作，避免被飞书清洗器丢弃');
+  const firstActions = actions.slice(0, 3);
   assert.deepEqual(firstActions.map((button) => button.text.content), ['查看人才', '初筛通过', '收藏']);
   assert.equal(firstActions[0].behaviors[0].default_url, 'https://app.ttcadvisory.com/app/talent/PL123');
-  assert.match(firstActions[1].behaviors[0].value.text, /candidate_ref=PL123/);
-  assert.match(firstActions[1].behaviors[0].value.text, /action=KEEP_FOR_REVIEW/);
-  assert.match(firstActions[2].behaviors[0].value.text, /不要调用任何工具/);
-  assert.doesNotMatch(firstActions[2].behaviors[0].value.text, /brainx_/);
-  assert.equal(rows[2].columns.at(-1).elements[0].behaviors[0].default_url,
-    'https://app.ttcadvisory.com/app/talent/PL456');
+  assert.deepEqual(Object.keys(firstActions[1].behaviors[0].value).sort(), ['a', 'k', 'oc', 'q']);
+  assert.equal(firstActions[1].behaviors[0].value.oc, 'ocf1');
+  assert.match(firstActions[1].behaviors[0].value.q, /candidate_ref=PL123/);
+  assert.match(firstActions[1].behaviors[0].value.q, /action=KEEP_FOR_REVIEW/);
+  assert.match(firstActions[2].behaviors[0].value.q, /不要调用任何工具/);
+  assert.doesNotMatch(firstActions[2].behaviors[0].value.q, /brainx_/);
+  assert.equal(actions[3].behaviors[0].default_url, 'https://app.ttcadvisory.com/app/talent/PL456');
   assert.doesNotMatch(JSON.stringify(result.payload), /"content":"发送简历"|brainx_send_candidate_resume|&#x20;|\\\||\\##/);
   assert.match(result.payload.text, /张三.*PL123/s);
 });
@@ -137,9 +141,9 @@ test('TTC 候选结果清除转义乱码并为每人提供查看、初筛通过�
 test('候选表格不把第三方或无效链接包装成 TTC 按钮', () => {
   const text = `候选人结果\n| 姓名 | 当前公司 / 职位 | 匹配度 | 详情 |\n|---|---|---|---|\n| 张三 | 甲公司 / 测试开发 | 80% | [查看](https://evil.example/talent/PL123) |`;
   const result = formatBrainxReplyPayload({ kind: 'final', channel: 'feishu', payload: { text } });
-  const rows = result.payload.channelData.feishu.card.body.elements
-    .filter((element) => element.tag === 'column_set');
-  assert.equal(rows[1].columns.at(-1).elements[0].text.content, '链接待核实');
+  const cardText = JSON.stringify(result.payload.channelData.feishu.card);
+  assert.match(cardText, /链接待核实/);
+  assert.doesNotMatch(cardText, /"tag":"button"/);
   assert.doesNotMatch(JSON.stringify(result.payload), /evil\.example/);
 });
 

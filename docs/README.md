@@ -132,6 +132,7 @@
 - [双项目 14 天作战计划](design/week-plan-brainx-reloop.html)：BrainX × reloop 至 9/14 决赛的双泳道排期、底线条件与不做清单。
 - [BrainX 最终交付蓝图与施工总清单](brainx-final-delivery-blueprint.md)：基于当前代码审计定义最终产品形态、黄金路径、跨前后端施工顺序和端到端验收。
 - [前端审核台账](frontend-reviews/README.md)：前端审核、正式接入、发布与真实数据验证状态的唯一权威入口。
+- [方向画像自定义与推荐刷新复核](frontend-reviews/2026-09-11-direction-profile-input.md)：基础方向关键词保存、即时重算及工作台/机器人共用最新推荐轮次的接入边界与证据。
 - [前端交互架构](frontend-interaction-architecture.md)：BrainX 页面分层、状态诚实性和核心用户动作链。
 - [推荐队列与职位决策产品架构](recommendation-queue-product-architecture.md)：完整200条推荐队列、20条分页、决策分层、卡片字段、动作闭环与全部职位进入详情规则。
 - [BrainX 岗位推荐算法与评分标准](BrainX岗位推荐算法与评分标准.md)：当前 `baseline-1.1` 六维确定性评分、前端口径、验收标准与未来学习排序路线。

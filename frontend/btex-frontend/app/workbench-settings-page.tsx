@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { brainxFetch, type RadarFieldReport } from "./brainx-api";
+import { brainxFetch, type BackendProfileUpdate, type BackendRecommendationRun, type RadarFieldReport } from "./brainx-api";
 import type { AuthStatus, SyncStatus } from "./decision-demo";
 import { SettingsCenterReview, type SettingsCenterData } from "./settings-center-review";
 
@@ -38,6 +38,7 @@ function WorkbenchSettingsPage({
   onBack,
   onOpenConnections,
   onRefresh,
+  onProfileSaved,
   notify,
 }: {
   auth: AuthStatus;
@@ -50,10 +51,12 @@ function WorkbenchSettingsPage({
   onBack: () => void;
   onOpenConnections: () => void;
   onRefresh: () => void;
+  onProfileSaved: (keywords: string[], note: string) => Promise<void> | void;
   notify: (message: string) => void;
 }) {
   const [ttc, setTtc] = useState<TtcStatus>(emptyTtc);
   const [talent, setTalent] = useState<TalentHealth>(emptyTalent);
+  const [savedProfile, setSavedProfile] = useState({ keywords, note });
   useEffect(() => {
     let active = true;
     void Promise.all([
@@ -71,8 +74,8 @@ function WorkbenchSettingsPage({
     profile: {
       consultantId,
       displayName: auth.consultant,
-      keywords,
-      note: note || null,
+      keywords: savedProfile.keywords,
+      note: savedProfile.note || null,
       feishuAuthorized: auth.authorized,
       feishuNeedsReauth: auth.needsReauth,
     },
@@ -104,7 +107,32 @@ function WorkbenchSettingsPage({
         unavailableFilters: fieldNames(fieldReport, false),
       } : null,
     },
-  }), [auth, consultantId, fieldReport, keywords, note, policyVersion, sync, talent, ttc]);
+  }), [auth, consultantId, fieldReport, policyVersion, savedProfile, sync, talent, ttc]);
+
+  const saveDirection = async (nextKeywords: string[]) => {
+    const updated = await brainxFetch<BackendProfileUpdate>("/api/v1/profile", {
+      method: "PUT", body: { profile_keywords: nextKeywords },
+    });
+    const savedKeywords = updated.profile_keywords || nextKeywords;
+    const savedNote = updated.profile_note ?? savedProfile.note;
+    setSavedProfile({ keywords: savedKeywords, note: savedNote });
+    let refreshed = true;
+    let refreshMessage = "";
+    try {
+      await brainxFetch<BackendRecommendationRun>("/api/v1/recommendations/run", { method: "POST" });
+    } catch (error) {
+      refreshed = false;
+      refreshMessage = error instanceof Error ? error.message : "当前职位快照不可用";
+    }
+    try {
+      await onProfileSaved(savedKeywords, savedNote);
+    } catch {
+      // 保存与重算已经由后端确认；父页面快照稍后仍可通过常规刷新重新读取。
+    }
+    notify(refreshed
+      ? "方向画像已保存；精选盘与机器人岗位推荐已按新方向刷新"
+      : `方向画像已保存；推荐暂未刷新：${refreshMessage}`);
+  };
 
   const handleAction = (action: "edit-profile" | "connect-ttc" | "reauthorize-feishu" | "open-strategy" | "refresh-diagnostics" | "logout") => {
     if (action === "logout") {
@@ -124,7 +152,7 @@ function WorkbenchSettingsPage({
 
   const initialSection = typeof window !== "undefined"
     && new URLSearchParams(window.location.search).get("settings") === "model" ? "model" : "profile";
-  return <SettingsCenterReview data={data} initialSection={initialSection} review={false} onBack={onBack} onAction={handleAction} />;
+  return <SettingsCenterReview data={data} initialSection={initialSection} review={false} onBack={onBack} onAction={handleAction} onSaveDirection={saveDirection} />;
 }
 
 export { WorkbenchSettingsPage };

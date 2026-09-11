@@ -46,19 +46,20 @@ const needsAttentionData: SettingsCenterData = {
 };
 
 const action = fn();
+const saveDirection = fn(async () => undefined);
 
 const meta = {
   title: "组合场景/设置中心",
   component: SettingsCenterReview,
   parameters: { bare: true },
-  args: { data: healthyData, onAction: action },
+  args: { data: healthyData, onAction: action, onSaveDirection: saveDirection },
 } satisfies Meta<typeof SettingsCenterReview>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
 function SettingsStory({ data }: { data: SettingsCenterData }) {
-  return <SettingsCenterReview data={data} onBack={fn()} onAction={action} />;
+  return <SettingsCenterReview data={data} onBack={fn()} onAction={action} onSaveDirection={saveDirection} />;
 }
 
 export const ConnectedHealthy: Story = {
@@ -68,7 +69,13 @@ export const ConnectedHealthy: Story = {
     await expect(canvas.getByRole("heading", { name: "个人资料" })).toBeInTheDocument();
     await expect(canvas.getByText("系统身份")).toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: "方向画像" }));
-    await expect(canvas.getByText("当前 scorer 实际读取并参与方向匹配")).toBeInTheDocument();
+    await expect(canvas.getByText("当前评分器实际读取并参与岗位方向匹配")).toBeInTheDocument();
+    const directionInput = canvas.getByRole("textbox", { name: "我希望优先推荐的岗位方向" });
+    await userEvent.clear(directionInput);
+    await userEvent.type(directionInput, "AI 产品、企业服务、出海增长");
+    await userEvent.click(canvas.getByRole("button", { name: "保存并刷新岗位推荐" }));
+    await expect(saveDirection).toHaveBeenCalledWith(["AI 产品", "企业服务", "出海增长"]);
+    await expect(canvas.getByRole("status")).toHaveTextContent("新的岗位推荐会优先使用这些方向关键词");
     await userEvent.click(canvas.getByRole("button", { name: /数据连接/ }));
     await expect(canvas.getByText("TTC 职位系统")).toBeInTheDocument();
     await expect(canvas.getByText("MySQL 已连接")).toBeInTheDocument();

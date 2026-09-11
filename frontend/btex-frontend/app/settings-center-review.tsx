@@ -49,6 +49,7 @@ type SettingsCenterReviewProps = {
   review?: boolean;
   onBack?: () => void;
   onAction?: (action: "edit-profile" | "connect-ttc" | "reauthorize-feishu" | "open-strategy" | "refresh-diagnostics" | "logout") => void;
+  onSaveDirection?: (keywords: string[]) => Promise<void> | void;
 };
 
 const sectionGroups = [
@@ -67,7 +68,7 @@ const sectionGroups = [
 const sectionCopy: Record<SettingsSection, { title: string; description: string }> = {
   profile: { title: "个人资料", description: "管理当前登录身份和顾问资料。" },
   model: { title: "我的模型", description: "为你的飞书私聊 Agent 配置供应商、模型和个人密钥。" },
-  direction: { title: "方向画像", description: "查看真实参与推荐的关键词，以及仅供记录的画像备注。" },
+  direction: { title: "方向画像", description: "自定义真实参与岗位推荐的方向关键词。" },
   connections: { title: "数据连接", description: "管理 TTC、飞书和人才库的真实连接状态。" },
   strategy: { title: "推荐策略", description: "查看当前策略版本，并进入独立策略审核页面。" },
   diagnostics: { title: "同步诊断", description: "核对职位快照、字段能力和最近同步异常。" },
@@ -101,14 +102,41 @@ function ProfilePanel({ data, onAction }: SettingsCenterReviewProps) {
   </div>;
 }
 
-function DirectionPanel({ data, onAction, review }: SettingsCenterReviewProps) {
+function directionKeywords(value: string) {
+  return [...new Set(value.split(/[、,，;；\n]+/).map(keyword => keyword.trim()).filter(Boolean))];
+}
+
+function DirectionPanel({ data, review, onSaveDirection }: SettingsCenterReviewProps) {
+  const [keywordDraft, setKeywordDraft] = useState(data.profile.keywords.join("、"));
+  const [saving, setSaving] = useState(false);
+  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+  const parsed = directionKeywords(keywordDraft);
+  const invalid = parsed.length > 20 || parsed.some(keyword => keyword.length > 20);
+  const save = async () => {
+    if (invalid || !onSaveDirection) return;
+    setSaving(true);
+    setFeedback(null);
+    try {
+      await onSaveDirection(parsed);
+      setFeedback({ tone: "success", text: "已保存。新的岗位推荐会优先使用这些方向关键词。" });
+    } catch (error) {
+      setFeedback({ tone: "error", text: `保存失败：${error instanceof Error ? error.message : "后端未响应"}` });
+    } finally {
+      setSaving(false);
+    }
+  };
   return <div className="settings-panel-stack">
     <SettingGroup title="当前生效">
-      <SettingRow label="方向关键词" description="当前 scorer 实际读取并参与方向匹配" value={<div className="settings-keywords">{data.profile.keywords.length ? data.profile.keywords.map(keyword => <span key={keyword}>{keyword}</span>) : <em>尚未设置</em>}</div>} />
-      <SettingRow label="画像备注" description="当前不进入 scorer，仅供顾问记录" value={data.profile.note || "—"} />
+      <SettingRow label="方向关键词" description="当前评分器实际读取并参与岗位方向匹配" value={<div className="settings-keywords">{data.profile.keywords.length ? data.profile.keywords.map(keyword => <span key={keyword}>{keyword}</span>) : <em>尚未设置</em>}</div>} />
     </SettingGroup>
-    <div className="settings-honesty-note"><AlertTriangle /><p><b>{review ? "结构化偏好仍在审核。" : "结构化偏好尚未开放。"}</b> 排除项和硬约束没有后端字段及评分语义，本页不会提前开放保存。</p></div>
-    <button className="settings-primary-action" type="button" onClick={() => onAction?.("edit-profile")}><Tags />{review ? "进入方向画像审核" : "查看当前能力说明"}</button>
+    <section className="settings-direction-editor" aria-labelledby="direction-editor-title">
+      <header><div><Tags /><div><h2 id="direction-editor-title">自定义推荐方向</h2><p>用顿号、逗号或换行分隔。最多 20 个，每个最长 20 字。</p></div></div><span>{parsed.length}/20</span></header>
+      <label><span>我希望优先推荐的岗位方向</span><textarea value={keywordDraft} onChange={event => setKeywordDraft(event.target.value)} maxLength={420} placeholder="例如：AI 产品、企业服务、出海增长、北京" /></label>
+      {invalid && <p className="settings-direction-feedback error" role="alert">最多填写 20 个关键词，每个关键词最长 20 字。</p>}
+      {feedback && <p className={`settings-direction-feedback ${feedback.tone}`} role="status">{feedback.text}</p>}
+      <div><button className="settings-primary-action" type="button" disabled={saving || invalid || !onSaveDirection} onClick={() => void save()}><Tags />{saving ? "保存并刷新中…" : "保存并刷新岗位推荐"}</button><small>飞书机器人和工作台对话中的岗位推荐，都会读取刷新后的同一轮结果。</small></div>
+    </section>
+    <div className="settings-honesty-note"><AlertTriangle /><p><b>{review ? "方向关键词已经可以保存；结构化偏好仍在审核。" : "方向关键词已经开放。"}</b> 排除项和硬约束还没有后端字段及评分语义，本页不会把它们伪装成已生效能力。</p></div>
   </div>;
 }
 
@@ -147,11 +175,11 @@ function DiagnosticsPanel({ data, onAction }: SettingsCenterReviewProps) {
   </div>;
 }
 
-export function SettingsCenterReview({ data, initialSection = "profile", review = true, onBack, onAction }: SettingsCenterReviewProps) {
+export function SettingsCenterReview({ data, initialSection = "profile", review = true, onBack, onAction, onSaveDirection }: SettingsCenterReviewProps) {
   const [active, setActive] = useState<SettingsSection>(initialSection);
   const [query, setQuery] = useState("");
   const visibleGroups = useMemo(() => sectionGroups.map(group => ({ ...group, items: group.items.filter(item => item.label.includes(query.trim())) })).filter(group => group.items.length), [query]);
-  const props = { data, initialSection, review, onBack, onAction };
+  const props = { data, initialSection, review, onBack, onAction, onSaveDirection };
   const copy = sectionCopy[active];
   return <div className="settings-center-review">
     <aside className="settings-sidebar">

@@ -293,6 +293,18 @@ test("settings exposes a real session exit before switching local test accounts"
   assert.match(page, /window\.location\.reload/);
 });
 
+test("direction settings persist profile and refresh the recommendation run used by the bot", async () => {
+  const [settings, page] = await Promise.all([
+    source("app/settings-center-review.tsx"),
+    source("app/workbench-settings-page.tsx"),
+  ]);
+  assert.match(settings, /我希望优先推荐的岗位方向/);
+  assert.match(settings, /保存并刷新岗位推荐/);
+  assert.match(page, /"\/api\/v1\/profile"[\s\S]*?method: "PUT"/);
+  assert.match(page, /"\/api\/v1\/recommendations\/run"[\s\S]*?method: "POST"/);
+  assert.match(page, /body: \{ profile_keywords: nextKeywords \}/);
+});
+
 test("manual tuning adjusts soft layers without bypassing hard rules", async () => {
   const [workbench, rules] = await Promise.all([workbenchSource(), source("app/workbench-rules.tsx")]);
 

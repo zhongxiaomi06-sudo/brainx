@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { openDb } from '../src/db.js';
 import { runSync } from '../src/sync.js';
 import { recommend } from '../src/recommend.js';
+import { updateProfile } from '../src/roster.js';
 import { createJobToolHandlers } from '../src/agent-gateway/tools-jobs.js';
 import { createActionToolHandlers } from '../src/agent-gateway/tools-actions.js';
 import { supermaiCriteriaKey } from '../src/supermai-sourcing.js';
@@ -44,6 +45,19 @@ test('me context 与 daily brief 只读取当前顾问并提供证据/未知', a
   assert.ok(brief.facts.length <= 3);
   assert.ok(brief.evidence_refs.length > 0);
   assert.equal(db.prepare('SELECT COUNT(*) n FROM decision_events').get().n, before, 'Agent 工具不得写业务事件');
+});
+
+test('保存方向画像并重算后，机器人读取最新推荐轮次', async () => {
+  const { db, handlers } = fixture();
+  const before = await handlers.brainx_daily_brief({ limit: 3 }, context('felix', 'daily_brief'));
+  updateProfile(db, 'felix', { profile_keywords: ['AI 产品', '企业服务'], profile_note: '优先看复杂产品' });
+  const refreshed = recommend(db, 'felix', { top: 5 });
+  const after = await handlers.brainx_daily_brief({ limit: 3 }, context('felix', 'daily_brief'));
+  assert.notEqual(refreshed.run_id, before.data.run_ref);
+  assert.equal(after.data.run_ref, refreshed.run_id, '机器人必须读取保存画像后生成的最新冻结轮次');
+  const profile = JSON.parse(db.prepare("SELECT profile_json FROM consultants WHERE consultant_id='felix'").get().profile_json);
+  assert.deepEqual(profile.profile_keywords, ['AI 产品', '企业服务']);
+  assert.equal(profile.profile_note, '优先看复杂产品');
 });
 
 test('job assessment 复用职位可见性并分开事实、推断和建议', async () => {

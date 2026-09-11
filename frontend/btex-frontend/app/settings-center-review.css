@@ -172,6 +172,23 @@
 .settings-keywords { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 6px; }
 .settings-keywords span { padding: 4px 7px; border: 1px solid #d8e6e1; border-radius: 999px; background: #f5faf8; color: #315d51; font-size: 10px; }
 .settings-keywords em { color: #8b9692; font-size: 11px; font-style: normal; }
+.settings-direction-editor { display: grid; gap: 16px; padding: 20px; border: 1px solid var(--settings-line); border-radius: 14px; background: #fbfdfc; }
+.settings-direction-editor > header, .settings-direction-editor > header > div, .settings-direction-editor > div { display: flex; align-items: center; }
+.settings-direction-editor > header { justify-content: space-between; gap: 16px; }
+.settings-direction-editor > header > div { gap: 10px; }
+.settings-direction-editor > header svg { width: 20px; color: var(--settings-accent); }
+.settings-direction-editor h2 { margin: 0; font-size: 15px; }
+.settings-direction-editor p { margin: 4px 0 0; color: #7b8783; font-size: 11px; }
+.settings-direction-editor > header > span { color: #71807b; font-size: 11px; }
+.settings-direction-editor label { display: grid; gap: 8px; color: #31403b; font-size: 12px; font-weight: 700; }
+.settings-direction-editor label small { color: #7b8783; font-size: 10px; font-weight: 500; }
+.settings-direction-editor textarea { min-height: 74px; resize: vertical; padding: 12px 14px; border: 1px solid #d7e1de; border-radius: 10px; outline: 0; background: #fff; color: #1d2926; font: inherit; font-size: 12px; line-height: 1.6; }
+.settings-direction-editor textarea:focus { border-color: #81c9b5; box-shadow: 0 0 0 3px rgba(8, 113, 92, 0.08); }
+.settings-direction-editor > div { gap: 12px; flex-wrap: wrap; }
+.settings-direction-editor > div > small { color: #71807b; font-size: 10px; }
+.settings-primary-action:disabled { cursor: not-allowed; opacity: .5; }
+.settings-direction-feedback.success { color: #08715c; }
+.settings-direction-feedback.error { color: #a33d36; }
 .settings-honesty-note {
   display: grid;
   grid-template-columns: 18px minmax(0, 1fr);

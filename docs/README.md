@@ -19,6 +19,7 @@
 | OpenClaw、飞书机器人、AI 猎头工作流、人才权限或简历解析 | [BrainX × OpenClaw AI 猎头工作流产品需求文档](prd-2026-09-02-openclaw-ai-recruiting-workflow.md)、[安全操作手册](SECURITY.md) |
 | BrainTex 飞书欢迎页、功能菜单、按钮卡片或新用户指引 | [BrainTex 飞书功能首页与新用户指引](2026-09-03-braintex-feishu-home.md)、[BrainTex 群聊工作流技术 PRD](prd-2026-09-01-braintex-group-workflow.md) |
 | OpenClaw 多顾问安装、上线、运维、故障或回滚 | [BrainTex 服务器部署与飞书接入 Agent 完整施工手册](2026-09-03-braintex-server-deployment-agent-manual.md)、[OpenClaw 多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md)、[部署编排](DEPLOYMENT.md) |
+| 新同事开通 BrainTex、飞书首次使用或将开通任务交给部署 Agent | [BrainTex 同事开通与首次使用实用手册](2026-09-10-braintex-coworker-onboarding-runbook.md)、[BrainTex 飞书功能首页与新用户指引](2026-09-03-braintex-feishu-home.md) |
 | 顾问个人模型、自带 API Key、按飞书用户隔离 Agent 或模型切换 | [顾问个人模型配置规格](../specs/004-personal-model-config/spec.md)、[OpenClaw 多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md)、[安全操作手册](SECURITY.md) |
 | 服务器由同事或 Agent 维护、需要从空环境到异机可用的完整步骤与验收证据 | [BrainTex 服务器部署与飞书接入 Agent 完整施工手册](2026-09-03-braintex-server-deployment-agent-manual.md)、[BrainX × OpenClaw ECS 部署交接单](2026-09-03-openclaw-ecs-handoff.md) |
 | 候选人事实版本、人才 RDS 迁移、shortlist 数据契约或授权查询 | [候选人事实与 shortlist 数据契约](2026-09-03-candidate-data-contracts.md)、[BrainX × OpenClaw AI 猎头工作流产品需求文档](prd-2026-09-02-openclaw-ai-recruiting-workflow.md) |
@@ -85,6 +86,7 @@
 - [安全操作手册](SECURITY.md)：密钥、RDS、授权与数据隔离操作。
 - [部署编排](DEPLOYMENT.md)：生产 systemd、本地开发、隔离 Docker 测试和 CI。
 - [BrainTex 服务器部署与飞书接入 Agent 完整施工手册](2026-09-03-braintex-server-deployment-agent-manual.md)：交给部署 Agent 或服务器同事的权威端到端手册，覆盖飞书后台、OpenClaw 插件、三类环境文件、RDS 权限、身份绑定、启动、九步真实验收、故障与回滚。
+- [BrainTex 同事开通与首次使用实用手册](2026-09-10-braintex-coworker-onboarding-runbook.md)：可直接发给 Codex/部署 Agent 的单人开通任务文案，覆盖脱敏就绪计划、人工审批边界、身份与 TTC 授权、飞书首次使用及真机验收。
 - [OpenClaw 多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md)：服务端安装、权限绑定、灰度验收、日常运维与可恢复回滚。
 - [顾问个人模型配置规格](../specs/004-personal-model-config/spec.md)：定义飞书私聊一人一 Agent、个人模型凭据隔离、自助配置、同意留痕、共享群模型边界和多人验收标准；StepFun 仅是可选个人供应商，不是全员默认模型。
 - [私聊 JD 直接提交建岗草稿规格](../specs/005-private-jd-job-draft/spec.md)：顾问私聊整段 JD → 带证据待确认草稿（brainx_submit_job_jd，sha256 幂等，LLM 提炼规则保底，origin='p2p_jd' 仅提交人可见，确认复用 confirmDraft 衔接接单/找人链路）。
@@ -97,8 +99,12 @@
 - [BrainTex 飞书功能首页与新用户指引](2026-09-03-braintex-feishu-home.md)：定义 `/brainx` 确定性卡片、六个顾问任务入口、权限边界、首次出现时机和真实验收流程。
 - [候选人事实与 shortlist 数据契约](2026-09-03-candidate-data-contracts.md)：`candidate_fact_v1`、`candidate_match_bundle_v1`、reloop 真实数据转换、人才/职位双授权、固定飞书文案、MCP PoC 暴露条件及当前未完成项的唯一施工说明。
 - [候选人保留与项目共享上下文复核](frontend-reviews/2026-09-09-candidate-focus-context.md)：飞书候选行“保留”、项目级重点名单、后续群问答读取与安全边界。
+- [重点关注并发送人才卡复核](frontend-reviews/2026-09-10-candidate-focus-share-card.md)：候选行统一重点关注、共享上下文与人才卡同步投放边界。
+- [每日推荐卡一键接单并建群复核](frontend-reviews/2026-09-10-daily-card-quick-launch.md)：推荐卡签名确认、自动加入项目、接单、幂等建群和不自动找人的边界。
 - [候选人 Offer 决策群复核](frontend-reviews/2026-09-09-candidate-decision-group.md)：重点候选人独立建群、原项目群摘要迁移、群准入与幂等边界。
 - [候选卡片与对话建群复核](frontend-reviews/2026-09-09-candidate-card-conversation-group.md)：逐行发送人才卡、移除建群按钮、自然语言建群与自动重点名单边界。
+- [候选人 Offer 决策报告](2026-09-10-candidate-offer-report.md)：决策群首卡、飞书云文档版式、`/report` 更新、安全与真实验收边界。
+- [Offer 决策群首卡与报告复核](frontend-reviews/2026-09-10-candidate-offer-report.md)：三个首卡动作、上下文迁移和发布/真机状态。
 - [BrainX × OpenClaw AI 猎头工作流产品需求文档](prd-2026-09-02-openclaw-ai-recruiting-workflow.md)：当前阶段权威开发基线；基于代码审计和官方能力，定义 OpenClaw 主 Agent、飞书最小权限、BrainX 窄网关、人才授权、简历事实、匹配、施工阶段和发布门禁。
 - [历史：BrainX 飞书 AI 猎头副驾驶产品需求文档](prd-2026-09-01-feishu-ai-consultant-copilot.md)：主 Agent 调整前的 Codex 方案和用户研究，仅作历史参考。
 - [历史：BrainX Codex Agent 职责与权限规范](codex-agent-responsibilities-and-permissions.md)：旧 Codex 方案的权限、审批和沙箱研究；不得据此向 OpenClaw 开放工具。

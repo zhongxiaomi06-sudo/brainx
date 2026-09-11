@@ -88,12 +88,15 @@ export function buildProjectLaunchCard(job, { publicBaseUrl, state = null } = {}
   const facts = [job.city, job.hc == null ? null : `HC ${job.hc}`, job.pipeline].filter(Boolean).join(' · ');
   const projectRef = String(job.project_id || '').trim().slice(0, 64);
   const accepted = String(state || '').toUpperCase() === 'ACCEPTED';
-  const openmaiCommand = `为项目 ${projectRef} 使用 OpenMai 找人。读取本群最近一条由顾问明确发送的“找人条件：”作为补充条件；如果没有，就只根据职位事实自动找人。现在直接调用 brainx_openmai_search，不要再次询问找人方式。`;
+  // PR#60：异步找人入口必须带 [BRAINTEX_SEARCH_START] 标记（插件据此立刻回一条
+  // 群状态），并在任务返回 running/triggered 后结束本轮，不要原地轮询。
+  // Reloop 走同步读取 brainx_candidate_shortlist，立即返回，不加标记。
+  const openmaiCommand = `[BRAINTEX_SEARCH_START] 为项目 ${projectRef} 使用 OpenMai 找人。读取本群最近一条由顾问明确发送的“找人条件：”作为补充条件；如果没有，就只根据职位事实自动找人。现在直接调用 brainx_openmai_search，不要再次询问找人方式。任务返回 running/triggered 后立即回复“正在找人，完成后候选人会自动发到本群”并结束本轮，不要原地轮询。`;
   const reloopCommand = `为项目 ${projectRef} 使用 Reloop 内部人才库找人。读取本群最近一条由顾问明确发送的“找人条件：”作为补充条件；现在直接调用 brainx_candidate_shortlist，把候选人整理成清单，不要再次询问找人方式。`;
-  const supermaiCommand = `为项目 ${projectRef} 使用 SuperMai 找人。读取本群最近一条由顾问明确发送的“找人条件：”作为补充条件；如果没有，就根据职位事实自动生成判据。现在直接调用 brainx_supermai_scout，不要再次询问找人方式。`;
+  const supermaiCommand = `[BRAINTEX_SEARCH_START] 为项目 ${projectRef} 使用 SuperMai 找人。读取本群最近一条由顾问明确发送的“找人条件：”作为补充条件；如果没有，就根据职位事实自动生成判据。现在直接调用 brainx_supermai_scout，不要再次询问找人方式。任务返回 running/triggered 后立即回复“正在找人，完成后候选人会自动发到本群”并结束本轮，不要原地轮询。`;
   // 卡片输入框的值经 openclaw 回传时可能丢失（插件不解析 form_value），
   // 因此指令必须自带兜底：拿不到输入值就退回“找人条件：”或职位事实，不得卡住。
-  const criteriaCommand = `为项目 ${projectRef} 按补充条件找人。优先使用卡片输入框里顾问填写的条件；如果你没有拿到输入值，就读取本群最近一条由顾问明确发送的“找人条件：”；两者都没有则只根据职位事实找人。现在直接调用 brainx_openmai_search，不要再次询问找人方式。`;
+  const criteriaCommand = `为项目 ${projectRef} 按补充条件找人。优先使用卡片输入框里顾问填写的条件；如果你没有拿到输入值，就读取本群最近一条由顾问明确发送的“找人条件：”；两者都没有则只根据职位事实找人。现在直接调用 brainx_openmai_search，不要再次询问找人方式。任务返回 running/triggered 后立即回复“正在找人，完成后候选人会自动发到本群”并结束本轮，不要原地轮询。`;
   const acceptCommand = `为项目 ${projectRef} 接单。现在直接调用 brainx_accept_job，参数为 { "job_id": "${projectRef}", "confirm": true }，不要再询问职位编号或二次确认。`;
   const searchActions = [
     { tag: 'button', type: 'primary', text: { tag: 'plain_text', content: 'OpenMai 找人' },

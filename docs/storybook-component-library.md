@@ -47,17 +47,19 @@
 
 飞书卡片对象深链不新增视觉组件，复用完整工作台、`JobDetailCard` 和真实数据入口三态的既有 Storybook。生产代码只接受 HTTPS 基址，职位与回放在正式数据加载并完成 Web 会话鉴权后打开；候选引用只用于预填对话问题。深链不携带 consultant、tenant、open_id、token 或 scope，也不能替代后端对象权限检查。接入状态见[飞书卡片 HTTPS 深链接入记录](frontend-reviews/2026-09-03-feishu-card-deep-links.md)。
 
-BrainTex 飞书功能首页不在 React Storybook 里复制一套仿真卡片；仓库输出 OpenClaw 通用 `presentation`，由锁定版官方飞书渠道生成真实卡片 2.0。因此 Storybook 状态保持“未开始”，视觉验收必须在真实飞书客户端完成，自动测试只验证内容、按钮命令、HTTPS 和授权边界。状态见 [BrainTex 飞书功能首页审核记录](frontend-reviews/2026-09-03-braintex-feishu-home.md)。
+BrainTex 飞书功能首页不在 React Storybook 里复制一套仿真卡片；仓库输出 OpenClaw 通用 `presentation`，由锁定版官方飞书渠道生成真实卡片 2.0。因此 Storybook 状态保持“未开始”，视觉验收必须在真实飞书客户端完成，自动测试只验证内容、首次开工指引、脱敏就绪状态、按钮命令、HTTPS 和授权边界。状态见 [BrainTex 飞书功能首页审核记录](frontend-reviews/2026-09-03-braintex-feishu-home.md)。
 
-BrainTex 每日推荐卡不在 Storybook 复制飞书组件；条数来自本人配置，正文组织为结论、依据、风险和下一步，URL 只负责打开已鉴权的正式工作台。2026-09-03 已在目标飞书验证原生互动卡；普通自然语言回复的 `presentation` typed hook 已实现，但当前锁定版 Feishu 自动回复路径没有传入该 hook，仍需升级或修复后再验收。候选 Case 专页尚未设计，不能把底层状态工具记为前端完成。状态见 [BrainTex 富卡片与业务闭环审核记录](frontend-reviews/2026-09-03-braintex-rich-cards-loop.md)。
+BrainTex 每日推荐卡不在 Storybook 复制飞书组件；条数来自本人配置，正文组织为结论、依据、风险和下一步。配置签名密钥时，每个职位提供“接单并建群”、查看职位、回放和忽略；主按钮复用正式接单与幂等建群链路，不启动收费找人任务，缺密钥时降级为打开工作台。2026-09-10 Dykes 真机已确认 5 行卡片视觉；首次点击暴露基址尾斜杠生成双斜杠路径的 404，现已归一化并加入回归，仍需用新卡复测建群成员和重复点击。普通自然语言回复的 `presentation` typed hook 已实现，但当前锁定版 Feishu 自动回复路径没有传入该 hook，仍需升级或修复后再验收。状态见 [每日推荐卡一键接单并建群复核](frontend-reviews/2026-09-10-daily-card-quick-launch.md)。
 
-OpenMai 候选人总览同样不在 React Storybook 伪造飞书组件。正式投递使用飞书 Card 2.0 原生列布局：筛选条件用纯文字，候选人按姓名与岗位、经验与城市、学历、核心匹配、匹配度和操作形成整洁表格，每行最右侧只提供“发送卡片”和“□ 保留”。“发送卡片”在当前群投放一张带 TTC 人才库链接的人才卡；决策群改由顾问自然语言明确要求后触发，未保留候选人自动加入重点名单。两条路径均不发送简历附件。自动测试负责结构、链接、写入和幂等契约，视觉及动作以真实飞书预览为准，见 [候选卡片与对话建群复核](frontend-reviews/2026-09-09-candidate-card-conversation-group.md)。
+OpenMai 候选人总览同样不在 React Storybook 伪造飞书组件。正式投递使用飞书 Card 2.0 原生列布局：筛选条件用纯文字，候选人按姓名与岗位、经验与城市、学历、核心匹配、匹配度和操作形成整洁表格，每行最右侧只提供“重点关注”。该动作把候选人写入项目共享重点名单，并在来源项目群幂等投放一张带 TTC 人才库链接的人才卡；决策群改由顾问自然语言明确要求后触发。两条路径均不发送简历附件。自动测试负责结构、链接、写入和幂等契约，视觉及动作以真实飞书预览为准，见 [重点关注并发送人才卡复核](frontend-reviews/2026-09-10-candidate-focus-share-card.md)。
+
+候选人 Offer 决策群首卡和飞书云文档报告也不在 React Storybook 仿制。首卡按候选概览、项目匹配、原群证据、待核实项组织，并提供查看 TTC 人才、生成报告、更新报告；群内 `/report` 复用更新能力。自动测试覆盖脱敏上下文、非指令证据标记、按钮命令、版本和文档块；本地全链另已串通建群、V1、新消息和 V2。真实布局、scope 与回调状态见 [Offer 决策群首卡与报告复核](frontend-reviews/2026-09-10-candidate-offer-report.md)。
 
 岗位画像输入使用 React Storybook 的“业务组件/OpenMai 岗位画像输入”场景覆盖：验证 `needs_input` 提示、输入框和提交动作。飞书的“请补充岗位画像”橙卡仍以原生客户端验收，不在 Storybook 复制。
 
-项目群启动状态为“建群后等待选择找人方式”：正式工作台不再把建群描述为自动启动 OpenMai，后端也不会在建群阶段检查 TTC 凭证或发起搜索。飞书原生项目卡片现已接入“OpenMai 找人”和“SuperMai 找人”两个真实按钮；顾问可先在群里发送 `找人条件：……`，留空则按职位事实自动生成。该卡片不在 React Storybook 复制。锁定版 OpenClaw 的语义化飞书卡片尚不能把表单输入值交给 Agent，因此卡片内联输入框仍未完成，真实视觉与回调以飞书客户端验收为准。状态见 [项目群双找人入口与可选条件复核](frontend-reviews/2026-09-09-project-search-method-buttons.md)。
+项目群启动状态为“建群后等待选择找人方式”：正式工作台不再把建群描述为自动启动 OpenMai，后端也不会在建群阶段检查 TTC 凭证或发起搜索。飞书原生项目卡片现已接入“OpenMai 找人”和“SuperMai 找人”两个真实按钮；顾问可先在群里发送 `找人条件：……`，留空则按职位事实自动生成。按钮点击后由 OpenClaw 插件直接向当前群发送可见的“正在找人”文字状态，随后异步结果由 BrainX worker 回群；该原生消息行为不在 React Storybook 复制。锁定版 OpenClaw 的语义化飞书卡片尚不能把表单输入值交给 Agent，因此卡片内联输入框仍未完成，真实视觉与回调以飞书客户端验收为准。状态见 [项目群双找人入口与可选条件复核](frontend-reviews/2026-09-09-project-search-method-buttons.md)。
 
-候选结果卡在表格之后提供“OpenMai 继续找人”和“SuperMai 继续找人”。按钮只表达渠道与继续动作，历史 TTC 编号由 BrainX 从结构化结果提取、累计并传入下一轮，不能由 Agent 或卡片值直接提供；无可确认编号时失败关闭。该飞书原生交互不在 Storybook 仿制，状态见 [项目群下一轮找人与 TTC 排除名单复核](frontend-reviews/2026-09-09-project-search-next-round-exclusions.md)。
+候选结果卡在表格之后提供“OpenMai 继续找人”和“SuperMai 继续找人”。按钮只表达渠道与继续动作，历史 TTC 编号由 BrainX 从结构化结果提取、累计并传入下一轮，不能由 Agent 或卡片值直接提供；无可确认编号时失败关闭。`找人条件：……` 群消息只保存下一轮条件，不能在按钮前自行调用找人工具；同一按钮任务只有首次启动传 `continue_search=true`，轮询强制改为 `false` 或省略；卡片大标题按真实 `search_round` 显示“首轮”或“第 N 轮”。该飞书原生交互不在 Storybook 仿制，状态见 [项目群下一轮找人与 TTC 排除名单复核](frontend-reviews/2026-09-09-project-search-next-round-exclusions.md)。
 
 ## 使用命令
 

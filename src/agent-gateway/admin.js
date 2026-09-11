@@ -211,6 +211,32 @@ export function getRecruitingReadiness(db, input, options) {
   };
 }
 
+/** 单位顾问开通计划：仅组织已脱敏的 readiness，不自动提权或暴露凭证。 */
+export function getConsultantOnboardingPlan(db, input, options) {
+  if (!text(input.consultantId)) fail('ADMIN_INPUT_INVALID');
+  const readiness = getRecruitingReadiness(db, input, options);
+  const consultant = readiness.items.find((item) => item.consultant_id === input.consultantId);
+  if (!consultant) fail('ADMIN_TARGET_NOT_FOUND');
+  const nextSteps = [];
+  if (!consultant.roster_identity) nextSteps.push({ owner: '人力/飞书管理员', action: '核验本人身份并补全花名册映射' });
+  if (!consultant.openclaw_allowlisted) nextSteps.push({ owner: '部署 Agent', action: '将已核验用户加入 OpenClaw 私聊白名单并完整重启' });
+  if (!consultant.gateway_identity_bound) nextSteps.push({ owner: '部署 Agent', action: '使用 bind-roster 建立当前飞书 App 下的 Gateway 身份绑定' });
+  if (!consultant.ttc_connected) nextSteps.push({ owner: '业务授权人 + 部署 Agent', action: '明确批准后授予本人 TTC/OpenMai 用途权限' });
+  nextSteps.push({ owner: '飞书管理员', action: '确认应用可用范围、所需 scope 和新版本已发布' });
+  nextSteps.push({ owner: '新顾问', action: '私聊发送 /brainx，点击开工自检，再在白名单项目群 @ 机器人完成真机验收' });
+  return {
+    schema_version: 'consultant_onboarding_plan.v1',
+    account_id: readiness.account_id,
+    consultant,
+    ready_for_bot: consultant.roster_identity && consultant.openclaw_allowlisted
+      && consultant.gateway_identity_bound,
+    ready_for_search: consultant.roster_identity && consultant.openclaw_allowlisted
+      && consultant.gateway_identity_bound && consultant.ttc_connected,
+    next_steps: nextSteps,
+    human_approval_required: ['FEISHU_APP_PUBLISH', 'IDENTITY_VERIFICATION', 'TTC_BUSINESS_GRANT'],
+  };
+}
+
 /** 从已核验花名册批量建立 Gateway 身份；显式 confirm，且整批冲突时原子失败。 */
 export function bindRosterIdentities(db, input, options) {
   const admin = adminContext(options);

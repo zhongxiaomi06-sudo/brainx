@@ -250,6 +250,11 @@ set +a
 
 node bin/brainx-agent-admin.mjs readiness --account mia
 
+# 新增单人时先看脱敏开通计划；不会自动提权
+node bin/brainx-agent-admin.mjs onboarding-plan \
+  --account mia \
+  --consultant <BRAINX_CONSULTANT_ID>
+
 node bin/brainx-agent-admin.mjs bind-roster \
   --tenant <TENANT_ID> \
   --account mia \
@@ -275,6 +280,8 @@ node bin/brainx-agent-admin.mjs grant-group \
 一个 `(account_id, open_id)` 只能绑定一个顾问。能看到机器人、在同一个群或名字叫 Mia 都不能替代绑定。撤权使用 `revoke-identity` / `revoke-group`，撤权后立即做负向查询。
 
 `readiness` 只显示内部顾问名和每层布尔状态，不显示 open_id、密钥或 TTC token。`bind-roster` 只接受 active 且已有已核验 open_id 的花名册成员，必须传 `--confirm true`；任一身份冲突会让整批原子回滚。单人异常修复仍使用 `bind-identity`，不得从聊天昵称推断绑定。
+
+`onboarding-plan` 按某位顾问组织上述脱敏就绪状态，分别输出 `ready_for_bot`、`ready_for_search`、阻塞项的负责角色和下一步。它是只读计划，飞书发布、本人身份和 TTC 业务授权仍必须人工确认。单人实操见 [同事开通与首次使用手册](2026-09-10-braintex-coworker-onboarding-runbook.md)。
 
 ## 10. 启动顺序
 

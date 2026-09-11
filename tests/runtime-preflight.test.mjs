@@ -12,6 +12,9 @@ function valid() {
     BRAINX_DB: '/opt/brainx/data/brainx.sqlite', BRAINX_MYSQL_HOST: 'db.internal',
     BRAINX_MYSQL_DATABASE: 'brainx_talent', BRAINX_MYSQL_USER: 'brainx_agent_readonly',
     BRAINX_MYSQL_PASSWORD: value('e'), BRAINX_MYSQL_SSL: '1',
+    BRAINX_FEISHU_CREDENTIALS_FROM_OPENCLAW: '1',
+    BRAINX_OPENCLAW_CONFIG_PATH: '/var/lib/brainx/.openclaw/openclaw.json',
+    BRAINX_FEISHU_DOC_BASE_URL: 'https://tenant.feishu.cn',
   };
   const worker = {
     BRAINX_DB: agent.BRAINX_DB, BRAINX_BASE_URL: 'https://base.example.com',
@@ -49,6 +52,7 @@ test('运行配置预检一次指出 Agent API、身份白名单和回群 worker
   input.worker.BRAINX_DB = '/tmp/other.sqlite';
   input.openclaw.BRAINX_FEISHU_ALLOWED_OPEN_ID_6 = 'ou_user_1';
   input.agent.BRAINX_AGENT_ADMIN_ALLOWLIST = 'operator-2';
+  input.agent.BRAINX_FEISHU_DOC_BASE_URL = 'http://127.0.0.1';
   const result = validateRuntimeConfig(input);
   assert.equal(result.ok, false);
   assert.ok(result.errors.includes('openclaw.env:BRAINX_AGENT_GATEWAY_TOKEN:PLACEHOLDER'));
@@ -59,17 +63,19 @@ test('运行配置预检一次指出 Agent API、身份白名单和回群 worker
   assert.ok(result.errors.some(error => error.endsWith(':BRAINX_BASE_URL:MISMATCH')));
   assert.ok(result.errors.includes('openclaw.env:ALLOWED_OPEN_IDS:DUPLICATE'));
   assert.ok(result.errors.includes('agent.env:BRAINX_AGENT_ADMIN_ALLOWLIST:ADMIN_MISSING'));
+  assert.ok(result.errors.includes('agent.env:BRAINX_FEISHU_DOC_BASE_URL:INVALID'));
   assert.equal(JSON.stringify(result).includes(value('a')), false, '报告不得回显任何密钥');
 });
 
-test('OpenClaw 工具策略必须同时开放两个候选人搜索入口', () => {
+test('OpenClaw 工具策略必须同时开放两个找人入口和候选报告', () => {
   assert.deepEqual(validateOpenClawToolPolicy({
     tools: { profile: 'minimal', alsoAllow: ['brainx_openmai_search'] },
   }), {
     ok: false,
-    errors: ['openclaw.json:tools:brainx_supermai_scout:MISSING'],
+    errors: ['openclaw.json:tools:brainx_supermai_scout:MISSING',
+      'openclaw.json:tools:brainx_candidate_report:MISSING'],
   });
   assert.deepEqual(validateOpenClawToolPolicy({
-    tools: { allow: ['brainx_openmai_search', 'brainx_supermai_scout'] },
+    tools: { allow: ['brainx_openmai_search', 'brainx_supermai_scout', 'brainx_candidate_report'] },
   }), { ok: true, errors: [] });
 });

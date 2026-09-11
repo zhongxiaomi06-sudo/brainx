@@ -124,6 +124,11 @@ ${JSON.stringify({ candidates: [{ candidate_ref: 'openmai-card-1', name: '李四
   });
   const context = { principal: { tenantId: 'tenant-a', consultantId: 'felix',
     chatType: 'group', chatId: 'oc_project' } };
+  const focusedResult = await handlers.brainx_candidate_workflow({ job_id: jobId,
+    candidate_ref: 'openmai-card-1', action: 'KEEP_FOR_REVIEW', confirm: true }, context);
+  assert.equal(focusedResult.data.focus_status, 'FOCUSED');
+  assert.equal(focusedResult.data.talent_card_status, 'sent');
+  assert.equal(sent.length, 1);
   const shared = await handlers.brainx_candidate_workflow({ job_id: jobId,
     candidate_ref: 'openmai-card-1', action: 'SEND_TALENT_CARD', confirm: true }, context);
   assert.equal(shared.data.talent_card_status, 'sent');
@@ -140,14 +145,14 @@ ${JSON.stringify({ candidates: [{ candidate_ref: 'openmai-card-1', name: '李四
   await assert.rejects(() => handlers.brainx_candidate_workflow({ job_id: jobId,
     candidate_ref: 'openmai-card-1', action: 'CREATE_DECISION_GROUP', confirm: true },
   { principal: { ...context.principal, chatId: 'oc_other' } }), /NOT_FOUND_OR_FORBIDDEN/);
-  assert.equal(db.prepare(`SELECT COUNT(*) n FROM project_candidate_focus
-    WHERE position_id=? AND candidate_ref=?`).get(jobId, 'openmai-card-1').n, 0,
-  '错误群建群被拒绝时不能留下自动保留副作用');
+  assert.equal(db.prepare(`SELECT focus_status FROM project_candidate_focus
+    WHERE position_id=? AND candidate_ref=?`).get(jobId, 'openmai-card-1').focus_status, 'FOCUSED',
+  '错误群建群被拒绝时不能改变已有重点关注状态');
 
   const group = await handlers.brainx_candidate_workflow({ job_id: jobId,
     candidate_ref: 'openmai-card-1', action: 'CREATE_DECISION_GROUP', confirm: true }, context);
   assert.equal(group.data.decision_group_status, 'READY');
-  assert.equal(group.data.added_to_project_focus, true);
+  assert.equal(group.data.added_to_project_focus, false);
   assert.equal(created.length, 1);
   db.close();
 });

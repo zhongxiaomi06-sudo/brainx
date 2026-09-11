@@ -37,10 +37,9 @@ import { assistantRoutes } from './assistant-routes.js';
 import { personalModelRoutes } from './personal-model-routes.js';
 import { pickTray, nextBatch, feedback as recommendationFeedback, undoFeedback as recommendationUndoFeedback } from './recommendation-batch.js';
 import { recommendationPage } from './recommendation-page.js';
-import { verifyQuick, quickResultPage, QUICK_ACTIONS } from './quickfb.js';
+import { quickActionRoute } from './quick-action-route.js';
 import { verifySnapshotKey, jobSnapshot } from './snapshot.js';
 import { createGuard } from './guard.js';
-import { recordOpportunityIgnore } from './opportunity-ignore.js';
 import { makeClientErrorRoute } from './client-error.js';
 import { body, err, isPathInside, json, normalizeWorkbenchPreferences, proxyFrontend,
   safeJsonArray, STATIC_MIME } from './server-http.js';
@@ -290,24 +289,8 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
       const out = recommendationUndoFeedback(db, cid, await body(req));
       json(res, out.ok ? 200 : out.status || 422, out);
     },
-    // 一键反馈（F2，2026-08-24）：推送卡片按钮直写，HMAC 签名代替 session
-    // （open 路由，鉴权全在 verifyQuick）。顾问不登录工作台也能产标签。
-    'GET /api/v1/feedback/quick': (req, res, cid, q) => {
-      const p = Object.fromEntries(q);
-      const page = (okFlag, text, status) => {
-        res.writeHead(okFlag ? 200 : (status || 400), { 'Content-Type': 'text/html; charset=utf-8' });
-        res.end(quickResultPage(okFlag, text));
-      };
-      const v = verifyQuick(p, now());
-      if (!v.ok) return page(false, v.error, v.status);
-      if (!db.prepare('SELECT 1 FROM job_facts WHERE project_id=?').get(p.project)) {
-        return page(false, '职位不存在', 404);
-      }
-      const out = recordOpportunityIgnore(db, p.consultant, p.project,
-        `quick-ignore:${p.consultant}:${p.project}:${p.day}`);
-      if (!out.ok) return page(false, out.error || out.message || '操作失败');
-      return page(true, `已记录：${QUICK_ACTIONS[p.action]}${out.already ? '（此前已记录）' : ''}`);
-    },
+    // 推荐卡一键动作：HMAC 签名代替工作台 session；忽略或接单建群都复用正式写链路。
+    'GET /api/v1/feedback/quick': quickActionRoute(db, bus, deps.projectLaunch),
     'POST /api/v1/recommendations/next-batch': async (req, res, cid) => {
       const out = nextBatch(db, cid, await body(req));
       json(res, out.ok ? 200 : out.status || 409, out);
@@ -567,7 +550,7 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
                     // 鉴权在 handler 内自校验（verifySnapshotKey），未配置 key 时 fail-closed 全拒。
                     'GET /api/v1/jobs/snapshot', 'GET /api/v1/meta/guard',
                     'POST /api/v1/meta/client-error', // 浏览器端错误探针：未必有 session，只写聚合日志
-                    // 一键反馈：无 session，HMAC 签名即鉴权（verifyQuick fail-closed）
+                    // 推荐卡一键动作：无 session，HMAC 签名即鉴权（verifyQuick fail-closed）
                     'GET /api/v1/feedback/quick'];
       const cid = open.includes(`${req.method} ${path}`) ? null : auth(req, res);
       if (open.includes(`${req.method} ${path}`) || cid) {

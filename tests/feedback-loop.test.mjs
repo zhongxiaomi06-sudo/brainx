@@ -67,16 +67,51 @@ test('F1: owner 不在花名册 → 不落行；他人策展行不被冲掉', ()
 
 // —— F2：一键反馈签名 ——
 test('F2: 未配置密钥 → quickLink=null、verify=503（fail-closed）', () => {
-  const saved = process.env.BRAINX_FEEDBACK_SECRET;
-  delete process.env.BRAINX_FEEDBACK_SECRET;
-  assert.equal(quickLink('http://x', 'mia', 'P1', 'ignore', now()), null);
-  assert.equal(verifyQuick({ consultant: 'mia', project: 'P1', action: 'ignore', day: '2026-08-24', sig: 'x' }, now()).status, 503);
-  if (saved) process.env.BRAINX_FEEDBACK_SECRET = saved;
+  const keys = ['BRAINX_FEEDBACK_SECRET', 'BRAINX_ALLOW_HTTP_LOOPBACK',
+    'BRAINX_DEV_AUTH', 'BRAINX_BASE_URL'];
+  const saved = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
+  try {
+    keys.forEach((key) => delete process.env[key]);
+    assert.equal(quickLink('http://x', 'mia', 'P1', 'ignore', now()), null);
+    assert.equal(verifyQuick({ consultant: 'mia', project: 'P1', action: 'ignore', day: '2026-08-24', sig: 'x' }, now()).status, 503);
+  } finally {
+    for (const key of keys) {
+      if (saved[key] === undefined) delete process.env[key];
+      else process.env[key] = saved[key];
+    }
+  }
+});
+
+test('F2: 明确的本地回环环境使用稳定派生签名，公网地址仍禁止降级', () => {
+  const keys = ['BRAINX_FEEDBACK_SECRET', 'BRAINX_ALLOW_HTTP_LOOPBACK',
+    'BRAINX_DEV_AUTH', 'BRAINX_BASE_URL'];
+  const saved = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
+  try {
+    delete process.env.BRAINX_FEEDBACK_SECRET;
+    process.env.BRAINX_ALLOW_HTTP_LOOPBACK = '1';
+    process.env.BRAINX_DEV_AUTH = 'stable-local-auth-secret';
+    process.env.BRAINX_BASE_URL = 'http://127.0.0.1:3000/';
+    const link = quickLink(process.env.BRAINX_BASE_URL, 'dykes', 'P1', 'launch', '2026-09-10T01:00:00Z');
+    assert.ok(link);
+    const params = Object.fromEntries(new URL(link).searchParams);
+    assert.equal(verifyQuick(params, '2026-09-10T02:00:00Z').ok, true);
+    process.env.BRAINX_DEV_AUTH = 'rotated-local-auth-secret';
+    assert.equal(verifyQuick(params, '2026-09-10T02:00:00Z').status, 403);
+    process.env.BRAINX_BASE_URL = 'https://brainx.example.com';
+    assert.equal(quickLink(process.env.BRAINX_BASE_URL, 'dykes', 'P1', 'launch', '2026-09-10T01:00:00Z'), null);
+  } finally {
+    for (const key of keys) {
+      if (saved[key] === undefined) delete process.env[key];
+      else process.env[key] = saved[key];
+    }
+  }
 });
 
 test('F2: 签名往返；篡改/过期被拒', () => {
   process.env.BRAINX_FEEDBACK_SECRET = 'test-secret-64';
-  const link = quickLink('http://x', 'mia', 'P1', 'ignore', '2026-08-24T01:00:00Z');
+  const link = quickLink('http://x/', 'mia', 'P1', 'ignore', '2026-08-24T01:00:00Z');
+  assert.match(link, /^http:\/\/x\/api\/v1\/feedback\/quick\?/);
+  assert.doesNotMatch(link, /x\/\/api/);
   const p = Object.fromEntries(new URL(link).searchParams);
   assert.equal(verifyQuick(p, '2026-08-24T02:00:00Z').ok, true);
   assert.equal(verifyQuick(p, '2026-08-25T02:00:00Z').ok, true, '次日仍有效');
@@ -109,6 +144,58 @@ test('F2: HTTP 端点端到端（无 session，忽略写统一排除事实且幂
     assert.equal(r3.status, 403);
   } finally {
     server.close();
+  }
+});
+
+test('推荐卡一键接单：自动加入项目、幂等建群和接单，但不自动产生找人费用', async () => {
+  process.env.BRAINX_FEEDBACK_SECRET = 'test-secret-64';
+  const launchDb = openDb(':memory:');
+  const projectId = 'J-QUICK-LAUNCH';
+  runSync(launchDb, { source: 'test', consultant_id: 'felix', payload: ttcPayload([{
+    project_id: projectId, company: '测试客户', role: '算法工程师', city: '上海',
+    pipeline: '待开始', hc: 2, active_state: 'OPEN', source_url: null, captured_at: now(),
+  }]) });
+  const openId = launchDb.prepare("SELECT open_id FROM consultants WHERE consultant_id='felix'").get().open_id;
+  launchDb.prepare(`INSERT INTO feishu_identity_bindings
+    (binding_id,tenant_id,channel_account_id,feishu_app_key_hash,open_id,consultant_id,
+     binding_status,verified_at,verified_by,created_at,updated_at)
+    VALUES ('quick-binding','tenant-a','brainx-prod',?,?,'felix','ACTIVE',?,'system',?,?)`)
+    .run('a'.repeat(64), openId, now(), now(), now());
+  const calls = [];
+  const server = createServer(launchDb, { projectLaunch: {
+    appConfigured: true,
+    publicBaseUrl: 'https://base.yorkteam.cn/',
+    createProjectChat: async (input) => {
+      calls.push(['create', input]);
+      return { chat_id: 'oc_quick_launch', name: input.name };
+    },
+    ensureOpenClawGroupAllowed: async (...args) => calls.push(['allow', ...args]),
+    sendInteractiveCard: async (input) => {
+      calls.push(['send', input]);
+      return { message_id: 'om_quick_launch' };
+    },
+    startOpenmaiTask: () => calls.push(['search']),
+  } });
+  await new Promise((resolve) => server.listen(0, resolve));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  try {
+    const link = quickLink(base, 'felix', projectId, 'launch', now());
+    const first = await fetch(link);
+    assert.equal(first.status, 200);
+    assert.match(await first.text(), /项目群已就绪/);
+    assert.equal(launchDb.prepare(`SELECT relation FROM job_memberships
+      WHERE consultant_id='felix' AND project_id=? AND valid_to IS NULL`).get(projectId).relation, 'MY_JOB');
+    assert.equal(launchDb.prepare(`SELECT state FROM current_engagement
+      WHERE consultant_id='felix' AND project_id=?`).get(projectId).state, 'ACCEPTED');
+    assert.equal(launchDb.prepare('SELECT status FROM project_launches WHERE project_id=?')
+      .get(projectId).status, 'READY');
+    assert.deepEqual(calls.map((call) => call[0]), ['create', 'send', 'allow']);
+    const second = await fetch(link);
+    assert.equal(second.status, 200);
+    assert.deepEqual(calls.map((call) => call[0]), ['create', 'send', 'allow'], '重复点击不重复建群或发卡');
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    launchDb.close();
   }
 });
 

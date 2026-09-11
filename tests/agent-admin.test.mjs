@@ -9,6 +9,7 @@ import {
   revokeGroupScope,
   bindRosterIdentities,
   getRecruitingReadiness,
+  getConsultantOnboardingPlan,
 } from '../src/agent-gateway/admin.js';
 
 const APP_HASH = hashFeishuAppKey('cli_brainx');
@@ -107,6 +108,25 @@ test('管理员可显式确认后从已核验花名册原子批量绑定，重�
   }, ADMIN);
   assert.deepEqual(second, { status: 'ACTIVE', selected: 2, created: 0, already: 2 });
   assert.equal(db.prepare("SELECT COUNT(*) n FROM feishu_identity_bindings WHERE binding_status='ACTIVE'").get().n, 2);
+});
+
+test('单人开通计划给出分层责任且不把人工审批伪装成已完成', () => {
+  const db = openDb(':memory:');
+  const miaOpenId = db.prepare("SELECT open_id FROM consultants WHERE consultant_id='mia'").get().open_id;
+  const plan = getConsultantOnboardingPlan(db, {
+    accountId: 'brainx-prod', consultantId: 'mia', feishuAppKeyHash: APP_HASH,
+    allowedOpenIds: [miaOpenId],
+  }, ADMIN);
+  assert.equal(plan.ready_for_bot, false);
+  assert.equal(plan.ready_for_search, false);
+  assert.ok(plan.next_steps.some((item) => /bind-roster/.test(item.action)));
+  assert.deepEqual(plan.human_approval_required,
+    ['FEISHU_APP_PUBLISH', 'IDENTITY_VERIFICATION', 'TTC_BUSINESS_GRANT']);
+  assert.doesNotMatch(JSON.stringify(plan), /ou_|token|app_key/i);
+  assert.throws(() => getConsultantOnboardingPlan(db, {
+    accountId: 'brainx-prod', consultantId: 'unknown', feishuAppKeyHash: APP_HASH,
+    allowedOpenIds: [miaOpenId],
+  }, ADMIN), /ADMIN_TARGET_NOT_FOUND/);
 });
 
 test('花名册批量绑定遇到身份冲突时整批回滚', () => {

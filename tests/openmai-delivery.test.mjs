@@ -199,26 +199,36 @@ ${JSON.stringify({ candidates: [
   assert.match(rows[1].columns[0].elements[0].text.content, /^1\. 张三/);
   assert.match(rows[1].columns[3].elements[0].text.content, /91%/);
   assert.doesNotMatch(JSON.stringify(card), /\|姓名\|详情\||不应把这段/);
-  const firstButton = rows[1].columns[5].elements[0];
-  assert.equal(firstButton.text.content, '发送卡片');
-  assert.match(firstButton.value.text, /action=SEND_TALENT_CARD/);
-  assert.match(firstButton.value.text, /candidate_ref=c-1/);
-  const keepButton = rows[1].columns[5].elements[1];
-  assert.equal(keepButton.text.content, '□ 保留');
+  const keepButton = rows[1].columns[5].elements[0];
+  assert.equal(keepButton.text.content, '重点关注');
   assert.match(keepButton.value.text, /candidate_ref=c-1/);
   assert.match(keepButton.value.text, /action=KEEP_FOR_REVIEW/);
   assert.match(keepButton.value.text, /confirm=true/);
-  assert.equal(rows[1].columns[5].elements.length, 2);
+  assert.equal(rows[1].columns[5].elements.length, 1);
+  assert.doesNotMatch(JSON.stringify(card), /action=SEND_TALENT_CARD/);
   assert.doesNotMatch(JSON.stringify(card), /为 TA 建决策群/);
   const secondButton = rows[2].columns[5].elements[0];
   assert.match(secondButton.value.text, /candidate_ref=c-2/);
   assert.match(card.elements.at(-1).elements[0].content, /项目共同重点名单/);
   assert.match(card.elements[0].content, /第 2 轮/);
+  assert.equal(card.header.title.content, 'BrainTex · 第 2 轮候选人不足');
+  const completeCandidates = Array.from({ length: 6 }, (_, index) => ({
+    candidate_ref: `c-${index + 1}`, name: `候选人${index + 1}`, evaluation: '匹配',
+  }));
+  const completeCard = buildOpenmaiDeliveryCard({
+    job: { project_id: 'P-DELIVERY', company: '甲公司', role: '研发负责人', search_round: 2 },
+    status: 'done', resultText: `<!-- BRAINX_CANDIDATES_V1\n${JSON.stringify({ candidates: completeCandidates })}\n-->`,
+    publicBaseUrl: 'https://base.yorkteam.cn/',
+  });
+  assert.equal(completeCard.header.title.content, 'BrainTex · 第 2 轮候选人已就绪');
   const continueActions = card.elements.filter((element) => element.tag === 'action');
   assert.equal(continueActions.length, 1, '候选行操作仍在最右侧，名单后只追加继续找人入口');
   assert.deepEqual(continueActions[0].actions.map((button) => button.text.content),
     ['OpenMai 继续找人', 'SuperMai 继续找人']);
   assert.ok(continueActions[0].actions.every((button) => button.value.text.includes('continue_search=true')));
+  assert.ok(continueActions[0].actions.every((button) => button.value.text.includes('continue_search 改为 false')));
+  assert.ok(continueActions[0].actions.every((button) => button.value.text.startsWith('[BRAINTEX_SEARCH_START]')));
+  assert.ok(continueActions[0].actions.every((button) => button.value.text.includes('正在继续找人')));
   assert.ok(continueActions[0].actions.every((button) => button.value.text.includes('BrainX')));
   assert.doesNotMatch(JSON.stringify(card), /"content":"发送简历"|brainx_send_candidate_resume/);
 });

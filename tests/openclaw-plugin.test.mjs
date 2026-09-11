@@ -10,6 +10,7 @@ import {
   resolveTrustedPrincipal,
 } from '../plugins/brainx-openclaw/runtime.js';
 import { createBraintexPromptContext } from '../plugins/brainx-openclaw/prompt.js';
+import { createCandidateReportCommand } from '../plugins/brainx-openclaw/onboarding.js';
 
 const root = new URL('../', import.meta.url);
 const fixture = JSON.parse(await readFile(new URL('tests/fixtures/openclaw-production/plugin-contract.json', root)));
@@ -36,14 +37,15 @@ test('plugin package and manifest declare exactly the approved tools', () => {
   assert.deepEqual(pkg.openclaw.extensions, ['./index.js']);
   assert.equal(manifest.id, 'brainx-openclaw');
   assert.deepEqual(manifest.activation, { onStartup: true });
+  assert.match(entrySource, /api\.on\('message_received'/);
   assert.match(entrySource, /api\.on\('reply_payload_sending'/);
   assert.match(entrySource, /api\.on\('before_prompt_build'/);
   assert.doesNotMatch(entrySource, /registerHook\('reply_payload_sending'/);
   assert.equal(manifest.configSchema.additionalProperties, false);
-  assert.deepEqual(manifest.contracts.commands, ['brainx']);
+  assert.deepEqual(manifest.contracts.commands, ['brainx', 'report']);
   assert.deepEqual(manifest.contracts.tools, fixture.allowed_tools);
   assert.deepEqual(BRAINX_OPENCLAW_TOOLS.map(({ name }) => name), fixture.allowed_tools);
-  assert.equal(new Set(manifest.contracts.tools).size, 25);
+  assert.equal(new Set(manifest.contracts.tools).size, 26);
   assert.ok(!manifest.contracts.tools.includes('brainx_send_candidate_resume'));
   for (const tool of BRAINX_OPENCLAW_TOOLS) {
     assert.equal(tool.parameters.additionalProperties, false);
@@ -59,18 +61,23 @@ test('BrainTex prompt routes natural-language job recommendations to authorized 
   assert.match(prompt, /不得凭常识编造职位方向/);
   assert.match(prompt, /OpenMai 找人.*SuperMai 找人/s);
   assert.match(prompt, /找人条件：/);
+  assert.match(prompt, /只是在保存下一次搜索的可选条件/);
+  assert.match(prompt, /不得在这条消息上调用任何找人工具/);
+  assert.match(prompt, /否则会与随后按钮形成重复付费任务/);
+  assert.match(prompt, /第一次调用传 continue_search=true/);
+  assert.match(prompt, /后续轮询必须改为 continue_search=false/);
   assert.match(prompt, /按钮本身就是.*明确选择/);
   assert.match(prompt, /KEEP_FOR_REVIEW/);
   assert.match(prompt, /focused_candidates/);
-  assert.match(prompt, /发送卡片.*SEND_TALENT_CARD/s);
+  assert.match(prompt, /\/report.*brainx_candidate_report/s);
   assert.match(prompt, /为这个人建群.*CREATE_DECISION_GROUP/s);
   assert.match(prompt, /消息本身就是.*明确确认/);
-  // 2026-09-10 晚 wendy 会话教训：呈现纪律（保留查看链接）+ 轮询间隔硬约束 + 禁止虚假承诺提醒
+  // 项目搜索由 worker 自动投递；自由搜索仍保留轮询纪律。
   assert.match(prompt, /不得因为表格列多就删掉链接/);
   assert.match(prompt, /把原始链接补回去/);
-  assert.match(prompt, /间隔至少 60 秒/);
-  assert.match(prompt, /不要承诺.*设提醒/s);
-  assert.match(prompt, /结果不会自动推送/);
+  assert.match(prompt, /正在找人/);
+  assert.match(prompt, /完成后候选人会自动发到本群/);
+  assert.match(prompt, /不得原地连续轮询/);
   // specs/011 修订：接单 SOP——用户不碰参数，先岗位理解再确认，两参调用
   assert.match(prompt, /接单流程（用户全程不提供任何参数/);
   assert.match(prompt, /先定位唯一职位[\s\S]*?brainx_daily_brief/);
@@ -79,6 +86,13 @@ test('BrainTex prompt routes natural-language job recommendations to authorized 
   assert.match(prompt, /参数只有 \{ job_id, confirm: true \}/);
   assert.match(prompt, /职位无法唯一定位或用户未确认时，不得调用接单工具/);
   assert.equal(createBraintexPromptContext({ messageProvider: 'telegram' }), undefined);
+});
+
+test('/report 只让已授权飞书发送人继续进入报告编排', async () => {
+  const command = createCandidateReportCommand();
+  assert.equal(command.name, 'report');
+  assert.equal((await command.handler({ channel: 'feishu', isAuthorizedSender: true })).continueAgent, true);
+  assert.equal((await command.handler({ channel: 'feishu', isAuthorizedSender: false })).isError, true);
 });
 
 test('项目群双找人入口支持可选条件且不接受身份或路由注入', () => {
@@ -102,6 +116,9 @@ test('项目群双找人入口支持可选条件且不接受身份或路由注�
   assert.ok(workflow.parameters.properties.action.enum.includes('SEND_TALENT_CARD'));
   assert.deepEqual(gateway.schema('brainx_candidate_workflow'), workflow.parameters,
     '候选保留参数必须与 BrainX 网关白名单一致');
+  const report = BRAINX_OPENCLAW_TOOLS.find(({ name }) => name === 'brainx_candidate_report');
+  assert.deepEqual(gateway.schema('brainx_candidate_report'), report.parameters,
+    '报告参数必须与 BrainX 网关白名单一致');
 });
 
 test('trusted principal rejects missing, inconsistent, non-Feishu, and forged private contexts', () => {
@@ -153,7 +170,7 @@ test('tool request is fixed to loopback and produces a BrainX-verifiable asserti
   const body = JSON.parse(calls[0].options.body);
   assert.equal(body.schema_version, 'agent_tool_request.v1');
   assert.deepEqual(body.client, {
-    plugin_version: '1.4.1', openclaw_version: '2026.7.1-2', model_ref: 'openai/gpt-5',
+    plugin_version: '1.4.2', openclaw_version: '2026.7.1-2', model_ref: 'openai/gpt-5',
   });
   const payload = verifyPrincipalAssertion(body.principal_assertion, {
     secret,

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { openDb, now } from '../src/db.js';
 import { runSync } from '../src/sync.js';
 import { confirmMembership } from '../src/membership.js';
-import { launchProject, launchRecruitingWorkflow, ProjectLaunchError } from '../src/project-launch.js';
+import { launchProject, launchRecruitingWorkflow, buildProjectLaunchCard, ProjectLaunchError } from '../src/project-launch.js';
 import { listProjects } from '../src/projects.js';
 
 const PID = 'P-LAUNCH-1';
@@ -53,6 +53,25 @@ test('项目启动：建群、投放职位、绑定项目并激活群 Agent 范�
   assert.match(buttons[0].value.text, /"confirm": true/);
   assert.ok(buttons[0].value.text.includes(`项目 ${PID}`));
   assert.match(calls[1][1].card.elements[1].content, /尚未接单/);
+  // specs/014 + PR#60：已接单卡片给三个找人入口。异步入口必须带 [BRAINTEX_SEARCH_START]
+  // 标记（插件据此立刻回一条群状态）并声明「不要原地轮询」；Reloop 走同步读取，不加标记。
+  const acceptedCard = buildProjectLaunchCard({
+    project_id: PID, company: '海马云', role: '产品经理', city: '上海', hc: 2,
+    pipeline: '待推荐', consultant_name: 'Felix',
+  }, { publicBaseUrl: 'https://base.yorkteam.cn/', state: 'ACCEPTED' });
+  const acceptedButtons = acceptedCard.elements
+    .flatMap((element) => element.actions || []).filter((button) => button.value?.text);
+  assert.deepEqual(acceptedButtons.map((button) => button.text.content),
+    ['OpenMai 找人', 'Reloop 找人', 'SuperMai 找人', '按条件找人']);
+  const markedButtons = acceptedButtons
+    .filter((button) => button.value.text.startsWith('[BRAINTEX_SEARCH_START]'));
+  assert.deepEqual(markedButtons.map((button) => button.text.content), ['OpenMai 找人', 'SuperMai 找人']);
+  const asyncButtons = acceptedButtons.filter((button) => button.text.content !== 'Reloop 找人');
+  assert.ok(asyncButtons.every((button) => button.value.text.includes('正在找人')));
+  assert.ok(asyncButtons.every((button) => button.value.text.includes('结束本轮')));
+  assert.ok(asyncButtons.every((button) => button.value.text.includes(`项目 ${PID}`)));
+  assert.match(acceptedButtons[1].value.text, /brainx_candidate_shortlist/);
+  assert.doesNotMatch(acceptedButtons[1].value.text, /正在找人/, 'Reloop 是同步读取，不应要求顾问等待');
   assert.equal(db.prepare('SELECT chat_id FROM job_facts WHERE project_id=?').get(PID).chat_id, 'oc_launch');
   assert.equal(db.prepare('SELECT enabled FROM chat_contexts WHERE chat_id=?').get('oc_launch').enabled, 1);
   const scope = db.prepare('SELECT * FROM agent_group_scopes WHERE chat_id=?').get('oc_launch');

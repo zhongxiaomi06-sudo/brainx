@@ -43,12 +43,10 @@ function acceptJob(db, args, principal, startSearch) {
     search = startSearch(db, principal.consultantId, args.job_id);
   }
   const unknowns = [];
-  // 找人任务已触发：明确指引模型用 openmai_search 轮询取结果并交付（2026-09-04
-  // wendy 案例：模型去查 candidate_shortlist(RDS 旁路) 导致 20 位候选无人交付）。
+  // 项目搜索由投递 worker 自动回群；工具只要求模型给出即时可见状态后结束本轮。
   if (search?.status === 'triggered') {
-    unknowns.push('候选人搜索已异步启动（正常 3-5 分钟收敛），请每隔约 1 分钟（间隔至少 60 秒）用 '
-      + 'brainx_openmai_search(job_id) 查询（最多守候 10 分钟），完成后把候选人完整呈现给顾问（保留「查看」链接）；'
-      + '不要向顾问承诺任何「自动通知/设提醒」——结果不会自动推送。');
+    unknowns.push('候选人搜索已异步启动。立即回复顾问“正在找人，通常需要 3-5 分钟，完成后候选人会自动发到项目群”并结束本轮；'
+      + '除非顾问之后明确询问进度，不要原地轮询。');
   } else if (search?.status === 'already_done') {
     unknowns.push('该岗位已有完成结果，用 brainx_openmai_search(job_id) 取回并呈现给顾问。');
   } else if (search?.status === 'error') {

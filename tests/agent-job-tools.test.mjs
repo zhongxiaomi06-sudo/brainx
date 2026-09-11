@@ -26,6 +26,19 @@ test('me context 与 daily brief 只读取当前顾问并提供证据/未知', a
   const me = await handlers.brainx_me_context({}, context('felix', 'self_context'));
   assert.equal(me.data.consultant_ref, 'self');
   assert.equal(me.data.display_name, 'Felix 黄鑫');
+  assert.deepEqual(me.data.onboarding, {
+    bot_identity: 'ready',
+    job_recommendations: 'ready',
+    openmai_search: 'action_required',
+    daily_recommendations: 'ready',
+    daily_times: ['07:00', '19:00'],
+    daily_job_count: 3,
+    blockers: [{
+      code: 'OPENMAI_ACCESS_MISSING', owner: 'BrainTex 管理员',
+      action: '核验并授权团队 TTC/OpenMai 凭证',
+    }],
+  });
+  assert.equal(JSON.stringify(me).includes('credential_owner_consultant_id'), false);
   const brief = await handlers.brainx_daily_brief({ limit: 3 }, context('felix', 'daily_brief'));
   assert.ok(brief.facts.length > 0);
   assert.ok(brief.facts.length <= 3);
@@ -154,6 +167,9 @@ test('项目已有共享找人任务时另一位顾问选择渠道不会重复�
   assert.equal(out.data.status, 'running');
   assert.equal(out.data.shared, true);
   assert.equal(out.data.task_id, 'task-owner');
+  assert.match(out.unknowns.join(''), /正在找人/);
+  assert.match(out.unknowns.join(''), /自动发到本群/);
+  assert.doesNotMatch(out.unknowns.join(''), /每隔约 1 分钟/);
   assert.equal(db.prepare(`SELECT COUNT(*) count FROM openmai_results
     WHERE consultant_id='mia' AND project_id=?`).get(projectId).count, 0);
 });
@@ -274,6 +290,7 @@ test('找人任务 running/触发响应内嵌守候纪律（2026-09-09 事故：
   assert.ok(guard.includes('不要尝试 read/exec'), 'running 响应禁止尝试被禁工具');
   // 2026-09-10 晚 wendy 会话教训：1-2 秒连打 40 次后放弃守候 + 虚假承诺设提醒
   assert.ok(guard.includes('间隔至少 60 秒'), 'running 响应硬性规定查询间隔');
+  assert.ok(guard.includes('continue_search=false'), '继续找人轮询必须撤掉新一轮启动标记');
   assert.ok(guard.includes('已运行'), 'running 响应带已运行时长锚点');
   assert.ok(typeof running.data.elapsed_seconds === 'number' && running.data.elapsed_seconds >= 0,
     'running 响应 data 带 elapsed_seconds');

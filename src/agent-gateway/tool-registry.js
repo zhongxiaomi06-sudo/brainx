@@ -5,6 +5,7 @@ import { createCandidateActionToolHandlers } from './tools-candidate-actions.js'
 import { createJobFactsToolHandlers } from './tools-job-facts.js';
 import { createJdSubmitToolHandlers } from './tools-jd-submit.js';
 import { sendInteractiveCard } from '../feishu-bot.js';
+import { createCandidateReportToolHandlers } from '../candidate-report.js';
 
 const BANNED_ARGUMENTS = new Set([
   'tenant_id', 'consultant_id', 'sender', 'open_id', 'scope', 'sql', 'url', 'command', 'file',
@@ -104,6 +105,9 @@ export const AGENT_TOOL_ROWS = Object.freeze([
   { name: 'brainx_send_candidate_resume', purpose: ['candidate_action'], parameters: object({
     job_id: string(), candidate_ref: string(), confirm: boolean(),
   }, ['job_id', 'candidate_ref', 'confirm']), projectKey: 'job_id' },
+  { name: 'brainx_candidate_report', purpose: ['candidate_review'], parameters: object({
+    mode: string({ enum: ['GENERATE', 'REGENERATE'] }), confirm: boolean(),
+  }, ['mode', 'confirm']) },
 ]);
 
 export class AgentToolError extends Error {
@@ -179,7 +183,8 @@ export function createToolRegistry(options = {}) {
   });
 }
 
-export function createProductionToolRegistry({ db, talentDependencies = {}, actionDependencies = {} }) {
+export function createProductionToolRegistry({ db, talentDependencies = {}, actionDependencies = {},
+  reportDependencies = {} }) {
   const jobs = createJobToolHandlers({ db });
   // specs/014：默认接上飞书发卡通道，用于接单成功后把接单卡换成找人卡；
   // 未配置飞书凭证时 sendInteractiveCard 抛错，已由 sendAcceptedCard 兜底吞掉。
@@ -187,10 +192,13 @@ export function createProductionToolRegistry({ db, talentDependencies = {}, acti
   const candidateActions = createCandidateActionToolHandlers({ db, ...talentDependencies });
   const jobFacts = createJobFactsToolHandlers({ db });
   const jdSubmit = createJdSubmitToolHandlers({ db });
+  const reports = createCandidateReportToolHandlers({ db, ...reportDependencies });
   const talent = createTalentToolHandlers({
     db, // 供 shortlist 空结果溯源（区分「OpenMai 找人岗」与「未授权岗」，2026-09-04 wendy 案例）
     ...talentDependencies,
     jobGapHandler: jobs.brainx_gap_questions,
   });
-  return createToolRegistry({ handlers: { ...jobs, ...talent, ...actions, ...candidateActions, ...jobFacts, ...jdSubmit } });
+  return createToolRegistry({ handlers: {
+    ...jobs, ...talent, ...actions, ...candidateActions, ...jobFacts, ...jdSubmit, ...reports,
+  } });
 }

@@ -4,7 +4,7 @@ import { openDb } from '../src/db.js';
 import { hashFeishuAppKey } from '../src/agent-gateway/authorization.js';
 import {
   bindIdentity, revokeIdentity, grantGroupScope, revokeGroupScope,
-  bindRosterIdentities, getRecruitingReadiness,
+  bindRosterIdentities, getRecruitingReadiness, getConsultantOnboardingPlan,
 } from '../src/agent-gateway/admin.js';
 import { grantSharedTtcCredential, revokeSharedTtcCredential } from '../src/ttcsdk/auth.js';
 import { launchProject } from '../src/project-launch.js';
@@ -71,6 +71,11 @@ if (command === 'bind-identity') {
     accountId: input.account, feishuAppKeyHash: appHash(input.account),
     allowedOpenIds: allowedOpenIds(),
   }, admin);
+} else if (command === 'onboarding-plan') {
+  result = getConsultantOnboardingPlan(db, {
+    accountId: input.account, consultantId: input.consultant,
+    feishuAppKeyHash: appHash(input.account), allowedOpenIds: allowedOpenIds(),
+  }, admin);
 } else if (command === 'bind-roster') {
   result = bindRosterIdentities(db, {
     tenantId: input.tenant, accountId: input.account,
@@ -101,7 +106,7 @@ if (command === 'bind-identity') {
       message: String(error.message).slice(0, 300) };
   }
 } else {
-  throw new Error('命令：readiness | bind-roster | bind-identity | revoke-identity | grant-group | revoke-group | grant-ttc-openmai | revoke-ttc-openmai');
+  throw new Error('命令：readiness | onboarding-plan | bind-roster | bind-identity | revoke-identity | grant-group | revoke-group | grant-ttc-openmai | revoke-ttc-openmai');
 }
 
 console.log(JSON.stringify(result));

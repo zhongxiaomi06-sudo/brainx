@@ -13,7 +13,8 @@
  * 做什么：
  *   1) 启动真实 Chrome（独立 profile + CDP），打开猎聘；
  *   2) 轮询等待你在窗口里过验证码 / 登录 —— 检测到页面恢复正常即视为通过；
- *   3) 把登录态 AES 加密落盘（默认 scripts/session/.state-liepin.enc）；
+ *   3) 把登录态 AES 加密落盘（默认 scripts/session/.state-liepin.enc）——
+ *      **只保留猎聘域名**（见 pruneStorageState），避免把本机其它网站的会话一起写进去；
  *   4) 顺带列出页面上疑似「人才搜索」的入口链接，便于下一轮直接直达。
  *
  * 合法边界：仅用你自己的账号、访问你本就有权看到的内容；不绕过风控（验证码由你本人完成）。
@@ -25,6 +26,7 @@
  *   CDP_PORT      调试端口（默认 9224）
  *   PROFILE_DIR   Chrome 用户目录（默认 ~/.brainx-chrome-liepin）
  *   SESSION_FILE  登录态输出（默认 scripts/session/.state-liepin.enc）
+ *   COOKIE_DOMAIN_ALLOW  落盘时只保留该域名后缀的 cookie（默认 liepin.com）
  *   WAIT_MINUTES  等待人工处理的最长分钟数（默认 10）
  *   START_URL     起始页（默认猎聘首页）
  */
@@ -55,6 +57,25 @@ const START_URL = process.env.START_URL || 'https://www.liepin.com/';
 const require2 = createRequire(join(ROOT, 'package.json'));
 const { chromium } = require2('playwright');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+const ALLOW = process.env.COOKIE_DOMAIN_ALLOW || 'liepin.com';
+
+/**
+ * 裁剪 storageState：只留 ALLOW 域名下的 cookie（外加通用 WAF cookie）。
+ * 为什么必须裁：这个 Chrome profile 是共用的，`ctx.storageState()` 会把**整个
+ * profile 的全部 cookie** 一起落盘。2026-09-11 实测一次抓取落盘 311 个 cookie /
+ * 67 个域名，其中只有 18 个是猎聘，其余 293 个是本人 Google / 飞书 / GitHub /
+ * ChatGPT / DeepSeek 等账号的完整会话 cookie——那等于把整套登录态写进一个密文文件。
+ */
+function pruneStorageState(state, allow = ALLOW) {
+  const suffix = String(allow).toLowerCase();
+  const keepDomain = (d) => String(d || '').replace(/^\./, '').toLowerCase().endsWith(suffix);
+  const keepCookie = (c) => keepDomain(c.domain) || /^acw_|^cdn_sec_tc$/i.test(c.name);
+  return {
+    cookies: (state?.cookies || []).filter(keepCookie),
+    origins: (state?.origins || []).filter((o) => String(o?.origin || '').toLowerCase().includes(suffix)),
+  };
+}
 
 if (!existsSync(CHROME_PATH)) {
   console.error(`找不到 Chrome：${CHROME_PATH}（用 CHROME_PATH 指定）`);
@@ -128,9 +149,14 @@ if (!passed) {
 }
 
 await sleep(2000);
-const state = await ctx.storageState();
+const rawState = await ctx.storageState();
+const state = pruneStorageState(rawState);
 writeFileSync(OUT, encrypt(JSON.stringify(state)));
+const dropped = rawState.cookies.length - state.cookies.length;
 console.log(`[liepin] 登录态已加密保存 → ${OUT}（${state.cookies.length} 个 cookie）`);
+if (dropped > 0) {
+  console.log(`[liepin] 已剔除 ${dropped} 个非 ${ALLOW} cookie（该 profile 是共用的，不裁会把本人其它网站会话一并落盘）`);
+}
 
 const links = await page.evaluate(() => [...document.querySelectorAll('a[href]')]
   .map((a) => ({ text: (a.textContent || '').trim().slice(0, 20), href: a.href }))

@@ -1,5 +1,16 @@
 # Agent Commit 记录
 
+## 2026-09-11｜fix(sourcing): 猎聘登录态按域名裁剪落盘，避免把本人其它网站会话一并写入
+
+- 触发：核查 `.state-liepin.enc` 时发现**过度采集**——解密后是 **311 个 cookie / 67 个域名，其中只有 18 个属于猎聘**，其余 293 个是本人 Google（`SID`/`HSID`/`__Secure-1PSID` 等，跨 google.com/.hk/.de/accounts 共 50 个）、飞书（`session`、`passport_app_access_token`）、GitHub（`logged_in`、`_gh_sess`）、ChatGPT 与 OpenAI（`cf_clearance`）、DeepSeek（`ds_session_id`）、manus、suno、genspark、教务系统等的**完整登录会话 cookie**。
+- 根因：脚本调 `ctx.storageState()` 会把**整个 Chrome profile 的全部 cookie** 落盘，而该 profile（`~/.brainx-chrome-liepin`）是共用的——本人也在里面日常浏览过（9222 端口上同时开着 trae console、飞书文档、deepseek 等页面）。密文虽已 gitignore + AES 加密，但密钥就在同机 `.env`，只防误传、不防本机。
+- 修法：新增 `pruneStorageState()`，落盘前只保留 `*.liepin.com`（可用 `COOKIE_DOMAIN_ALLOW` 覆盖）加 `acw_*` / `cdn_sec_tc` 这类通用 WAF cookie，命中剔除时打印数量。存量文件已按同一规则离线裁剪：**311 → 18**（备份留 /tmp，不入库）。
+- 顺带得到一条决定形态的结论：`acw_tc` 是**30 分钟短效** cookie（本次 12:04 发放、12:34 过期，实测已失效）→ **猎聘登录态无法跨小时复用，风控只能由本人现场通过**，这正是「SuperMai 只能是装在顾问本机的 GUI、各人自己下载」的技术原因；服务端定时任务在架构上做不到。
+- 改动文件：scripts/session/liepin-chrome-session.mjs。
+- 验证：`node --check` 通过；裁剪后逐条核对保留项包含 `__sessionId`/`__uuid`/`__seq`/`XSRF-TOKEN` + `safe.liepin.com` 的 `JSESSIONID` + 5 个域名的 `acw_tc`，登录与风控字段结构完整。因 `acw_tc` 已过期，**未做端到端复跑**（复跑需重新过验证码）。
+- 未做：未改业务代码；未 push；通用脚本 `login-capture.mjs` 存在同样的全量落盘问题，本轮未一并处理。
+
+
 ## 2026-09-11｜chore(sourcing): 补提交 170e64c 漏掉的猎聘 CDP 会话脚本，解除 specs/017 的 push 门禁
 
 - 背景（跨会话阻塞）：上一轮 `170e64c` 只提交了 `capture-liepin-talent.mjs`，**同批新建的 `scripts/session/liepin-chrome-session.mjs` 漏提交**，成了工作区里唯一的未跟踪文件；而 full 门禁会扫描未跟踪文件，于是 specs/017（`60ac39e`）的门禁卡在 **23/24**，`main` 领先 origin 两个提交推不上去。本提交只补交遗留文件，不含新功能。

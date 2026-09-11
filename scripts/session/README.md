@@ -58,7 +58,32 @@ node scripts/session/capture-cockpit-chat.mjs "<驾驶舱群会话URL>" oc_群id
 - `SCROLL_ROUNDS` 控制向上加载多少轮历史（默认 6）。
 - 抓到的消息会转成 brainx 消息契约后写入 `job_messages`，驾驶舱链路（`bridge.js` 的活跃度统计等）自动可用。
 
+## 猎聘人才搜索抓取 POC（SuperMai 的真实形态）
+
+SuperMai 找人 = **GUI 模拟点击在猎聘等网站搜索**，不是 API（2026-09-11 用户拍板）。
+实测：无头浏览器（即便带 stealth）访问 `www.liepin.com` 会返回 200 但跳到 `about:blank`，
+**必须用有头模式 + 本人真实登录态**。
+
+```bash
+# 1) 抓猎聘登录态（弹窗，你扫码登录，进主界面后回终端回车）
+LOGIN_URL="https://www.liepin.com/" \
+SESSION_FILE=scripts/session/.state-liepin.enc \
+node scripts/session/login-capture.mjs
+
+# 2) 复用登录态，人工在浏览器里搜一次，回车让脚本抓
+node scripts/session/capture-liepin-talent.mjs
+```
+
+抓取脚本做三件事：存页面 HTML + 截图、**录下页面调用的所有 JSON 接口**、
+用一组候选选择器试探人才卡片并导出命中数量与文本样本。
+其中「录接口」是 POC 的关键——GUI 抓取的终局往往是发现底层搜索接口后直连，比解析 DOM 稳得多。
+
+- 想看录到了哪些接口：`API_HINT=""` 放宽（默认只录含 `/api/` 的）。
+- 产物在 `scripts/session/out/`（`liepin-*.html` / `.png` / `.json`、`liepin-api-*.json`）。
+- 可多次回车连续抓多轮，输入 `q` 结束。
+
 ## 安全须知
-- `.state.enc` 是**你的登录态密文**，`out/` 可能含**你账号可见的敏感数据**——两者都不进 git（见 .gitignore）。
+- `.state*.enc` 是**你的登录态密文**，`out/` 可能含**你账号可见的敏感数据**（含候选人个人信息）——两者都不进 git（见 .gitignore）。
+- 只用于你自己的账号、你本就有权看到的内容；不绕过风控、不抓他人凭证；产物不外传。
 - 密钥丢了就解不开，重跑 login-capture 即可。
 - 登录态会过期；`session-reuse` 检测到要求重新登录会提醒你重跑抓取。

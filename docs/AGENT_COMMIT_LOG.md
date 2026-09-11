@@ -1,5 +1,15 @@
 # Agent Commit 记录
 
+## 2026-09-11｜chore(sourcing): SuperMai 外部搜索链路核查 + 猎聘 GUI 抓取 POC 工具（未接业务）
+
+- 背景：用户反馈 SuperMai 与 OpenMai 返回同一批候选人（都是 TTC 库内 PL 编号），判据还自动用职位事实生成；用户拍板「入口错误，不是搜索 TTC 人才库」，随后明确 **SuperMai 真实形态 = GUI 模拟点击在猎聘等网站搜索**。
+- 核查结论（三条外部搜索路全堵）：①`gateway.ttcadvisory.com/search/scout/match`、`/search/jobs` 依旧 ALB **503**；②`app.ttcadvisory.com/app/sourcing/api/sourcing/v1`（TTC Sourcing = SuperMai Web，真实契约从 git 历史 4192c6f 挖回）`POST /auth/login {ttc_token}` **200 可换 sourcing_token**、`/auth/me` 200，但 `/sessions`、`/chat/sql_query`、`/chat/quick_*_search`、`/search/github`、`/candidates/stats` **全 404**（重抓线上 chunk 确认路径无误，是后端检索没部署）；③OpenMai 引擎自述（一次 completions 探测）**只能查 TTC 库**（私域 PT + 公域 PL），不能实时检索猎聘/脉脉/BOSS，禁止返回 TTC 库即无数据源。
+- GUI 抓取可行性：无头 chromium（含 playwright-extra stealth）访问 `www.liepin.com`、`www.zhipin.com` 均 `status=200` 但 `url=about:blank`（强反爬）；`maimai.cn` 200 可读；`talent.liepin.com` 404。→ 只能**有头模式 + 本人真实登录态**。
+- 新增 `scripts/session/capture-liepin-talent.mjs`：复用既有加密登录态，人工在浏览器完成搜索后回车抓取，产出 HTML + 全页截图 + 卡片选择器试探（命中数与文本样本）+ **页面调用的全部 JSON 接口录制**（GUI 抓取的终局是发现底层接口后直连，比解析 DOM 稳）。支持多轮抓取，`q` 结束；`SESSION_FILE` 默认 `.state-liepin.enc`。
+- 配套：`.gitignore` 的 `.state.enc` 放宽为 `.state*.enc`（覆盖新增平台登录态）；`scripts/session/README.md` 增「猎聘人才搜索抓取 POC」节（含 login-capture 复用命令）与合规边界。
+- 未做：未改任何业务代码（判据逻辑按用户指示保持现状）、未接生产、未抓任何真实人才数据。
+- 验证：`node --check` 通过；无登录态时按预期打印引导并退出（exit 1）。
+
 ## 2026-09-10｜docs(项目群): 机器人进旧群自动发「绑定职位」卡设计稿（specs/015，未实现）
 
 - 背景：用户提出「把机器人拉到旧群，拉进去第一件事也是弹卡片开始找人」。当前只有「工作台接单→系统建群」才发卡，旧群拉机器人后 openclaw 无白名单、agent_group_scopes 无记录 → 完全不响应。

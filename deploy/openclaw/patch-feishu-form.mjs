@@ -7,7 +7,8 @@ const SUPPORTED_PACKAGE = '@openclaw/feishu';
 const SUPPORTED_VERSION = '2026.7.1';
 const LEGACY_MARKER = 'BRAINX_FORM_VALUE_BRIDGE_V1';
 const MARKER = 'BRAINX_FORM_VALUE_BRIDGE_V2';
-const PRESENTATION_MARKER = 'BRAINX_INBOUND_PRESENTATION_BRIDGE_V1';
+const LEGACY_PRESENTATION_MARKER = 'BRAINX_INBOUND_PRESENTATION_BRIDGE_V1';
+const PRESENTATION_MARKER = 'BRAINX_INBOUND_PRESENTATION_BRIDGE_V2';
 
 function replaceOnce(source, before, after, label) {
   const first = source.indexOf(before);
@@ -66,8 +67,15 @@ ${formProjectionSource()}
   return replaceOnce(source, before, after, 'card action fallback');
 }
 
-export function patchInboundPresentationDelivery(source) {
+export function patchInboundPresentationDelivery(source, runtimeModule = './channel.runtime-fixture.js') {
   if (source.includes(PRESENTATION_MARKER)) return source;
+  const loadOutbound = `const { feishuChannelRuntime } = await import(${JSON.stringify(runtimeModule)}); // ${PRESENTATION_MARKER}
+\t\t\t\tconst outbound = feishuChannelRuntime.feishuOutbound;`;
+  if (source.includes(LEGACY_PRESENTATION_MARKER)) {
+    return replaceOnce(source,
+      `const outbound = await core.channel.outbound.loadAdapter("feishu"); // ${LEGACY_PRESENTATION_MARKER}`,
+      loadOutbound, 'legacy inbound presentation delivery');
+  }
   const before = `\t\tdeliver: async (payload, info) => {
 \t\t\tif (info?.kind === "final") skippedFinalReason = null;
 \t\t\tconst payloadText = payload.isReasoning && payload.text ? formatReasoningMessage(payload.text) : payload.text;`;
@@ -75,7 +83,7 @@ export function patchInboundPresentationDelivery(source) {
 \t\t\tif (info?.kind === "final") skippedFinalReason = null;
 \t\t\tconst feishuData = isRecord(payload.channelData?.feishu) ? payload.channelData.feishu : void 0;
 \t\t\tif (payload.presentation || payload.interactive || isRecord(feishuData?.card) || isRecord(feishuData?.interactiveCard)) {
-\t\t\t\tconst outbound = await core.channel.outbound.loadAdapter("feishu"); // ${PRESENTATION_MARKER}
+\t\t\t\t${loadOutbound}
 \t\t\t\tawait outbound.sendPayload({
 \t\t\t\t\tcfg,
 \t\t\t\t\tto: sendTarget,
@@ -122,14 +130,15 @@ export function patchFeishuPlugin(pluginRoot, { write = false } = {}) {
     throw new Error(`requires ${SUPPORTED_PACKAGE}@${SUPPORTED_VERSION}; found ${manifest.name}@${manifest.version}`);
   }
   const targets = [
-    [distFile(pluginRoot, 'monitor.account-'), patchCardActionParser],
-    [distFile(pluginRoot, 'monitor.account-'), patchInboundPresentationDelivery],
-    [distFile(pluginRoot, 'send-result-'), patchCardActionFallback],
+    [distFile(pluginRoot, 'monitor.account-'), patchCardActionParser, MARKER],
+    [distFile(pluginRoot, 'monitor.account-'),
+      (source) => patchInboundPresentationDelivery(source, `./${basename(distFile(pluginRoot, 'channel.runtime-'))}`),
+      PRESENTATION_MARKER],
+    [distFile(pluginRoot, 'send-result-'), patchCardActionFallback, MARKER],
   ];
-  const results = targets.map(([path, patch]) => {
+  const results = targets.map(([path, patch, expectedMarker]) => {
     const source = readFileSync(path, 'utf8');
     const patched = patch(source);
-    const expectedMarker = patch === patchInboundPresentationDelivery ? PRESENTATION_MARKER : MARKER;
     if (!patched.includes(expectedMarker)) throw new Error(`${basename(path)}: patch marker missing`);
     if (write && patched !== source) atomicWrite(path, patched);
     return { path, changed: patched !== source };

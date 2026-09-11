@@ -59,10 +59,57 @@ test('兼容桥遇到未知 OpenClaw 源码形状时拒绝继续', () => {
 test('入站回复的结构化卡片交给官方飞书出站适配器', () => {
   const patched = patchInboundPresentationDelivery(inboundDeliveryFixture);
   assert.match(patched, /payload\.presentation/);
-  assert.match(patched, /core\.channel\.outbound\.loadAdapter\("feishu"\)/);
+  assert.match(patched, /feishuChannelRuntime\.feishuOutbound/);
   assert.match(patched, /outbound\.sendPayload/);
   assert.match(patched, /markVisibleReplySent\(\)/);
-  assert.match(patched, /BRAINX_INBOUND_PRESENTATION_BRIDGE_V1/);
+  assert.match(patched, /BRAINX_INBOUND_PRESENTATION_BRIDGE_V2/);
   assert.equal(patchInboundPresentationDelivery(patched), patched, '重复应用必须幂等');
   assert.throws(() => patchInboundPresentationDelivery('changed upstream'), /expected exactly one/);
+});
+
+test('入站卡片真正调用插件运行时发送器并保留回复位置', async () => {
+  const runtimeModule = `data:text/javascript,${encodeURIComponent(`
+    export const calls = [];
+    export const feishuChannelRuntime = { feishuOutbound: {
+      async sendPayload(value) { calls.push(value); }
+    } };
+  `)}`;
+  const runtime = await import(runtimeModule);
+  const patched = patchInboundPresentationDelivery(inboundDeliveryFixture, runtimeModule);
+  let visible = 0;
+  const createDeliver = new Function('bindings', `
+    const { cfg, sendTarget, accountId, identity, effectiveReplyInThread,
+      sendReplyToMessageId, rootId, markVisibleReplySent } = bindings;
+    let skippedFinalReason;
+    const isRecord = value => !!value && typeof value === 'object';
+    const formatReasoningMessage = value => value;
+    return ({ ${patched} }).deliver;
+  `);
+  const bindings = {
+    cfg: {}, sendTarget: 'chat:test', accountId: 'test', identity: {},
+    effectiveReplyInThread: false, sendReplyToMessageId: 'message:test', rootId: 'root:test',
+    markVisibleReplySent: () => { visible += 1; },
+  };
+  const payload = { text: '职位推荐', presentation: { blocks: [] } };
+  await createDeliver(bindings)(payload, { kind: 'final' });
+  assert.equal(runtime.calls[0].payload, payload, '不可只传 text 丢掉卡片字段');
+  assert.equal(runtime.calls[0].to, bindings.sendTarget);
+  assert.equal(runtime.calls[0].replyToId, 'message:test');
+  assert.equal(visible, 1);
+  await createDeliver({ ...bindings, effectiveReplyInThread: true })(payload, { kind: 'final' });
+  assert.equal(runtime.calls[1].threadId, 'message:test');
+  assert.equal(runtime.calls[1].replyToId, undefined);
+  await createDeliver(bindings)({ text: '普通文字' }, { kind: 'final' });
+  assert.equal(runtime.calls.length, 2, '普通文字保留原有投递路径');
+  const native = { text: '人才', channelData: { feishu: { card: { schema: '2.0' } } } };
+  await createDeliver(bindings)(native, { kind: 'final' });
+  assert.equal(runtime.calls[2].payload, native);
+});
+
+test('旧入站桥升级为包自身运行时，拒绝不完整旧补丁', () => {
+  const legacy = 'const outbound = await core.channel.outbound.loadAdapter("feishu"); // BRAINX_INBOUND_PRESENTATION_BRIDGE_V1';
+  const patched = patchInboundPresentationDelivery(legacy, './channel.runtime-test.js');
+  assert.match(patched, /import\("\.\/channel.runtime-test.js"\)/);
+  assert.doesNotMatch(patched, /loadAdapter/);
+  assert.throws(() => patchInboundPresentationDelivery('// BRAINX_INBOUND_PRESENTATION_BRIDGE_V1'), /expected exactly one/);
 });

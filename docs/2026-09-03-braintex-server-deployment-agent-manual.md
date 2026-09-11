@@ -151,7 +151,7 @@ sudo deploy/openclaw/install.sh --apply
 - `@openclaw/feishu@2026.7.1`；
 - 仓库内 `@brainx/openclaw-plugin@1.0.0`。
 
-安装官方飞书插件后，安装器会运行 `deploy/openclaw/patch-feishu-form.mjs`：只在包名、版本和两个目标源码块完全匹配时保留 BrainX 表单的 `form_value.criteria` 与 `form_value.job_id`，随后立即以 `--check` 复核。任何漂移都会中止安装；不得跳过检查或手工仿制该补丁。
+安装官方飞书插件后，安装器会运行 `deploy/openclaw/patch-feishu-form.mjs`：只在包名、版本和两个目标源码块完全匹配时保留 BrainX 表单的 `form_value.criteria` 与 `form_value.job_id`；随后运行 `deploy/openclaw/patch-reply-payload-hook.mjs`，给锁定版 OpenClaw 的外部渠道直接分发入口补装官方 `reply_payload_sending`。两者都会立即以 `--check` 复核；任何版本或源码形状漂移都会中止安装，不得跳过检查或手工仿制补丁。
 
 同时安装 `brainx-today`、`brainx-job`、`brainx-talent`、`brainx-match`、`brainx-engagement-draft`、`brainx-interview-prep`、`brainx-review` 七个生产 Skill。其余仓库 Skill 不进入首批生产，避免把历史工具名或更宽能力一起带入。
 

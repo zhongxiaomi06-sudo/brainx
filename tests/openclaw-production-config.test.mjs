@@ -118,6 +118,9 @@ test('systemd units keep internal services on one host and load secrets from pro
   assert.match(installer, /p\.name==="@openclaw\/feishu"&&p\.version===process\.argv\[2\]/);
   assert.match(installer, /patch-feishu-form\.mjs" --apply "\$FEISHU_PLUGIN_ROOT"/);
   assert.match(installer, /patch-feishu-form\.mjs" --check "\$FEISHU_PLUGIN_ROOT"/);
+  assert.match(installer, /OPENCLAW_PACKAGE_ROOT=\$\(dirname "\$OPENCLAW_REAL_BIN"\)/);
+  assert.match(installer, /patch-reply-payload-hook\.mjs" --apply "\$OPENCLAW_PACKAGE_ROOT"/);
+  assert.match(installer, /patch-reply-payload-hook\.mjs" --check "\$OPENCLAW_PACKAGE_ROOT"/);
   assert.match(installer, /\. \/etc\/brainx\/openclaw\.env; set \+a; exec "\$0" "\$@"/);
   assert.match(installer, /@openclaw\/feishu@2026\.7\.1/);
   assert.match(installer, /plugins\/brainx-openclaw\/package\.json/);

@@ -9,7 +9,7 @@
 ## 首次安装
 
 1. 将已验收 commit 部署到 `/opt/brainx`，安装 Node 依赖并构建前端。
-2. 安装并锁定 OpenClaw `2026.7.1-2`，执行 `sudo deploy/openclaw/install.sh --check`。`--apply` 会锁定安装官方飞书插件 `@openclaw/feishu@2026.7.1`、对其应用版本锁定的 BrainX 表单兼容桥，并安装仓库内 BrainX 插件。
+2. 安装并锁定 OpenClaw `2026.7.1-2`，执行 `sudo deploy/openclaw/install.sh --check`。`--apply` 会锁定安装官方飞书插件 `@openclaw/feishu@2026.7.1`，应用表单回传桥与外部渠道最终回复钩子桥，再安装仓库内 BrainX 插件。两处桥都校验包版本和源码形状，任何上游漂移均失败关闭。
 3. 执行 `--apply`，然后在 `/etc/brainx/agent.env`、`worker.env` 与 `openclaw.env` 替换全部占位值；文件保持 `0640 root:brainx`。启动服务前必须执行 `sudo deploy/openclaw/install.sh --validate` 并得到 `ok=true`。Gateway 使用人才库只读账号，确定性 worker 使用独立最小 DML 账号。
 4. 运行 SQLite/RDS additive migration；先做 RDS 备份和只读健康检查，再执行写迁移。
 5. 先用 `brainx-agent-admin readiness --account mia` 查看逐人就绪层；单人新增或故障时先运行 `onboarding-plan --account mia --consultant <id>`，再用 `bind-roster` 从已核验花名册建立 Gateway 身份。群、sender、purpose 与项目范围仍需显式登记。Otto 已离职：保留历史审计，但 `consultants.active=0` 且不得存在 ACTIVE 身份绑定。

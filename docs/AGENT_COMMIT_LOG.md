@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-11 · `fix(OpenClaw): 补回飞书最终回复钩子`
+
+- 根因：Dykes 第六轮真机确认 1.3.15 仍发送纯文本；锁定版官方飞书插件自建 dispatcher 后直接调用 `dispatchReplyFromConfig`，没有经过宿主安装 `reply_payload_sending` 的包装入口，所以 BrainX 卡片格式化器从未收到最终回复。
+- 修复：新增只适配 OpenClaw `2026.7.1-2`、固定源码形状且幂等的窄兼容桥，在外部 dispatcher 的直接分发入口补装宿主原生最终回复钩子；生产安装器自动 apply/check，版本或源码漂移即失败关闭。
+- 验证结果：兼容桥、生产安装器、OpenClaw 插件与推荐卡专项 29/29 通过；提交后应用到本地锁定版 OpenClaw 并重启真机复测。
+
 ## 2026-09-11 · `fix(飞书): 在发送前可靠替换推荐卡`
 
 - 改动摘要：真机确认 OpenClaw 入站回复未执行 `reply_payload_sending` 后，新增 `message_sending` 最终发送钩子，通过官方飞书 outbound adapter 投递 BrainX 互动卡，成功后取消原始纯文本，失败则保留原文；插件升级至 1.3.15。

@@ -37,6 +37,8 @@ OPENCLAW_ACTUAL_VERSION=$($BRAINX_OPENCLAW_BIN --version)
   echo "OpenClaw 2026.7.1-2 required; found: $OPENCLAW_ACTUAL_VERSION" >&2
   exit 65
 }
+OPENCLAW_REAL_BIN=$(readlink -f "$(command -v "$BRAINX_OPENCLAW_BIN")")
+OPENCLAW_PACKAGE_ROOT=$(dirname "$OPENCLAW_REAL_BIN")
 
 for required_file in \
   "$BRAINX_DEPLOY_ROOT/deploy/openclaw/openclaw.production.json" \
@@ -44,6 +46,7 @@ for required_file in \
   "$BRAINX_DEPLOY_ROOT/deploy/openclaw/brainx-worker.env.example" \
   "$BRAINX_DEPLOY_ROOT/deploy/openclaw/openclaw.env.example" \
   "$BRAINX_DEPLOY_ROOT/deploy/openclaw/patch-feishu-form.mjs" \
+  "$BRAINX_DEPLOY_ROOT/deploy/openclaw/patch-reply-payload-hook.mjs" \
   "$BRAINX_DEPLOY_ROOT/plugins/brainx-openclaw/package.json" \
   "$BRAINX_DEPLOY_ROOT/deploy/systemd/brainx-agent-gateway.service" \
   "$BRAINX_DEPLOY_ROOT/deploy/systemd/brainx-worker.service" \
@@ -137,6 +140,10 @@ fi
 # 应用仓库内的窄补丁；版本或文件形状变化即 fail-closed，避免静默破坏第三方插件。
 node "$BRAINX_DEPLOY_ROOT/deploy/openclaw/patch-feishu-form.mjs" --apply "$FEISHU_PLUGIN_ROOT"
 node "$BRAINX_DEPLOY_ROOT/deploy/openclaw/patch-feishu-form.mjs" --check "$FEISHU_PLUGIN_ROOT"
+# OpenClaw 2026.7.1-2 的外部渠道直接调用 dispatchReplyFromConfig 时没有给既有
+# dispatcher 安装 reply_payload_sending。补丁只补回官方钩子，不包含 BrainX 业务逻辑。
+node "$BRAINX_DEPLOY_ROOT/deploy/openclaw/patch-reply-payload-hook.mjs" --apply "$OPENCLAW_PACKAGE_ROOT"
+node "$BRAINX_DEPLOY_ROOT/deploy/openclaw/patch-reply-payload-hook.mjs" --check "$OPENCLAW_PACKAGE_ROOT"
 install_plugin "$BRAINX_PLUGIN_ARCHIVE"
 systemctl daemon-reload
 if systemctl is-active --quiet openclaw-brainx; then

@@ -1,5 +1,14 @@
 # Agent Commit 记录
 
+## 2026-09-11｜chore(sourcing): 补提交 170e64c 漏掉的猎聘 CDP 会话脚本，解除 specs/017 的 push 门禁
+
+- 背景（跨会话阻塞）：上一轮 `170e64c` 只提交了 `capture-liepin-talent.mjs`，**同批新建的 `scripts/session/liepin-chrome-session.mjs` 漏提交**，成了工作区里唯一的未跟踪文件；而 full 门禁会扫描未跟踪文件，于是 specs/017（`60ac39e`）的门禁卡在 **23/24**，`main` 领先 origin 两个提交推不上去。本提交只补交遗留文件，不含新功能。
+- 内容：`scripts/session/liepin-chrome-session.mjs` —— 用 CDP（`--remote-debugging-port` + 独立 profile `~/.brainx-chrome-liepin`）驱动**本机真实 Chrome** 打开猎聘，轮询等待**真人**过一次 IP 验证码 / 登录，随后把 `storageState` 经 AES 加密落盘 `.state-liepin.enc`，并列出页面上疑似「人才搜索」的入口链接；启动前会清掉 `HTTP(S)_PROXY` 等环境变量，避免本机透明代理带走浏览器流量。
+- 为什么必须走真实 Chrome：无头 chromium（含 playwright-extra stealth）访问 `www.liepin.com` 会 302 到 `safe.liepin.com/intercept/ip/captcha/dispatch`（IP 维度风控），导致其微前端远程模块加载失败、前端崩到 `about:blank`，脚本层无法自行绕过。
+- 顺带清理：删除上一轮废弃的空目录 `specs/016-supermai-channel-disable/`（用户否决「停用 SuperMai」方案后留下的占位，空目录不入库）。
+- 验证：`node --check scripts/session/liepin-chrome-session.mjs` 通过；本提交后未跟踪文件归零，specs/017 的 push 门禁阻塞解除。
+- 未做：未改任何业务代码；未 push。
+
 ## 2026-09-11｜feat(agent): 补 agent 侧建群入口 + 私聊 bind 早失败（specs/017）
 
 - 上游事故（linda，09-11）：私聊说「接单」→ `brainx_accept_job` 成功（JBC31PR=ACCEPTED），**但没有项目群**；她问「你为啥不给我拉群」后，模型只能拿 `brainx_bind_group_project` 顶包，**私聊里连撞 4 次 `GROUP_NOT_INTAKED`**；最后她自己建群、拉机器人、点绑定卡才走通。

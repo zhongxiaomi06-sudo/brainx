@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   patchCardActionFallback,
   patchCardActionParser,
+  patchInboundPresentationDelivery,
 } from '../deploy/openclaw/patch-feishu-form.mjs';
 
 const parserFixture = `function parseFeishuCardActionEventPayload(value) {
@@ -27,6 +28,11 @@ const fallbackFixture = `function buildFeishuCardActionTextFallback(event) {
 \treturn String(actionValue);
 }`;
 
+const inboundDeliveryFixture = `\t\tdeliver: async (payload, info) => {
+\t\t\tif (info?.kind === "final") skippedFinalReason = null;
+\t\t\tconst payloadText = payload.isReasoning && payload.text ? formatReasoningMessage(payload.text) : payload.text;
+\t\t},`;
+
 test('兼容桥把飞书 form_value 保留到卡片动作对象', () => {
   const patched = patchCardActionParser(parserFixture);
   assert.match(patched, /action\.form_value/);
@@ -48,4 +54,15 @@ test('兼容桥只给显式 BrainX 表单附加白名单字段', () => {
 test('兼容桥遇到未知 OpenClaw 源码形状时拒绝继续', () => {
   assert.throws(() => patchCardActionParser('changed upstream'), /expected exactly one/);
   assert.throws(() => patchCardActionFallback('changed upstream'), /expected exactly one/);
+});
+
+test('入站回复的结构化卡片交给官方飞书出站适配器', () => {
+  const patched = patchInboundPresentationDelivery(inboundDeliveryFixture);
+  assert.match(patched, /payload\.presentation/);
+  assert.match(patched, /core\.channel\.outbound\.loadAdapter\("feishu"\)/);
+  assert.match(patched, /outbound\.sendPayload/);
+  assert.match(patched, /markVisibleReplySent\(\)/);
+  assert.match(patched, /BRAINX_INBOUND_PRESENTATION_BRIDGE_V1/);
+  assert.equal(patchInboundPresentationDelivery(patched), patched, '重复应用必须幂等');
+  assert.throws(() => patchInboundPresentationDelivery('changed upstream'), /expected exactly one/);
 });

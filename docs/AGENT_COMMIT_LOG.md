@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-11 · `fix(飞书): 投递入站回复结构化卡片`
+
+- 根因：补回 `reply_payload_sending` 后真机日志确认卡片转换已执行，但锁定版官方飞书入站 dispatcher 的 `deliver` 仅解析文字/媒体，继续忽略转换后的 `presentation` 和原生卡片字段。
+- 修复：把既有飞书版本锁定兼容桥扩展到入站投递；仅当回复确实带结构化载荷时交由官方 outbound adapter 渲染发送，普通文字路径、回复关系与媒体逻辑保持原样。
+- 验证结果：飞书兼容桥、OpenClaw 宿主桥、生产安装器、插件和推荐卡专项 33/33 通过；随后应用本地插件并真机复测。
+
 ## 2026-09-11 · `fix(OpenClaw): 补回飞书最终回复钩子`
 
 - 根因：Dykes 第六轮真机确认 1.3.15 仍发送纯文本；锁定版官方飞书插件自建 dispatcher 后直接调用 `dispatchReplyFromConfig`，没有经过宿主安装 `reply_payload_sending` 的包装入口，所以 BrainX 卡片格式化器从未收到最终回复。

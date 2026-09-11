@@ -7,6 +7,7 @@ const SUPPORTED_PACKAGE = '@openclaw/feishu';
 const SUPPORTED_VERSION = '2026.7.1';
 const LEGACY_MARKER = 'BRAINX_FORM_VALUE_BRIDGE_V1';
 const MARKER = 'BRAINX_FORM_VALUE_BRIDGE_V2';
+const PRESENTATION_MARKER = 'BRAINX_INBOUND_PRESENTATION_BRIDGE_V1';
 
 function replaceOnce(source, before, after, label) {
   const first = source.indexOf(before);
@@ -65,6 +66,32 @@ ${formProjectionSource()}
   return replaceOnce(source, before, after, 'card action fallback');
 }
 
+export function patchInboundPresentationDelivery(source) {
+  if (source.includes(PRESENTATION_MARKER)) return source;
+  const before = `\t\tdeliver: async (payload, info) => {
+\t\t\tif (info?.kind === "final") skippedFinalReason = null;
+\t\t\tconst payloadText = payload.isReasoning && payload.text ? formatReasoningMessage(payload.text) : payload.text;`;
+  const after = `\t\tdeliver: async (payload, info) => {
+\t\t\tif (info?.kind === "final") skippedFinalReason = null;
+\t\t\tconst feishuData = isRecord(payload.channelData?.feishu) ? payload.channelData.feishu : void 0;
+\t\t\tif (payload.presentation || payload.interactive || isRecord(feishuData?.card) || isRecord(feishuData?.interactiveCard)) {
+\t\t\t\tconst outbound = await core.channel.outbound.loadAdapter("feishu"); // ${PRESENTATION_MARKER}
+\t\t\t\tawait outbound.sendPayload({
+\t\t\t\t\tcfg,
+\t\t\t\t\tto: sendTarget,
+\t\t\t\t\tpayload,
+\t\t\t\t\ttext: payload.text,
+\t\t\t\t\taccountId,
+\t\t\t\t\tidentity,
+\t\t\t\t\t...effectiveReplyInThread ? { threadId: sendReplyToMessageId ?? rootId } : sendReplyToMessageId ? { replyToId: sendReplyToMessageId } : {}
+\t\t\t\t});
+\t\t\t\tmarkVisibleReplySent();
+\t\t\t\treturn;
+\t\t\t}
+\t\t\tconst payloadText = payload.isReasoning && payload.text ? formatReasoningMessage(payload.text) : payload.text;`;
+  return replaceOnce(source, before, after, 'inbound presentation delivery');
+}
+
 function formProjectionSource() {
   return `\t\tconst submitted = {};
 \t\tconst criteria = typeof formValue.criteria === "string" ? formValue.criteria.trim().slice(0, 2e3) : "";
@@ -96,12 +123,14 @@ export function patchFeishuPlugin(pluginRoot, { write = false } = {}) {
   }
   const targets = [
     [distFile(pluginRoot, 'monitor.account-'), patchCardActionParser],
+    [distFile(pluginRoot, 'monitor.account-'), patchInboundPresentationDelivery],
     [distFile(pluginRoot, 'send-result-'), patchCardActionFallback],
   ];
   const results = targets.map(([path, patch]) => {
     const source = readFileSync(path, 'utf8');
     const patched = patch(source);
-    if (!patched.includes(MARKER)) throw new Error(`${basename(path)}: patch marker missing`);
+    const expectedMarker = patch === patchInboundPresentationDelivery ? PRESENTATION_MARKER : MARKER;
+    if (!patched.includes(expectedMarker)) throw new Error(`${basename(path)}: patch marker missing`);
     if (write && patched !== source) atomicWrite(path, patched);
     return { path, changed: patched !== source };
   });

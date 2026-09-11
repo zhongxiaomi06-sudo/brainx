@@ -12,6 +12,11 @@ EnvironmentFile=/etc/brainx/agent.env
 # specs/014：接单成功后要由网关自己发「找人卡」，需要应用身份的飞书凭证。
 # 只挂这两个键，避免整挂 openclaw.env 覆盖 agent.env 的同名键。
 EnvironmentFile=/etc/brainx/feishu-bot.env
+# specs/015：深链与项目群卡片生成需要 BRAINX_BASE_URL。本服务以 brainx 用户运行，
+# 读不到 root:600 的 /opt/brainx/.env（含 BRAINX_DEV_AUTH，禁止整体挂载），故单独提供。
+# 缺失时 brainx_bind_group_project 以 BRAINX_BASE_URL_REQUIRED 失败
+# （2026-09-11 felix 在「linda -投放增长转项群」绑定失败事故）。
+EnvironmentFile=/etc/brainx/base-url.env
 Environment=BRAINX_AGENT_GATEWAY_HOST=127.0.0.1
 Environment=BRAINX_AGENT_GATEWAY_PORT=3102
 ExecStartPre=/usr/bin/node /opt/brainx/bin/brainx-runtime-preflight.mjs

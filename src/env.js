@@ -9,7 +9,17 @@ import { fileURLToPath } from 'node:url';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const p = process.env.BRAINX_ENV_FILE || join(ROOT, '.env');
 if (existsSync(p) && typeof process.loadEnvFile === 'function') {
-  try { process.loadEnvFile(p); } catch { /* 格式错误不致命，按未配置处理 */ }
+  try {
+    process.loadEnvFile(p);
+  } catch (error) {
+    // ENOENT 是常态（本地无 .env），忽略；但「文件存在却读不到」（EACCES 等）
+    // 必须可见 —— 静默吞掉会让缺失的变量在很远的地方才炸：
+    // 2026-09-11 felix 在项目群绑定失败，根因就是 brainx-agent-gateway 以 brainx
+    // 用户运行、读不到 root:600 的 /opt/brainx/.env，BRAINX_BASE_URL 悄悄为空。
+    if (error?.code !== 'ENOENT') {
+      console.error(`[brainx] env: 无法加载 ${p}（${error?.code || error?.message}）；缺失的变量将按未配置处理`);
+    }
+  }
 }
 
 /** BRAINX_LARK_PROFILE：lark-cli 命名 profile。服务器多应用并存（Mia 个人应用 +

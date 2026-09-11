@@ -6,8 +6,12 @@ import { acceptCommitment } from '../src/commitment.js';
 import { collectProjectReminders, buildProjectReminderCard,
   remindProjectsOnce, inSendWindow, reminderWeekKey } from '../src/project-reminder.js';
 
-const OLD = new Date(Date.now() - 96 * 3600000).toISOString(); // 96h 前（>72h 阈值）
-const RECENT = new Date(Date.now() - 3600000).toISOString(); // 1h 前
+// 提醒判定是「at 相对最近活动超过 72h」。AT 写死且落在发送窗口内（CST 11:00），
+// 因此 OLD 必须相对 AT 计算：若 OLD 相对 Date.now()，写死的 AT 会随日历推移滑出
+// 72h 阈值，测试在 2026-09-11 起必然失败（实测 at-OLD 只剩 71.4h，候选数 1→0）。
+const AT = new Date('2026-09-10T03:00:00.000Z'); // CST 11:00
+const OLD = new Date(AT.getTime() - 96 * 3600000).toISOString(); // 距 AT 96h（>72h 阈值）
+const RECENT = new Date(Date.now() - 3600000).toISOString(); // 1h 前（相对 now：断言「刚刚有活动」）
 
 function fixture() {
   const db = openDb(':memory:');
@@ -109,7 +113,7 @@ test('remindProjectsOnce：窗口外跳过；窗口内幂等不重发', async ()
   assert.equal(closed.window, 'closed');
   assert.equal(closed.sent, 0);
 
-  const at = new Date('2026-09-10T03:00:00.000Z'); // CST 11:00
+  const at = AT; // CST 11:00，与 OLD 相差 96h
   const first = await remindProjectsOnce(db, { at, send: false, publicBaseUrl: 'https://app.ttcadvisory.com' });
   assert.equal(first.candidates, 1, '首轮命中 1 个候选');
   assert.equal(first.sent, 0, 'PREVIEW 不计入发送数');
@@ -122,7 +126,7 @@ test('remindProjectsOnce：窗口外跳过；窗口内幂等不重发', async ()
 test('remindProjectsOnce：发送失败落 FAILED，下一轮可重试成功', async () => {
   const { db, projectId } = fixture();
   seedReminderProject(db, projectId);
-  const at = new Date('2026-09-10T03:00:00.000Z'); // CST 11:00
+  const at = AT; // CST 11:00，与 OLD 相差 96h
   const bad = await remindProjectsOnce(db, { at, send: true, publicBaseUrl: 'https://app.ttcadvisory.com',
     sendImpl: async () => { throw new Error('FEISHU_DOWN'); } });
   assert.equal(bad.failed, 1, '发送失败计入 failed');

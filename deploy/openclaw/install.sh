@@ -43,6 +43,8 @@ for required_file in \
   "$BRAINX_DEPLOY_ROOT/deploy/openclaw/brainx-agent.env.example" \
   "$BRAINX_DEPLOY_ROOT/deploy/openclaw/brainx-worker.env.example" \
   "$BRAINX_DEPLOY_ROOT/deploy/openclaw/openclaw.env.example" \
+  "$BRAINX_DEPLOY_ROOT/deploy/openclaw/brainx-feishu-bot.env.example" \
+  "$BRAINX_DEPLOY_ROOT/deploy/openclaw/brainx-base-url.env.example" \
   "$BRAINX_DEPLOY_ROOT/plugins/brainx-openclaw/package.json" \
   "$BRAINX_DEPLOY_ROOT/deploy/systemd/brainx-agent-gateway.service" \
   "$BRAINX_DEPLOY_ROOT/deploy/systemd/brainx-worker.service" \
@@ -77,6 +79,10 @@ install_env() {
 install_env "$BRAINX_DEPLOY_ROOT/deploy/openclaw/brainx-agent.env.example" /etc/brainx/agent.env
 install_env "$BRAINX_DEPLOY_ROOT/deploy/openclaw/brainx-worker.env.example" /etc/brainx/worker.env
 install_env "$BRAINX_DEPLOY_ROOT/deploy/openclaw/openclaw.env.example" /etc/brainx/openclaw.env
+# specs/014+015：agent-gateway 以 brainx 用户运行，读不到 root:600 的 /opt/brainx/.env。
+# 它自己发卡需要飞书应用凭证，生成深链/卡片需要生产 HTTPS 基址，各自单独成文件。
+install_env "$BRAINX_DEPLOY_ROOT/deploy/openclaw/brainx-feishu-bot.env.example" /etc/brainx/feishu-bot.env
+install_env "$BRAINX_DEPLOY_ROOT/deploy/openclaw/brainx-base-url.env.example" /etc/brainx/base-url.env
 
 OPENCLAW_CONFIG="$BRAINX_OPENCLAW_STATE/openclaw.json"
 run_openclaw() {

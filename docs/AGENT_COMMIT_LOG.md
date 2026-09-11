@@ -1829,3 +1829,18 @@
 - 设计取舍：不建 PENDING_BINDING scope 行，用 groupIntakeBinding 工具标记等价且更简单（spec §3.3 已改）。
 - 测试：tests/group-intake.test.mjs 9 组（基线/新群/死群/授权/bind 列/bind 激活/重复绑定/卡片/注册表）；后端全量 663/663（受影响断言：工具数 24→25、契约 fixture 加项、插件版本 1.3.9→1.4.0）。
 - 部署：待跑 full 门禁后 SSH 直推 + 插件副本 cp 到 /var/lib/brainx/.openclaw/extensions/brainx-openclaw/（chown brainx）+ 重启三服务 + 生产 openclaw.json tools.allow 加 brainx_bind_group_project。
+
+## 2026-09-11｜fix(群绑定): 补齐 agent-gateway 的 BRAINX_BASE_URL，配置缺失不再静默（specs/015 事故修复）
+
+- 事故：felix 在「linda -投放增长转项群」（oc_1bdacf1becaadf0bd972af46163a37dd）点「绑定我的职位」后失败。生产库证据：`agent_runs` / `agent_tool_calls` 显示 01:38:33~01:38:50Z 连续 12 次 `brainx_bind_group_project`，`authorization_result=ALLOWED`、`provided_keys=["confirm","job_id"]`、`status=FAILED`、`error_code=BRAINX_BASE_URL_REQUIRED`；openclaw 日志显示 09:35:48 卡片动作触发、09:35:52 list 模式成功返回职位清单、09:38:32 顾问在群里打出选定职位「北京像素律动科技 — 海外增长运营（北京）J46JRXJ」。
+- 结论：既不是「没有对应岗位」（list 模式已成功返回 9 个可绑定职位且含 J46JRXJ），也不是「上下文未正确触发」（授权链路全通、`purpose=group_binding`）。根因是 `brainx-agent-gateway` 以 `User=brainx` 运行、读不到 `/opt/brainx/.env`（`-rw------- root`），`BRAINX_BASE_URL` 为空 → `projectLaunchPreflight` 追加 `BRAINX_BASE_URL_REQUIRED` blocker（`src/project-launch.js:73`）→ 工具失败。对照：`brainx`/`brainx-worker` 以 root 运行，进程内均有该变量。
+- 修复：生产新建 `/etc/brainx/base-url.env`（0640 root:brainx，内容 `BRAINX_BASE_URL=https://base.yorkteam.cn`）并加入本服务 `EnvironmentFile`；仓库补 `deploy/openclaw/brainx-base-url.env.example`、`deploy/openclaw/brainx-feishu-bot.env.example`（后者是 specs/014 的遗漏），并接入 `install.sh` 的 required_file 与 `install_env`。
+- 加固（禁止静默失败）：`src/env.js` 不再无条件吞掉 `.env` 加载异常 —— 非 ENOENT（EACCES 等「文件存在却读不到」）打印可见告警；`bin/brainx-agent-gateway.mjs` 启动时自检 `BRAINX_BASE_URL` 并告警。
+- 验证：以 gateway 相同环境（systemd-run + 三份 EnvironmentFile）跑只读脚本 → `preflight_ready=true`、`preflight_blockers=[]`、`deeplink=https://base.yorkteam.cn/?open=opportunity%3Amine`、卡片按钮齐（OpenMai/Reloop/SuperMai/按条件找人/打开工作台）。修复前同一路径返回 `[{code:"BRAINX_BASE_URL_REQUIRED"}]`。
+
+## 2026-09-11｜test(提醒): 修正 project-reminder 用例的日历腐化（写死 at 撞 72h 静默阈值）
+
+- 现象：`tests/project-reminder.test.mjs` 两条用例失败 ——「首轮命中 1 个候选」实际 0、「发送失败计入 failed」实际 0。
+- 根因：fixture 的 `OLD` 相对 `Date.now()` 取 96h 前，而用例把 `at` 写死为 `2026-09-10T03:00:00.000Z`。随日历推进 `at-OLD` 滑到 71.4h，不再满足 `silenceHours=72` 阈值（2026-09-10 当天该差值约 84h，故当时通过）。
+- 修法：引入固定 `AT`（CST 11:00，落在 09:00–21:00 发送窗口内），`OLD` 改为相对 `AT` 计算，两处 `at` 复用 `AT`；`RECENT` 仍相对 `now`（断言的是「刚刚有活动」）。断言与语义均未改变。
+- 验证：`git stash` 掉本次全部改动后该文件仍 fail 2（证明与生产修复无关）；修后 6/6 通过。

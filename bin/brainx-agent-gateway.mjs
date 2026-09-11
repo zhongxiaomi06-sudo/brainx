@@ -10,6 +10,15 @@ function appHashesFromEnv() {
   return Object.fromEntries(Object.entries(source).map(([account, appKey]) => [account, hashFeishuAppKey(appKey)]));
 }
 
+// 启动自检：BRAINX_BASE_URL 缺失时，深链与项目群卡片类工具会以
+// BRAINX_BASE_URL_REQUIRED 失败，而报错点离配置很远、只在顾问点按钮时才暴露
+// （2026-09-11 felix 在「linda -投放增长转项群」绑定失败事故）。
+// 这里显式告警，让运维在启动日志里就能看见。
+if (!process.env.BRAINX_BASE_URL) {
+  console.error('[brainx] WARN: BRAINX_BASE_URL 未配置；深链与项目群卡片类工具将不可用'
+    + '（检查 /etc/brainx/base-url.env 是否已挂到本服务的 EnvironmentFile）');
+}
+
 const db = openDb();
 const server = createAgentGatewayServer({
   db,

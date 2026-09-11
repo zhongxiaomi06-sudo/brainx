@@ -54,6 +54,16 @@ test('plugin package and manifest declare exactly the approved tools', () => {
   }
 });
 
+test('npm package includes every local module imported by a shipped JavaScript file', async () => {
+  const shipped = new Set(pkg.files);
+  for (const file of pkg.files.filter((name) => name.endsWith('.js'))) {
+    const source = await readFile(new URL(`plugins/brainx-openclaw/${file}`, root), 'utf8');
+    for (const match of source.matchAll(/from ['"]\.\/([^'"]+)['"]/g)) {
+      assert.ok(shipped.has(match[1]), `${file} imports ${match[1]} but package.json files omits it`);
+    }
+  }
+});
+
 test('BrainTex prompt routes natural-language job recommendations to authorized data', () => {
   const prompt = createBraintexPromptContext({ messageProvider: 'feishu' });
   assert.match(prompt, /推荐三个/);
@@ -170,7 +180,7 @@ test('tool request is fixed to loopback and produces a BrainX-verifiable asserti
   const body = JSON.parse(calls[0].options.body);
   assert.equal(body.schema_version, 'agent_tool_request.v1');
   assert.deepEqual(body.client, {
-    plugin_version: '1.3.12', openclaw_version: '2026.7.1-2', model_ref: 'openai/gpt-5',
+    plugin_version: '1.3.13', openclaw_version: '2026.7.1-2', model_ref: 'openai/gpt-5',
   });
   const payload = verifyPrincipalAssertion(body.principal_assertion, {
     secret,

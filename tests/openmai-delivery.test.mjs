@@ -182,7 +182,7 @@ test('OpenMai 澄清语句不得伪装成候选人已就绪', () => {
   assert.doesNotMatch(card.header.title.content, /已就绪/);
 });
 
-test('OpenMai 总览每行提供人才卡片与项目共享保留按钮，不显示建群按钮', () => {
+test('OpenMai 总览每行提供查看、初筛通过和无后端收藏按钮，不显示建群按钮', () => {
   const resultText = `不应把这段 Markdown 原文直接发群\n|姓名|详情|\n|---|---|\n<!-- BRAINX_CANDIDATES_V1
 ${JSON.stringify({ candidates: [
     { candidate_ref: 'c-1', name: '张三', evaluation: '匹配 91%，驱动经验待核实',
@@ -196,20 +196,22 @@ ${JSON.stringify({ candidates: [
   const rows = card.elements.filter((element) => element.tag === 'column_set');
   assert.equal(rows.length, 3, '一行表头加两行候选人');
   assert.equal(rows[0].columns[0].elements[0].text.content, '候选人 / 当前岗位');
-  assert.match(rows[1].columns[0].elements[0].text.content, /^1\. 张三/);
+  assert.match(rows[1].columns[0].elements[0].text.content, /^张三/);
   assert.match(rows[1].columns[3].elements[0].text.content, /91%/);
   assert.doesNotMatch(JSON.stringify(card), /\|姓名\|详情\||不应把这段/);
-  const keepButton = rows[1].columns[5].elements[0];
-  assert.equal(keepButton.text.content, '重点关注');
-  assert.match(keepButton.value.text, /candidate_ref=c-1/);
-  assert.match(keepButton.value.text, /action=KEEP_FOR_REVIEW/);
-  assert.match(keepButton.value.text, /confirm=true/);
-  assert.equal(rows[1].columns[5].elements.length, 1);
+  const actions = rows[1].columns[5].elements;
+  assert.deepEqual(actions.map((button) => button.text.content), ['查看人才', '初筛通过', '收藏']);
+  assert.equal(actions[0].multi_url.url, 'https://app.ttcadvisory.com/app/talent/c-1');
+  assert.match(actions[1].value.text, /candidate_ref=c-1/);
+  assert.match(actions[1].value.text, /action=KEEP_FOR_REVIEW/);
+  assert.match(actions[1].value.text, /confirm=true/);
+  assert.match(actions[2].value.text, /不要调用任何工具/);
+  assert.doesNotMatch(actions[2].value.text, /brainx_/);
   assert.doesNotMatch(JSON.stringify(card), /action=SEND_TALENT_CARD/);
   assert.doesNotMatch(JSON.stringify(card), /为 TA 建决策群/);
-  const secondButton = rows[2].columns[5].elements[0];
-  assert.match(secondButton.value.text, /candidate_ref=c-2/);
-  assert.match(card.elements.at(-1).elements[0].content, /项目共同重点名单/);
+  const secondActions = rows[2].columns[5].elements;
+  assert.match(secondActions[1].value.text, /candidate_ref=c-2/);
+  assert.match(card.elements.at(-1).elements[0].content, /初筛通过.*人才卡.*收藏.*不写入/);
   assert.match(card.elements[0].content, /第 2 轮/);
   assert.equal(card.header.title.content, 'BrainTex · 第 2 轮候选人不足');
   const completeCandidates = Array.from({ length: 6 }, (_, index) => ({

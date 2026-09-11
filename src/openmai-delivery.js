@@ -89,7 +89,7 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
         text: { tag: 'plain_text', content: success ? '打开工作台查看与评估' : '打开工作台处理' },
         multi_url: { url: target, pc_url: target, android_url: target, ios_url: target } }] }] : []),
       { tag: 'note', elements: [{ tag: 'plain_text',
-        content: '“重点关注”会加入项目共同重点名单，并立即在群里投放带 TTC 链接的人才卡' }] },
+        content: '“初筛通过”会投放标准人才卡；“收藏”仅显示确认，不写入人才库' }] },
     ],
   };
 }
@@ -116,7 +116,7 @@ function candidateTableHeading() {
   return {
     tag: 'column_set', flex_mode: 'none', background_style: 'grey',
     columns: [tableCell('候选人 / 当前岗位', 3), tableCell('经验 / 城市', 2),
-      tableCell('学历', 2), tableCell('核心匹配', 4), tableCell('匹配度', 1), tableCell('操作', 2)],
+      tableCell('学历', 2), tableCell('核心匹配', 4), tableCell('匹配度', 1), tableCell('操作', 3)],
   };
 }
 
@@ -133,33 +133,44 @@ function ttcTalentUrl(candidate) {
   return `https://app.ttcadvisory.com/app/talent/${encodeURIComponent(candidate.candidateRef)}`;
 }
 
-function keepCandidateAction(job, candidate) {
+function screeningCandidateAction(job, candidate) {
   const projectRef = String(job.project_id || '').trim().slice(0, 64);
-  const command = `把项目 ${projectRef} 的候选人 ${candidate.candidateRef} 标记为重点关注。`
+  const command = `把项目 ${projectRef} 的候选人 ${candidate.candidateRef} 初筛通过。`
     + '这个按钮就是我的明确确认：现在调用 brainx_candidate_workflow，'
     + `传入 job_id=${projectRef}、candidate_ref=${candidate.candidateRef}、`
-    + 'action=KEEP_FOR_REVIEW、confirm=true。成功后告诉群里“☑ 已重点关注”，'
+    + 'action=KEEP_FOR_REVIEW、confirm=true。成功后告诉群里“☑ 初筛通过”，'
     + '并说明此人已进入本项目共享上下文，同时已发送人才卡；不要发送简历。';
-  return { tag: 'button', type: 'primary', text: { tag: 'plain_text', content: '重点关注' },
+  return { tag: 'button', type: 'default', text: { tag: 'plain_text', content: '初筛通过' },
     value: { text: command } };
 }
 
-function candidateTableRow({ candidate, index, job, baseUrl }) {
+function viewCandidateAction(url) {
+  return { tag: 'button', type: 'primary', text: { tag: 'plain_text', content: '查看人才' },
+    multi_url: { url, pc_url: url, android_url: url, ios_url: url } };
+}
+
+function demoFavoriteAction(candidate) {
+  return { tag: 'button', type: 'default', text: { tag: 'plain_text', content: '收藏' },
+    value: { text: `[BRAINTEX_DEMO_FAVORITE] 候选人 ${candidate.candidateRef}：只回复“已收藏”，`
+      + '不要调用任何工具，不要写入、修改或假装已经写入任何数据。' } };
+}
+
+function candidateTableRow({ candidate, job, baseUrl }) {
   void baseUrl;
   const detailUrl = ttcTalentUrl(candidate);
-  const action = detailUrl ? []
+  const action = detailUrl ? [viewCandidateAction(detailUrl)]
     : [{ tag: 'div', text: { tag: 'plain_text', content: '链接待核实' } }];
   if (candidate.candidateRefValid !== false) {
-    action.push(keepCandidateAction(job, candidate));
+    action.push(screeningCandidateAction(job, candidate), demoFavoriteAction(candidate));
   }
   return [
     { tag: 'column_set', flex_mode: 'none', background_style: 'default', columns: [
-      tableCell(`${index + 1}. ${groupSafeOpenmaiText(candidate.name, 60)}\n${groupSafeOpenmaiText(candidate.role, 120)}`, 3),
+      tableCell(`${groupSafeOpenmaiText(candidate.name, 60)}\n${groupSafeOpenmaiText(candidate.role, 120)}`, 3),
       tableCell(`${groupSafeOpenmaiText(candidate.experience, 40)} · ${groupSafeOpenmaiText(candidate.city, 40)}`, 2),
       tableCell(groupSafeOpenmaiText(candidate.education, 80), 2),
       tableCell(groupSafeOpenmaiText(candidate.evaluation, 300), 4),
       tableCell(groupSafeOpenmaiText(candidate.score, 20), 1),
-      tableCell('', 2, action),
+      tableCell('', 3, action),
     ] },
   ];
 }

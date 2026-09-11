@@ -1,6 +1,10 @@
 import { parseCandidateTableReply } from './candidate-table.js';
 
-const FIELD_LABELS = ['结论', '关键依据', '主要风险', '下一步'];
+const FIELD_ALIASES = new Map([
+  ['职位简介', '职位简介'], ['岗位简介', '职位简介'], ['结论', '职位简介'],
+  ['适合原因', '适合原因'], ['推荐理由', '适合原因'], ['关键依据', '适合原因'],
+  ['需要确认', '需要确认'], ['待确认', '需要确认'], ['主要风险', '需要确认'],
+]);
 
 function safeWorkbenchUrl(value) {
   try {
@@ -35,13 +39,17 @@ function cleanMarkdown(value) {
 }
 
 function parseFields(body) {
-  const fields = Object.fromEntries(FIELD_LABELS.map((label) => [label, '']));
+  const fields = { 职位简介: '', 适合原因: '', 需要确认: '' };
   let active = null;
   for (const rawLine of body.split('\n')) {
     const line = rawLine.trim();
-    const match = line.match(/^\*{0,2}(结论|关键依据|主要风险|下一步)[：:]\*{0,2}\s*(.*)$/);
+    const match = line.match(/^\*{0,2}(职位简介|岗位简介|结论|适合原因|推荐理由|关键依据|需要确认|待确认|主要风险|下一步)[：:]\*{0,2}\s*(.*)$/);
     if (match) {
-      active = match[1];
+      if (match[1] === '下一步') {
+        active = null;
+        continue;
+      }
+      active = FIELD_ALIASES.get(match[1]);
       fields[active] = cleanMarkdown(match[2]);
     } else if (active && line) {
       fields[active] = `${fields[active]} ${cleanMarkdown(line)}`.trim();
@@ -71,7 +79,7 @@ function parseRecommendation(text) {
   const pattern = /^(?:#{1,4}\s*)?(\d{1,2})[.)、]\s*(.+?)\s*$/gm;
   const matches = [...normalizedText.matchAll(pattern)];
   const hasRecommendationShape = /职位|岗位|推荐/.test(normalizedText)
-    || /^(?:结论|关键依据|主要风险|下一步)[：:]/m.test(normalizedText)
+    || /^(?:职位简介|岗位简介|结论|适合原因|推荐理由|关键依据|需要确认|待确认|主要风险)[：:]/m.test(normalizedText)
     || /[｜|][A-Za-z0-9_-]{4,64}\s*$/m.test(normalizedText);
   if (!matches.length || !hasRecommendationShape) return null;
   const jobs = matches.slice(0, 10).map((match, index) => {
@@ -81,7 +89,7 @@ function parseRecommendation(text) {
       ...parseJobHeader(match[2]),
       fields: parseFields(normalizedText.slice(match.index + match[0].length, end)),
     };
-  }).filter((job) => job.projectId || job.fields.结论 || job.fields.关键依据);
+  }).filter((job) => job.projectId || Object.values(job.fields).some(Boolean));
   if (!jobs.length) return null;
   const intro = normalizedText.slice(0, matches[0].index).replace(/^\s*#+\s*[^\n]+\n?/, '').trim();
   return { intro, jobs };
@@ -100,17 +108,16 @@ function recommendationBlocks(recommendation, workbenchUrl) {
   if (recommendation.intro) blocks.push({ type: 'text', text: recommendation.intro.slice(0, 600) });
   blocks.push({
     type: 'context',
-    text: `本轮共 ${recommendation.jobs.length} 个职位 · 每项展示结论、依据、风险和下一步`,
+    text: `本轮共 ${recommendation.jobs.length} 个职位 · 每项展示职位简介、适合原因和需要确认的信息`,
   });
   recommendation.jobs.forEach((job, index) => {
     if (index > 0 || recommendation.intro) blocks.push({ type: 'divider' });
-    const { 结论, 关键依据, 主要风险, 下一步 } = job.fields;
+    const { 职位简介, 适合原因, 需要确认 } = job.fields;
     const facts = [
       `**${job.rank}. ${job.company}｜${job.role}**${job.projectId ? `\n\`${job.projectId}\`` : ''}`,
-      `**结论**：${结论 || '待进一步核验'}`,
-      `**依据**：${关键依据 || '当前证据不足'}`,
-      `**风险**：${主要风险 || '暂无明确风险记录'}`,
-      `**下一步**：${下一步 || '查看职位事实后决定是否推进'}`,
+      `**职位简介**：${职位简介 || '职位职责待进一步核验'}`,
+      `**适合原因**：${适合原因 || '当前证据不足，暂不能判断是否适合'}`,
+      `**需要确认**：${需要确认 || '暂无明确待确认信息'}`,
     ];
     blocks.push({ type: 'text', text: facts.join('\n') });
     const detailUrl = jobDeepLink(workbenchUrl, job.projectId);

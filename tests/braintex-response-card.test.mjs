@@ -34,27 +34,28 @@ test('真实投递省略事件渠道时从 hook 上下文识别 Feishu', () => {
   assert.equal(result.payload.presentation.title, 'BrainTex · 今日职位推荐');
 });
 
-test('职位推荐被整理为逐职位分析和可执行按钮，不再只是长 Markdown', () => {
+test('职位推荐被整理为稳定的三段摘要和可执行按钮，不再只是长 Markdown', () => {
   const result = formatBrainxReplyPayload({
     kind: 'final', channel: 'feishu', payload: { text: `**今日职位推荐验收卡**
 数据来源：BrainX 最近一轮真实推荐，整体置信度偏低。
 
 1. **上海它石智航｜机器人 SLAM 算法工程师｜\`JTQTOTR\`**
-**结论：** 值得优先核验。
-**关键依据：** 推荐分 93.1；HC 2；方向匹配 100。
-**主要风险：** 招聘状态缺失；连续三轮未互动。
-**下一步：** 先联系 owner 确认当前阶段。
+**职位简介：** 机器人定位与运动规划岗位，HC 2。
+**适合原因：** SLAM 方向与我的机器人算法画像一致。
+**需要确认：** 招聘状态缺失；连续三轮未互动。
 
 2. **大疆｜飞控算法工程师｜\`JFZVW7R\`**
-**结论：** 值得核验，但不能直接冲。
-**关键依据：** 推荐分 93.1；HC 3。
-**主要风险：** 职位事实已超过 30 天。
-**下一步：** 确认仍开放后再找人。` },
+**职位简介：** 飞控算法岗位，HC 3。
+**适合原因：** 控制算法方向与我的画像一致。
+**需要确认：** 职位事实已超过 30 天。` },
   }, { publicBaseUrl: 'https://brainx.example.com/app?unsafe=1' });
 
   assert.equal(result.payload.presentation.title, 'BrainTex · 今日职位推荐');
   const texts = result.payload.presentation.blocks.filter(({ type }) => type === 'text');
   assert.match(texts[1].text, /上海它石智航｜机器人 SLAM 算法工程师/);
+  assert.match(texts[1].text, /职位简介.*机器人定位与运动规划岗位/);
+  assert.match(texts[1].text, /适合原因.*SLAM 方向/);
+  assert.doesNotMatch(texts[1].text, /推荐分 93\.1/);
   assert.match(texts[1].text, /招聘状态缺失/);
   const buttonGroups = result.payload.presentation.blocks.filter(({ type }) => type === 'buttons');
   assert.equal(buttonGroups[0].buttons[0].label, '查看职位');
@@ -71,10 +72,9 @@ test('模型使用公司职位分行格式时仍生成逐职位按钮', () => {
     kind: 'final', channel: 'feishu', payload: { text: `1. **公司：** 上海它石智航技术有限公司
 **职位：** 机器人SLAM算法工程师
 **职位ID：** \`JTQTOTR\`
-**结论：** 值得优先核验。
-**关键依据：** 推荐分 93.1；HC 2。
-**主要风险：** 招聘状态缺失。
-**下一步：** 先确认当前阶段。` },
+**职位简介：** 机器人定位与运动规划岗位，HC 2。
+**适合原因：** SLAM 方向与我的画像一致。
+**需要确认：** 招聘状态缺失。` },
   }, { publicBaseUrl: 'https://brainx.example.com' });
 
   const buttonGroups = result.payload.presentation.blocks.filter(({ type }) => type === 'buttons');
@@ -83,7 +83,22 @@ test('模型使用公司职位分行格式时仍生成逐职位按钮', () => {
   assert.equal(buttonGroups[0].buttons[2].label, '联系人与推进');
 });
 
-test('TTC 候选结果清除转义乱码并改为行内人才库按钮', () => {
+test('旧版职位字段仍能归一化为新的三段摘要', () => {
+  const result = formatBrainxReplyPayload({
+    kind: 'final', channel: 'feishu', payload: { text: `1. 甲公司｜算法工程师｜P12345
+结论：负责机器人控制算法
+关键依据：方向画像命中运动控制
+主要风险：工作地点待确认
+下一步：联系负责人` },
+  });
+  const text = result.payload.presentation.blocks.find(({ type }) => type === 'text').text;
+  assert.match(text, /职位简介.*负责机器人控制算法/);
+  assert.match(text, /适合原因.*方向画像命中运动控制/);
+  assert.match(text, /需要确认.*工作地点待确认/);
+  assert.doesNotMatch(text, /下一步|联系负责人/);
+});
+
+test('TTC 候选结果清除转义乱码并为每人提供查看、初筛通过和演示收藏', () => {
   const text = String.raw`TTC 测试客户 · 测试开发
 \
 \## 搜索结果
@@ -106,9 +121,13 @@ test('TTC 候选结果清除转义乱码并改为行内人才库按钮', () => {
   const rows = card.body.elements.filter((element) => element.tag === 'column_set');
   assert.equal(rows.length, 3, '一行表头加两行候选人');
   assert.equal(rows[1].columns[0].elements[0].text.content, '张三\n百度 / 测试开发');
-  const firstButton = rows[1].columns.at(-1).elements[0];
-  assert.equal(firstButton.text.content, '查看人才');
-  assert.equal(firstButton.behaviors[0].default_url, 'https://app.ttcadvisory.com/app/talent/PL123');
+  const firstActions = rows[1].columns.at(-1).elements;
+  assert.deepEqual(firstActions.map((button) => button.text.content), ['查看人才', '初筛通过', '收藏']);
+  assert.equal(firstActions[0].behaviors[0].default_url, 'https://app.ttcadvisory.com/app/talent/PL123');
+  assert.match(firstActions[1].behaviors[0].value.text, /candidate_ref=PL123/);
+  assert.match(firstActions[1].behaviors[0].value.text, /action=KEEP_FOR_REVIEW/);
+  assert.match(firstActions[2].behaviors[0].value.text, /不要调用任何工具/);
+  assert.doesNotMatch(firstActions[2].behaviors[0].value.text, /brainx_/);
   assert.equal(rows[2].columns.at(-1).elements[0].behaviors[0].default_url,
     'https://app.ttcadvisory.com/app/talent/PL456');
   assert.doesNotMatch(JSON.stringify(result.payload), /"content":"发送简历"|brainx_send_candidate_resume|&#x20;|\\\||\\##/);

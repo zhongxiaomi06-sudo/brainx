@@ -43,7 +43,8 @@ function safeTtcTalentUrl(value) {
   for (const match of String(value || '').matchAll(/https:\/\/[^\s)>]+/g)) {
     try {
       const url = new URL(match[0].replace(/&amp;/g, '&'));
-      if (url.origin === TTC_TALENT_ORIGIN && url.pathname.startsWith(TTC_TALENT_PATH)) {
+      if (url.origin === TTC_TALENT_ORIGIN && url.pathname.startsWith(TTC_TALENT_PATH)
+          && candidateRefFromUrl(url.toString())) {
         return url.toString();
       }
       const candidateRef = url.searchParams.get('candidate');
@@ -66,22 +67,52 @@ function tableHeader() {
   return {
     tag: 'column_set', flex_mode: 'none', background_style: 'grey', columns: [
       cell('候选人 / 当前岗位', 3), cell('经验 / 城市', 2), cell('学历', 2),
-      cell('核心匹配点', 5), cell('匹配度', 1), cell('操作', 2),
+      cell('核心匹配点', 5), cell('匹配度', 1), cell('操作', 3),
     ],
   };
 }
 
+function candidateRefFromUrl(value) {
+  try {
+    const url = new URL(value);
+    const ref = decodeURIComponent(url.pathname.slice(TTC_TALENT_PATH.length)).split('/')[0];
+    return /^[A-Za-z0-9:_-]{1,100}$/.test(ref) ? ref : null;
+  } catch {
+    return null;
+  }
+}
+
+function callbackButton(label, command) {
+  return { tag: 'button', type: 'default', text: { tag: 'plain_text', content: label },
+    behaviors: [{ type: 'callback', value: { text: command } }] };
+}
+
+function screeningCommand(candidateRef) {
+  return `[BRAINTEX_CANDIDATE_SCREEN] 将当前项目群候选人 ${candidateRef} 初筛通过。`
+    + '这个按钮就是本次明确确认：先根据当前项目群定位唯一职位，然后立即调用 '
+    + `brainx_candidate_workflow，传入 candidate_ref=${candidateRef}、action=KEEP_FOR_REVIEW、confirm=true。`
+    + '成功后回复“☑ 初筛通过”；BrainX 会把标准人才卡发到本群，不要重复发送。';
+}
+
+function demoFavoriteCommand(candidateRef) {
+  return `[BRAINTEX_DEMO_FAVORITE] 候选人 ${candidateRef}：只回复“已收藏”，`
+    + '不要调用任何工具，不要写入、修改或假装已经写入任何数据。';
+}
+
 function candidateRow(candidate) {
-  const action = candidate.url
-    ? [{ tag: 'button', type: 'primary', text: { tag: 'plain_text', content: '查看人才' },
-      behaviors: [{ type: 'open_url', default_url: candidate.url }] }]
-    : [{ tag: 'div', text: { tag: 'plain_text', content: '链接待核实' } }];
+  const candidateRef = candidateRefFromUrl(candidate.url);
+  const action = candidate.url ? [
+    { tag: 'button', type: 'primary', text: { tag: 'plain_text', content: '查看人才' },
+      behaviors: [{ type: 'open_url', default_url: candidate.url }] },
+    callbackButton('初筛通过', screeningCommand(candidateRef)),
+    callbackButton('收藏', demoFavoriteCommand(candidateRef)),
+  ] : [{ tag: 'div', text: { tag: 'plain_text', content: '链接待核实' } }];
   return {
     tag: 'column_set', flex_mode: 'none', background_style: 'default', columns: [
       cell(`${candidate.name}\n${candidate.role}`, 3),
       cell([candidate.experience, candidate.city].filter(Boolean).join(' · ') || '待核实', 2),
       cell(candidate.education || '待核实', 2), cell(candidate.match || '待核实', 5),
-      cell(candidate.score || '—', 1), cell('', 2, action),
+      cell(candidate.score || '—', 1), cell('', 3, action),
     ],
   };
 }
@@ -132,7 +163,7 @@ export function parseCandidateTableReply(value) {
     body: { elements: [
       ...(intro ? [{ tag: 'div', text: { tag: 'plain_text', content: intro } }] : []),
       tableHeader(), ...candidates.map(candidateRow),
-      { tag: 'div', text: { tag: 'plain_text', content: '点击“查看人才”将打开 TTC 人才库详情页；不发送简历附件。' } },
+      { tag: 'div', text: { tag: 'plain_text', content: '“初筛通过”会发送标准人才卡；“收藏”仅显示确认，不写入人才库。' } },
     ] },
   };
   const fallback = [title, intro, ...candidates.map((candidate, index) =>

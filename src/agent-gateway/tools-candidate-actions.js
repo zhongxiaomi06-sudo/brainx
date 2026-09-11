@@ -133,7 +133,7 @@ export function createCandidateActionToolHandlers({
             .digest('hex').slice(0, 32);
           await sendTextMessageFn({ target: context.principal.chatId,
             text: talentUrl(args.candidate_ref, candidate),
-            idempotencyKey: `candidate-card-${key}` });
+            idempotencyKey: `candidate-link-${key}` });
           talentLinkStatus = 'sent';
         }
         return { data: { ...row, talent_link_status: talentLinkStatus }, facts: [{ candidate_ref: args.candidate_ref,
@@ -165,7 +165,7 @@ export function createCandidateActionToolHandlers({
           .digest('hex').slice(0, 32);
         await sendTextMessageFn({ target: context.principal.chatId,
           text: talentUrl(args.candidate_ref, candidate),
-          idempotencyKey: `candidate-card-${key}` });
+          idempotencyKey: `candidate-link-${key}` });
         return { data: { candidate_ref: args.candidate_ref, talent_link_status: 'sent' },
           facts: [{ candidate_ref: args.candidate_ref, talent_link_sent_to_current_group: true }],
           inferences: [], recommendations: [], unknowns: [],

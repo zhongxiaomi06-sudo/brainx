@@ -134,6 +134,7 @@ ${JSON.stringify({ candidates: [{ candidate_ref: 'openmai-card-1', name: '李四
   assert.equal(shared.data.talent_link_status, 'sent');
   assert.equal(sent[0].target, 'oc_project');
   assert.equal(sent[0].text, 'https://app.ttcadvisory.com/app/talent/openmai-card-1');
+  assert.match(sent[0].idempotencyKey, /^candidate-link-[a-f0-9]{32}$/);
   assert.equal(Object.hasOwn(sent[0], 'card'), false, '不得再拼装 BrainTex 自制人才卡');
   assert.equal(sent.length, 2);
   await assert.rejects(() => handlers.brainx_candidate_workflow({ job_id: jobId,

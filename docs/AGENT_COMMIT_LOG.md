@@ -1844,3 +1844,10 @@
 - 根因：fixture 的 `OLD` 相对 `Date.now()` 取 96h 前，而用例把 `at` 写死为 `2026-09-10T03:00:00.000Z`。随日历推进 `at-OLD` 滑到 71.4h，不再满足 `silenceHours=72` 阈值（2026-09-10 当天该差值约 84h，故当时通过）。
 - 修法：引入固定 `AT`（CST 11:00，落在 09:00–21:00 发送窗口内），`OLD` 改为相对 `AT` 计算，两处 `at` 复用 `AT`；`RECENT` 仍相对 `now`（断言的是「刚刚有活动」）。断言与语义均未改变。
 - 验证：`git stash` 掉本次全部改动后该文件仍 fail 2（证明与生产修复无关）；修后 6/6 通过。
+
+## 2026-09-11｜fix(worker): 信号处理器先于「已就绪」日志注册，消除 full 门禁偶发假失败
+
+- 现象：`npm run verify` full 的「后端与共享逻辑测试」偶发失败 —— `tests/worker.test.mjs` 报「SIGTERM 应干净退出（exit 0）」实际 `null`；单独跑必过、高负载连跑偶发。
+- 根因：`src/worker.js` 主块先 `console.log('[worker] 批处理进程已就绪…')` 再 `process.once('SIGTERM', shutdown)`。测试以该日志作为「可以发 SIGTERM」的信号，处理器尚未就位时信号走默认行为杀进程 → `exitCode=null`。2026-09-03 已记录同类现象（当时是测试侧改为等就绪日志），但那并未消除竞态本身。
+- 修法：把 `keepAlive` / `shutdown` / 两个 `process.once` 提到就绪日志之前，使「日志可见 ⟺ 处理器已注册」。逻辑等价，且顺带让启动窗口内到达的信号也能优雅退出。
+- 验证：`tests/worker.test.mjs` 连跑 5 次全通过；`npm test` 663/663。

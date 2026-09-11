@@ -109,18 +109,28 @@ test('授权：未绑定群只放行 bind 工具；未接管/已绑定的群拒�
   const ok = authorizePrincipal(db, intakeBindingPayload(), { feishuAppKeyHash: APP_HASH, allowIntakeBinding: true });
   assert.equal(ok.consultantId, 'felix');
 
-  // 未接管的群拒绝
+  // 未接管的群：明确报 GROUP_NOT_INTAKED（specs/017，此前是裸 NOT_FOUND_OR_FORBIDDEN）
   assert.throws(() => authorizePrincipal(db, intakeBindingPayload({ chat_id: 'oc_unknown' }),
-    { feishuAppKeyHash: APP_HASH, allowIntakeBinding: true }), /NOT_FOUND_OR_FORBIDDEN/);
+    { feishuAppKeyHash: APP_HASH, allowIntakeBinding: true }), /GROUP_NOT_INTAKED/);
   // 已绑定的群拒绝（不能再 bind）
   db.prepare('UPDATE bot_chat_intake SET status=? WHERE chat_id=?').run('BOUND', 'oc_new');
   assert.throws(() => authorizePrincipal(db, intakeBindingPayload(),
-    { feishuAppKeyHash: APP_HASH, allowIntakeBinding: true }), /NOT_FOUND_OR_FORBIDDEN/);
+    { feishuAppKeyHash: APP_HASH, allowIntakeBinding: true }), /GROUP_ALREADY_BOUND/);
   // 普通工具（无 allowIntakeBinding）在未绑定群拒绝
   db.prepare('UPDATE bot_chat_intake SET status=? WHERE chat_id=?').run('CARD_SENT', 'oc_new');
   assert.throws(() => authorizePrincipal(db, intakeBindingPayload({
     tool_name: 'brainx_candidate_shortlist', purpose: 'candidate_review',
   }), { feishuAppKeyHash: APP_HASH }), /NOT_FOUND_OR_FORBIDDEN/);
+  db.close();
+});
+
+test('授权（specs/017）：私聊里调 bind 直接 GROUP_REQUIRED，不放行到 handler', () => {
+  const db = readyDb();
+  db.prepare('UPDATE feishu_identity_bindings SET open_id=? WHERE consultant_id=?').run('ou_felix', 'felix');
+  // 私聊：chat_id 就是顾问 open_id（intake 表里永远不会有）
+  assert.throws(() => authorizePrincipal(db, intakeBindingPayload({
+    chat_type: 'p2p', chat_id: 'ou_felix',
+  }), { feishuAppKeyHash: APP_HASH, allowIntakeBinding: true }), /GROUP_REQUIRED/);
   db.close();
 });
 

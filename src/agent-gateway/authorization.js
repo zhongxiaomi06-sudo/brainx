@@ -69,8 +69,10 @@ function authorizeGroup(db, payload, binding, projectRef) {
  */
 function authorizeIntakeBinding(db, payload, binding) {
   const intake = db.prepare(`SELECT status FROM bot_chat_intake WHERE chat_id=?`).get(payload.chat_id);
-  if (!intake || !['SEEN', 'CARD_SENT'].includes(intake.status)) fail();
+  if (!intake) fail('GROUP_NOT_INTAKED');
   if (payload.purpose !== 'group_binding') fail();
+  if (intake.status === 'BOUND') fail('GROUP_ALREADY_BOUND');
+  if (!['SEEN', 'CARD_SENT'].includes(intake.status)) fail('GROUP_NOT_INTAKED');
 }
 
 export function authorizePrincipal(db, payload, options = {}) {
@@ -86,6 +88,9 @@ export function authorizePrincipal(db, payload, options = {}) {
   if (projectRef !== null && !validText(projectRef)) fail();
   const binding = resolveBinding(db, payload, options.feishuAppKeyHash);
   if (options.requireP2p && payload.chat_type !== 'p2p') fail();
+  // specs/017：群绑定只在群里成立——私聊里 chat_id 是顾问本人的 open_id，永远不在 bot_chat_intake 里，
+  // 放行到 handler 只会拿到一个业务层错误。这里早失败，直接给出「先拉机器人进群再点卡」的指引。
+  if (options.allowIntakeBinding && payload.chat_type !== 'group') fail('GROUP_REQUIRED');
   if (payload.chat_type === 'p2p') {
     if (payload.chat_id !== payload.requester_sender_id) fail();
   } else if (options.allowIntakeBinding) {

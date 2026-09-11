@@ -34,6 +34,7 @@
 | **群内接单被拒、卡片没有找人按钮、要在项目群里直接接单或按条件找人** | **[项目群卡片动作规格](../specs/014-launch-card-actions/spec.md)**（群内接单放开、卡片按承接状态分岔、OpenMai/Reloop/SuperMai 三按钮 + 条件输入框、存量群 scope 补齐 job_action）、[拉群即见卡规格](../specs/013-launch-card-first/spec.md) |
 | **机器人被拉进已有群后没反应、想让它自动发「绑定职位」卡、或在旧群里绑定职位开始找人** | **[机器人进群接管规格](../specs/015-group-intake/spec.md)**（轮询发现新群发绑定卡 + groupIntakeBinding 特例授权 + 绑定后发找人卡与拉群指引/防滥用提醒） |
 | **顾问点了「绑定我的职位」却绑不上（群绑定停在 CARD_SENT、project_id 一直为空）** | 先查 `agent_tool_calls.error_code`：`BRAINX_BASE_URL_REQUIRED` = `brainx-agent-gateway` 缺生产基址 —— 本服务以 `brainx` 用户运行读不到 `root:600` 的 `/opt/brainx/.env`，须单独挂 `/etc/brainx/base-url.env`（见 [提交日志 2026-09-11](AGENT_COMMIT_LOG.md)、[机器人进群接管规格](../specs/015-group-intake/spec.md)） |
+| **顾问在飞书里接单后没拉到群、私聊里让机器人建群它却去绑定群、或私聊绑定报错反复重试** | **[agent 侧建群入口与私聊 bind 早失败规格](../specs/017-agent-project-launch/spec.md)**（新增 `brainx_launch_project_chat` 建群工具 + 私聊 bind 直接 GROUP_REQUIRED + 业务错误码文案补全） |
 | OpenClaw 壳子、Skill 编写、飞书渠道接入或外部 Agent 边界 | [OpenClaw 壳子 + 自写 Skill 架构](2026-09-02-openclaw-shell-architecture.md)、[复用与自建边界及权限需求 PRD](prd-2026-09-01-reuse-selfbuild-boundary.md) |
 | DataClaw 交流会索取清单、接口谈判或外部 Agent 边界 | [OpenClaw 壳子 + 自写 Skill 架构](2026-09-02-openclaw-shell-architecture.md)、[DataClaw 集成交流会历史底稿](2026-09-02-dataclaw-integration-brief.md) |
 | **BrainX 下游交付、MCP server 工具契约、接口打包或部署** | **[BrainX 下游交付文档](2026-09-02-brainx-mcp-deliverable.md)**（用户职责边界内）、[OpenClaw 壳子架构 §6 接口挂载](2026-09-02-openclaw-shell-architecture.md) |

@@ -3,7 +3,7 @@ import { currentState } from '../engagement.js';
 import { jobVisibleTo } from '../visibility.js';
 import { startOpenmaiTask } from '../openmai-task.js';
 import { getPushPreferences, updatePushPreferences } from '../push-preferences.js';
-import { buildProjectLaunchCard, workflowDueAt } from '../project-launch.js';
+import { buildProjectLaunchCard, launchProject, workflowDueAt } from '../project-launch.js';
 import { bindGroupToProject, listBindableJobs } from '../group-intake.js';
 
 function fail(code) {
@@ -134,6 +134,38 @@ async function bindGroupProject(db, args, principal, sendCardFn) {
 }
 
 /**
+ * specs/017：agent 侧建群入口。web 接单（specs/011）会自动建群，飞书对话里的
+ * brainx_accept_job 不会——顾问在私聊接单后没有群，只能自己建群再点绑定卡（09-11 linda 投诉）。
+ * 这里直接复用 013 的 launchProject：建群 → 发职位卡 → best-effort 准入 → 置 READY。
+ * 幂等键按顾问+职位固定，重复调用只回 already，不重复建群。
+ */
+async function launchProjectChat(db, args, principal, launchProjectFn) {
+  requireConfirmation(args);
+  requireVisible(db, principal, args.job_id);
+  const launchProjectImpl = launchProjectFn || launchProject;
+  try {
+    const result = await launchProjectImpl(db, principal.consultantId, args.job_id, {
+      idempotency_key: `agent-launch:${principal.consultantId}:${args.job_id}`,
+      force: args.force === true,
+    }, { publicBaseUrl: process.env.BRAINX_BASE_URL });
+    const launch = result.launch;
+    return {
+      data: { job_ref: args.job_id, chat_id: launch.chat_id, chat_name: launch.chat_name || null,
+        status: launch.status, already: result.already === true, openclaw_status: launch.openclaw_status },
+      facts: [{ job_ref: args.job_id, project_chat: launch.chat_id, status: launch.status }],
+      inferences: [], recommendations: [],
+      unknowns: result.already
+        ? ['该项目群已经存在，直接在群里点找人按钮即可。']
+        : ['项目群已建好，职位卡已发到群里；机器人正在接入本群（接入失败会自动重试，不影响找人）。'],
+      evidence_refs: [`project_launch:${launch.launch_id}`, `job_facts:${args.job_id}`],
+      next_allowed_actions: ['brainx_openmai_search', 'brainx_supermai_scout', 'brainx_candidate_shortlist'],
+    };
+  } catch (error) {
+    fail(error.code || 'FEISHU_CHAT_CREATE_FAILED');
+  }
+}
+
+/**
  * specs/014：群内接单成功后把「接单卡」换成「找人卡」。
  * 不换的话顾问手上那张卡还停在接单按钮，点第二次只会报错（york 22:14 之后的死循环）。
  * 发卡是 best-effort：失败不得回滚已经成功的接单。
@@ -156,7 +188,7 @@ function sendAcceptedCard(db, jobId, sendCard) {
   }
 }
 
-export function createActionToolHandlers({ db, startSearchFn, sendCardFn } = {}) {
+export function createActionToolHandlers({ db, startSearchFn, sendCardFn, launchProjectFn } = {}) {
   const startSearch = startSearchFn || ((store, consultantId, jobId, options) => (
     startOpenmaiTask(store, null, consultantId, jobId, options)
   ));
@@ -191,5 +223,7 @@ export function createActionToolHandlers({ db, startSearchFn, sendCardFn } = {})
     brainx_record_job_progress: (args, context) => recordJobProgress(db, args, context.principal),
     // specs/015：旧群绑定职位。chat_id 取自 principal；job_id 可选——不传列职位，传了+confirm 绑定。
     brainx_bind_group_project: async (args, context) => bindGroupProject(db, args, context.principal, sendCardFn),
+    // specs/017：agent 侧建群入口（飞书私聊接单后补建项目群）。
+    brainx_launch_project_chat: async (args, context) => launchProjectChat(db, args, context.principal, launchProjectFn),
   };
 }

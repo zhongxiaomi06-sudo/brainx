@@ -12,6 +12,17 @@ const ERRORS = Object.freeze({
   RATE_LIMITED: [429, '请求过于频繁，请稍后重试', true],
   TOOL_DISABLED: [404, '当前工具不可用', false],
   REPLAYED_REQUEST: [409, '该请求已经处理', false],
+  // specs/017：以下业务错误此前不在白名单里，会被 errorEnvelope 统一降级成 INTERNAL
+  // 「服务暂时无法完成请求」——模型既不知道错在哪也不知道去哪儿，只能对同一次无效调用反复重试
+  // （2026-09-11 linda 私聊连续 4 次 GROUP_NOT_INTAKED）。这里给出可执行的中文指引。
+  GROUP_REQUIRED: [409, '这个操作只能在项目群里做：请先把机器人拉进目标群，等群里出现「绑定我的职位」卡片后点它完成绑定。', false],
+  GROUP_NOT_INTAKED: [409, '机器人还没接管那个群，无法绑定。请先把机器人拉进目标群，看到「绑定我的职位」卡片后再点它。', false],
+  GROUP_ALREADY_BOUND: [409, '这个群已经绑定过职位了，不能重复绑定。如需为新职位建群，请让我「为这个职位建群」。', false],
+  PROJECT_MEMBERSHIP_REQUIRED: [409, '这个职位还不在你的项目里，请先在工作台把职位加入「我的项目」，再建群。', false],
+  AGENT_IDENTITY_BINDING_REQUIRED: [409, '你的账号还没完成飞书身份绑定，暂时无法建群，请联系管理员为你的账号补上身份绑定。', false],
+  BRAINX_BASE_URL_REQUIRED: [503, '服务端生产地址未配置，暂时无法建群，请联系管理员检查生产环境配置。', true],
+  FEISHU_CHAT_CREATE_FAILED: [502, '飞书项目群创建失败，请稍后重试；持续失败请联系管理员。', true],
+  PROJECT_LAUNCH_IN_PROGRESS: [409, '这个职位的项目群正在创建中，请稍后重试。', true],
   INTERNAL: [500, '服务暂时无法完成请求', false],
 });
 

@@ -1,7 +1,7 @@
 import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
 
 const GATEWAY_URL = 'http://127.0.0.1:3102/internal/v1/agent/tools';
-const PLUGIN_VERSION = '1.4.0';
+const PLUGIN_VERSION = '1.4.1';
 const OPENCLAW_VERSION = '2026.7.1-2';
 const string = (extra = {}) => ({ type: 'string', minLength: 1, maxLength: 512, ...extra });
 const integer = (minimum, maximum) => ({ type: 'integer', minimum, maximum });
@@ -51,7 +51,11 @@ export const BRAINX_OPENCLAW_TOOLS = Object.freeze([
   { name: 'brainx_bind_group_project', purpose: () => 'group_binding', parameters: object({
     job_id: string(), confirm: boolean(),
   }, ['confirm']),
-  description: '把当前群绑定到一个职位（specs/015，仅用于机器人被拉进旧群后激活该群）。chat_id 取自身份上下文，不要传。不传 job_id 时返回顾问名下可绑定职位清单让其选择；传 job_id 且 confirm=true 才完成绑定，绑定后群里会出现找人卡。' },
+  description: '把当前群绑定到一个职位（specs/015，仅用于机器人被拉进旧群后激活该群）。chat_id 取自身份上下文，不要传。不传 job_id 时返回顾问名下可绑定职位清单让其选择；传 job_id 且 confirm=true 才完成绑定，绑定后群里会出现找人卡。这个工具只能在群里调用；在私聊里调用会直接被告知先拉机器人进群。' },
+  { name: 'brainx_launch_project_chat', purpose: () => 'job_action', parameters: object({
+    job_id: string(), force: boolean(), confirm: boolean(),
+  }, ['job_id', 'confirm']),
+  description: '为某个已接单职位创建飞书项目群并投放职位卡（specs/017）。私聊里接单后如果还没有项目群，直接调用它补建，不要跟用户要群号、群名或任何参数；已有群时重复调用是幂等的，只返回已存在。card 内容变了要重发时传 force=true。' },
 ]);
 
 function canonicalJson(value) {

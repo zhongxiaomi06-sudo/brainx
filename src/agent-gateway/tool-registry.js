@@ -90,6 +90,11 @@ export const AGENT_TOOL_ROWS = Object.freeze([
   { name: 'brainx_bind_group_project', purpose: ['group_binding'], groupIntakeBinding: true, parameters: object({
     job_id: string(), confirm: boolean(),
   }, ['confirm']) },
+  // specs/017：agent 侧建群入口。飞书对话里接单不会建群（只有 web 接单会），
+  // 顾问在私聊说「接单了但没群 / 建群 / 拉群」时用它补齐，与 web 接单行为对齐。
+  { name: 'brainx_launch_project_chat', purpose: ['job_action'], groupRequiresProject: true, parameters: object({
+    job_id: string(), force: boolean(), confirm: boolean(),
+  }, ['job_id', 'confirm']), projectKey: 'job_id' },
   { name: 'brainx_candidate_workflow', purpose: ['candidate_action'], parameters: object({
     job_id: string(), candidate_ref: string(), action: string({ enum: ['ADD_TO_PROJECT', 'MARK_PREPARING',
       'RECORD_OUTREACH_SENT', 'RECORD_REPLIED', 'SUBMIT_TO_CLIENT', 'MOVE_TO_INTERVIEW',

@@ -1,5 +1,14 @@
 # Agent Commit 记录
 
+## 2026-09-11｜feat(agent): 补 agent 侧建群入口 + 私聊 bind 早失败（specs/017）
+
+- 上游事故（linda，09-11）：私聊说「接单」→ `brainx_accept_job` 成功（JBC31PR=ACCEPTED），**但没有项目群**；她问「你为啥不给我拉群」后，模型只能拿 `brainx_bind_group_project` 顶包，**私聊里连撞 4 次 `GROUP_NOT_INTAKED`**；最后她自己建群、拉机器人、点绑定卡才走通。
+- 根因两条：①**建群只存在于 web 路径**（`server.js` 接单端点 → `postAcceptSideEffects`；`launchRecruitingWorkflow`），agent 工具清单里**没有任何建群工具**，`brainx_accept_job` 只做 accept + 补发卡 → 飞书对话里「接单即拉群」这条用户预期根本不成立；②**`GROUP_NOT_INTAKED` 不在 `errorEnvelope` 白名单**，被统一降级成 `INTERNAL`「服务暂时无法完成请求」，模型既不知道错在哪也不知道去哪儿，只能反复重试。放大因素：`authorizePrincipal` 的 p2p 分支绕过 intake 校验，把本该在授权层就说清的错拖到了业务层。
+- 修法（工具化，不动接单主链路）：①新增工具 `brainx_launch_project_chat`（`job_action`，`job_id` + `confirm` 必填，可选 `force`），内部直接复用 013 的 `launchProject`（建群 → 发卡 → 准入 best-effort → 置 READY），幂等键 `agent-launch:<cid>:<job>` 固定，重复调用返回 `already=true` 不重复建群；②`authorizePrincipal` 对 `allowIntakeBinding` 工具**只在群里放行**，非 group 一律 `GROUP_REQUIRED`；`authorizeIntakeBinding` 细分 `GROUP_NOT_INTAKED` / `GROUP_ALREADY_BOUND`；③`envelopes.js` 补 9 条业务错误文案（`GROUP_REQUIRED`/`GROUP_NOT_INTAKED`/`GROUP_ALREADY_BOUND`/`PROJECT_MEMBERSHIP_REQUIRED`/`AGENT_IDENTITY_BINDING_REQUIRED`/`BRAINX_BASE_URL_REQUIRED`/`FEISHU_CHAT_CREATE_FAILED`/`PROJECT_LAUNCH_IN_PROGRESS`），全部给可执行中文指引；④`prompt.js` 补两条：接单后**紧接着**调用建群工具（参数同样只有 job_id + confirm）、私聊里不要调绑定工具而应引导「先拉机器人进群再点卡」。
+- 改动文件：src/agent-gateway/{tools-actions,tool-registry,authorization,envelopes}.js、plugins/brainx-openclaw/{runtime.js(1.4.1),openclaw.plugin.json,package.json,prompt.js}、deploy/openclaw/openclaw.production.json、tests/fixtures/openclaw-production/plugin-contract.json、tests/{agent-action-tools,group-intake,openclaw-plugin,agent-gateway-http,agent-golden-workflow}.test.mjs、specs/017-agent-project-launch/（spec/plan/tasks）、docs/README.md。
+- 测试：新增 4 组（建群工具幂等 + 未确认拒绝 + blocker 错误码透出；私聊 bind 早失败）；受影响断言同步——网关工具数 25→26、插件白名单 24→25、插件版本 1.4.0→1.4.1、intake 拒绝码 `NOT_FOUND_OR_FORBIDDEN`→`GROUP_NOT_INTAKED`/`GROUP_ALREADY_BOUND`。后端全量 666/666 通过。
+- 未做：未改 `brainx_accept_job` 自身（避免群内接单重复建群），行为对齐靠「工具 + 提示词」；未部署生产（插件副本与 openclaw.json 白名单待同步）。
+
 ## 2026-09-11｜chore(sourcing): SuperMai 外部搜索链路核查 + 猎聘 GUI 抓取 POC 工具（未接业务）
 
 - 背景：用户反馈 SuperMai 与 OpenMai 返回同一批候选人（都是 TTC 库内 PL 编号），判据还自动用职位事实生成；用户拍板「入口错误，不是搜索 TTC 人才库」，随后明确 **SuperMai 真实形态 = GUI 模拟点击在猎聘等网站搜索**。

@@ -122,3 +122,55 @@ test('机器人可记录进展并建立下一行动', () => {
   }, context);
   assert.equal(result.data.active_action.title, '筛选首批候选人');
 });
+
+// specs/017：飞书私聊接单不会建群（只有 web 接单会），agent 侧补一个建群入口。
+test('建群工具（specs/017）：带确认才建群，幂等键按顾问+职位固定', async () => {
+  const calls = [];
+  const launchFn = async (_db, consultantId, projectId, input) => {
+    calls.push({ consultantId, projectId, input });
+    return { ok: true, already: false, launch: { launch_id: 'L-1', consultant_id: consultantId,
+      project_id: projectId, status: 'READY', chat_id: 'oc_project', chat_name: '海马云-产品经理',
+      openclaw_status: 'OK' } };
+  };
+  const db = openDb(':memory:');
+  runSync(db, { source: 'fixture', consultant_id: 'felix' });
+  const jobId = db.prepare(`SELECT jf.project_id FROM job_facts jf
+    JOIN job_memberships jm ON jm.project_id=jf.project_id
+    WHERE jm.consultant_id='felix' LIMIT 1`).get().project_id;
+  const handlers = createActionToolHandlers({ db, launchProjectFn: launchFn });
+  const context = { principal: { tenantId: 'tenant-a', consultantId: 'felix', chatType: 'p2p' } };
+
+  // 未带确认不建群
+  await assert.rejects(() => handlers.brainx_launch_project_chat({ job_id: jobId }, context), /INVALID_ARGUMENT/);
+  assert.equal(calls.length, 0, '未确认不得触发建群');
+
+  const out = await handlers.brainx_launch_project_chat({ job_id: jobId, confirm: true }, context);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].projectId, jobId);
+  assert.equal(calls[0].input.idempotency_key, `agent-launch:felix:${jobId}`, '幂等键必须固定，重复调用不重复建群');
+  assert.equal(out.data.chat_id, 'oc_project');
+  assert.equal(out.data.status, 'READY');
+  assert.ok(out.next_allowed_actions.includes('brainx_openmai_search'));
+
+  // 已经是 READY 的职位：底层返回 already=true，工具如实透出，不谎报新建
+  const already = await createActionToolHandlers({ db, launchProjectFn: async () => ({
+    ok: true, already: true, launch: { launch_id: 'L-1', status: 'READY', chat_id: 'oc_project', openclaw_status: 'OK' },
+  }) }).brainx_launch_project_chat({ job_id: jobId, confirm: true }, context);
+  assert.equal(already.data.already, true);
+  assert.ok(already.unknowns.some((u) => u.includes('已经存在')), '已存在的群要明说，避免顾问以为又建了一个');
+  db.close();
+});
+
+test('建群工具（specs/017）：底层 blocker 错误码原样透出，不被吞成 INTERNAL', async () => {
+  const db = openDb(':memory:');
+  runSync(db, { source: 'fixture', consultant_id: 'felix' });
+  const jobId = db.prepare(`SELECT jf.project_id FROM job_facts jf
+    JOIN job_memberships jm ON jm.project_id=jf.project_id
+    WHERE jm.consultant_id='felix' LIMIT 1`).get().project_id;
+  const handlers = createActionToolHandlers({ db, launchProjectFn: async () => {
+    throw Object.assign(new Error('no membership'), { code: 'PROJECT_MEMBERSHIP_REQUIRED' });
+  } });
+  await assert.rejects(() => handlers.brainx_launch_project_chat({ job_id: jobId, confirm: true },
+    { principal: { tenantId: 'tenant-a', consultantId: 'felix', chatType: 'p2p' } }), /PROJECT_MEMBERSHIP_REQUIRED/);
+  db.close();
+});

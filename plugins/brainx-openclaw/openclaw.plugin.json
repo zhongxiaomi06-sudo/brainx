@@ -31,7 +31,8 @@
       "brainx_start_candidate_search",
       "brainx_record_job_progress",
       "brainx_candidate_workflow",
-      "brainx_bind_group_project"
+      "brainx_bind_group_project",
+      "brainx_launch_project_chat"
     ]
   },
   "configSchema": {

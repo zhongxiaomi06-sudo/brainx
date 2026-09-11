@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { formatBrainxReplyPayload } from '../plugins/brainx-openclaw/response-card.js';
+import { createRichReplySendingHandler } from '../plugins/brainx-openclaw/rich-reply-sending.js';
 
 test('飞书最终文字回答统一转成有标题、分段和工作台入口的卡片', () => {
   const result = formatBrainxReplyPayload({
@@ -121,4 +122,41 @@ test('候选表格不把第三方或无效链接包装成 TTC 按钮', () => {
     .filter((element) => element.tag === 'column_set');
   assert.equal(rows[1].columns.at(-1).elements[0].text.content, '链接待核实');
   assert.doesNotMatch(JSON.stringify(result.payload), /evil\.example/);
+});
+
+test('OpenClaw 最终发送钩子用飞书适配器投递推荐卡并取消原始纯文本', async () => {
+  const sent = [];
+  const handler = createRichReplySendingHandler({
+    config: {},
+    runtime: {
+      config: { current: () => ({ channels: { feishu: {} } }) },
+      channel: { outbound: { loadAdapter: async () => ({
+        sendPayload: async (payload) => sent.push(payload),
+      }) } },
+    },
+  });
+  const content = `1. 测试公司｜算法工程师｜P292374
+结论：建议核验
+关键依据：匹配分 80
+主要风险：HC 仅 1
+下一步：接单`;
+  const result = await handler({ to: 'ou_test', content }, {
+    channelId: 'feishu', accountId: 'default',
+  });
+  assert.deepEqual(result, { cancel: true, cancelReason: 'brainx_rich_reply_sent' });
+  assert.equal(sent.length, 1);
+  const buttons = sent[0].payload.presentation.blocks.find(({ type }) => type === 'buttons').buttons;
+  assert.equal(buttons[0].label, '接单并建群');
+  assert.equal(sent[0].to, 'ou_test');
+});
+
+test('飞书替换卡投递失败时保留原始文字', async () => {
+  const handler = createRichReplySendingHandler({
+    runtime: { channel: { outbound: { loadAdapter: async () => ({
+      sendPayload: async () => { throw new Error('offline'); },
+    }) } } },
+  });
+  assert.equal(await handler({ to: 'ou_test', content: '职位建议：先核验。' }, {
+    channelId: 'feishu',
+  }), undefined);
 });

@@ -1,5 +1,10 @@
 # Agent Commit 记录
 
+## 2026-09-11 · `fix(飞书): 在发送前可靠替换推荐卡`
+
+- 改动摘要：真机确认 OpenClaw 入站回复未执行 `reply_payload_sending` 后，新增 `message_sending` 最终发送钩子，通过官方飞书 outbound adapter 投递 BrainX 互动卡，成功后取消原始纯文本，失败则保留原文；插件升级至 1.3.15。
+- 验证结果：OpenClaw 插件与推荐卡专项测试 18/18 通过；`npm run verify:quick` 16/16 通过。提交后重装并在 Dykes 私聊重发真卡。
+
 ## 2026-09-11 · `fix(推荐卡): 强制保留职位编号生成接单按钮`
 
 - 改动摘要：根据 Dykes 飞书真机结果，强制 `brainx_daily_brief` 的最终回答逐岗保留 `job.project_id` 与固定分析字段，避免模型省略编号后推荐卡退化为无按钮文本；同步升级 OpenClaw 插件至 1.3.14 并登记真机失败证据。

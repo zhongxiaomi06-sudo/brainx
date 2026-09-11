@@ -70,7 +70,10 @@ function parseRecommendation(text) {
   );
   const pattern = /^(?:#{1,4}\s*)?(\d{1,2})[.)、]\s*(.+?)\s*$/gm;
   const matches = [...normalizedText.matchAll(pattern)];
-  if (!matches.length || !/职位|岗位|推荐/.test(normalizedText)) return null;
+  const hasRecommendationShape = /职位|岗位|推荐/.test(normalizedText)
+    || /^(?:结论|关键依据|主要风险|下一步)[：:]/m.test(normalizedText)
+    || /[｜|][A-Za-z0-9_-]{4,64}\s*$/m.test(normalizedText);
+  if (!matches.length || !hasRecommendationShape) return null;
   const jobs = matches.slice(0, 10).map((match, index) => {
     const end = matches[index + 1]?.index ?? normalizedText.length;
     return {

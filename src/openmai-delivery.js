@@ -89,7 +89,7 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
         text: { tag: 'plain_text', content: success ? '打开工作台查看与评估' : '打开工作台处理' },
         multi_url: { url: target, pc_url: target, android_url: target, ios_url: target } }] }] : []),
       { tag: 'note', elements: [{ tag: 'plain_text',
-        content: '“初筛通过”会投放标准人才卡；“收藏”仅显示确认，不写入人才库' }] },
+        content: '“初筛通过”会发送 TTC 人才链接并由飞书展开卡片；“收藏”仅显示确认，不写入人才库' }] },
     ],
   };
 }
@@ -139,7 +139,7 @@ function screeningCandidateAction(job, candidate) {
     + '这个按钮就是我的明确确认：现在调用 brainx_candidate_workflow，'
     + `传入 job_id=${projectRef}、candidate_ref=${candidate.candidateRef}、`
     + 'action=KEEP_FOR_REVIEW、confirm=true。成功后告诉群里“☑ 初筛通过”，'
-    + '并说明此人已进入本项目共享上下文，同时已发送人才卡；不要发送简历。';
+    + '并说明此人已进入本项目共享上下文，同时已发送 TTC 人才链接；不要发送简历。';
   return { tag: 'button', type: 'default', text: { tag: 'plain_text', content: '初筛通过' },
     value: { text: command } };
 }

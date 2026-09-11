@@ -94,7 +94,7 @@ test('OpenMai 候选可进入项目，重点名单在项目成员间共享且不
   db.close();
 });
 
-test('候选卡片按钮发送 TTC 链接，自然语言建群可自动加入重点名单', async () => {
+test('初筛通过只发送 TTC 人才链接，自然语言建群可自动加入重点名单', async () => {
   const { db, jobId } = fixture();
   const resultText = `候选结果\n<!-- BRAINX_CANDIDATES_V1
 ${JSON.stringify({ candidates: [{ candidate_ref: 'openmai-card-1', name: '李四',
@@ -114,7 +114,7 @@ ${JSON.stringify({ candidates: [{ candidate_ref: 'openmai-card-1', name: '李四
   const created = [];
   const handlers = createCandidateActionToolHandlers({ db,
     candidateShortlistFn: async () => ({ items: [], page: { next_page_token: null } }),
-    sendInteractiveCardFn: async (input) => { sent.push(input); return { message_id: 'om-card' }; },
+    sendTextMessageFn: async (input) => { sent.push(input); return { message_id: 'om-card' }; },
     createCandidateDecisionGroupFn: async (innerDb, _principal, args) => {
       created.push(args);
       assert.equal(innerDb.prepare(`SELECT focus_status FROM project_candidate_focus
@@ -127,16 +127,15 @@ ${JSON.stringify({ candidates: [{ candidate_ref: 'openmai-card-1', name: '李四
   const focusedResult = await handlers.brainx_candidate_workflow({ job_id: jobId,
     candidate_ref: 'openmai-card-1', action: 'KEEP_FOR_REVIEW', confirm: true }, context);
   assert.equal(focusedResult.data.focus_status, 'FOCUSED');
-  assert.equal(focusedResult.data.talent_card_status, 'sent');
+  assert.equal(focusedResult.data.talent_link_status, 'sent');
   assert.equal(sent.length, 1);
   const shared = await handlers.brainx_candidate_workflow({ job_id: jobId,
     candidate_ref: 'openmai-card-1', action: 'SEND_TALENT_CARD', confirm: true }, context);
-  assert.equal(shared.data.talent_card_status, 'sent');
+  assert.equal(shared.data.talent_link_status, 'sent');
   assert.equal(sent[0].target, 'oc_project');
-  assert.match(JSON.stringify(sent[0].card), /李四|88%|打开 TTC 人才库/);
-  assert.match(sent[0].card.elements[2].actions[0].multi_url.url,
-    /app\.ttcadvisory\.com\/app\/talent\/openmai-card-1/);
-  assert.doesNotMatch(JSON.stringify(sent[0].card), /简历\.pdf|138\d{8}/);
+  assert.equal(sent[0].text, 'https://app.ttcadvisory.com/app/talent/openmai-card-1');
+  assert.equal(Object.hasOwn(sent[0], 'card'), false, '不得再拼装 BrainTex 自制人才卡');
+  assert.equal(sent.length, 2);
   await assert.rejects(() => handlers.brainx_candidate_workflow({ job_id: jobId,
     candidate_ref: 'openmai-card-1', action: 'SEND_TALENT_CARD', confirm: true },
   { principal: { ...context.principal, chatType: 'p2p', chatId: 'ou_felix' } }),

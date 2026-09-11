@@ -150,6 +150,44 @@ export async function sendInteractiveCard({
   return { message_id: sendBody.data?.message_id || null };
 }
 
+/** 发送纯文本消息；人才库链接必须单独发送，交由飞书侧的链接展开规则生成标准卡片。 */
+export async function sendTextMessage({
+  target,
+  text,
+  idempotencyKey,
+  appId,
+  appSecret,
+  fetchImpl = globalThis.fetch,
+  timeoutMs = 15_000,
+}) {
+  ({ appId, appSecret } = feishuCredentials(appId, appSecret));
+  if (!appId || !appSecret) throw new Error('FEISHU_BOT_CREDENTIALS_MISSING');
+  if (!/^(ou|oc)_[A-Za-z0-9_-]+$/.test(String(target || ''))) {
+    throw new Error('FEISHU_TARGET_INVALID');
+  }
+  const content = String(text || '').trim();
+  if (!content) throw new Error('FEISHU_TEXT_REQUIRED');
+
+  const token = await getTenantAccessToken({ appId, appSecret, fetchImpl, timeoutMs });
+  const receiveIdType = String(target).startsWith('oc_') ? 'chat_id' : 'open_id';
+  const uuidQuery = idempotencyKey ? `&uuid=${encodeURIComponent(idempotencyKey)}` : '';
+  const response = await fetchImpl(
+    `${FEISHU_BASE}/open-apis/im/v1/messages?receive_id_type=${receiveIdType}${uuidQuery}`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ receive_id: target, msg_type: 'text',
+        content: JSON.stringify({ text: content }) }),
+      signal: AbortSignal.timeout(timeoutMs),
+    },
+  );
+  const body = await readJson(response, 'FEISHU_TEXT_SEND_RESPONSE_INVALID');
+  if (response.ok === false || body.code !== 0) {
+    throw new Error(`FEISHU_TEXT_SEND_FAILED: ${safeMessage(body, body.code ?? 'unknown')}`);
+  }
+  return { message_id: body.data?.message_id || null };
+}
+
 /** 把互动卡片作为幂等话题回复；用于候选人附件异常等局部状态，不污染群主时间线。 */
 export async function replyInteractiveCard({
   messageId,

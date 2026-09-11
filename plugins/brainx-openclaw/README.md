@@ -20,7 +20,7 @@
 
 每轮候选名单底部继续提供两个渠道的“继续找人”按钮。继续搜索由 BrainX 自动从历史结构化结果提取、累计并传递 TTC 候选编号排除名单；Agent 不接收也不能编造排除编号。没有可确认编号时失败关闭，不产生新的搜索任务。
 
-候选表格每行只提供“重点关注”。它通过 `KEEP_FOR_REVIEW` 写入项目共享重点名单，并在来源项目群幂等投放一张带 TTC 人才库链接的人才卡；后续项目群问答从 `brainx_candidate_shortlist.focused_candidates` 读取，不依赖易丢失的模型会话记忆。明确取消时使用 `REMOVE_FROM_REVIEW`。
+候选表格每行提供“查看人才 / 初筛通过 / 收藏”。`KEEP_FOR_REVIEW` 写入项目共享重点名单，并在来源项目群幂等发送一条 TTC 人才链接，由飞书侧已有链接展开规则生成标准人才卡；BrainX 不再拼装第二套候选卡。后续项目群问答从 `brainx_candidate_shortlist.focused_candidates` 读取，不依赖易丢失的模型会话记忆。明确取消时使用 `REMOVE_FROM_REVIEW`；“收藏”仅作演示反馈，不写后端。
 
 候选表格不再显示“为 TA 建决策群”。顾问在项目群自然语言说“为这个人建群”或点名候选人要求建决策群，即构成 `CREATE_DECISION_GROUP` 的本次明确确认；候选人未保留时 BrainX 会先自动加入重点名单。指代不唯一时 Agent 只追问候选人姓名，不猜测。
 

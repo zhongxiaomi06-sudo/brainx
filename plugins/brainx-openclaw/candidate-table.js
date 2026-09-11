@@ -77,7 +77,7 @@ function screeningCommand(candidateRef) {
   return `[BRAINTEX_CANDIDATE_SCREEN] 将当前项目群候选人 ${candidateRef} 初筛通过。`
     + '这个按钮就是本次明确确认：先根据当前项目群定位唯一职位，然后立即调用 '
     + `brainx_candidate_workflow，传入 candidate_ref=${candidateRef}、action=KEEP_FOR_REVIEW、confirm=true。`
-    + '成功后回复“☑ 初筛通过”；BrainX 会把标准人才卡发到本群，不要重复发送。';
+    + '成功后回复“☑ 初筛通过”；BrainX 会把 TTC 人才链接发到本群并由飞书展开，不要重复发送。';
 }
 
 function demoFavoriteCommand(candidateRef) {
@@ -153,7 +153,7 @@ export function parseCandidateTableReply(value) {
       ...candidates.flatMap((candidate, index) => [
         ...(index ? [{ tag: 'hr' }] : []), ...candidateRow(candidate),
       ]),
-      { tag: 'div', text: { tag: 'plain_text', content: '“初筛通过”会发送标准人才卡；“收藏”仅显示确认，不写入人才库。' } },
+      { tag: 'div', text: { tag: 'plain_text', content: '“初筛通过”会发送 TTC 人才链接并由飞书展开；“收藏”仅显示确认，不写入人才库。' } },
     ] },
   };
   const fallback = [title, intro, ...candidates.map((candidate, index) =>

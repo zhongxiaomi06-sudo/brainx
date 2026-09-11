@@ -211,7 +211,8 @@ ${JSON.stringify({ candidates: [
   assert.doesNotMatch(JSON.stringify(card), /为 TA 建决策群/);
   const secondActions = rows[2].columns[5].elements;
   assert.match(secondActions[1].value.text, /candidate_ref=c-2/);
-  assert.match(card.elements.at(-1).elements[0].content, /初筛通过.*人才卡.*收藏.*不写入/);
+  assert.match(card.elements.at(-1).elements[0].content,
+    /初筛通过.*TTC 人才链接.*飞书展开.*收藏.*不写入/);
   assert.match(card.elements[0].content, /第 2 轮/);
   assert.equal(card.header.title.content, 'BrainTex · 第 2 轮候选人不足');
   const completeCandidates = Array.from({ length: 6 }, (_, index) => ({

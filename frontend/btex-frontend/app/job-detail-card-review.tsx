@@ -138,10 +138,6 @@ function pipelineItems(pipeline: JobDetailPipeline) {
     .map(([key, value]) => ({ label: pipelineLabels[key.toLowerCase()] || key, value }));
 }
 
-function percent(value: number | null) {
-  return value === null ? "待确认" : `${Math.round(value * 100)}%`;
-}
-
 function scoreText(value: number | null) {
   return value === null ? "待确认" : `${Number(value.toFixed(1))} / 100`;
 }
@@ -164,13 +160,11 @@ function JudgementContent({ job, recommendation }: {
   return <>
     <section className="job-detail-score-summary" aria-label="推荐评分摘要">
       <div><span>推荐指数</span><b>{recommendation.score ?? "待确认"}</b></div>
-      <div><span>证据覆盖</span><b>{recommendation.evidenceCoverage === null ? "待确认" : `${recommendation.evidenceCoverage}%`}</b></div>
-      <div><span>策略版本</span><b>{recommendation.policyVersion || "待确认"}</b></div>
     </section>
     <section className="job-detail-review-section">
       <div className="job-detail-review-section-title"><span><BarChart3 /></span><div><h3>评分依据</h3><p>后端冻结六维评分；缺失维度不按 0 分处理</p></div></div>
       <div className="job-detail-score-list">{dimensions.map(item => <div className={`job-detail-score-row${item.score === null ? " is-missing" : ""}`} key={item.dim}>
-        <span><b>{item.label}</b><small>{item.weight === null ? "权重待确认" : `权重 ${percent(item.weight)}`}</small></span>
+        <span><b>{item.label}</b></span>
         <div className="job-detail-score-bar" role="progressbar" aria-label={item.label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={item.score ?? undefined}><i style={{ width: `${Math.max(0, Math.min(100, item.score ?? 0))}%` }} /></div>
         <strong>{scoreText(item.score)}{item.weightedScore !== null && <small>贡献 {Number(item.weightedScore.toFixed(2))}</small>}</strong>
       </div>)}</div>
@@ -219,8 +213,9 @@ export function JobDetailCard({
     { id: "judgement", label: "判断" },
     { id: "engagement", label: "跟进与结果" },
     { id: "trail", label: "决策轨迹" },
-    { id: "replay", label: "回放" },
   ];
+  // T1：回放 tab 已下线；历史入口仍可能传入 "replay"，统一落到决策轨迹。
+  const effectiveTab = selectedTab === "replay" ? "trail" : selectedTab;
   const selectTab = (tab: JobDetailTab) => {
     if (tab === selectedTab) return;
     if (!activeTab) setLocalTab(tab);
@@ -277,22 +272,11 @@ export function JobDetailCard({
         </div>
 
         <nav className="job-detail-review-tabs" aria-label="职位详情视图">
-          {tabs.map(tab => <button key={tab.id} type="button" className={selectedTab === tab.id ? "active" : ""} aria-current={selectedTab === tab.id ? "page" : undefined} onClick={() => selectTab(tab.id)}>{tab.label}</button>)}
+          {tabs.map(tab => <button key={tab.id} type="button" className={effectiveTab === tab.id ? "active" : ""} aria-current={effectiveTab === tab.id ? "page" : undefined} onClick={() => selectTab(tab.id)}>{tab.label}</button>)}
         </nav>
 
         <div className="job-detail-review-scroll">
-          {selectedTab === "facts" ? <><section className="job-detail-review-section">
-            <div className="job-detail-review-section-title"><span><BriefcaseBusiness /></span><div><h3>核心职位事实</h3><p>只展示 TTC 与 BrainX 当前可以核验的字段</p></div></div>
-            <dl className="job-detail-review-facts">
-              <Fact label="职位编号" value={job.projectId} />
-              <Fact label="主做顾问" value={job.ownerName} />
-              <Fact label="与我的关系" value={job.relation} />
-              <Fact label="当前阶段" value={job.currentStage} />
-              <Fact label="客户类型" value={job.companyType} />
-              <Fact label="优先级" value={job.priority} />
-            </dl>
-          </section>
-
+          {effectiveTab === "facts" ? <>
           <section className="job-detail-review-section">
             <div className="job-detail-review-section-title"><span><ArrowRight /></span><div><h3>招聘进展</h3><p>结构化 Pipeline；缺失不等于零</p></div></div>
             {pipeline.length ? <div className="job-detail-review-pipeline">{pipeline.map((item, index) => <div key={`${item.label}-${index}`}><span>{item.label}</span><b>{item.value}</b></div>)}</div> : <div className="job-detail-review-empty">暂无可核验进展</div>}
@@ -311,22 +295,19 @@ export function JobDetailCard({
             <span><b>TTC CRM 职位快照</b><small>最近同步 {displayDate(job.capturedAt)} · 缺失字段保持待确认</small></span>
             {onOpenSource && <button type="button" onClick={() => onOpenSource(job.projectId)}>查看来源<ExternalLink /></button>}
           </section>
-          </> : detailContent || (selectedTab === "judgement" ? <JudgementContent job={job} recommendation={recommendation} /> : selectedTab === "engagement" ? <section className="job-detail-review-section">
+          </> : detailContent || (effectiveTab === "judgement" ? <JudgementContent job={job} recommendation={recommendation} /> : effectiveTab === "engagement" ? <section className="job-detail-review-section">
             <div className="job-detail-review-section-title"><span><ArrowRight /></span><div><h3>跟进与结果</h3><p>项目关系、当前阶段和下一步动作</p></div></div>
             <dl className="job-detail-review-facts"><Fact label="跟进状态" value={job.engagementState} /><Fact label="与我的关系" value={job.relation} /><Fact label="当前阶段" value={job.currentStage} /><Fact label="下一步动作" value={job.nextAction} /></dl>
-          </section> : selectedTab === "trail" ? <section className="job-detail-review-section">
+          </section> : <section className="job-detail-review-section">
             <div className="job-detail-review-section-title"><span><Clock3 /></span><div><h3>决策轨迹</h3><p>真实操作记录</p></div></div>
             {recentEvents.length ? <div className="job-detail-review-events">{recentEvents.map(event => <div key={event.id}><i /><span><b>{event.label}</b>{event.detail && <small>{event.detail}</small>}</span><time>{displayDate(event.at)}</time></div>)}</div> : <div className="job-detail-review-empty">尚无操作记录</div>}
-          </section> : <section className="job-detail-review-section">
-            <div className="job-detail-review-section-title"><span><Database /></span><div><h3>决策回放</h3><p>只展示后端已经冻结的推荐快照</p></div></div>
-            <div className="job-detail-review-empty">尚无可回放的冻结决策</div>
           </section>)}
         </div>
 
         {(onDismiss || onIgnore || onAddToProjects) && <footer className={`job-detail-review-actions${[onDismiss, onIgnore, onAddToProjects].filter(Boolean).length === 1 ? " is-single" : ""}`}>
           {onDismiss && <button type="button" className="is-dismiss" onClick={() => onDismiss(job.projectId)}>暂不考虑</button>}
           {onIgnore && job.inMyProjects && <button type="button" className="is-ignore" disabled={ignoring} onClick={() => void ignoreProject()}>{ignoring ? "忽略中…" : "忽略"}</button>}
-          {onAddToProjects && <button type="button" className="is-primary" disabled={job.inMyProjects || adding} onClick={() => void addToProjects()}>{job.inMyProjects ? "已加入我的项目" : adding ? "添加中…" : "加入我的项目"}</button>}
+          {onAddToProjects && <button type="button" className="is-primary" disabled={job.inMyProjects || adding} onClick={() => void addToProjects()}>{job.inMyProjects ? "已加入我的项目" : adding ? "接单中…" : "一键接单"}</button>}
         </footer>}
       </section>
     </div>

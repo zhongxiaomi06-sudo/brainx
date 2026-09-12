@@ -188,11 +188,11 @@ export const TodayDecisionEntry: Story = {
     await expect(canvas.getByText("本周确认客户面试反馈")).toBeInTheDocument();
     await expect(canvas.getAllByText("待确认").length).toBeGreaterThan(0);
     await userEvent.click(canvas.getByRole("button", { name: "职位事实" }));
-    await userEvent.click(canvas.getByRole("button", { name: "加入我的项目" }));
+    await userEvent.click(canvas.getByRole("button", { name: "一键接单" }));
     await expect(canvas.getByRole("button", { name: "已加入我的项目" })).toBeDisabled();
     await expect(canvas.getByRole("button", { name: "忽略" })).toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: "忽略" }));
-    await expect(canvas.getByRole("button", { name: "加入我的项目" })).toBeEnabled();
+    await expect(canvas.getByRole("button", { name: "一键接单" })).toBeEnabled();
   },
 };
 
@@ -217,7 +217,7 @@ export const AllPositionsEntry: Story = {
     await expect(initialSize.height).toBeGreaterThanOrEqual(560);
     await expect(canvas.getByText("TTC CRM 职位快照")).toBeInTheDocument();
     await expect(canvas.getByText("备注与职位描述")).toBeInTheDocument();
-    for (const tab of ["判断", "跟进与结果", "决策轨迹", "回放", "职位事实"]) {
+    for (const tab of ["判断", "跟进与结果", "决策轨迹", "职位事实"]) {
       await userEvent.click(canvas.getByRole("button", { name: tab }));
       await expect(dialogSize()).toEqual(initialSize);
       await expect(footerLabels()).toEqual(initialFooterLabels);

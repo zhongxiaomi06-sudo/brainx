@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-12｜feat(frontend): 职位详情页回放 tab 下线 + 一键接单 + 字段精简（冲刺清单 T1/T2）
+
+- T1：`job-detail-card-review.tsx` 删除「回放」tab 与恒空的决策回放占位区；历史入口（`workbench.tsx` 通知、深链）重映射到判断页，不再出现空 tab。详情页主按钮改「一键接单」：`acceptJobAndLaunch` 一次点击 = 入项目 + `launchProjectWorkflow` 拉群推卡，无表单无二次确认（复用既有 `launchProjectInFeishu`，签名放宽为 `Pick<ProjectSummary,"project_id"|"company">`）。
+- T2：删除 facts 区 6 字段（职位编号/主做顾问/与我的关系/当前阶段/客户类型/优先级）；判断页摘要去掉证据覆盖、策略版本，六维评分行去掉权重；首屏只剩公司、岗位、base 地、状态、HC。
+- 同步：Storybook 场景与 rendered-html 断言更新；前端审核台账新增 [2026-09-12 一键接单与字段精简](frontend-reviews/2026-09-12-job-detail-quick-accept.md)，JobDetailCard 行结论同步。
+- 验证：前端 `npm test` 44/44 通过；`tsc --noEmit` 无错误；eslint 干净（workbench.tsx 本就处于 ignore）。
+
 ## 2026-09-12｜fix(agent-gateway): 建群工具 openclaw_status 缺失归一为 null，消除幂等路径 500
 
 - 触发：E19 生产冒烟（mia 账号私聊场景直调 `brainx_launch_project_chat`）发现幂等路径 500 INTERNAL；审计表 `agent_tool_calls` 显示 1ms 内失败。

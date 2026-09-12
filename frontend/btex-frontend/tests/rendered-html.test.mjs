@@ -114,7 +114,8 @@ test("keeps joined candidates visible in the recommendation queue and verificati
   assert.match(workbench, /getProjects\(\)/);
   assert.match(workbench, /onAddToProjects=\{job=>addToMyProjects\(job\.id,job\.company\)\}/);
   assert.match(workbench, /if \(action === "ADD"\) return onAddToProjects\(job\);/);
-  assert.match(workbench, /添加中…/);
+  assert.match(workbench, /接单中…/);
+  assert.match(workbench, /一键接单/);
   assert.match(workbench, /已加入我的项目/);
   assert.match(workbench, /<RecommendationQueueV2Review items=\{queueItems\}/);
   assert.match(workbench, /"剩余 HC"\s*:\s*"UNKNOWN"/);
@@ -169,7 +170,7 @@ test("preserves engagement, result recording, replay, sync and notifications", a
   assert.match(loop, /commitment-timeline[\s\S]*commitment-idle-actions/);
   assert.match(workbench, /panel&&!pendingCommand&&<WorkbenchPanel/);
   assert.match(workbench, /onDismiss=\{legal\.includes\("DISMISS"\)/);
-  assert.match(workbench, /onAddToProjects=\{\(\)=>onMembership\(job,"MY_JOB"\)\}/);
+  assert.match(workbench, /onAddToProjects=\{\(\)=>onAcceptAndLaunch\(job\)\}/);
   assert.match(workbench, /onIgnore=\{removableProject/);
   assert.doesNotMatch(workbench, /panel\.tab!=="engagement"/);
   assert.match(globalCss, /command-modal \.filter-select-menu\{[^}]*max-height:[^}]*overflow-y:auto/);
@@ -325,7 +326,7 @@ test("uses TTC facts and field capabilities without restoring fake job filters",
   assert.match(workbench, /notes:\s*row\.notes/);
   assert.match(workbench, /mergeOpportunityDetail\(toJobDetail\(source\), await getOpportunityDetail/);
   assert.match(workbench, /备注与职位描述/);
-  assert.match(workbench, /activeTab=\{panel\.tab\}/);
+  assert.match(workbench, /activeTab=\{panelTab\}/);
   assert.match(workbench, /onFollow=\{onAddToProjects\}/);
   assert.match(workbench, /updateOpportunityMembership\(jobId,"MY_JOB"/);
   assert.doesNotMatch(workbench, /function JobFactDetail|aria-label=\{`\$\{row\.role\} 职位事实`\}/);

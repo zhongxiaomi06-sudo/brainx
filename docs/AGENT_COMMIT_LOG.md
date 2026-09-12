@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-12｜docs(sprint): 报告链路打通证据与消息落库管道限制登记
+
+- 报告服务修复过程：`ERR_INVALID_URL`（缺 `BRAINX_FEISHU_DOC_BASE_URL`，已补 `https://jxog8b3tny.feishu.cn` 至 agent.env）→ `FEISHU_DOC_CREATE_FAILED`（应用缺 `docx:document` 权限，用户已在飞书后台开通）。
+- 验证：`brainx_candidate_report` GENERATE V4 / REGENERATE V5 均 200，报告卡带文档链接到 Offer 决策群，文档六节内容可读。
+- 遗留（赛后 T18）：`lark_messages` 只由未上线的 `src/gateway` WS 服务写入，群消息不落库导致「本决策群新增证据」恒空、REGENERATE 不含新材料；生产保持 OpenClaw 单事件连接（集群不广播），赛前不得加第二条 WS。已登记灰测文档第 9 条。
+
 ## 2026-09-12｜fix(deploy): 新群准入三层根因修复——决策群/Offer 群链路打通
 
 - 触发：NL 测「为黄俊凯建一个决策群」连续 INTERNAL；审计锁定 `OPENCLAW_GROUP_ALLOWLIST_FAILED`。借 PrivateTmp 隔离的临时插桩拿到真实 stderr：openclaw CLI「Config file is not readable… chown 993」。

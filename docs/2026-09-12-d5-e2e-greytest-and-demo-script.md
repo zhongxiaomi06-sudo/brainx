@@ -10,7 +10,8 @@
 | 建群 + 职位卡 | ✅ | `brainx_launch_project_chat` → 新群「智子芯元（深圳）科技有限责任公司-AI产品经理」READY，群卡秒到 |
 | 找人 → 候选人投递 | ✅ | 接单自动触发 OpenMai（om_43a0bb74）→「首轮候选人已就绪」总览卡（6 人，每行重点关注）自动回群 |
 | 初筛通过 → 自动推三按钮卡 | ✅ | marker 消息 → agent 调 KEEP_FOR_REVIEW → FOCUSED + 自动推「BrainTex · 候选人卡片」（查看链接/初筛通过/一键加入人才库 三按钮齐全） |
-| 一键加入人才库 → RDS 真实写入 | ✅ | marker 消息 → agent 调 `brainx_talent_pool_add` → 黄俊凯 #396 写入 RDS；幂等标记 `[ref:...]`；另工具直调李燊 #395 |
+| 一键加入人才库 → RDS 真实写入 | ✅ | marker 消息 → agent 调 `brainx_talent_pool_add` → 黄俊凯 #396 写入 RDS；幂等标记 `[ref:...]`；另工具直调李燊 #395、NL 余学庆 #397 |
+| Offer 决策群 + 报告 | ✅ | 「为黄俊凯建决策群」→ 群 READY + 首卡；`brainx_candidate_report` V4/V5 生成，报告卡带文档链接到群，文档六节可读（飞书 `docx:document` 权限已开通，`BRAINX_FEISHU_DOC_BASE_URL` 已补） |
 | SuperMai 服务端链路 | ✅ | `brainx_supermai_scout` 直通 done：私域无命中 → TTC 公域 228 命中精选 10 人（与 OpenMai 共用引擎，无需本地 GUI） |
 | Web 端全部 UI 改动 | ✅ | 已随三轮部署上线（T8/T1/T2/T5/T3/T4/T6/T7/T13），门禁三轮 24/24 |
 
@@ -25,6 +26,7 @@
 6. **launch 新建群在 openclaw 重启后收到「还没绑定职位」绑定卡**（specs/015 intake 误判，scope 实际存在）：展示层干扰，赛后修。
 7. **agent 接单后跳过「确认岗位」询问与紧接着的建群步骤**（playbook 未注入所致；注入已开启，待观察）：演示时私聊接单后需补一句「把群建起来」。
 8. ECS 到 GitHub 网络偶发不通：git pull 首次超时，重试成功。部署如遇此情况直接重试。
+9. **「新材料进报告」的消息落库管道生产未运行**：`lark_messages` 只由 `src/gateway`（lark-gateway WS 服务）写入，而生产故意只跑 OpenClaw 一条事件连接（飞书长连接集群不广播，双开会抢事件）。因此「本决策群新增证据」恒为空、`source_message_count=0`——T18（上传材料重新生成反映最新上下文）赛后由 OpenClaw 插件侧落库解决，赛前不得为此前启第二个 WS 连接。报告生成本身（V4/V5）与文档、卡片均正常。
 
 ## 三、演示脚本（评审日）
 

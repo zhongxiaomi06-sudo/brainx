@@ -9,7 +9,7 @@ export function formatCandidateShortlistMessage(rawBundle, { jobName = '当前�
   const requirement = [context?.experience_requirement, context?.education_requirement]
     .filter(Boolean).map(oneLine).join('；');
   const lines = [`【候选人判断｜${oneLine(jobName).slice(0, 80)}】`,
-    `岗位画像：${oneLine(context?.summary) || '职位要求待补充'}${requirement ? `；${requirement}` : ''}`,
+    `职位信息：${oneLine(context?.summary) || '职位要求待补充'}${requirement ? `；${requirement}` : ''}`,
     '结论：先看可验证的交付证据，再核实基础人事、年龄和到岗等会改变判断的硬条件。'];
   if (!bundle.items.length) return [...lines, '当前没有可展示的已授权候选人。'].join('\n');
   for (const item of bundle.items) {

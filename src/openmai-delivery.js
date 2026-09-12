@@ -79,7 +79,7 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
     config: { wide_screen_mode: true },
     header: { template: complete ? 'green' : success ? 'orange' : 'red', title: { tag: 'plain_text',
       content: complete ? readyTitle
-        : needsInput ? 'BrainTex · 请补充岗位画像'
+        : needsInput ? 'BrainTex · 请补充职位信息'
           : success ? partialTitle : 'BrainTex · 候选人搜索失败' } },
     elements: [
       { tag: 'markdown', content },

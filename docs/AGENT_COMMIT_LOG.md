@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-12｜fix(openmai): 全站文案「岗位画像」统一为「补充职位信息」（冲刺清单 T8）
+
+- 任务：0.9 冲刺清单 T8（P0），全站不得再出现「岗位画像」字样，统一为「补充职位信息」。
+- 改动面：前端 `app/openmai-panel.tsx`（提示语、标签、aria-label）、`app/stories/openmai-panel.stories.tsx`（场景名、mock 文案、查询名）；后端仅用户可见文案——`src/openmai-routes.js`（422 报错）、`src/openmai-result.js`（needs_input 提示）、`src/openmai-delivery.js`（飞书橙卡标题）、`src/candidate-shortlist-message.js`（群内消息标签）。按钮「用此画像开始/重新找人」不含「岗位画像」字样，按最小改动保留。
+- 同步更新：`docs/storybook-component-library.md` 中对 Storybook 场景名的活引用；历史审核记录与迁移注释属历史结论，未改写。
+- 验证：`tests/openmai-delivery.test.mjs` 14/14 通过；前端 `npm test`（rendered-html 等 4 个测试文件）44/44 通过；全仓代码与 UI 已无「岗位画像」残留（剩余命中均为历史文档）。
+
 ## 2026-09-11｜merge(main): 合并 PR #60「候选人重点关注与 Offer 报告闭环」（13 处冲突按并集解决）
 
 - 任务：验证 GitHub 最新 PR #60（`codex/candidate-offer-report-20260910`，20 提交 / 69 文件 / +1515 −173）并合入 `main`，要求**保留 PR 全部模块改动**，同时不丢本地未推的 4 个提交（specs/017 等），合并后部署 ECS。

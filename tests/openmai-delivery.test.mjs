@@ -170,15 +170,15 @@ test('OpenMai 结构化候选少于 6 人时显式标记不足，历史无机器
 });
 
 test('OpenMai 澄清语句不得伪装成候选人已就绪', () => {
-  const quality = assessOpenmaiCandidateBatch('请选择测试岗位画像');
+  const quality = assessOpenmaiCandidateBatch('请选择测试职位信息');
   assert.equal(quality.needsInput, true);
   assert.equal(quality.complete, false);
   const card = buildOpenmaiDeliveryCard({
     job: { project_id: 'P-NEEDS-INPUT', company: '测试客户', role: '测试' },
-    status: 'needs_input', resultText: '请选择测试岗位画像', publicBaseUrl: 'https://base.yorkteam.cn/',
+    status: 'needs_input', resultText: '请选择测试职位信息', publicBaseUrl: 'https://base.yorkteam.cn/',
   });
   assert.equal(card.header.template, 'orange');
-  assert.match(card.header.title.content, /补充岗位画像/);
+  assert.match(card.header.title.content, /补充职位信息/);
   assert.doesNotMatch(card.header.title.content, /已就绪/);
 });
 

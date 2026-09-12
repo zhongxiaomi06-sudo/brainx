@@ -22,7 +22,7 @@ export function openmaiRoutes(db, bus) {
       const payload = await body(req);
       if (payload === null) return err(res, 400, 'BAD_JSON', '请求体不是合法 JSON');
       const searchBrief = String(payload?.search_brief || '').trim();
-      if (searchBrief.length > 2000) return err(res, 422, 'SEARCH_BRIEF_TOO_LONG', '岗位画像不能超过 2000 字');
+      if (searchBrief.length > 2000) return err(res, 422, 'SEARCH_BRIEF_TOO_LONG', '职位信息不能超过 2000 字');
       const out = startOpenmaiTask(db, bus, cid, id, {
         force: true, searchBrief, excludeCandidateRefs: nextSearchExclusions(db, id),
       });

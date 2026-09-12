@@ -68,7 +68,7 @@ test("uses the reference three-column shell and a single-column opportunity work
   assert.match(workbench, /type OpportunityRowModel/);
   assert.match(workbench, /function OpportunityRow/);
   assert.doesNotMatch(workbench, /<div className="pick-card-rail"><div className="pick-card-publish"/);
-  assert.doesNotMatch(workbench, /assistant-tabs|assistant-insight/); // 2026-08-31 洞察区(岗位画像/职位市场 tabs)已按产品决定移除,不得回加
+  assert.doesNotMatch(workbench, /assistant-tabs|assistant-insight/); // 2026-08-31 洞察区(画像/职位市场 tabs)已按产品决定移除,不得回加
   assert.match(workbench, /<RecommendationQueueV2Review items=\{queueItems\}/);
   assert.doesNotMatch(workbench, /today-brief|今天只处理最值得推进的职位|TODAY&apos;S DECISIONS/);
   assert.match(workbench, /onOpen=\{item => \{ const job = queueJobs\.get\(item\.projectId\); if \(job\) open\(job, "judgement"\); \}\}/);
@@ -274,7 +274,7 @@ test("OpenMai 需要画像时提供原地输入并把画像提交给重跑接口
     source("app/openmai-panel.tsx"),
     source("app/brainx-api.ts"),
   ]);
-  assert.match(panel, /aria-label="补充岗位画像"/);
+  assert.match(panel, /aria-label="补充职位信息"/);
   assert.match(panel, /用此画像开始找人/);
   assert.match(panel, /onRerun\(jobId,brief\.trim\(\)\)/);
   assert.match(api, /body:\s*\{\s*search_brief:\s*searchBrief\s*\}/);

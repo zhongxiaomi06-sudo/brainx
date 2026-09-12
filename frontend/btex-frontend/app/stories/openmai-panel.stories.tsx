@@ -4,13 +4,13 @@ import { OpenmaiPanel } from "../openmai-panel";
 
 const rerun = fn();
 const meta = {
-  title: "业务组件/OpenMai 岗位画像输入",
+  title: "业务组件/OpenMai 职位信息输入",
   component: OpenmaiPanel,
   parameters: { bare: true },
   args: {
     jobId: "P-NEEDS-INPUT",
     mode: "connected",
-    openmai: { status: "needs_input", result_text: "请选择测试岗位画像" },
+    openmai: { status: "needs_input", result_text: "请选择测试职位信息" },
     onRerun: rerun,
   },
 } satisfies Meta<typeof OpenmaiPanel>;
@@ -21,7 +21,7 @@ type Story = StoryObj<typeof meta>;
 export const NeedsInput: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const input = canvas.getByRole("textbox", { name: "补充岗位画像" });
+    const input = canvas.getByRole("textbox", { name: "补充职位信息" });
     await userEvent.type(input, "功率模块研发负责人，必须有 SiC 经验");
     await userEvent.click(canvas.getByRole("button", { name: "用此画像开始找人" }));
     await expect(rerun).toHaveBeenCalledWith("P-NEEDS-INPUT", "功率模块研发负责人，必须有 SiC 经验");

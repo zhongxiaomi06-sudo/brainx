@@ -33,7 +33,8 @@
       "brainx_candidate_workflow",
       "brainx_bind_group_project",
       "brainx_launch_project_chat",
-      "brainx_candidate_report"
+      "brainx_candidate_report",
+      "brainx_talent_pool_add"
     ]
   },
   "configSchema": {

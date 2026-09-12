@@ -133,7 +133,9 @@ ${JSON.stringify({ candidates: [{ candidate_ref: 'openmai-card-1', name: '李四
     candidate_ref: 'openmai-card-1', action: 'SEND_TALENT_CARD', confirm: true }, context);
   assert.equal(shared.data.talent_card_status, 'sent');
   assert.equal(sent[0].target, 'oc_project');
-  assert.match(JSON.stringify(sent[0].card), /李四|88%|打开 TTC 人才库/);
+  assert.match(JSON.stringify(sent[0].card), /李四|88%|查看链接|初筛通过|一键加入人才库/);
+  assert.match(JSON.stringify(sent[0].card), /\[BRAINTEX_CANDIDATE_KEEP\] 职位 \S+ 候选人 openmai-card-1/);
+  assert.match(JSON.stringify(sent[0].card), /\[BRAINTEX_TALENT_ADD\] 职位 \S+ 候选人 openmai-card-1/);
   assert.match(sent[0].card.elements[2].actions[0].multi_url.url,
     /app\.ttcadvisory\.com\/app\/talent\/openmai-card-1/);
   assert.doesNotMatch(JSON.stringify(sent[0].card), /简历\.pdf|138\d{8}/);
@@ -228,5 +230,46 @@ ${JSON.stringify({ candidates: [
   await assert.rejects(() => handlers.brainx_send_candidate_resume({
     job_id: jobId, candidate_ref: 'openmai-no-attachment', confirm: true,
   }, group), /RESUME_NOT_AVAILABLE/);
+  db.close();
+});
+
+// 冲刺 T12：一键加入人才库——真实写 RDS（幂等），RDS 不可写时降级为待同步，不阻塞演示闭环。
+test('一键加入人才库：成功、幂等、降级与未授权拒绝', async () => {
+  const { db, jobId } = fixture();
+  const resultText = `候选结果\n<!-- BRAINX_CANDIDATES_V1
+${JSON.stringify({ candidates: [{ candidate_ref: 'openmai-talent-1', name: '王五',
+  role: '乙公司 / 研发负责人', evaluation: '匹配 90%', score: '90%' }] })}
+-->`;
+  db.prepare(`INSERT INTO openmai_results
+    (project_id,consultant_id,status,result_text,task_id,started_at,finished_at)
+    VALUES (?,?,'done',?,'om-talent','2026-09-12T00:00:00.000Z','2026-09-12T00:01:00.000Z')`)
+    .run(jobId, 'felix', resultText);
+  const context = { principal: { tenantId: 'tenant-a', consultantId: 'felix', chatType: 'p2p' } };
+  const calls = [];
+  const handlers = createCandidateActionToolHandlers({ db,
+    addTalentFn: async (input) => { calls.push(input); return { id: 42, already: calls.length > 1 }; },
+  });
+  const first = await handlers.brainx_talent_pool_add({
+    job_id: jobId, candidate_ref: 'openmai-talent-1', confirm: true }, context);
+  assert.equal(first.data.talent_id, 42);
+  assert.equal(first.data.already, false);
+  assert.match(calls[0].summary, /^\[ref:openmai-talent-1\] 职位:/);
+  assert.equal(calls[0].name, '王五');
+  const second = await handlers.brainx_talent_pool_add({
+    job_id: jobId, candidate_ref: 'openmai-talent-1', confirm: true }, context);
+  assert.equal(second.data.already, true);
+  assert.ok(second.unknowns.some((u) => u.includes('已在人才库')), '幂等命中要明说已收藏');
+
+  const failing = createCandidateActionToolHandlers({ db,
+    addTalentFn: async () => { throw new Error('RDS down'); } });
+  const degraded = await failing.brainx_talent_pool_add({
+    job_id: jobId, candidate_ref: 'openmai-talent-1', confirm: true }, context);
+  assert.equal(degraded.data.sync_pending, true, 'RDS 不可写必须降级为待同步而不是 500');
+  assert.ok(degraded.unknowns.some((u) => u.includes('同步中')));
+
+  await assert.rejects(() => handlers.brainx_talent_pool_add({
+    job_id: jobId, candidate_ref: 'candidate-x', confirm: true }, context), /NOT_FOUND_OR_FORBIDDEN/);
+  await assert.rejects(() => handlers.brainx_talent_pool_add({
+    job_id: jobId, candidate_ref: 'openmai-talent-1', confirm: false }, context), /INVALID_ARGUMENT/);
   db.close();
 });

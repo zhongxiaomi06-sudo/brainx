@@ -1,5 +1,14 @@
 # Agent Commit 记录
 
+## 2026-09-12｜feat(agent): 候选人卡三按钮 + brainx_talent_pool_add 一键入库（冲刺清单 T10/T11/T12）
+
+- 架构前提（生产实证）：飞书长连接为集群模式不广播，生产唯一事件连接在 OpenClaw；卡片回调走 OpenClaw 既有 `card.action.trigger` → synthetic 文本命令链路（按钮 `value.text` 原样成为 agent 消息），与 [BRAINTEX_SEARCH_START] 同一模式，不加第二条 WS、不动 OpenClaw 本体、不改现有消息分发。
+- T10：`candidateShareCard` 单按钮改三按钮——「查看链接」（multi_url 纯跳转）、「初筛通过」（value 带 [BRAINTEX_CANDIDATE_KEEP] 标记）、「一键加入人才库」（value 带 [BRAINTEX_TALENT_ADD] 标记）。
+- T11：prompt.js 教学——KEEP 标记 = KEEP_FOR_REVIEW 明确确认，直接调 `brainx_candidate_workflow`，复用既有「项目群自动推标准候选人卡」链路，零新后端逻辑。
+- T12：新工具 `brainx_talent_pool_add`（gateway 27→28 工具）真实写 RDS `talent` 表：幂等口径 = 姓名 + summary 的 [ref:xxx] 来源标记（不改表结构、不加迁移）；RDS 不可写时返回 sync_pending 降级「已收藏（同步中）」而非 500。插件四件套同步（runtime/plugin.json/生产模板/契约 fixture），版本 bump 1.4.3，prompt.js 教学 TALENT_ADD 标记。
+- 测试：卡片三按钮标记断言；talent_pool_add 成功/幂等/降级/未授权四路径；gateway 健康检查 28 工具、黄金工作流、插件契约全部同步。
+- 验证：后端相关 51/51 通过。卡片回调真实点击仍需飞书后台确认「回调→长连接」已开启 + 生产部署后真机验证。
+
 ## 2026-09-12｜fix(frontend): 同步 Storybook 断言并压回 500 行上限（T1/T2/T5 门禁修复）
 
 - 完整门禁暴露两类问题：①`job-detail-card-review.stories.tsx` 与 `jobs-workspace-review.stories.tsx` 的 play 断言仍引用已删除的「核心职位事实」「策略版本 baseline-1.0」「加入我的项目」按钮名；②T5 让 `engagement-loop.tsx` 涨到 514 行、T1 让 `workbench.tsx` 涨到 503 行，双双突破 500 行上限。

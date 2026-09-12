@@ -1,7 +1,7 @@
 import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
 
 const GATEWAY_URL = 'http://127.0.0.1:3102/internal/v1/agent/tools';
-const PLUGIN_VERSION = '1.4.2';
+const PLUGIN_VERSION = '1.4.3';
 const OPENCLAW_VERSION = '2026.7.1-2';
 const string = (extra = {}) => ({ type: 'string', minLength: 1, maxLength: 512, ...extra });
 const integer = (minimum, maximum) => ({ type: 'integer', minimum, maximum });
@@ -59,6 +59,9 @@ export const BRAINX_OPENCLAW_TOOLS = Object.freeze([
   { name: 'brainx_candidate_report', purpose: () => 'candidate_review', parameters: object({
     mode: string({ enum: ['GENERATE', 'REGENERATE'] }), confirm: boolean(),
   }, ['mode', 'confirm']), description: '在当前候选人 Offer 决策群生成或更新飞书云文档报告。' },
+  { name: 'brainx_talent_pool_add', purpose: () => 'candidate_action', parameters: object({
+    job_id: string(), candidate_ref: string(), confirm: boolean(),
+  }, ['job_id', 'candidate_ref', 'confirm']), description: '把授权候选人一键加入团队人才库（RDS，幂等）。候选人卡上的「一键加入人才库」按钮点击后调用；重复调用只返回已存在。' },
 ]);
 
 function canonicalJson(value) {

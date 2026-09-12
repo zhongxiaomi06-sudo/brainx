@@ -105,6 +105,10 @@ export const AGENT_TOOL_ROWS = Object.freeze([
   { name: 'brainx_send_candidate_resume', purpose: ['candidate_action'], parameters: object({
     job_id: string(), candidate_ref: string(), confirm: boolean(),
   }, ['job_id', 'candidate_ref', 'confirm']), projectKey: 'job_id' },
+  // 冲刺 T12：候选人卡「一键加入人才库」入口，真实写 RDS 人才库（幂等，失败降级为待同步）。
+  { name: 'brainx_talent_pool_add', purpose: ['candidate_action'], parameters: object({
+    job_id: string(), candidate_ref: string(), confirm: boolean(),
+  }, ['job_id', 'candidate_ref', 'confirm']), projectKey: 'job_id' },
   { name: 'brainx_candidate_report', purpose: ['candidate_review'], parameters: object({
     mode: string({ enum: ['GENERATE', 'REGENERATE'] }), confirm: boolean(),
   }, ['mode', 'confirm']) },

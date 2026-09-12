@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { now, uuid } from '../db.js';
+import { now, uuid, withMysql, insertTalent } from '../db.js';
 import { candidateShortlist } from '../candidate-shortlist.js';
 import { listProjectCandidateFocus, projectSearchCandidate,
   setProjectCandidateFocus } from '../candidate-focus.js';
@@ -39,9 +39,19 @@ function candidateShareCard(jobId, candidateRef, candidate = {}) {
     elements: [
       { tag: 'markdown', content: `**${safeCardText(candidate.name || candidateRef, 80)}**\n${safeCardText(candidate.role || '当前岗位待核实', 120)}` },
       { tag: 'markdown', content: `**经历**：${profile}\n**匹配度**：${safeCardText(candidate.score || '待核实', 20)}\n**核心匹配点**：${safeCardText(candidate.evaluation, 500)}` },
-      { tag: 'action', actions: [{ tag: 'button', type: 'primary',
-        text: { tag: 'plain_text', content: '打开 TTC 人才库' },
-        multi_url: { url, pc_url: url, android_url: url, ios_url: url } }] },
+      { tag: 'action', actions: [
+        { tag: 'button', type: 'primary',
+          text: { tag: 'plain_text', content: '查看链接' },
+          multi_url: { url, pc_url: url, android_url: url, ios_url: url } },
+        // 冲刺 T10/T11/T12：按钮点击由 OpenClaw 转成带标记的群消息，
+        // agent 按标记调 brainx_candidate_workflow / brainx_talent_pool_add。
+        { tag: 'button',
+          text: { tag: 'plain_text', content: '初筛通过' },
+          value: { text: `[BRAINTEX_CANDIDATE_KEEP] 职位 ${jobId} 候选人 ${candidateRef}` } },
+        { tag: 'button',
+          text: { tag: 'plain_text', content: '一键加入人才库' },
+          value: { text: `[BRAINTEX_TALENT_ADD] 职位 ${jobId} 候选人 ${candidateRef}` } },
+      ] },
       { tag: 'note', elements: [{ tag: 'plain_text',
         content: `项目 ${safeCardText(jobId, 80)} · 链接仍由 TTC 登录与权限控制 · 不发送简历附件` }] },
     ] };
@@ -122,6 +132,22 @@ function openmaiResume(db, jobId, candidateRef) {
   return null;
 }
 
+/**
+ * 冲刺 T12：候选人一键加入 RDS 人才库。幂等口径 = 姓名 + summary 里的 [ref:xxx] 来源标记；
+ * talent 表不加迁移、不改结构。RDS 不可写时由调用方降级，不在此处吞错。
+ */
+async function defaultAddTalent({ name, summary, sourceRef }) {
+  const existingId = await withMysql(async (conn) => {
+    const [rows] = await conn.execute(
+      'SELECT id FROM talent WHERE name=? AND summary LIKE ? LIMIT 1',
+      [name, `[ref:${sourceRef}]%`]);
+    return rows[0]?.id ?? null;
+  });
+  if (existingId) return { id: existingId, already: true };
+  const id = await insertTalent({ name, summary, status: 'active' });
+  return { id, already: false };
+}
+
 export function createCandidateActionToolHandlers({
   db, candidateShortlistFn = candidateShortlist, downloadResumeFn = downloadResumePdf,
   sendPdfFileFn = sendPdfFile, getAuthorizedTtcJwtFn = getAuthorizedTtcJwt,
@@ -129,6 +155,7 @@ export function createCandidateActionToolHandlers({
   downloadTtcResumePdfFn = downloadTtcResumePdf,
   createCandidateDecisionGroupFn = createCandidateDecisionGroup,
   sendInteractiveCardFn = sendInteractiveCard,
+  addTalentFn = defaultAddTalent,
 } = {}) {
   return {
     brainx_candidate_workflow: async (args, context) => {
@@ -237,6 +264,35 @@ export function createCandidateActionToolHandlers({
         facts: [{ candidate_ref: args.candidate_ref, resume_sent_to_current_project_group: true }],
         inferences: [], recommendations: [], unknowns: [],
         evidence_refs: [`openmai_candidate:${args.candidate_ref}`], next_allowed_actions: [] };
+    },
+    // 冲刺 T12：一键加入人才库。真实写 RDS（幂等）；RDS 不可写时明确返回待同步，不阻塞群里的演示闭环。
+    brainx_talent_pool_add: async (args, context) => {
+      if (args.confirm !== true || !jobVisibleTo(db, context.principal.consultantId, args.job_id)) {
+        fail(args.confirm === true ? 'NOT_FOUND_OR_FORBIDDEN' : 'INVALID_ARGUMENT');
+      }
+      const discovered = projectSearchCandidate(db, args.job_id, args.candidate_ref);
+      const focusedCandidate = listProjectCandidateFocus(db, context.principal.tenantId, args.job_id)
+        .find((candidate) => candidate.candidate_ref === args.candidate_ref);
+      const candidate = discovered || focusedCandidate || openmaiResume(db, args.job_id, args.candidate_ref);
+      if (!candidate) fail('NOT_FOUND_OR_FORBIDDEN');
+      const name = safeCardText(candidate.name || args.candidate_ref, 80);
+      const summary = `[ref:${args.candidate_ref}] 职位:${safeCardText(args.job_id, 40)}｜`
+        + `${safeCardText(candidate.role || '岗位待核实', 120)}｜${safeCardText(candidate.evaluation || '', 300)}`;
+      try {
+        const result = await addTalentFn({ name, summary, sourceRef: args.candidate_ref });
+        return { data: { candidate_ref: args.candidate_ref, talent_id: result.id, already: result.already === true },
+          facts: [{ candidate_ref: args.candidate_ref, talent_pool: true }], inferences: [], recommendations: [],
+          unknowns: [result.already
+            ? `「${name}」已在人才库（#${result.id}），等同已收藏。`
+            : `「${name}」已加入人才库（#${result.id}）。`],
+          evidence_refs: [`talent_pool:${result.id}`],
+          next_allowed_actions: ['brainx_candidate_workflow'] };
+      } catch {
+        return { data: { candidate_ref: args.candidate_ref, talent_id: null, already: false, sync_pending: true },
+          facts: [], inferences: [], recommendations: [],
+          unknowns: [`人才库暂时不可写，「${name}」已记录为待同步；请回复顾问“已收藏（同步中）”，不要说操作失败。`],
+          evidence_refs: [], next_allowed_actions: ['brainx_candidate_workflow'] };
+      }
     },
   };
 }

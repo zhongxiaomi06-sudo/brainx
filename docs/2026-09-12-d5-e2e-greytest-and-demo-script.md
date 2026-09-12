@@ -16,7 +16,7 @@
 
 ## 二、灰测中发现并处理的问题
 
-0. **【演示必读】群内自然语言「把第 N 个候选人加入人才库」目前不可靠**：step-3.5-flash 不走「群名→daily_brief→job_id」解析，固执调用 bind_group_project 并虚报「全部接口权限错误」（审计实证它从未调用 shortlist/talent 工具）。根因之一是插件 prompt 注入被 `allowPromptInjection=false` 长期阻断（playbook 从未生效，本次已改 true 并同步模板），但 /reset + 新 prompt 后仍未纠正。**演示纪律：群内操作一律用卡片按钮（评委可点），自然语言只在私聊用明确公司/职位名（已验证：「帮我接 深圳思博威视 的智能影像产品经理」→ 接单建群全通）**。
+0. **群内自然语言操作（带明确候选人指代）已验证可用**：「把第三个候选人田玺重点关注」→ agent 正确走 shortlist→openmai_search→workflow 链路并自动推三按钮卡（15:36 生产实测）。此前「把第 N 个候选人加入人才库」连续失败是双重根因——prompt 注入被 `allowPromptInjection=false` 阻断（playbook 未生效）+ 旧会话错误锚定；注入启用 + /reset 后已恢复。**仍建议演示以按钮为主、NL 为辅**：模型为 step-3.5-flash，复杂指代（跨群、模糊人名）仍可能解析失败；不含明确职位/候选人信息的 NL 不要在现场依赖。
 1. **agent 接单不落 membership → 建群必报 PROJECT_MEMBERSHIP_REQUIRED**：已修代码（commit 1f6ffa5，接单幂等写 MY_JOB），回归测试补齐；NL 私聊接单链路已复验。
 2. **测试群 scope senders 缺 mia**：数据修复补入（`agent_group_scopes` UPDATE，未改代码）。
 3. **OpenClaw 新群准入 CLI 失败**（OPENCLAW_GROUP_ALLOWLIST_FAILED）：根因链有三层，已全部修复——①串行 5 次 CLI ≈25s 超 20s 默认超时（三个服务 env 追加 `BRAINX_OPENCLAW_TIMEOUT_MS=90000`）；②`brainx-agent-gateway` 生产单元未显式 `User=brainx` 以 root 运行，openclaw CLI 的配置归属校验拒绝 root 直读 600 配置（agent.env 追加 `BRAINX_OPENCLAW_RUN_AS=brainx`，repo 单元旧版即 `User=brainx`，生产与 repo 的分歧待赛后统一）；③`ProtectSystem=strict` 使 `/var/lib/brainx/.openclaw` 对服务只读（单元 `ReadWritePaths` 追加该路径，repo `deploy/systemd/brainx-agent-gateway.service` 已同步）。另：灰测期间曾以 root 手跑 CLI 把 openclaw.json 写成 root:root 600，已 chown 回 brainx——**生产排障不得以 root 直接执行 openclaw CLI**。修复后决策群创建端到端通过：群「黄俊凯-AI产品经理-Offer决策」READY，Offer 首卡（候选人概览/项目匹配/待核实）到群。

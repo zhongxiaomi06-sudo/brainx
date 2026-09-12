@@ -72,10 +72,7 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
         + (quality.message ? `\n\n> ${quality.message}` : '')
       : `**${job.company} · ${job.role}**\n\n${groupSafeOpenmaiText(resultText)}`)
     : `**${job.company} · ${job.role}**\n\n本轮候选人搜索失败：${groupSafeOpenmaiText(error, 500)}\n\n请修复连接后在工作台重试。`;
-  const table = candidates.length ? [
-    candidateTableHeading(),
-    ...candidates.map((candidate, index) => candidateTableRow({ candidate, index })),
-  ] : [];
+  const rows = candidates.length ? candidateFocusRows(job, candidates) : [];
   return {
     config: { wide_screen_mode: true },
     header: { template: complete ? 'green' : success ? 'orange' : 'red', title: { tag: 'plain_text',
@@ -84,8 +81,10 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
           : success ? partialTitle : 'BrainTex · 候选人搜索失败' } },
     elements: [
       { tag: 'markdown', content },
-      ...table,
-      ...focusSection(job, candidates),
+      // 说明收成一行小灰字 note：按钮与候选人随行后不再需要长段教学。
+      ...(candidates.length ? [focusIntroNote()] : []),
+      ...rows,
+      ...candidateQualityNotes(candidates),
       ...(candidates.length ? [continueSearchActions(job)] : []),
       // 失败 / 空结果卡只有这一个动作 → 右对齐收口（F4）。
       ...(!success || !candidates.length ? [alignSoloAction({ tag: 'action', actions: [{ tag: 'button', type: 'primary',
@@ -95,24 +94,39 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
   };
 }
 
-/** 「重点关注」动作区：按钮按序号对应表格行，独占表格下方的整行。
- *  此前按钮塞在 6 列表格的「操作」列里，只分到约 53px，文字必被省略号截断
- *  （排版门禁 button-truncated）。每行最多 3 个按钮，超过则另起一行。 */
-function focusSection(job, candidates) {
-  const focusable = candidates.map((candidate, index) => ({ candidate, no: index + 1 }))
-    .filter(({ candidate }) => candidate.candidateRefValid !== false);
-  if (!focusable.length) return [];
-  const rows = [];
-  for (let start = 0; start < focusable.length; start += 3) {
-    rows.push({ tag: 'action', actions: focusable.slice(start, start + 3)
-      .map(({ candidate, no }) => keepCandidateAction(job, candidate, no)) });
-  }
+/** 「重点关注」按钮与候选人随行：每个候选人一行，信息在左、本人的关注按钮在右列，
+ *  取代「4 列表格 + 序号按钮矩阵」——矩阵要靠序号对号入座，8 个 primary 按钮视觉过载。
+ *  候选人名字本身就是按钮（点名字 = 重点关注，随后人才卡带 TTC 链接发到群里），
+ *  不再有任何独立「关注」按钮。按钮作为裸 button 元素放在列内（飞书与渲染门禁均支持），
+ *  type=default 弱化。历史教训：按钮曾塞进 6 列表格的「操作」列，只分到约 53px 必被
+ *  省略号截断（排版门禁 button-truncated）；因此右列固定 2/7 宽度、名字截到 12 字。 */
+function candidateFocusRows(job, candidates) {
   return [
-    { tag: 'markdown', content:
-      '**重点关注**：点对应序号的按钮，即把该候选人加入项目共同重点名单，并收到带 TTC 链接的人才卡。' },
-    ...rows,
-    ...candidateQualityNotes(candidates),
+    { tag: 'column_set', flex_mode: 'none', background_style: 'grey',
+      columns: [tableCell('匹配与背景 · 核心匹配', 5), tableCell('点名字关注', 2)] },
+    ...candidates.map((candidate, index) => {
+      const info = [
+        `**匹配度 ${groupSafeOpenmaiText(candidate.score, 20)}** · ${groupSafeOpenmaiText(candidate.role, 120)}`,
+        backgroundText(candidate),
+        groupSafeOpenmaiText(candidate.evaluation, 300),
+      ].filter(Boolean).join('\n');
+      const name = groupSafeOpenmaiText(candidate.name, 12);
+      return { tag: 'column_set', flex_mode: 'none', background_style: 'default', columns: [
+        { tag: 'column', width: 'weighted', weight: 5, vertical_align: 'top',
+          elements: [{ tag: 'markdown', content: info }] },
+        { tag: 'column', width: 'weighted', weight: 2, vertical_align: 'center',
+          elements: [candidate.candidateRefValid === false
+            ? { tag: 'div', text: { tag: 'plain_text', content: `${index + 1}. ${name}` } }
+            : keepCandidateAction(job, candidate, index + 1, name)] },
+      ] };
+    }),
   ];
+}
+
+/** 按钮说明收成一行 note（小号灰字）：名字即按钮，一句话说清动作与结果。 */
+function focusIntroNote() {
+  return { tag: 'note', elements: [{ tag: 'plain_text',
+    content: '点候选人名字，即把该候选人加入项目共同重点名单，并收到带 TTC 链接的人才卡。' }] };
 }
 
 /** 表格原来的「操作」列兼作「链接待核实」提示，该列移除后信号改在这里披露，避免静默丢失。 */
@@ -146,14 +160,6 @@ function tableCell(content, weight, elements) {
   };
 }
 
-function candidateTableHeading() {
-  return {
-    tag: 'column_set', flex_mode: 'none', background_style: 'grey',
-    columns: [tableCell('候选人 / 当前岗位', 3), tableCell('背景', 3),
-      tableCell('核心匹配', 4), tableCell('匹配度', 2)],
-  };
-}
-
 function ttcTalentUrl(candidate) {
   if (candidate.talentUrl) {
     try {
@@ -167,22 +173,23 @@ function ttcTalentUrl(candidate) {
   return `https://app.ttcadvisory.com/app/talent/${encodeURIComponent(candidate.candidateRef)}`;
 }
 
-/** 按钮文案带序号（对应表格行号），使「表格下方的动作行」能唯一指向候选人；
- *  不带序号时多个同名按钮无法区分，带候选人姓名则长名会被省略号截断。 */
-function keepCandidateAction(job, candidate, no) {
+/** 候选人名字就是按钮：点名字 = 重点关注（KEEP_FOR_REVIEW），成功后人才卡带 TTC 链接发群。
+ *  按钮保留行号前缀（「1. 张某」），群里说「第 N 个候选人」依旧指第 N 行；
+ *  名字截到 12 字，保证右列（2/7 宽）不截断。 */
+function keepCandidateAction(job, candidate, no, name) {
   const projectRef = String(job.project_id || '').trim().slice(0, 64);
   const command = `把项目 ${projectRef} 的候选人 ${candidate.candidateRef} 标记为重点关注。`
     + '这个按钮就是我的明确确认：现在调用 brainx_candidate_workflow，'
     + `传入 job_id=${projectRef}、candidate_ref=${candidate.candidateRef}、`
     + 'action=KEEP_FOR_REVIEW、confirm=true。成功后告诉群里“已重点关注”，'
     + '并说明此人已进入本项目共享上下文，同时已发送人才卡；不要发送简历。';
-  return { tag: 'button', type: 'primary', text: { tag: 'plain_text', content: `重点关注 ${no}` },
+  return { tag: 'button', type: 'default', text: { tag: 'plain_text', content: `${no}. ${name}` },
     value: { text: command } };
 }
 
-/** F8：5 列中文数据在 372px 内摆不开，「7 年 · 深圳」会被折成「7 年 · 深\n圳」。
- *  把「经验 / 城市」与「学历」并成一列「背景」（`7 年 · 深圳 · 硕士 · 哈工大`），
- *  列数降到 4，每列宽度立刻宽裕。
+/** F8：中文数据在 372px 内摆不开，「7 年 · 深圳」会被折成「7 年 · 深\n圳」。
+ *  把「经验 / 城市」与「学历」并成一行「背景」（`7 年 · 深圳 · 硕士 · 哈工大`），
+ *  候选人信息列立刻宽裕。
  *  上游缺字段时会填「待核实」占位，直接拼会出现「待核实 · 待核实 · 待核实」，
  *  因此先剔除空值与占位、再去重，全空才回退成单个「待核实」。 */
 function backgroundText(candidate) {
@@ -190,15 +197,6 @@ function backgroundText(candidate) {
     .map((value) => String(value ?? '').trim())
     .filter((value) => value && value !== '待核实');
   return [...new Set(parts.map((value) => groupSafeOpenmaiText(value, 40)))].join(' · ') || '待核实';
-}
-
-function candidateTableRow({ candidate, index }) {
-  return { tag: 'column_set', flex_mode: 'none', background_style: 'default', columns: [
-    tableCell(`${index + 1}. ${groupSafeOpenmaiText(candidate.name, 60)}\n${groupSafeOpenmaiText(candidate.role, 120)}`, 3),
-    tableCell(backgroundText(candidate), 3),
-    tableCell(groupSafeOpenmaiText(candidate.evaluation, 300), 4),
-    tableCell(groupSafeOpenmaiText(candidate.score, 20), 2),
-  ] };
 }
 
 export function enqueueOpenmaiDeliveries(db, at = now()) {

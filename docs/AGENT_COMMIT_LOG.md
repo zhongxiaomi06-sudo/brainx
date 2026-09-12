@@ -1,5 +1,14 @@
 # Agent Commit 记录
 
+## 2026-09-13｜feat(card): 找人结果卡重做——候选人名字即关注按钮，去掉按钮矩阵
+
+- 触发：用户截图指出投递卡「重点关注 1–8」按钮矩阵太难用（「按钮实在太雷霆了，重新做」），先要求「按钮放到候选人后面」，随后明确为「可以点击名字就是重点关注，然后发送链接，下面的按钮去掉」。
+- **改版**（`src/openmai-delivery.js`）：删除 4 列数据表 + 序号按钮矩阵；改为每个候选人一行 column_set——左列 markdown（`**匹配度 86** · 岗位` / 背景 / 核心匹配），右列一个 `type=default` 裸按钮，文案即「序号. 名字」（名字截 12 字防截断）。点名字 = KEEP_FOR_REVIEW 明确确认，成功后人才卡带 TTC 链接发群（指令串不变）。全卡不再出现独立「重点关注 N」按钮；说明从整段 markdown 收成一行 note（「点候选人名字，即把该候选人加入项目共同重点名单，并收到带 TTC 链接的人才卡」）。编号无效候选人右列回退为纯文本名字。
+- **历史约束沿用**：按钮曾塞 6 列表格操作列只分 53px 必截断（button-truncated），故右列固定 2/7 宽；序号保留在按钮文案，群里「第 N 个候选人」仍指第 N 行；`candidateQualityNotes`（编号无效/链接待核实）不变。
+- **联动**：`plugins/brainx-openclaw/prompt.js` 候选行描述同步为「名字即按钮」；渲染基线 `openmai-delivery-complete.darwin.png` 重建并人眼复核（表头不换行、按钮不截断、无矩阵）。
+- 验证：`tests/openmai-delivery.test.mjs` 17/17（断言重写：名字按钮文案/KEEP 指令串/无矩阵/6 人 7 行）；`openclaw-production-config` + `project-launch` + `agent-candidate-actions` 29/29；卡片渲染门禁 17/17。
+- 部署提示：本卡由 `brainx-worker` 投递构建、`prompt.js` 属 OpenClaw 插件副本，生产需 pull 后重启 worker 并重跑 `install.sh --apply`。
+
 ## 2026-09-13｜test(agent): 建群误报生产复测——定位为会话历史模仿，新会话验证通过
 
 - 触发：用户再次要求「push 到云端、三处代码统一、真实链路自然语言逐步测试」。复核确认本地/origin(分支+main)/生产均为 `f7136ac`、四服务 active、H-1 畸形链接仍 400。

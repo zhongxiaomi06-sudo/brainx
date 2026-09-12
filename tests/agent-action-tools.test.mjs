@@ -66,6 +66,9 @@ test('确认接单会建立行动并自动启动找人，重复键保持幂等',
   const again = handlers.brainx_accept_job(args, context);
   assert.equal(again.data.state, 'ACCEPTED');
   assert.equal(db.prepare(`SELECT COUNT(*) n FROM decision_events WHERE idempotency_key='agent:accept:1'`).get().n, 1);
+  // 2026-09-12 D5 灰测实证：接单必须落 MY_JOB 成员关系，否则 launchProjectChat 报 PROJECT_MEMBERSHIP_REQUIRED
+  assert.equal(db.prepare(`SELECT relation FROM job_memberships
+    WHERE consultant_id='felix' AND project_id=? AND valid_to IS NULL`).get(jobId)?.relation, 'MY_JOB');
 });
 
 test('接单触发的找人状态分支注入对应取回指引（already_done/error）', () => {

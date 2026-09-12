@@ -1,5 +1,13 @@
 # Agent Commit 记录
 
+## 2026-09-12｜fix(agent): 接单同步落 MY_JOB 成员关系，修复建群必报 PROJECT_MEMBERSHIP_REQUIRED
+
+- 触发：D5 灰测新链路——mia 私聊调 `brainx_accept_job` 接单成功（JNOEILO），紧接着 `brainx_launch_project_chat` 必报 `PROJECT_MEMBERSHIP_REQUIRED`。agent 接单只写承接状态，不写 `job_memberships`，而 launch 检查的是成员关系；web 一键接单没事（先 PATCH membership 再 launch）。群里自然语言接单 → 建群的演示主链路被卡死。
+- 修法：`tools-actions.js` 的 `acceptJob` 在接单成功后幂等调用 `confirmMembership(relation='MY_JOB')`（复用 web 同一写入函数与幂等键规范），与 web 行为对齐。最小增量，不改 launch 检查本身。
+- 顺带实证（未改代码，仅记录）：`authorizeGroup` 要求每群恰好 1 行 ACTIVE scope 但三个老群各有 6 行（每顾问一行）→ 这些群对所有人生效均失败，列赛后系统修复；测试群 senders 缺 mia 已按数据修复补入（不改代码）。
+- 测试：`确认接单会建立行动` 用例补断言——接单后 `job_memberships` 存在 MY_JOB 行。
+- 验证：`tests/agent-action-tools.test.mjs` 等 15/15 通过。
+
 ## 2026-09-12｜feat(frontend): OpenMai 推荐字段顿号切分 + 画像编辑入口接通（冲刺清单 T6/T7/T13）
 
 - T6：`openmai-panel.tsx` 输入框改单行、上限 20 字，按「、」实时切分为推荐字段标签（输入「北京、半导体、总监」产出 3 个字段）；提交按钮以切分结果非空为准。

@@ -1,5 +1,6 @@
 import { acceptCommitment, recordProgress } from '../commitment.js';
 import { currentState } from '../engagement.js';
+import { confirmMembership } from '../membership.js';
 import { jobVisibleTo } from '../visibility.js';
 import { startOpenmaiTask } from '../openmai-task.js';
 import { getPushPreferences, updatePushPreferences } from '../push-preferences.js';
@@ -38,6 +39,12 @@ function acceptJob(db, args, principal, startSearch) {
     idempotency_key: args.idempotency_key || `bot:accept:${principal.consultantId}:${args.job_id}`,
   });
   if (!result.ok) fail(result.status === 404 ? 'NOT_FOUND_OR_FORBIDDEN' : 'INVALID_ARGUMENT');
+  // 2026-09-12 D5 灰测实证：agent 侧接单不落 MY_JOB 成员关系，随后 launchProjectChat
+  // 必报 PROJECT_MEMBERSHIP_REQUIRED。与 web 一键接单对齐，接单即幂等写入成员关系。
+  confirmMembership(db, principal.consultantId, args.job_id, {
+    relation: 'MY_JOB',
+    idempotency_key: `bot:membership:${principal.consultantId}:${args.job_id}`,
+  });
   let search = null;
   if (!result.already || result.state === 'ACCEPTED') {
     search = startSearch(db, principal.consultantId, args.job_id);

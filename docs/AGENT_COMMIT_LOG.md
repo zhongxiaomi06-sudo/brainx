@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-12｜feat(frontend): OpenMai 推荐字段顿号切分 + 画像编辑入口接通（冲刺清单 T6/T7/T13）
+
+- T6：`openmai-panel.tsx` 输入框改单行、上限 20 字，按「、」实时切分为推荐字段标签（输入「北京、半导体、总监」产出 3 个字段）；提交按钮以切分结果非空为准。
+- T7：设置中心方向画像「打开编辑」从占位通知改为跳转判断规则页的真实画像编辑器（`onEditProfile` → `go("rules")`）；保存走既有 `saveProfile`（PUT /api/v1/profile + `onProfileSaved` 回写 state），改完立即生效并回显关键词卡。
+- T13：每轮找人结果卡底部常驻补充职位信息输入框（done 状态下结果 Markdown 正下方），无需回溯历史入口——随 T6 改单行的同时确认满足。
+- 验证：前端 44/44、Storybook 85/85（openmai 场景改为顿号三字段断言）、`tsc --noEmit` 通过。
+
 ## 2026-09-12｜feat(frontend): 判断页核心匹配要点 + 快捷跳转三连，按钮排列修正（冲刺清单 T3/T4）
 
 - T3（综合方案）：`JudgementContent` 删除六维柱状图「评分依据」与「判断依据」区，改为「核心匹配要点」（冻结推荐理由前三条，静态排版、不调大模型）+ 风险与缺失 + 建议动作；新增「快捷跳转」——职位来源/客户公司/驾驶舱三个跳转，全部复用现有路由（TTC 来源页、workbench 客户页、精选盘首页），`onOpenClient`/`onOpenCockpit` 经四层透传到全部职位页详情卡；`scoreDimensions`/`scoreText`/`BarChart3` 随死代码删除。

@@ -22,8 +22,11 @@ export const NeedsInput: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const input = canvas.getByRole("textbox", { name: "补充职位信息" });
-    await userEvent.type(input, "功率模块研发负责人，必须有 SiC 经验");
+    await userEvent.type(input, "北京、半导体、总监");
+    // T6：顿号切分应产出 3 个推荐字段
+    const tags = within(canvasElement.querySelector('[aria-label="推荐字段"]') as HTMLElement);
+    await expect(tags.getAllByText(/北京|半导体|总监/)).toHaveLength(3);
     await userEvent.click(canvas.getByRole("button", { name: "用此画像开始找人" }));
-    await expect(rerun).toHaveBeenCalledWith("P-NEEDS-INPUT", "功率模块研发负责人，必须有 SiC 经验");
+    await expect(rerun).toHaveBeenCalledWith("P-NEEDS-INPUT", "北京、半导体、总监");
   },
 };

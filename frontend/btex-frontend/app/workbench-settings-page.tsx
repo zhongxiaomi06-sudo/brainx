@@ -38,6 +38,7 @@ function WorkbenchSettingsPage({
   onBack,
   onOpenConnections,
   onRefresh,
+  onEditProfile,
   notify,
 }: {
   auth: AuthStatus;
@@ -50,6 +51,7 @@ function WorkbenchSettingsPage({
   onBack: () => void;
   onOpenConnections: () => void;
   onRefresh: () => void;
+  onEditProfile: () => void;
   notify: (message: string) => void;
 }) {
   const [ttc, setTtc] = useState<TtcStatus>(emptyTtc);
@@ -119,7 +121,9 @@ function WorkbenchSettingsPage({
       return;
     }
     if (action === "refresh-diagnostics") return onRefresh();
-    notify(action === "edit-profile" ? "方向画像将在下一批通过审核后的组件接入" : "推荐策略将在只读预演接口完成后接入");
+    // T7：方向画像「编辑」接入真实的画像编辑器（判断规则页），保存即生效并回显。
+    if (action === "edit-profile") return onEditProfile();
+    notify("推荐策略将在只读预演接口完成后接入");
   };
 
   const initialSection = typeof window !== "undefined"

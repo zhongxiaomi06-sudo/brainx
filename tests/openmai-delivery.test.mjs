@@ -309,3 +309,63 @@ test('OpenMai 成功投递只发送候选人表格，不再自动发送简历或
   assert.doesNotMatch(JSON.stringify(cards[0].card), /"content":"发送简历"|brainx_send_candidate_resume/);
   db.close();
 });
+
+function crashedSendingDb(attempts) {
+  const db = seededDb();
+  const at = now();
+  const stale = new Date(Date.parse(at) - 20 * 60 * 1000).toISOString();
+  // 模拟进程在「置 SENDING 之后、发送结果落库之前」崩溃：行卡在 SENDING、updated_at 停在崩溃前
+  db.prepare(`INSERT INTO openmai_deliveries
+    (delivery_id,task_id,consultant_id,project_id,chat_id,result_status,
+     delivery_status,attempts,next_attempt_at,created_at,updated_at)
+    VALUES ('dv-stale','om_delivery','felix','P-DELIVERY','oc_delivery','done',
+     'SENDING',?,?,?,?)`).run(attempts, stale, stale, stale);
+  return { db, at };
+}
+
+test('H-2：SENDING 中断行超时回置 PENDING，同轮主循环重新投递并收敛项目状态', async () => {
+  const { db, at } = crashedSendingDb(1);
+  const calls = [];
+  const out = await deliverOpenmaiResultsOnce(db, {
+    at, publicBaseUrl: 'https://base.yorkteam.cn/',
+    sendInteractiveCard: async (input) => { calls.push(input); return { message_id: 'om_recovered' }; },
+  });
+  assert.equal(out.sent, 1);
+  assert.equal(calls.length, 1);
+  assert.equal(db.prepare('SELECT delivery_status FROM openmai_deliveries').get().delivery_status, 'SENT');
+  assert.equal(db.prepare('SELECT search_status FROM project_launches').get().search_status, 'DONE');
+  db.close();
+});
+
+test('H-2：SENDING 中断且重试耗尽（attempts>=5）直接 FAILED 并把项目找人置为失败', async () => {
+  const { db, at } = crashedSendingDb(5);
+  const out = await deliverOpenmaiResultsOnce(db, {
+    at, publicBaseUrl: 'https://base.yorkteam.cn/',
+    sendInteractiveCard: async () => { throw new Error('不应再次发送'); },
+  });
+  assert.equal(out.attempted, 0, 'FAILED 且 attempts=5 不应再被主循环捞取');
+  const row = db.prepare('SELECT delivery_status,last_error FROM openmai_deliveries').get();
+  assert.equal(row.delivery_status, 'FAILED');
+  assert.match(row.last_error, /SENDING 超时/);
+  const launch = db.prepare('SELECT search_status,error_code FROM project_launches').get();
+  assert.equal(launch.search_status, 'FAILED');
+  assert.equal(launch.error_code, 'FEISHU_OPENMAI_DELIVERY_FAILED');
+  db.close();
+});
+
+test('H-2：未超时的 SENDING 行（可能正在投递）不被回收打断', async () => {
+  const db = seededDb();
+  const at = now();
+  db.prepare(`INSERT INTO openmai_deliveries
+    (delivery_id,task_id,consultant_id,project_id,chat_id,result_status,
+     delivery_status,attempts,next_attempt_at,created_at,updated_at)
+    VALUES ('dv-live','om_delivery','felix','P-DELIVERY','oc_delivery','done',
+     'SENDING',1,?,?,?)`).run(at, at, at);
+  const out = await deliverOpenmaiResultsOnce(db, {
+    at, publicBaseUrl: 'https://base.yorkteam.cn/',
+    sendInteractiveCard: async () => { throw new Error('不应打断进行中的投递'); },
+  });
+  assert.equal(out.attempted, 0);
+  assert.equal(db.prepare('SELECT delivery_status FROM openmai_deliveries').get().delivery_status, 'SENDING');
+  db.close();
+});

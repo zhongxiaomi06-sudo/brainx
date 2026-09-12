@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { openDb, now } from '../src/db.js';
 import { runSync } from '../src/sync.js';
 import { confirmMembership } from '../src/membership.js';
-import { launchProject, launchRecruitingWorkflow, buildProjectLaunchCard, ProjectLaunchError } from '../src/project-launch.js';
+import { launchProject, launchRecruitingWorkflow, buildProjectLaunchCard, projectLaunchPreflight, ProjectLaunchError } from '../src/project-launch.js';
 import { listProjects } from '../src/projects.js';
 
 const PID = 'P-LAUNCH-1';
@@ -365,5 +365,40 @@ test('项目启动：force 重发卡片——不重建群，只按当前状态�
   assert.equal(sends[1].target, 'oc_redeliver');
   assert.notEqual(keys[1], keys[0], 'force 必须换新的发送幂等键，否则飞书会按 uuid 去重');
   assert.equal(db.prepare('SELECT chat_id FROM project_launches WHERE project_id=?').get(PID).chat_id, 'oc_redeliver');
+  db.close();
+});
+
+test('H-2 preflight：RUNNING 超过一小时视为中断残留，不再短路 TTC 凭证前置', () => {
+  const db = readyDb();
+  const stale = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+  // 模拟投递进程崩溃后 search_status 永久锁在 RUNNING 的残留行
+  db.prepare(`INSERT INTO project_launches
+    (launch_id,consultant_id,project_id,idempotency_key,status,current_step,chat_id,
+     search_status,search_task_id,created_at,updated_at)
+    VALUES ('launch-stale','felix',?,'launch-stale-key','READY','READY','oc_stale',
+     'RUNNING','om-stale',?,?)`).run(PID, stale, stale);
+  const out = projectLaunchPreflight(db, 'felix', PID, {
+    appConfigured: true, publicBaseUrl: 'https://base.yorkteam.cn/',
+    requireSearch: true, ttcConnected: false,
+  });
+  assert.ok(out.blockers.some((b) => b.code === 'TTC_CREDENTIALS_REQUIRED'),
+    '超龄 RUNNING 不应再被当作进行中任务复用');
+  db.close();
+});
+
+test('H-2 preflight：一小时内的 RUNNING 仍复用，不新增 TTC 凭证前置', () => {
+  const db = readyDb();
+  const fresh = now();
+  db.prepare(`INSERT INTO project_launches
+    (launch_id,consultant_id,project_id,idempotency_key,status,current_step,chat_id,
+     search_status,search_task_id,created_at,updated_at)
+    VALUES ('launch-live','felix',?,'launch-live-key','READY','READY','oc_live',
+     'RUNNING','om-live',?,?)`).run(PID, fresh, fresh);
+  const out = projectLaunchPreflight(db, 'felix', PID, {
+    appConfigured: true, publicBaseUrl: 'https://base.yorkteam.cn/',
+    requireSearch: true, ttcConnected: false,
+  });
+  assert.ok(!out.blockers.some((b) => b.code === 'TTC_CREDENTIALS_REQUIRED'),
+    '活跃 RUNNING 应继续复用，不要求重新配置凭证');
   db.close();
 });

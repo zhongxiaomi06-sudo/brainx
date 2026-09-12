@@ -13,6 +13,9 @@ BRAINX_PRODUCTION_SKILLS=(
   brainx-engagement-draft
   brainx-interview-prep
   brainx-review
+  brainx-sourcing-reloop
+  brainx-sourcing-openmai
+  brainx-sourcing-supermai
 )
 
 if [[ "$BRAINX_INSTALL_MODE" != "--check" && "$BRAINX_INSTALL_MODE" != "--apply" \

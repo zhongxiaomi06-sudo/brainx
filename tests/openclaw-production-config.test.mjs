@@ -128,12 +128,17 @@ test('systemd units keep internal services on one host and load secrets from pro
   assert.match(installer, /sudo -u brainx env HOME=\/var\/lib\/brainx\s+\\\s+npm pack/);
   assert.match(installer, /systemctl is-active --quiet openclaw-brainx/);
   assert.match(installer, /systemctl restart openclaw-brainx/);
-  for (const skill of [
-    'brainx-today', 'brainx-job', 'brainx-talent', 'brainx-match',
-    'brainx-engagement-draft', 'brainx-interview-prep', 'brainx-review',
-  ]) {
-    assert.match(installer, new RegExp(`^  ${skill}$`, 'm'));
-  }
+  // H-3：安装器技能清单必须与生产配置完全一致（双向）。曾发生配置加了 3 个
+  // sourcing 技能而安装器没跟上：全新机器 --apply 后三通道找人静默失效，且旧
+  // 断言只硬编码 7 个技能、与安装器同构，永远绿拦不住。以配置为真值源断言。
+  const installerSkills = installer.match(/^BRAINX_PRODUCTION_SKILLS=\($([\s\S]*?)^\)/m);
+  assert.ok(installerSkills, 'install.sh 应声明 BRAINX_PRODUCTION_SKILLS 数组');
+  const declared = new Set(installerSkills[1].split('\n').map((line) => line.trim()).filter(Boolean));
+  assert.deepEqual(
+    [...declared].sort(),
+    [...config.agents.defaults.skills].sort(),
+    'install.sh 的 BRAINX_PRODUCTION_SKILLS 必须与 openclaw.production.json 的 agents.defaults.skills 一致',
+  );
   assert.match(installer, /\$BRAINX_OPENCLAW_STATE\/skills\/\$skill_name\/SKILL\.md/);
   assert.doesNotMatch(installer, /\$\{env_name\}\.env\.example/);
   assert.doesNotMatch(installer, /install -m 0600 -o root -g brainx/);

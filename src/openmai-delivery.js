@@ -9,7 +9,9 @@ import { assessOpenmaiCandidateBatch, extractOpenmaiCandidates } from './openmai
 const PHONE = /(?<!\d)(?:\+?86[-\s]?)?1[3-9]\d{9}(?!\d)/g;
 const EMAIL = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
 const MAX_RESUME_BYTES = 12 * 1024 * 1024;
-const STALE_SEARCH_MS = 60 * 60 * 1000;
+// H-2 复用判定共用：search_status='RUNNING' 只有在最近一小时内才算「进行中」，
+// 超龄视为中断残留，不再短路 preflight/群按钮（与 failStaleOpenmaiTasks 同一阈值）。
+export const STALE_SEARCH_MS = 60 * 60 * 1000;
 
 export { assessOpenmaiCandidateBatch, extractOpenmaiCandidates } from './openmai-result.js';
 
@@ -279,6 +281,48 @@ export function failStaleOpenmaiTasks(db, at = now(), maxAgeMs = STALE_SEARCH_MS
   return recovered;
 }
 
+// H-2：SENDING 无租约兜底——投递是「先置 SENDING 再 await 网络」，进程若在中间崩溃，
+// 该行既不在 PENDING/FAILED 的捞取范围、也不满足人工重试（要求 FAILED），将永久卡死，
+// 连带 project_launches.search_status 锁在 RUNNING、复用判定短路（只剩 continue_search 逃生门）。
+// 处理：SENDING 停留超过 SENDING_STALE_MS（一次飞书 HTTP 调用远用不了这么久）视为进程中断，
+// attempts<5 回置 PENDING 由主循环重投；attempts 已耗尽的直接 FAILED 并同步项目状态。
+const SENDING_STALE_MS = 10 * 60 * 1000;
+
+export function recoverStaleSendingDeliveries(db, at = now(), staleMs = SENDING_STALE_MS) {
+  const cutoff = new Date(Date.parse(at) - staleMs).toISOString();
+  const rows = db.prepare(`SELECT delivery_id,project_id,attempts FROM openmai_deliveries
+    WHERE delivery_status='SENDING' AND updated_at<=?`).all(cutoff);
+  if (!rows.length) return { recovered: 0, exhausted: 0 };
+  const reopen = db.prepare(`UPDATE openmai_deliveries SET delivery_status='PENDING',
+    next_attempt_at=?,updated_at=? WHERE delivery_id=?`);
+  const exhaust = db.prepare(`UPDATE openmai_deliveries SET delivery_status='FAILED',
+    last_error='投递中断后长时间未恢复（SENDING 超时），已耗尽重试次数。',updated_at=?
+    WHERE delivery_id=?`);
+  const failProject = db.prepare(`UPDATE project_launches SET search_status='FAILED',
+    error_code='FEISHU_OPENMAI_DELIVERY_FAILED',
+    error_message='候选结果已生成，但投递中断且重试耗尽，未能送达飞书项目群；请明确重试投递。',updated_at=?
+    WHERE launch_id=(SELECT launch_id FROM project_launches WHERE project_id=?
+      ORDER BY CASE status WHEN 'READY' THEN 0 WHEN 'POSTING_JOB' THEN 1
+        WHEN 'CREATING_CHAT' THEN 2 ELSE 3 END, created_at, launch_id LIMIT 1)`);
+  let recovered = 0;
+  let exhausted = 0;
+  db.exec('BEGIN');
+  try {
+    for (const row of rows) {
+      if (row.attempts < 5) {
+        reopen.run(at, at, row.delivery_id);
+        recovered += 1;
+      } else {
+        exhaust.run(at, row.delivery_id);
+        failProject.run(at, row.project_id);
+        exhausted += 1;
+      }
+    }
+    db.exec('COMMIT');
+  } catch (error) { db.exec('ROLLBACK'); throw error; }
+  return { recovered, exhausted };
+}
+
 function retryAt(at, attempts) {
   const delaySeconds = Math.min(300, 5 * (2 ** Math.max(0, attempts - 1)));
   return new Date(Date.parse(at) + delaySeconds * 1000).toISOString();
@@ -287,6 +331,7 @@ function retryAt(at, attempts) {
 export async function deliverOpenmaiResultsOnce(db, dependencies = {}) {
   const at = dependencies.at || now();
   failStaleOpenmaiTasks(db, at, dependencies.staleSearchMs || STALE_SEARCH_MS);
+  recoverStaleSendingDeliveries(db, at, dependencies.staleSendingMs || SENDING_STALE_MS);
   const enqueued = enqueueOpenmaiDeliveries(db, at);
   const rows = db.prepare(`SELECT d.*, r.result_text, r.error, r.search_round, j.company, j.role
     FROM openmai_deliveries d

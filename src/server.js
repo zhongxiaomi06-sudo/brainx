@@ -42,7 +42,7 @@ import { verifySnapshotKey, jobSnapshot } from './snapshot.js';
 import { createGuard } from './guard.js';
 import { makeClientErrorRoute } from './client-error.js';
 import { body, err, isPathInside, json, normalizeWorkbenchPreferences, proxyFrontend,
-  safeJsonArray, STATIC_MIME } from './server-http.js';
+  resolveRoute, safeJsonArray, STATIC_MIME } from './server-http.js';
 export { isPathInside } from './server-http.js';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const FRONTEND_DIR = join(ROOT, 'frontend', 'btex-frontend');
@@ -525,18 +525,9 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
     guard.record(req, res);
     const u = new URL(req.url, 'http://x');
     let path = u.pathname;
-    // 动态段匹配：/api/v1/opportunities/:id/engagement 等
-    let handler = routes[`${req.method} ${path}`];
-    let dynId = null;
-    if (!handler) {
-      for (const key of Object.keys(routes)) {
-        const [m, p] = key.split(' ');
-        if (m !== req.method || !p.includes(':id')) continue;
-        const rx = new RegExp('^' + p.replace(':id', '([^/]+)') + '$');
-        const mm = rx.exec(path);
-        if (mm) { handler = routes[key]; dynId = decodeURIComponent(mm[1]); break; }
-      }
-    }
+    // 动态段匹配含 H-1 修复：非法百分号编码（如 %zz）由 resolveRoute 收口为 invalidPath
+    const { handler, dynId, invalidPath } = resolveRoute(routes, req.method, path);
+    if (invalidPath) return err(res, 400, 'INVALID_PATH', '路径段不是合法的百分号编码');
     if (handler) {
       const open = ['GET /api/v1/consultants', 'POST /api/v1/session', 'DELETE /api/v1/session',
                     'GET /api/v1/oauth/status', 'GET /api/v1/oauth/authorize', 'GET /api/v1/oauth/callback',
@@ -584,6 +575,8 @@ ${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  // H-1 兜底：漏网的 Promise rejection 不接管会让 Node≥15 默认崩溃进程；记录到 stderr、不退出。
+  process.on('unhandledRejection', (reason) => console.error('[brainx] unhandledRejection（已兜底）:', reason));
   const port = Number(process.env.BRAINX_PORT || 3000);
   // 只绑回环：工作台含未脱敏业务数据，不应对局域网暴露（BRAINX_HOST 显式覆盖除外）
   const host = process.env.BRAINX_HOST || '127.0.0.1';

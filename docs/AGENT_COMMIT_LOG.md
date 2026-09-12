@@ -1,5 +1,16 @@
 # Agent Commit 记录
 
+## 2026-09-12｜fix(backend): 后端链路审计三项高危修复——路由解码崩溃/投递 SENDING 卡死/安装器技能缺口（H-1/H-2/H-3）
+
+- 触发：当日全链路只读审计（报告 `~/Downloads/brainx-backend-audit-2026-09-12.md`）发现三项高危，用户拍板「影响到演示和小部分使用即修」，三项均实际影响：H-1 一条 URL 可打挂演示服务、H-2 锁死项目找人入口、H-3 全新装机三通道找人静默失效。
+- **H-1 路由解码崩溃**：`server.js` 动态段 `decodeURIComponent` 曾位于 handler try/catch 与鉴权之外，`GET /api/v1/opportunities/%zz` 触发 URIError 以 async rejection 冒泡，Node≥15 默认进程崩溃且未登录可触发。修复：路由匹配整体抽为 `server-http.js#resolveRoute`（解码失败收口为 invalidPath → 400），主入口补全局 `unhandledRejection` 兜底（记录不退出）。附带 `server.js` 632→625 行（贴边文件净减），基线同步收紧。
+- **H-2 投递 SENDING 卡死**：`openmai-delivery.js` 投递是「先置 SENDING 再 await 网络」，进程中途崩溃后该行不在 PENDING/FAILED 捞取范围、也不满足人工重试条件，永久卡死并连带 `project_launches.search_status` 锁在 RUNNING、复用判定短路。修复：①新增 `recoverStaleSendingDeliveries`（SENDING 超 10 分钟：attempts<5 回置 PENDING 重投、≥5 转 FAILED 并把项目找人置为失败），并入投递主循环；②复用判定加 staleness——`RUNNING` 超过 1 小时（与 failStaleOpenmaiTasks 同阈值，`STALE_SEARCH_MS` 导出共用）视为中断残留，`activeProjectSearch`（tools-jobs.js）与 `projectLaunchPreflight`（project-launch.js）不再被错误短路，DONE 终态不受影响。
+- **H-3 安装器技能缺口**：`deploy/openclaw/install.sh` 只装 7 个技能，生产配置引用 10 个（ffef925d 加 3 个 sourcing 技能时漏改安装器），全新机器 `--apply` 后三通道找人静默失效且门禁测试与安装器同构永远绿。修复：安装器补齐 3 个技能；门禁测试改为「安装器清单 === 生产配置 skills」双向断言（已做反向红验证：删任一技能测试必红）。
+- 新增测试：`tests/server-routing.test.mjs`（3 例：非法编码 400/服务存活/合法编码不受影响）；`tests/openmai-delivery.test.mjs` +3 例（超时回置重投/耗尽转失败/未超时不打断）；`tests/project-launch.test.mjs` +2 例（超龄 RUNNING 不再短路/活跃 RUNNING 仍复用）。
+- 基线同步：`workbench.tsx` 超长行 23→21（d1d24c60 视觉统一改善后按门禁要求收紧）、`server.js` 632→625。
+- 验证：`node --test` 新增 8 例全绿；`verify:quick` 15/16（唯一失败为 kimi-code-cli 遗留未提交删除导致的「完整检出」环境态，非本次改动，CI 干净检出不复现）；`verify`（full）见提交前记录。
+- 注：与另一 workbuddy 会话（判断面板文案精简，锁于 23:15）文件范围不相交，本次仅触碰后端 src/、deploy/、后端 tests/ 与本日志。
+
 ## 2026-09-12｜fix(frontend): 视觉规范统一——令牌收敛/对比度/标题格式/术语本地化
 
 - 触发：用户要求按当日前端审计报告（`outputs/2026-09-12-frontend-audit/index.html`）的五个结论共同修复，今天修完、统一格式。

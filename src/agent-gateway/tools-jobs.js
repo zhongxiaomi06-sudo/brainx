@@ -5,7 +5,7 @@ import { relationOf } from '../relations.js';
 import { currentState } from '../engagement.js';
 import { startOpenmaiTask, getOpenmaiResult } from '../openmai-task.js';
 import { supermaiCriteriaKey, startSupermaiScoutTask } from '../supermai-sourcing.js';
-import { extractOpenmaiCandidates } from '../openmai-delivery.js';
+import { extractOpenmaiCandidates, STALE_SEARCH_MS } from '../openmai-delivery.js';
 import { getPushPreferences } from '../push-preferences.js';
 import { nextSearchExclusions } from '../search-rounds.js';
 import { ttcOpenmaiAuthStatus } from '../ttcsdk/auth.js';
@@ -219,9 +219,15 @@ function projectCriteria(job, extra = '') {
 }
 
 function activeProjectSearch(db, projectId) {
+  // H-2：RUNNING 只在最近一小时内算「进行中」——投递/找人进程中断后 search_status
+  // 可能永久停在 RUNNING（无租约兜底），超龄行不再短路新任务，让顾问能重新发起找人。
+  // DONE 是终态，不受时间过滤（语义是「已有结果可复用」）。
+  const cutoff = new Date(Date.now() - STALE_SEARCH_MS).toISOString();
   return db.prepare(`SELECT search_status,search_task_id FROM project_launches
-    WHERE project_id=? AND status='READY' AND search_status IN ('RUNNING','DONE')
-    ORDER BY created_at,launch_id LIMIT 1`).get(projectId) || null;
+    WHERE project_id=? AND status='READY'
+      AND (search_status='DONE'
+        OR (search_status='RUNNING' AND COALESCE(search_started_at,updated_at) > ?))
+    ORDER BY created_at,launch_id LIMIT 1`).get(projectId, cutoff) || null;
 }
 
 function markProjectSearch(db, projectId, out) {

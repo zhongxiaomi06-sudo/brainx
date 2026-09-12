@@ -72,10 +72,10 @@
     },
     {
       "path": "frontend/btex-frontend/app/workbench.tsx",
-      "maxLongLines": 23,
+      "maxLongLines": 21,
       "maxLength": 3023,
       "owner": "frontend",
-      "reason": "存量工作台组件待拆分和格式化；只能减少，不能恶化",
+      "reason": "存量工作台组件待拆分和格式化；只能减少，不能恶化（d1d24c60 视觉统一后 23→21，按门禁要求同步收紧）",
       "expiresOn": "2026-09-30"
     }
   ],
@@ -96,9 +96,9 @@
     },
     {
       "path": "src/server.js",
-      "maxLines": 632,
+      "maxLines": 625,
       "owner": "backend",
-      "reason": "已拆出 TTC 数据源路由，剩余存量路由与启动编排仍须继续拆分；只能减少，不能增长",
+      "reason": "已拆出 TTC 数据源路由与动态路由匹配（resolveRoute），剩余存量路由与启动编排仍须继续拆分；只能减少，不能增长",
       "expiresOn": "2026-10-31"
     }
   ],

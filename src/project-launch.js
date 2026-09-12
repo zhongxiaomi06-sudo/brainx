@@ -4,6 +4,7 @@ import { now } from './db.js';
 import { createProjectChat, sendInteractiveCard } from './feishu-bot.js';
 import { registerChatContext } from './gateway/chat-contexts.js';
 import { buildBrainxDeepLink, productionBaseUrl } from './brainx-deep-links.js';
+import { STALE_SEARCH_MS } from './openmai-delivery.js';
 import { acceptCommitment } from './commitment.js';
 import { currentState } from './engagement.js';
 import { ttcOpenmaiAuthStatus } from './ttcsdk/auth.js';
@@ -73,8 +74,13 @@ export function projectLaunchPreflight(db, consultantId, projectId, {
     blockers.push({ code: 'BRAINX_BASE_URL_REQUIRED', message: 'BrainTex 生产 HTTPS 地址未配置' });
   }
   const sharedLaunch = getProjectLaunch(db, consultantId, projectId);
+  // H-2：RUNNING 超过一小时视为中断残留（无租约兜底，进程崩溃会把 search_status
+  // 永久锁在 RUNNING），不再当作可复用的进行中任务，避免 preflight 被错误短路。
+  const searchLive = sharedLaunch?.search_status !== 'RUNNING'
+    || Date.parse(sharedLaunch.search_started_at || sharedLaunch.updated_at) > Date.now() - STALE_SEARCH_MS;
   const reusesActiveSearch = sharedLaunch?.status === 'READY'
-    && ['RUNNING', 'DONE'].includes(sharedLaunch.search_status);
+    && ['RUNNING', 'DONE'].includes(sharedLaunch.search_status)
+    && searchLive;
   const searchReady = ttcConnected ?? ttcOpenmaiAuthStatus(db, consultantId).connected;
   if (requireSearch && !reusesActiveSearch && !searchReady) {
     blockers.push({ code: 'TTC_CREDENTIALS_REQUIRED', message: '请先配置个人或已授权的团队 TTC 寻访凭证' });

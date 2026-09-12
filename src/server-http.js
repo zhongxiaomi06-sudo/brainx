@@ -101,3 +101,24 @@ export async function body(req) {
   const text = Buffer.concat(chunks).toString('utf8');
   try { return JSON.parse(text || '{}'); } catch { return null; }
 }
+
+/** 路由匹配（H-1）：精确 key 优先，未命中再对含 :id 的动态路由做正则匹配。
+ * 动态段解码失败（如 %zz 非法百分号编码）属坏请求：decodeURIComponent 曾内联在
+ * server.js 请求回调里、位于 handler try/catch 与鉴权之前，URIError 会以 async
+ * rejection 冒泡，Node≥15 默认直接崩溃进程（未登录即可触发）。收口在这里：
+ * 返回 invalidPath，由调用方回 400。
+ */
+export function resolveRoute(routes, method, path) {
+  const exact = routes[`${method} ${path}`];
+  if (exact) return { handler: exact, dynId: null };
+  for (const key of Object.keys(routes)) {
+    const [m, p] = key.split(' ');
+    if (m !== method || !p.includes(':id')) continue;
+    const mm = new RegExp('^' + p.replace(':id', '([^/]+)') + '$').exec(path);
+    if (mm) {
+      try { return { handler: routes[key], dynId: decodeURIComponent(mm[1]) }; }
+      catch { return { invalidPath: true }; }
+    }
+  }
+  return { handler: null, dynId: null };
+}

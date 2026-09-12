@@ -1,5 +1,19 @@
 # Agent Commit 记录
 
+## 2026-09-12｜chore(cleanup): 清理无用产物与残留项，移除失效的 brainx 子模块引用
+
+- 触发：用户要求「检查当前的文件的不必要的项目，进行完全的清理」。按协作准则先做只读审计，风险项单独确认后再动手，全程不 `rm`。
+- **摘除失效 gitlink**：`brainx` 在索引里是 `160000 33af622a…` 的子模块引用（由 PR #2 合并带入），但仓库既无 `.gitmodules` 也无 `.git/modules/brainx`（从未初始化），磁盘上只是个空目录。仓库文档也无任何子模块约定，属误提交残留 → `git rm --cached brainx` 摘除索引项，并删除空的 `brainx/` 目录。
+- **未入库的本地产物全部移入回收站**（`~/.Trash/brainx-cleanup-20260912/`，非删除，可原样还原）：
+  - 11 个 `.DS_Store`（macOS 会自动重建）。
+  - 约 29 MB 可重建产物：`frontend/btex-frontend/{dist, storybook-static, tsconfig.tsbuildinfo}` 与 `.quality-gate/reports` —— 全部已被 `.gitignore` 覆盖，分别可由 `npm run build`、Storybook 构建、门禁重跑生成。
+  - `.workbuddy/untracked-backup-20260904`（9 月 4 日的一次性备份残留）。
+  - `data/brainx-cloud.db`(289 MB) 及其 `.gz`(30 MB) —— 经查**非唯一副本**，是云端训练用只读快照，可由 `scripts/pull-cloud-data.mjs` 从生产 47.110.93.137 重拉。
+- **确认后暂留的项**（已单独向用户说明风险）：`data/brainx.db.backup-pfix-20260819-170528`(228 MB) 经全盘检索确认**是唯一副本**，无任何其他备份，删除不可逆 → 暂留；根目录与 `frontend/btex-frontend` 两处 `node_modules`（合计约 1 GB）因 PID 70207/70209/70221 正持有其工作目录、且 `com.brainx.web.plist` 会自动重启，删除会打断本地服务 → 暂留。
+- **显式保留（绝不触碰）**：`data/brainx.db`(1.4 G 活跃库) 与 `-wal/-shm`、`data/.secret`(AES 密钥)、`logs/launchd.*.log`(被运行进程持有句柄)、全部已跟踪业务资料（根目录 CSV/PDF、`.prd_pages/`、`crm_openmai_demo/`、`distilled/`、`fixtures/`）。
+- 同步释放上一会话遗留的**陈旧工作锁**（owner: `task=feishu-card-typography-2plus2-focus-row`，18:58:57 创建，与本次任务无关），owner 副本留存于回收站。
+- 验证：改动仅索引中的 `brainx` 一条 + 本日志。工作区在操作前已确认干净 —— `tests/candidate-offer-report-e2e.test.mjs` 的 `M` 标记经哈希比对（`461cca66` 与 HEAD 一致）判定为纯 stat 脏，无未提交内容。
+
 ## 2026-09-12｜test(offer-e2e): 决策群动作块改为按元素类型定位，修掉索引漂移
 
 - 承接 commit `9a8abff9`：Offer 决策群首卡的迁移摘要改为按小节拆成多个 markdown 元素后，`tests/candidate-offer-report-e2e.test.mjs` 里 `card.elements[3].actions` 的硬编码下标漂移，读到的是小节元素而非动作块，报 `Cannot read properties of undefined (reading 'map')`。

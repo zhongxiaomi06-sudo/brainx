@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-12｜feat(frontend): 开始跟进取消三步表单，点击直接接单（冲刺清单 T5）
+
+- 任务：冲刺清单 T5——「开始跟进」不再弹出本轮目标/第一条行动/截止时间三步表单，点击直接接单，无中间态。
+- 做法：`engagement-loop.tsx` 新增 `submitAcceptDirect`，goal/action_title/due_at 默认值与 agent 侧服务端兜底一致（specs/011：「完成候选人搜索、筛选与匹配评估」/「启动候选人搜索并跟进交付」/次日 18:00），connected 直连 `/engagement` ACCEPT，离线走本地快照；入口按钮改为直接调用并带 busy 态。后端零改动；CommitmentEditor 的 accept 分支保留（Storybook 场景在用）。
+- 验证：前端 `npm test` 44/44 通过；`tsc --noEmit` 无错误。
+
 ## 2026-09-12｜feat(frontend): 职位详情页回放 tab 下线 + 一键接单 + 字段精简（冲刺清单 T1/T2）
 
 - T1：`job-detail-card-review.tsx` 删除「回放」tab 与恒空的决策回放占位区；历史入口（`workbench.tsx` 通知、深链）重映射到判断页，不再出现空 tab。详情页主按钮改「一键接单」：`acceptJobAndLaunch` 一次点击 = 入项目 + `launchProjectWorkflow` 拉群推卡，无表单无二次确认（复用既有 `launchProjectInFeishu`，签名放宽为 `Pick<ProjectSummary,"project_id"|"company">`）。

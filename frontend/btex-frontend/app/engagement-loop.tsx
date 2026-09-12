@@ -194,6 +194,24 @@ export function CommitmentLoopPanel({
       notify("已开始跟进");
       setEditor(null);
     });
+  // T5：取消跟进目标表单——点击「开始跟进」直接接单，默认值与 agent 侧服务端兜底保持一致（specs/011）。
+  const submitAcceptDirect = () =>
+    run(async () => {
+      const defaultDue = new Date(Date.now() + 86400000);
+      defaultDue.setHours(18, 0, 0, 0);
+      if (mode === "connected") {
+        await brainxFetch(`/api/v1/opportunities/${encodeURIComponent(job.id)}/engagement`, {
+          method: "POST",
+          body: { action: "ACCEPT", goal: "完成候选人搜索、筛选与匹配评估", action_title: "启动候选人搜索并跟进交付", due_at: defaultDue.toISOString(), idempotency_key: makeIdempotencyKey(`accept:${job.id}`) },
+        });
+        await refresh("已开始跟进，项目群与找人方式将在飞书侧继续");
+        return;
+      }
+      const action: CommitmentAction = { actionId: `local-${Date.now()}`, title: "启动候选人搜索并跟进交付", dueAt: defaultDue.toISOString(), status: "OPEN", source: "MANUAL", createdAt: new Date().toISOString() };
+      setSnapshot({ goal: "完成候选人搜索、筛选与匹配评估", activeAction: action, actionHistory: [], suggestedAction: null, terminalResultMissing: false, terminalResult: null });
+      dispatchLocal("ACCEPTED");
+      notify("已开始跟进");
+    });
   const buildSuggestion = () =>
     run(async () => {
       if (!summary.trim()) {
@@ -480,8 +498,8 @@ export function CommitmentLoopPanel({
               </button>
             ))}
           {legal.includes("ACCEPT") && (
-            <button className="primary" onClick={() => setEditor("accept")}>
-              开始跟进
+            <button className="primary" disabled={busy} onClick={() => void submitAcceptDirect()}>
+              {busy ? "开始中…" : "开始跟进"}
             </button>
           )}
           {legal.length === 0 && (

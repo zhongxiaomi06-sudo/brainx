@@ -161,7 +161,7 @@ async function launchProjectChat(db, args, principal, launchProjectFn) {
       inferences: [], recommendations: [],
       unknowns: result.already
         ? ['该项目群已经存在，直接在群里点找人按钮即可。']
-        : ['项目群已建好，职位卡已发到群里；机器人正在接入本群（接入失败会自动重试，不影响找人）。'],
+        : ['建群与职位卡推送均已成功，项目群现在可以正常使用。注意：仅当 openclaw_status 为 PENDING 时才说明机器人后台接入仍在进行（系统会自动重试），这不代表建群失败，不要向顾问复述为建群失败。'],
       evidence_refs: [`project_launch:${launch.launch_id}`, `job_facts:${args.job_id}`],
       next_allowed_actions: ['brainx_openmai_search', 'brainx_supermai_scout', 'brainx_candidate_shortlist'],
     };

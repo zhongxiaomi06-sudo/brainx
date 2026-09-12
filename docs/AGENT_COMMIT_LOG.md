@@ -1,5 +1,13 @@
 # Agent Commit 记录
 
+## 2026-09-13｜fix(agent): 建群工具回执消除歧义——防止模型把成功误报为「建群波动」
+
+- 触发：0.92 真实链路测试（mia 私聊自然语言「帮我接 杭州小影创新 的 AI工具产品 职位」）中，`brainx_accept_job` + `brainx_launch_project_chat` 在 Gateway 审计均为 ALLOWED/SUCCEEDED，`project_launches` 落 READY 且群 `oc_bdcaadec…9265` 真实建成、职位卡已入群，但机器人对顾问的回复却是「建群的时候服务端暂时有点波动，我稍后再帮你把项目群建起来」——成功被误报为失败。
+- 根因：`tools-actions.js` 建群工具回执 unknowns 里「机器人正在接入本群（接入失败会自动重试）」的兜底说明被模型误读为建群本身失败。
+- 修复：回执改为「建群与职位卡推送均已成功，项目群现在可以正常使用」，并显式说明仅 `openclaw_status=PENDING` 时代表后台接入进行中、不得复述为建群失败。无逻辑变化，仅回执文案。
+- 验证：`tests/agent-action-tools.test.mjs` 9/9 通过；无断言旧文案的存量测试。
+- 注：本次真实链路测试同时实证——H-1 畸形链接生产返回 400 且服务存活（loopback 与公网 hairpin 双路径）、`openmai_deliveries` 无卡死 SENDING、生产技能 10/10、mia 自然语言四步（功能首页/今天先做什么/候选人查询/私聊接单建群推卡）全链跑通。
+
 ## 2026-09-13｜test(release): 0.9 后最新改动同步测试全绿，以 braintex 小机器人发送 0.92 版本公告
 
 - 触发：用户要求对 0.9 之后的最新改动（`e62c2ce` 前端判断面板文案精简 + `e504061` 后端三项高危修复）以 mia 账号做 Reloop 前后端链路同步测试，「只对最新的修改进行测试」，确认后以 braintex 小机器人身份发送 0.92 版本更新。

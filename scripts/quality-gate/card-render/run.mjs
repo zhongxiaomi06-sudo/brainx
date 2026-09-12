@@ -225,6 +225,7 @@ async function main() {
   };
   writeFileSync(join(SHOT_DIR, 'summary.json'), `${JSON.stringify(summary, null, 2)}\n`);
   writeFileSync(join(SHOT_DIR, 'summary.md'), renderSummaryMarkdown(summary));
+  writeFileSync(join(SHOT_DIR, 'gallery.html'), renderGallery(summary));
 
   const failed = results.filter((entry) => entry.failures.length);
   process.stdout.write(`卡片渲染回归：${summary.passed}/${summary.total} 通过（平台 ${PLATFORM}）`
@@ -242,6 +243,43 @@ async function main() {
   }
   if (UPDATE) process.stdout.write(`基线已更新：${BASELINE_DIR}\n`);
   if (failed.length) process.exitCode = 1;
+}
+
+/** 把全部卡片截图摊在一页里，供人眼一次性复核排版；门禁只判定几何事实，
+ *  「好不好看」最终仍要人看这一页。 */
+function renderGallery(summary) {
+  const escape = (text) => String(text ?? '').replace(/[&<>"]/g,
+    (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[char]));
+  const cards = summary.results.map((entry) => {
+    const status = entry.failures.length ? '阻断' : entry.registered.length ? '存量登记' : '通过';
+    const tone = entry.failures.length ? '#a32d2d' : entry.registered.length ? '#854f0b' : '#0f6e56';
+    const notes = [...entry.failures, ...entry.registered]
+      .map((item) => `<li>${escape(item.detail)}</li>`).join('');
+    const metrics = entry.metrics
+      ? `高 ${entry.metrics.cardHeight}px · ${entry.metrics.actionRows.length} 组按钮 · 最大列高 ${entry.metrics.maxColumnHeight}px`
+      : '未渲染';
+    return `<figure><figcaption><b>${escape(entry.id)}</b>`
+      + `<span style="color:${tone}">${status}</span></figcaption>`
+      + `<img src="./${escape(entry.id)}.png" alt="${escape(entry.title)}">`
+      + `<p class="meta">${escape(entry.title)}<br>${metrics}</p>`
+      + (notes ? `<ul>${notes}</ul>` : '')
+      + '</figure>';
+  }).join('');
+  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">`
+    + '<title>飞书群卡片渲染复核页</title><style>'
+    + 'body{margin:0;padding:24px;background:#f7f8f9;color:#1f2329;font:14px/1.6 "PingFang SC",sans-serif}'
+    + 'h1{font-size:18px;margin:0 0 4px}.sub{color:#5f5e5a;margin:0 0 20px}'
+    + '.grid{display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start}'
+    + 'figure{margin:0;width:452px;background:#fff;border:1px solid #e3e5e8;border-radius:12px;padding:12px}'
+    + 'figcaption{display:flex;justify-content:space-between;gap:8px;margin-bottom:8px}'
+    + 'img{width:100%;display:block;border:1px solid #e3e5e8;border-radius:8px}'
+    + '.meta{color:#8f959e;font-size:12px;margin:8px 0 0}'
+    + 'ul{margin:6px 0 0;padding-left:18px;color:#a32d2d;font-size:12px}'
+    + '</style></head><body>'
+    + '<h1>飞书群卡片渲染复核页</h1>'
+    + `<p class="sub">平台 ${escape(summary.platform)} · ${summary.passed}/${summary.total} 通过 · `
+    + `${summary.registeredCount || 0} 项存量登记 · 生成于 ${escape(summary.generatedAt)}</p>`
+    + `<div class="grid">${cards}</div></body></html>`;
 }
 
 function renderSummaryMarkdown(summary) {

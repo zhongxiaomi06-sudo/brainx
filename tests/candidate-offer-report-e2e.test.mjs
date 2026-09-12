@@ -44,7 +44,7 @@ test('本地全链：建 Offer 群、生成 V1、追加讨论后生成 V2', asyn
   // 迁移摘要已按小节拆成多个 markdown 元素，动作块不再是固定下标，改为按元素类型定位。
   const contextActions = sentCards[0].card.elements.find((element) => element.tag === 'action').actions;
   assert.deepEqual(contextActions.map((action) => action.text.content),
-    ['查看 TTC 人才', '生成报告', '更新报告']);
+    ['生成报告', '更新报告', '查看 TTC 人才']);
 
   const documents = [];
   const registry = createProductionToolRegistry({ db, reportDependencies: {

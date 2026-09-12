@@ -3,8 +3,7 @@
  *
  * 为什么单独一层：截图回归只能证明「和上一版长得一样」，无法证明「这一版是有章法的」。
  * 卡片文案由 src/*.js 直接拼字符串，没有模板约束，很容易写出「一坨加粗 + 一堆冒号」
- * 的密集文字墙。这里把「章法」拆成 5 条可以在 JSON 层判定的规则，让排版纪律
- * 和按钮截断一样能阻断 push。
+ * 的密集文字墙。这里把「章法」拆成可判定的规则，让排版纪律和按钮截断一样能阻断 push。
  *
  * 层级约定（详见 docs/standards/CARD_TYPOGRAPHY.md）：
  *   标题行  **职位名**          一义一行，必须是块的第 1 个非空行
@@ -14,6 +13,8 @@
  *   说明行  短句，不加粗
  *
  * 规则故意做得保守：只拦「一眼看出没章法」的事实，不表达审美偏好。
+ * 卡片文案一律不用 emoji（F7，2026-09-12）：装饰性 emoji 与语义标签混排最伤观感，
+ * 序号改用「1. 2. 3.」，强调改用文字标签（如「（高优）」）。
  */
 
 /** 单个 markdown 块的正文行上限：超过即视为文字墙，应拆块。 */
@@ -24,11 +25,14 @@ export const MAX_BLOCK_LINES_TOTAL = 16;
 export const MAX_LABEL_RUN = 3;
 /** 单个 action 块的按钮上限：超过 3 个，420px 卡片下按钮文字必被省略号截断。 */
 export const MAX_ACTION_BUTTONS = 3;
+/** 单个 action 块的按钮下限：只有 1 个时飞书按自然宽度左对齐渲染，整行右侧留白，
+ *  按钮看起来像孤儿（F4）。应改用 src/card-layout.js#alignSoloAction 右对齐收口。 */
+export const MIN_ACTION_BUTTONS = 2;
 
 /** 标签行：整行以加粗标签开头，紧跟冒号。 */
 const LABEL_LINE = /^\s*\*\*([^*]+)\*\*\s*[：:]/;
 /** 视觉标题行：以加粗开头且不是「**标签**：值」形式（标签行另有归属）。
- *  允许标题后有行尾强调（如 🔥），所以只判定前缀而不要求整行都是加粗。 */
+ *  只用前缀判定，允许标题后紧跟不加粗的行尾强调（如「（高优）」）。 */
 const HEADING_LINE = /^\s*\*\*[^*]+\*\*/;
 /** 列表项与引用行：可扫读，不计入正文行数，只受总行数约束。 */
 const LIST_LINE = /^\s*(?:[-*•]\s+|\d+\.\s+|>\s*)/;
@@ -66,6 +70,10 @@ export function checkTypography(card) {
         issues.push({ rule: 'action-row-too-many-buttons',
           detail: `${path} 一个动作块放了 ${count} 个按钮，超过 ${MAX_ACTION_BUTTONS} 个`
             + '（420px 卡片下按钮文字会被省略号截断），必须拆成多个动作块' });
+      } else if (count < MIN_ACTION_BUTTONS) {
+        issues.push({ rule: 'action-row-solo',
+          detail: `${path} 动作块只有 ${count} 个按钮：飞书按自然宽度左对齐渲染，`
+            + '整行右侧留白像孤儿按钮。请用 src/card-layout.js#alignSoloAction 右对齐收口' });
       }
     }
   }

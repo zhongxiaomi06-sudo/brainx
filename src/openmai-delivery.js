@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { now } from './db.js';
 import { sendInteractiveCard } from './feishu-bot.js';
 import { buildBrainxDeepLink, productionBaseUrl } from './brainx-deep-links.js';
+import { alignSoloAction } from './card-layout.js';
 import { assessOpenmaiCandidateBatch, extractOpenmaiCandidates } from './openmai-result.js';
 
 const PHONE = /(?<!\d)(?:\+?86[-\s]?)?1[3-9]\d{9}(?!\d)/g;
@@ -66,7 +67,7 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
   const content = success
     ? (candidates.length
       ? `**${job.company} · ${job.role}**\n\n${roundLabel}本轮共找到 ${candidates.length} 位候选人。`
-        + (quality.message ? `\n\n> ⚠️ ${quality.message}` : '')
+        + (quality.message ? `\n\n> ${quality.message}` : '')
       : `**${job.company} · ${job.role}**\n\n${groupSafeOpenmaiText(resultText)}`)
     : `**${job.company} · ${job.role}**\n\n本轮候选人搜索失败：${groupSafeOpenmaiText(error, 500)}\n\n请修复连接后在工作台重试。`;
   const table = candidates.length ? [
@@ -84,9 +85,10 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
       ...table,
       ...focusSection(job, candidates),
       ...(candidates.length ? [continueSearchActions(job)] : []),
-      ...(!success || !candidates.length ? [{ tag: 'action', actions: [{ tag: 'button', type: 'primary',
+      // 失败 / 空结果卡只有这一个动作 → 右对齐收口（F4）。
+      ...(!success || !candidates.length ? [alignSoloAction({ tag: 'action', actions: [{ tag: 'button', type: 'primary',
         text: { tag: 'plain_text', content: success ? '打开工作台查看与评估' : '打开工作台处理' },
-        multi_url: { url: target, pc_url: target, android_url: target, ios_url: target } }] }] : []),
+        multi_url: { url: target, pc_url: target, android_url: target, ios_url: target } }] })] : []),
     ],
   };
 }
@@ -105,7 +107,7 @@ function focusSection(job, candidates) {
   }
   return [
     { tag: 'markdown', content:
-      '**重点关注**：点按钮把对应序号的候选人加入项目共同重点名单，并投递带 TTC 链接的人才卡' },
+      '**重点关注**：点对应序号的按钮，即把该候选人加入项目共同重点名单，并收到带 TTC 链接的人才卡。' },
     ...rows,
     ...candidateQualityNotes(candidates),
   ];
@@ -145,8 +147,8 @@ function tableCell(content, weight, elements) {
 function candidateTableHeading() {
   return {
     tag: 'column_set', flex_mode: 'none', background_style: 'grey',
-    columns: [tableCell('候选人 / 当前岗位', 3), tableCell('经验 / 城市', 2),
-      tableCell('学历', 2), tableCell('核心匹配', 4), tableCell('匹配度', 1)],
+    columns: [tableCell('候选人 / 当前岗位', 3), tableCell('背景', 3),
+      tableCell('核心匹配', 4), tableCell('匹配度', 2)],
   };
 }
 
@@ -170,19 +172,30 @@ function keepCandidateAction(job, candidate, no) {
   const command = `把项目 ${projectRef} 的候选人 ${candidate.candidateRef} 标记为重点关注。`
     + '这个按钮就是我的明确确认：现在调用 brainx_candidate_workflow，'
     + `传入 job_id=${projectRef}、candidate_ref=${candidate.candidateRef}、`
-    + 'action=KEEP_FOR_REVIEW、confirm=true。成功后告诉群里“☑ 已重点关注”，'
+    + 'action=KEEP_FOR_REVIEW、confirm=true。成功后告诉群里“已重点关注”，'
     + '并说明此人已进入本项目共享上下文，同时已发送人才卡；不要发送简历。';
   return { tag: 'button', type: 'primary', text: { tag: 'plain_text', content: `重点关注 ${no}` },
     value: { text: command } };
 }
 
+/** F8：5 列中文数据在 372px 内摆不开，「7 年 · 深圳」会被折成「7 年 · 深\n圳」。
+ *  把「经验 / 城市」与「学历」并成一列「背景」（`7 年 · 深圳 · 硕士 · 哈工大`），
+ *  列数降到 4，每列宽度立刻宽裕。
+ *  上游缺字段时会填「待核实」占位，直接拼会出现「待核实 · 待核实 · 待核实」，
+ *  因此先剔除空值与占位、再去重，全空才回退成单个「待核实」。 */
+function backgroundText(candidate) {
+  const parts = [candidate.experience, candidate.city, candidate.education]
+    .map((value) => String(value ?? '').trim())
+    .filter((value) => value && value !== '待核实');
+  return [...new Set(parts.map((value) => groupSafeOpenmaiText(value, 40)))].join(' · ') || '待核实';
+}
+
 function candidateTableRow({ candidate, index }) {
   return { tag: 'column_set', flex_mode: 'none', background_style: 'default', columns: [
     tableCell(`${index + 1}. ${groupSafeOpenmaiText(candidate.name, 60)}\n${groupSafeOpenmaiText(candidate.role, 120)}`, 3),
-    tableCell(`${groupSafeOpenmaiText(candidate.experience, 40)} · ${groupSafeOpenmaiText(candidate.city, 40)}`, 2),
-    tableCell(groupSafeOpenmaiText(candidate.education, 80), 2),
+    tableCell(backgroundText(candidate), 3),
     tableCell(groupSafeOpenmaiText(candidate.evaluation, 300), 4),
-    tableCell(groupSafeOpenmaiText(candidate.score, 20), 1),
+    tableCell(groupSafeOpenmaiText(candidate.score, 20), 2),
   ] };
 }
 

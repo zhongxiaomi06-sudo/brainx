@@ -51,8 +51,11 @@ test('pushSlotFor：同一时段幂等（push_log 唯一键），无推荐不发
   assert.equal(n, 2);
   const card = JSON.parse(db.prepare(`SELECT card_json FROM push_log WHERE consultant_id='felix'
     AND kind='DAILY_TOP3' ORDER BY created_at LIMIT 1`).get().card_json);
-  assert.equal(card.elements.filter((element) => element.tag === 'action').length, 2,
-    '一条职位动作 + 底部工作台动作');
+  // 职位动作行是 1 个 action 块；底部「打开工作台」是孤行动作，已改成 column_set
+  // 右对齐收口（F4，src/card-layout.js），所以这里同时数 action 块与收口用的 column_set。
+  const actionRows = card.elements.filter((element) => element.tag === 'action').length;
+  const footerRows = card.elements.filter((element) => element.tag === 'column_set').length;
+  assert.equal(actionRows + footerRows, 2, '一条职位动作 + 底部工作台动作');
 });
 
 test('0012：零引用占位行删除、有引用行 CLOSED（回放不破）', () => {

@@ -73,8 +73,9 @@ function renderDiv(element) {
   return `<div class="el el-div">${inlineMarkdown(element.text?.content ?? '')}</div>`;
 }
 
-// 表格「操作」列里直接放单个 button（openmai-delivery 的候选表），
-// 它不是 action 块的子项，而是列元素本身。
+// 列内的裸 button：不是 action 块的子项，而是列元素本身。
+// 用途：右对齐收口的孤行动作 —— src/card-layout.js#alignSoloAction 把单按钮
+// 放进 column_set 的右列，按钮就成了列元素。
 function renderLoneButton(element) {
   return `<div class="el el-actions" data-count="1">${renderButton(element)}</div>`;
 }

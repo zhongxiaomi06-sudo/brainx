@@ -28,6 +28,13 @@ jobs:
         run: npm ci
       - name: 安装前端依赖
         run: npm ci --prefix frontend/btex-frontend
+      # 卡片渲染门禁用系统 Chrome（与前端 e2e 同一套浏览器，runner 自带，无需
+      # `npx playwright install`）；但 runner 默认没有中文字体，缺了 CJK 字体
+      # 中文会渲染成缺字方框，按钮截断这类「字宽几何」断言就失去意义。
+      - name: 安装中文字体（供卡片渲染门禁测量真实字宽）
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
       - name: 执行完整质量门禁
         run: npm run verify:ci
       - name: 保存门禁报告

@@ -2202,3 +2202,20 @@
 - 根因：`src/worker.js` 主块先 `console.log('[worker] 批处理进程已就绪…')` 再 `process.once('SIGTERM', shutdown)`。测试以该日志作为「可以发 SIGTERM」的信号，处理器尚未就位时信号走默认行为杀进程 → `exitCode=null`。2026-09-03 已记录同类现象（当时是测试侧改为等就绪日志），但那并未消除竞态本身。
 - 修法：把 `keepAlive` / `shutdown` / 两个 `process.once` 提到就绪日志之前，使「日志可见 ⟺ 处理器已注册」。逻辑等价，且顺带让启动窗口内到达的信号也能优雅退出。
 - 验证：`tests/worker.test.mjs` 连跑 5 次全通过；`npm test` 663/663。
+
+## 2026-09-12｜fix(卡片): 按钮主次/孤行/emoji/表格折叠 + 文字排版硬规则加严（F1–F8）
+
+- 背景：用户对「0.9 冲刺前端需求深度核查」的卡片问题清单逐条拍板 —— 原先「保持原状」的 F1/F4/F5/F6/F7 全部改为**要修**（原文「这个也都修改」），并追加一句「文字书写进行美观的调整修改」，因此本轮同时改了代码与规范。
+- F1 按钮主次：`src/agent-gateway/tools-candidate-actions.js` 主按钮从「查看 TTC 链接」改为「初筛通过」（深链按钮降级并移到末位）；`src/candidate-decision-group.js` 主按钮从「查看 TTC 人才」改为「生成报告」。
+- F4 单按钮孤行（8 处）：新增 `src/card-layout.js#alignSoloAction`，把「只有一个按钮的 action 块」换成 `column_set`（占位列 1 : 动作列 1、`flex_mode:none`），按钮右对齐收口，避免占满整行后右侧大片留白。落地于 `src/push.js`（2 处）、`src/stage-reminder.js`（2 处）、`src/project-launch.js`、`src/openmai-delivery.js`、`src/project-reminder.js`、`src/candidate-report.js`、`src/candidate-shortlist-card.js`、`src/group-intake.js`。
+- F5 项目卡 3 段 action 收成 2 段：`src/project-launch.js` 把末尾独立的「打开工作台」并入「补充条件」那一行。飞书把每个 action 块渲染成独立一行，3 行会把按钮层级拉平、看不出主次。
+- F6「回放」口径：文案改为「查看评估详情」，但**深链保持 `replay:<decision_id>` 未换**。证据链：`frontend/btex-frontend/app/workbench.tsx:274` 对 `kind === 'replay'` 打开 **judgement** 面板，而 `opportunity:<project_id>` 打开 **facts** 视图 —— 与同卡片已有的「查看职位」完全重合，换深链等于把两个按钮做成同一件事。*（此项与用户勾选的「改文案+换深链」不一致，已单独回报并说明原因。）*
+- F7 去 emoji：`1️⃣ 2️⃣…` → `1. 2.…`、`🔥` → `（高优）`、`👀 团队共享观察` → `团队共享观察`、`⚠️ ` 前缀去掉、`✕ 忽略` → `忽略`、`☑ 已重点关注` → `已重点关注`。规范 §2.1 给出替换表与理由（`danger` 按钮样式已经承担「破坏性」语义，emoji 是重复装饰）。
+- F8 表格折叠（用户「确认，调整」F8）：`src/openmai-delivery.js` 候选人表 5 列压到 4 列 —— 「经验/城市」+「学历」合并为「背景」列。列权重从 3/2/2/4/1 变为 3/3/4/2。算术依据：372px 可用宽 / 权重和 12 → 原权重 2 的列只有约 62px，减 16px padding 剩 46px，装不下「7 年 · 深圳」（约 52px）故折行；合并成权重 3（约 93px）放得下。上游缺字段或占位「待核实」会拼成「待核实 · 待核实」，因此先剔除空值与占位、再去重。
+- 门禁加严（闭掉两处盲区）：①`scripts/quality-gate/card-render/typography.mjs` 新增第 7 条硬规则 `action-row-solo`（单 action 块按钮 < 2）；②`run.mjs` 截断判据改用 `Range.getBoundingClientRect()` 量文字真实排版宽度 —— `scrollWidth / clientWidth` 都是整数取整，**小于 1px 的溢出会漏判**（实测「一键加入人才库」被省略号吃掉却报 PASS）；注意 `clientWidth` 已排除 border，只能减 padding，减两次会让每个按钮都误判；③`theme.css` 补 `.el-actions[data-count="1"] { flex: 0 0 auto }` —— 本地此前一律 `flex:1 1 0`，单按钮被拉满整行，截图门禁**结构性看不见 F4**。
+- CI：`.github/workflows/ci.yml` 增加 `fonts-noto-cjk` 安装。Linux runner 默认没有中文字体，缺字会让「字宽几何」类断言失去意义。
+- 连带修复（加严后暴露的真实缺陷，非误报）：`src/stage-reminder.js` 的「打开职位 · 启动找人」「打开职位 · 处理结果」被新判据判为截断 → 缩短为「启动找人」「处理本轮结果」；`src/project-launch.js` 的「一键加入人才库」→「加入人才库」。
+- 测试：受契约变化影响的 7 个用例同步（`agent-candidate-actions` / `candidate-decision-group` / `candidate-offer-report-e2e` / `candidate-shortlist-card` / `openmai-delivery` / `scheduler` / `quality-gate`）；`tests/quality-gate.test.mjs` 新增 2 组断言（`action-row-solo` 检出 + `alignSoloAction` 契约 6 项）。后端全量 **694/694**，卡片渲染回归 **17/17**（darwin、系统 Chrome）。
+- 文档：`docs/standards/CARD_TYPOGRAPHY.md` 重写为 7 条硬规则 + §2.1「不用 emoji」替换表 + 孤行收口与表格列数做法；`docs/2026-09-12-feishu-card-render-gate.md` 补 Range 判据、近似误差自省与第三轮处置表；`docs/frontend-reviews/2026-09-12-feishu-card-buttons-audit.md` 补 F1–F8 处置表、五维状态与「仍未确认」清单；`docs/README.md` 索引同步 6 → 7 条规则。
+- 门禁结论：`npm run verify`（full）**23/25**。内容类 23 项全绿（ESLint / TS / 后端 694 / 前端测试 / Storybook 测试 / 前端构建 / Storybook 构建 / 浏览器 e2e / 卡片渲染 / 烟雾 / 秘密扫描 / 行数 / 依赖审计）。失败 2 项均为 Git 状态类，且**全部由同工作区另一 Agent 未提交的删除引起**（`.agents/skills/speckit-*`×10、`.codebuddy/commands/speckit.*`×10、`.specify/integrations/*.manifest.json`×2）：①「工作区与操作状态（非干净）」②「完整检出（缺 22 个被跟踪文件）」。按 AGENTS.md §3.4 未触碰他人改动；这两项在 CI 的全新检出上不复现，故以 CI 为准。
+- 另：发现并还原了一个**被误删的已跟踪源文件** `frontend/btex-frontend/build/sites-vite-plugin.ts`（`vite.config.ts:3` 直接 import，缺失会让前端构建失败）。用 `git checkout HEAD --` 原样恢复，未改动任何他人提交内容。

@@ -133,10 +133,14 @@ ${JSON.stringify({ candidates: [{ candidate_ref: 'openmai-card-1', name: '李四
     candidate_ref: 'openmai-card-1', action: 'SEND_TALENT_CARD', confirm: true }, context);
   assert.equal(shared.data.talent_card_status, 'sent');
   assert.equal(sent[0].target, 'oc_project');
-  assert.match(JSON.stringify(sent[0].card), /李四|88%|查看链接|初筛通过|一键加入人才库/);
+  assert.match(JSON.stringify(sent[0].card), /李四|88%|查看 TTC 链接|初筛通过|加入人才库/);
   assert.match(JSON.stringify(sent[0].card), /\[BRAINTEX_CANDIDATE_KEEP\] 职位 \S+ 候选人 openmai-card-1/);
   assert.match(JSON.stringify(sent[0].card), /\[BRAINTEX_TALENT_ADD\] 职位 \S+ 候选人 openmai-card-1/);
-  assert.match(sent[0].card.elements[2].actions[0].multi_url.url,
+  // F1：primary 已从「查看 TTC 链接」这个纯跳转交给「初筛通过」，跳转按钮降到末位。
+  const shareActions = sent[0].card.elements[2].actions;
+  assert.equal(shareActions[0].text.content, '初筛通过', '真实业务动作必须是主按钮');
+  assert.equal(shareActions[0].type, 'primary');
+  assert.match(shareActions.find((action) => action.multi_url).multi_url.url,
     /app\.ttcadvisory\.com\/app\/talent\/openmai-card-1/);
   assert.doesNotMatch(JSON.stringify(sent[0].card), /简历\.pdf|138\d{8}/);
   await assert.rejects(() => handlers.brainx_candidate_workflow({ job_id: jobId,

@@ -19,6 +19,7 @@ import { pushCard } from './push.js';
 import { getPushPreferences } from './push-preferences.js';
 import { sendInteractiveCard } from './feishu-bot.js';
 import { buildBrainxDeepLink, productionBaseUrl } from './brainx-deep-links.js';
+import { alignSoloAction } from './card-layout.js';
 import { lastProjectActivityAt } from './project-reminder.js';
 
 const REMINDER_KIND = 'STAGE_REMINDER';
@@ -109,7 +110,7 @@ export function collectStageReminders(db, at = now(), { silenceHours = 24 } = {}
 export function buildStageReminderCard(ctx, { publicBaseUrl } = {}) {
   const baseUrl = productionBaseUrl(publicBaseUrl).href;
   const jobLine = [ctx.company, ctx.role].filter(Boolean).join(' · ');
-  const jobBtn = (text) => ({ tag: 'action', actions: [{
+  const jobBtn = (text) => alignSoloAction({ tag: 'action', actions: [{
     tag: 'button', type: 'primary', text: { tag: 'plain_text', content: text },
     multi_url: (() => { const u = buildBrainxDeepLink({ baseUrl, objectType: 'opportunity',
       objectRef: ctx.project_id }); return { url: u, pc_url: u, android_url: u, ios_url: u }; })(),
@@ -122,9 +123,9 @@ export function buildStageReminderCard(ctx, { publicBaseUrl } = {}) {
       header: { template: 'turquoise', title: { tag: 'plain_text', content: 'BrainTex · 今天想看什么岗位吗？' } },
       elements: [
         { tag: 'markdown', content: `**${ctx.display_name || ctx.consultant_id}**，你目前没有进行中的接单。\n直接私聊我你想找的岗位方向（如「找 3 年内的增长投放」），我按判据去搜人；或先看看今天建议优先处理的职位。` },
-        { tag: 'action', actions: [{ tag: 'button', type: 'primary',
+        alignSoloAction({ tag: 'action', actions: [{ tag: 'button', type: 'primary',
           text: { tag: 'plain_text', content: '打开工作台看职位' },
-          multi_url: (() => { const u = baseUrl; return { url: u, pc_url: u, android_url: u, ios_url: u }; })() }] },
+          multi_url: (() => { const u = baseUrl; return { url: u, pc_url: u, android_url: u, ios_url: u }; })() }] }),
         note,
       ] };
   }
@@ -133,7 +134,7 @@ export function buildStageReminderCard(ctx, { publicBaseUrl } = {}) {
       header: { template: 'blue', title: { tag: 'plain_text', content: 'BrainTex · 现在想找人吗？' } },
       elements: [
         { tag: 'markdown', content: `**${jobLine || ctx.project_id}** 已接单，但**还没有启动找人**。\n打开职位确认信息后一键启动，或直接私聊我补充要找的人选画像。` },
-        jobBtn('打开职位 · 启动找人'),
+        jobBtn('启动找人'),
         note,
       ] };
   }
@@ -141,7 +142,7 @@ export function buildStageReminderCard(ctx, { publicBaseUrl } = {}) {
     header: { template: 'orange', title: { tag: 'plain_text', content: 'BrainTex · 要找新的人吗？' } },
     elements: [
       { tag: 'markdown', content: `**${jobLine || ctx.project_id}** 的找人结果已经回来，但**还没有推进记录**（没有标记重点候选人、没有结果记录、也没建决策群）。\n上去处理本轮结果，或告诉我这轮不合适、重新按新判据找一批。` },
-      jobBtn('打开职位 · 处理结果'),
+      jobBtn('处理本轮结果'),
       note,
     ] };
 }

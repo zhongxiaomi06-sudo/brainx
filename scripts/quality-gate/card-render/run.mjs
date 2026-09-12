@@ -42,6 +42,21 @@ const ONLY = (() => {
 const DIFF_LIMIT = Number(process.env.BRAINX_CARD_DIFF_RATIO || 0.004);
 const PLATFORM = process.env.BRAINX_CARD_PLATFORM || process.platform;
 
+// 用系统 Chrome 而不是 Playwright 自带浏览器：仓库原有的浏览器链路检查
+// （frontend/btex-frontend/tests/e2e-browser-check.mjs）就是 channel="chrome"，
+// 本机与 GitHub ubuntu runner 都自带 Chrome；而 Playwright 的 bundled 浏览器
+// 需要额外的 `npx playwright install`，CI 里没有装，门禁会直接死在启动浏览器这一步。
+const BROWSER_CHANNEL = process.env.BRAINX_CARD_BROWSER_CHANNEL || 'chrome';
+
+/** 解析「已人工确认截图基线的平台」列表，默认只认 darwin（基线在 macOS 上人工确认过）。 */
+export function parsePlatformList(value) {
+  return new Set(String(value || 'darwin').split(',').map((name) => name.trim()).filter(Boolean));
+}
+// 只有这些平台上「缺基线」才阻断。其它平台（如 CI 的 linux）没有人工确认过的基线，
+// 像素比对无从谈起 —— 此时跳过像素比对并在报告里显著提示；而截断、横向溢出、
+// 文字排版这些断言与字体栅格化无关，在所有平台照常生效，CI 依然拦得住排版回归。
+const CURATED_PLATFORMS = parsePlatformList(process.env.BRAINX_CARD_BASELINE_PLATFORMS);
+
 // 卡片里带日期、签名、运行号等每次运行都变的字段；不归一化就无法做基线比对。
 // 顺序有讲究：先吃掉带年份的完整时间戳，再吃只带月日的相对时间戳（卡片标题用的是
 // now().slice(5, 16) 形式，如「09-12 19:05」——漏掉它会让标题随时钟逐分钟变化，
@@ -67,14 +82,27 @@ export function canonicalize(value) {
 async function readMetrics(page) {
   return page.evaluate(() => {
     const card = document.querySelector('.feishu-card');
+    // scrollWidth / clientWidth 都是整数取整。多个中文按钮挤在一行时，文字宽度往往只
+    // 超出不到 1px，取整后两者相等 → 漏判（实测「一键加入人才库」被省略号吃掉却报 PASS）。
+    // 改用 Range 量文字的真实排版宽度，与按钮内容宽度精确比较。
+    // 注意 clientWidth 已排除 border、但包含 padding，所以只减 padding，不能再减 border
+    // （减两次会让每个按钮都误判成截断）。
+    const textOverflows = (btn) => {
+      const style = getComputedStyle(btn);
+      const content = btn.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+      const range = document.createRange();
+      range.selectNodeContents(btn);
+      const width = range.getBoundingClientRect().width;
+      range.detach?.();
+      return width > content + 0.5;
+    };
     const actionRows = [...document.querySelectorAll('.el-actions')].map((row) => {
       const buttons = [...row.querySelectorAll('.btn')];
       const tops = new Set(buttons.map((btn) => Math.round(btn.getBoundingClientRect().top)));
       return {
         buttons: buttons.length,
         renderedRows: tops.size,
-        truncated: buttons.filter((btn) => btn.scrollWidth > btn.clientWidth + 1)
-          .map((btn) => (btn.textContent || '').trim()),
+        truncated: buttons.filter(textOverflows).map((btn) => (btn.textContent || '').trim()),
       };
     });
     const columns = [...document.querySelectorAll('.col')]
@@ -182,7 +210,7 @@ async function main() {
   mkdirSync(SHOT_DIR, { recursive: true });
   if (UPDATE) mkdirSync(BASELINE_DIR, { recursive: true });
 
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({ channel: BROWSER_CHANNEL });
   const context = await browser.newContext({ viewport: { width: 452, height: 900 }, deviceScaleFactor: 1 });
   const page = await context.newPage();
   await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -207,10 +235,14 @@ async function main() {
         writeFileSync(baseline, readFileSync(shot));
         entry.baseline = 'updated';
       } else if (!existsSync(baseline)) {
-        entry.baseline = 'missing';
-        reasons.push({ rule: 'baseline-missing',
-          detail: `缺少基线 fixtures/card-render/baseline/${scenario.id}.${PLATFORM}.png，`
-            + '确认截图无误后跑 --update 生成' });
+        if (CURATED_PLATFORMS.has(PLATFORM)) {
+          entry.baseline = 'missing';
+          reasons.push({ rule: 'baseline-missing',
+            detail: `缺少基线 fixtures/card-render/baseline/${scenario.id}.${PLATFORM}.png，`
+              + '确认截图无误后跑 --update 生成' });
+        } else {
+          entry.baseline = 'skipped-uncurated';
+        }
       } else {
         entry.baseline = 'compared';
         entry.diff = await pixelDiffRatio(page, baseline, shot);
@@ -229,8 +261,10 @@ async function main() {
 
   const summary = {
     generatedAt: new Date().toISOString(), platform: PLATFORM, update: UPDATE,
+    browserChannel: BROWSER_CHANNEL, curatedPlatforms: [...CURATED_PLATFORMS],
     diffLimit: DIFF_LIMIT, shots: SHOT_DIR, passed: results.filter((r) => !r.failures.length).length,
     registeredCount: results.reduce((sum, entry) => sum + entry.registered.length, 0),
+    baselineSkipped: results.filter((entry) => entry.baseline === 'skipped-uncurated').length,
     total: results.length, results,
   };
   writeFileSync(join(SHOT_DIR, 'summary.json'), `${JSON.stringify(summary, null, 2)}\n`);
@@ -238,8 +272,14 @@ async function main() {
   writeFileSync(join(SHOT_DIR, 'gallery.html'), renderGallery(summary));
 
   const failed = results.filter((entry) => entry.failures.length);
-  process.stdout.write(`卡片渲染回归：${summary.passed}/${summary.total} 通过（平台 ${PLATFORM}）`
+  process.stdout.write(`卡片渲染回归：${summary.passed}/${summary.total} 通过（平台 ${PLATFORM}`
+    + `，浏览器 ${BROWSER_CHANNEL}）`
     + `${summary.registeredCount ? `，另 ${summary.registeredCount} 项存量缺陷已登记` : ''}\n`);
+  if (summary.baselineSkipped) {
+    process.stdout.write(`  提示：平台 ${PLATFORM} 没有人工确认的截图基线，`
+      + `已跳过 ${summary.baselineSkipped} 张卡片的像素比对（截断 / 横向溢出 / 文字排版断言仍全部生效）；`
+      + '需要像素基线请在本平台跑 --update 并人眼确认后提交。\n');
+  }
   for (const entry of results) {
     const mark = entry.failures.length ? 'FAIL' : entry.registered.length ? 'WARN' : 'PASS';
     const shape = entry.metrics
@@ -287,8 +327,11 @@ function renderGallery(summary) {
     + 'ul{margin:6px 0 0;padding-left:18px;color:#a32d2d;font-size:12px}'
     + '</style></head><body>'
     + '<h1>飞书群卡片渲染复核页</h1>'
-    + `<p class="sub">平台 ${escape(summary.platform)} · ${summary.passed}/${summary.total} 通过 · `
-    + `${summary.registeredCount || 0} 项存量登记 · 生成于 ${escape(summary.generatedAt)}</p>`
+    + `<p class="sub">平台 ${escape(summary.platform)} · 浏览器 ${escape(summary.browserChannel)} · `
+    + `${summary.passed}/${summary.total} 通过 · `
+    + `${summary.registeredCount || 0} 项存量登记 · `
+    + `${summary.baselineSkipped ? `像素比对已跳过 ${summary.baselineSkipped} 张 · ` : ''}`
+    + `生成于 ${escape(summary.generatedAt)}</p>`
     + `<div class="grid">${cards}</div></body></html>`;
 }
 
@@ -296,7 +339,11 @@ function renderSummaryMarkdown(summary) {
   const lines = [
     '# 飞书群卡片渲染回归报告', '',
     `- 生成时间：${summary.generatedAt}`,
-    `- 平台分档：${summary.platform}`,
+    `- 平台分档：${summary.platform}（浏览器 ${summary.browserChannel}）`,
+    ...(summary.baselineSkipped
+      ? [`- 像素比对：本平台无人工确认基线，已跳过 ${summary.baselineSkipped} 张卡片的像素比对`
+        + '（截断 / 横向溢出 / 文字排版断言仍生效）']
+      : []),
     `- 结果：${summary.passed}/${summary.total} 通过`,
     `- 截图目录：\`${summary.shots}\``,
     `- 模式：${summary.update ? '重建基线' : '校验基线'}`, '',

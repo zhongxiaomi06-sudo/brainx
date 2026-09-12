@@ -94,6 +94,15 @@
 .btn-primary { border-color: #3370ff; background: #3370ff; color: #ffffff; }
 .btn-danger { border-color: #f54a45; background: #ffffff; color: #f54a45; }
 
+/* 单按钮行：飞书按「自然宽度 + 左对齐」渲染，不会把按钮拉伸到整行宽。
+   本地此前一律 flex:1 1 0，结果截图里孤行按钮被拉满，看不出「孤儿按钮 + 右侧留白」
+   （F4 门禁盲区）。这里与飞书对齐：单按钮不参与拉伸，只受卡片宽度上限约束。
+   多按钮行仍然等分——飞书多按钮行也是等分铺满，且等分是最保守的截断判据。 */
+.el-actions[data-count="1"] .btn { flex: 0 0 auto; max-width: 100%; }
+/* 右对齐收口（src/card-layout.js#alignSoloAction 把孤行按钮放进 column_set 右列）：
+   列内单按钮贴列尾，视觉上收在行末而不是悬在左侧。 */
+.col .el-actions[data-count="1"] { justify-content: flex-end; }
+
 /* 列内按钮：飞书会把按钮压到列宽，文字走省略号，而不是把卡片撑宽。
    不这样处理，表格卡片的失败原因就会变成「我的近似误差」而非真实排版问题。 */
 .col .el-actions { gap: 4px; }

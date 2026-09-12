@@ -4,6 +4,7 @@ import { now } from './db.js';
 import { listProjectCandidateFocus } from './candidate-focus.js';
 import { createFeishuDocument } from './feishu-document.js';
 import { sendInteractiveCard } from './feishu-bot.js';
+import { alignSoloAction } from './card-layout.js';
 
 const PHONE = /(?<!\d)(?:\+?86[-\s]?)?1[3-9]\d{9}(?!\d)/g;
 const EMAIL = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
@@ -54,8 +55,8 @@ export function readyCard(candidate, report) {
     header: { template: 'purple', title: { tag: 'plain_text', content: `BrainTex · Offer 决策报告 V${report.version}` } },
     elements: [
       { tag: 'markdown', content: `**${safe(candidate.name || candidate.candidate_ref, 100)}**\n已汇总候选事实、来源项目群上下文和本群最新讨论。` },
-      { tag: 'action', actions: [{ tag: 'button', type: 'primary', text: { tag: 'plain_text', content: '打开飞书报告' },
-        multi_url: { url: url.toString(), pc_url: url.toString(), android_url: url.toString(), ios_url: url.toString() } }] },
+      alignSoloAction({ tag: 'action', actions: [{ tag: 'button', type: 'primary', text: { tag: 'plain_text', content: '打开飞书报告' },
+        multi_url: { url: url.toString(), pc_url: url.toString(), android_url: url.toString(), ios_url: url.toString() } }] }),
       { tag: 'note', elements: [{ tag: 'plain_text', content: '后续有新讨论或电话纪要时，发送 /report 即可生成新版本。' }] },
     ] };
 }

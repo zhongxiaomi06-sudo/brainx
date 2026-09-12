@@ -13,9 +13,12 @@ test('候选推荐卡片：展示 Agent 判断并提供 BrainX 查询按钮', ()
   });
   assert.match(card.header.title.content, /沐仞科技 HR岗/);
   assert.match(card.elements[0].content, /一句话判断/);
-  const action = card.elements.find((element) => element.tag === 'action');
-  assert.equal(action.actions[0].text.content, '打开 BrainX 查询');
-  const target = new URL(action.actions[0].multi_url.url);
+  // F4：这张卡只有这一个动作，已改成 column_set 右对齐收口（src/card-layout.js），
+  // 按钮因此是列元素而不是 action 块的子项。
+  const button = card.elements.flatMap((element) => element.columns || [])
+    .flatMap((column) => column.elements || []).find((element) => element.tag === 'button');
+  assert.equal(button.text.content, '打开 BrainX 查询');
+  const target = new URL(button.multi_url.url);
   assert.equal(target.origin, 'https://base.yorkteam.cn');
   assert.equal(target.searchParams.get('open'), 'opportunity:job-hr-1');
   assert.equal(target.searchParams.get('candidate'), 'cand-opaque-1');

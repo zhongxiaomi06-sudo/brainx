@@ -13,6 +13,7 @@ import { larkProfileArgs } from './env.js';
 import { quickLink } from './quickfb.js';
 import { sendInteractiveCard } from './feishu-bot.js';
 import { buildBrainxDeepLink, productionBaseUrl } from './brainx-deep-links.js';
+import { alignSoloAction } from './card-layout.js';
 
 const REL_LABEL = { MY_JOB: '我的职位', PRIMARY_PM: '我主PM', TEAM_SHARED: '团队共享',
                     OTHER_CONSULTANT: '他人主做', NOT_JOINED: '未加入', UNKNOWN: '未知' };
@@ -38,16 +39,17 @@ export function buildDailyCard({ consultant_name, consultant_id, run, items, ite
     { tag: 'markdown', content: `**${consultant_name || '你好'}，今天建议优先处理 ${limit} 个职位**\n`
         + `从 ${run?.candidate_count ?? items.length} 个职位中筛选 · ${state === 'READY' ? '数据完整' : '数据不完整'} · 每项含依据、风险和下一步` },
   ];
-  const medals = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
   items.slice(0, limit).forEach((r, i) => {
     const j = r.job;
-    const hot = j.priority === 'HIGH' ? ' 🔥' : ''; // 重点高优（还做吗结构化，0007 起）
+    // F7：卡片内 emoji 一律去掉（1️⃣🔥👀⚠️✕ 混排最伤观感）。序号改用半角数字列表，
+    // 高优降级为文字标签 —— 语义保留，装饰去掉。
+    const hot = j.priority === 'HIGH' ? '（高优）' : ''; // 重点高优（还做吗结构化，0007 起）
     const opportunityUrl = buildBrainxDeepLink({ baseUrl, objectType: 'opportunity', objectRef: j.project_id });
     const launchUrl = consultant_id && quickLink(baseUrl, consultant_id, j.project_id, 'launch', now());
     // 排版纪律（docs/standards/CARD_TYPOGRAPHY.md）：标题行 → 元信息行 → 结论行 → 指标行，
-    // 空行分组后接最多 3 行标签行。🔥 放在标题的加粗之外，只作强调、不参与标题层级。
+    // 空行分组后接最多 3 行标签行。（高优）放在标题的加粗之外，只作强调、不参与标题层级。
     els.push({ tag: 'markdown', content:
-      `**${medals[i]} ${j.role}**${hot}\n`
+      `**${i + 1}. ${j.role}**${hot}\n`
       + `${j.company}${j.city ? ' · ' + j.city : ''} · ${REL_LABEL[j.relation] || j.relation}\n`
       + `综合 **${r.score}** 分 · 置信${{ HIGH: '高', MEDIUM: '中', LOW: '低' }[r.confidence_band]} · ${ACTION_LABEL[r.action]}\n`
       + `\`Fit ${dim(r, 'direction')} · Activity ${dim(r, 'activity')} · Evidence ${Math.round(r.evidence_coverage * 100)}\`\n`
@@ -60,12 +62,16 @@ export function buildDailyCard({ consultant_name, consultant_id, run, items, ite
     const primaryActions = launchUrl
       ? [btn('接单并建群', launchUrl, 'primary'), btn('查看职位', opportunityUrl)]
       : [btn('打开职位', opportunityUrl, 'primary')];
-    const secondaryActions = [btn('回放',
+    // F6：「回放」文案与 T1「回放 tab 已下线」口径冲突，改叫「查看评估详情」。
+    // 深链仍走 replay:<decision_id> —— 工作台按 brainxDecisionId 定位职位后打开
+    // judgement 面板（frontend/btex-frontend/app/workbench.tsx:274）；若改成
+    // opportunity:<project_id> 反而会打开 facts 视图，与「查看职位」完全重合。
+    const secondaryActions = [btn('查看评估详情',
       buildBrainxDeepLink({ baseUrl, objectType: 'replay', objectRef: r.decision_id }))];
     // 一键反馈（F2）：签名当日有效；未配置密钥时 quickLink 返 null，按钮不渲染
     const ignoreUrl = consultant_id && quickLink(baseUrl, consultant_id, j.project_id, 'ignore', now());
-    if (ignoreUrl) secondaryActions.push(btn('✕ 忽略', ignoreUrl, 'danger'));
-    // 辅助组只剩「回放」时，两行各一个按钮会显得松散，合并回第一行（合计 2 个，不触截断）。
+    if (ignoreUrl) secondaryActions.push(btn('忽略', ignoreUrl, 'danger'));
+    // 辅助组只剩「查看评估详情」时，两行各一个按钮会显得松散，合并回第一行（合计 2 个，不触截断）。
     if (primaryActions.length === 1 && secondaryActions.length === 1) {
       primaryActions.push(...secondaryActions.splice(0));
     }
@@ -74,11 +80,12 @@ export function buildDailyCard({ consultant_name, consultant_id, run, items, ite
     if (i < limit - 1) els.push({ tag: 'hr' });
   });
   const shared = items.filter((r) => r.job.relation === 'TEAM_SHARED').length;
-  if (shared) els.push({ tag: 'markdown', content: `👀 团队共享观察 ${shared} 个（打开工作台查看）` });
+  if (shared) els.push({ tag: 'markdown', content: `团队共享观察 ${shared} 个（打开工作台查看）` });
   els.push({ tag: 'hr' });
   els.push({ tag: 'markdown', content:
     `我的承接：跟进中 ${commitments.accepted_count} · 需处理 ${commitments.need_action_count}` });
-  els.push({ tag: 'action', actions: [btn('打开工作台', baseUrl, 'primary')] });
+  // F4：卡片尾部只有一个动作时占满整行、右侧留白 → 改为右对齐收口。
+  els.push(alignSoloAction({ tag: 'action', actions: [btn('打开工作台', baseUrl, 'primary')] }));
   els.push({ tag: 'note', elements: [{ tag: 'plain_text',
     content: `run: ${(run?.run_id || '').slice(0, 8)} · snapshot: ${(snapshot_id || '').slice(0, 8)} · ${run?.policy_version || ''}` }] });
 
@@ -102,7 +109,7 @@ export function buildSyncAlertCard(sync, { publicBaseUrl } = {}) {
     header: { template: TEMPLATE[state] || 'orange', title: { tag: 'plain_text', content: `Brain X · ${title}` } },
     elements: [
       { tag: 'markdown', content: `**${title}**\n${sub}\n读取 ${sync.rows_read}/${sync.rows_expected} 行` },
-      { tag: 'action', actions: [btn('打开工作台处理', `${baseUrl}?view=sync`, 'primary')] },
+      alignSoloAction({ tag: 'action', actions: [btn('打开工作台处理', `${baseUrl}?view=sync`, 'primary')] }),
     ] };
 }
 

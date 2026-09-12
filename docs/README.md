@@ -55,7 +55,7 @@
 | 前端审核、Storybook 确认、正式接入或发布状态 | [前端审核台账](frontend-reviews/README.md)、[内部 Storybook 组件库](storybook-component-library.md) |
 | 前端信息架构、页面流程或交互重构 | [前端交互架构](frontend-interaction-architecture.md)、[推荐队列与职位决策产品架构](recommendation-queue-product-architecture.md)、[BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md) |
 | 精选盘、推荐队列、推荐卡片或加入项目闭环 | [推荐队列与职位决策产品架构](recommendation-queue-product-architecture.md)、[前端审核台账](frontend-reviews/README.md) |
-| **改飞书群机器人卡片的文案、按钮或排版** | **[飞书群卡片文字排版规范](standards/CARD_TYPOGRAPHY.md)**（五级层级 + 6 条硬规则）、[卡片渲染回归门禁](2026-09-12-feishu-card-render-gate.md)、[前端审核台账](frontend-reviews/README.md) |
+| **改飞书群机器人卡片的文案、按钮或排版** | **[飞书群卡片文字排版规范](standards/CARD_TYPOGRAPHY.md)**（五级层级 + 7 条硬规则 + 卡片内不用 emoji）、[卡片渲染回归门禁](2026-09-12-feishu-card-render-gate.md)、[前端审核台账](frontend-reviews/README.md) |
 | 推荐算法、评分口径或学习排序规划 | [BrainX 岗位推荐算法与评分标准](BrainX岗位推荐算法与评分标准.md)、[推荐队列与职位决策产品架构](recommendation-queue-product-architecture.md) |
 | 前端重构排期、施工范围或阶段验收 | [前端真实数据重构施工清单](frontend-refactor-construction-checklist.md)、[前端交互架构](frontend-interaction-architecture.md) |
 | TTC 职位字段、筛选能力或字段变化 | [TTC 职位字段库](ttc-field-catalog.md)、[BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md) |
@@ -98,7 +98,7 @@
 - [D5 全链路灰测结论与演示脚本](2026-09-12-d5-e2e-greytest-and-demo-script.md)：接单→建群→找人→三按钮→RDS 入库的生产灰测证据、发现的问题与评审日演示纪律。
 - [0.9 冲刺核查处置方案（修正 + Reloop 变更）](2026-09-12-sprint-0.9-remediation-plan.md)：对核查报告的逐条复核修正、R1–R9 处置清单（含文件行号与验收）、Reloop 专项边界、原子 commit 切分与三项待拍板决策。
 - [飞书群卡片渲染回归门禁](2026-09-12-feishu-card-render-gate.md)：门禁原理、阻断判据、平台分档与存量缺陷登记口径；含首轮抓到的两处按钮截断缺陷及其修复、以及基线时间戳漂移的修复。新增任何卡片必须在此登记。
-- [飞书群卡片文字排版规范](standards/CARD_TYPOGRAPHY.md)：卡片文字的五级层级（标题/元信息/指标/标签/说明）与 6 条硬规则（块行数、连续标签行、动作块按钮数、冒号全角、标题位置）；写卡片文案前先读这一篇。
+- [飞书群卡片文字排版规范](standards/CARD_TYPOGRAPHY.md)：卡片文字的五级层级（标题/元信息/指标/标签/说明）与 7 条硬规则（块行数、连续标签行、动作块按钮数、孤行动作、冒号全角、标题位置），外加「卡片内不用 emoji」的替换口径；写卡片文案前先读这一篇。
 
 ### 设计与数据
 

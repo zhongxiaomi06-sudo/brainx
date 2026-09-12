@@ -18,15 +18,17 @@ import {
   selectRegularFiles,
   versionAtLeast,
 } from "../scripts/quality-gate/core.mjs";
-import { canonicalize } from "../scripts/quality-gate/card-render/run.mjs";
+import { canonicalize, parsePlatformList } from "../scripts/quality-gate/card-render/run.mjs";
 import { renderCard, renderElements } from "../scripts/quality-gate/card-render/renderer.mjs";
 import {
   checkTypography,
   MAX_ACTION_BUTTONS,
   MAX_BLOCK_LINES,
+  MIN_ACTION_BUTTONS,
 } from "../scripts/quality-gate/card-render/typography.mjs";
 import { buildScenarios } from "../scripts/quality-gate/card-render/scenarios.mjs";
 import { candidateShareCard } from "../src/agent-gateway/tools-candidate-actions.js";
+import { alignSoloAction } from "../src/card-layout.js";
 
 test("Node 22 测试入口显式启用 TypeScript 类型剥离", () => {
   const repoRoot = new URL("../", import.meta.url);
@@ -390,8 +392,18 @@ test("卡片渲染器能把真实构建出的候选人卡转成可截图 DOM", (
   const card = candidateShareCard("proj-1", "TTC-8842137", { name: "李燊", role: "影像算法产品经理" });
   const html = renderCard(card, { cardId: "candidate-share" });
   assert.match(html, /feishu-card/);
-  assert.match(html, /查看链接/);
-  assert.match(html, /一键加入人才库/);
+  assert.match(html, /查看 TTC 链接/);
+  assert.match(html, /加入人才库/);
+});
+
+test("卡片渲染门禁只在已人工确认基线的平台把「缺基线」当阻断", () => {
+  // CI 跑在 linux，而基线是在 macOS 上人工确认后提交的；若在 linux 上把缺基线当阻断，
+  // CI 会永久变红（像素比对在没基线的平台上本来就无从谈起）。
+  assert.ok(parsePlatformList(undefined).has("darwin"), "默认只认 darwin");
+  assert.deepEqual([...parsePlatformList("linux,darwin")].sort(), ["darwin", "linux"]);
+  assert.equal(parsePlatformList("linux").has("darwin"), false);
+  assert.deepEqual([...parsePlatformList("")], ["darwin"], "空值回落到默认");
+  assert.deepEqual([...parsePlatformList(" linux , darwin ")].sort(), ["darwin", "linux"], "两侧空白要去掉");
 });
 
 test("卡片存量缺陷登记必须带到期日，不得无限期挂账", () => {
@@ -443,6 +455,34 @@ test("排版纪律：标签行必须全角冒号，标题行必须位于块首",
     .map((item) => item.rule), ["label-colon-halfwidth"]);
   assert.deepEqual(checkTypography({ elements: [{ tag: "markdown", content: "元信息行\n**标题**\n正文" }] })
     .map((item) => item.rule), ["heading-not-first"]);
+});
+
+test("排版纪律：单按钮动作块判孤行，必须用 column_set 右对齐收口", () => {
+  const solo = { tag: "action", actions: Array.from({ length: MIN_ACTION_BUTTONS - 1 }, () => ({ tag: "button" })) };
+  const issues = checkTypography({ elements: [solo] });
+  assert.deepEqual(issues.map((item) => item.rule), ["action-row-solo"]);
+  assert.match(issues[0].detail, /alignSoloAction/);
+  // 两个按钮是正常下界，不应误报。
+  assert.deepEqual(checkTypography({
+    elements: [{ tag: "action", actions: [{ tag: "button" }, { tag: "button" }] }],
+  }), []);
+});
+
+test("孤行动作收口：alignSoloAction 只改写单按钮块，其余原样返回", () => {
+  const solo = { tag: "action", actions: [{ tag: "button", text: { content: "打开工作台" } }] };
+  const aside = alignSoloAction(solo);
+  assert.equal(aside.tag, "column_set", "孤行动作必须改写成 column_set");
+  assert.equal(aside.columns.length, 2, "左列留空、右列放按钮");
+  assert.deepEqual(aside.columns[0].elements[0].tag, "div", "左列占位，保证按钮落在行末");
+  assert.equal(aside.columns[1].elements[0], solo.actions[0], "按钮本体原样搬进右列，不做改写");
+
+  const pair = { tag: "action", actions: [{ tag: "button" }, { tag: "button" }] };
+  assert.equal(alignSoloAction(pair), pair, "多按钮行不需要收口");
+  const markdown = { tag: "markdown", content: "文案" };
+  assert.equal(alignSoloAction(markdown), markdown, "非动作元素必须原样返回");
+  assert.equal(alignSoloAction(null), null);
+  // 收口之后卡片本身必须是合规的（不能一边修 F4、一边触发别的规则）。
+  assert.deepEqual(checkTypography({ elements: [aside] }), []);
 });
 
 test("排版纪律：全部生产卡片样本零违规", () => {

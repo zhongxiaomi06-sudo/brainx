@@ -110,13 +110,20 @@ export function buildProjectLaunchCard(job, { publicBaseUrl, state = null } = {}
     { tag: 'button', type: 'primary', text: { tag: 'plain_text', content: '接单' },
       value: { text: acceptCommand } },
   ];
+  const workbenchButton = {
+    tag: 'button', type: 'default', text: { tag: 'plain_text', content: '打开职位工作台' },
+    multi_url: { url: detailUrl, pc_url: detailUrl, android_url: detailUrl, ios_url: detailUrl },
+  };
+  // F5：动作块从 3 段收到 2 段。飞书把每个 action 块渲染成独立一行，3 行会把
+  // 按钮层级拉平，看不出主次。现在一行是「找人方式」，另一行是「补充条件 + 工作台」。
   const elements = [
     { tag: 'markdown', content: `**${job.role}**\n${facts || '职位基础信息待补充'}\n\n`
       + `项目编号：${job.project_id}\n负责人：${job.consultant_name}` },
     { tag: 'markdown', content: accepted
       ? '**机器人已进入项目群，职位已接单**\n点按钮开始找人；也可以先在群里发送“找人条件：……”，再点「按条件找人」。'
       : '**机器人已进入项目群，该职位尚未接单**\n先点「接单」才能开始找人。机器人正在接入本群，如按钮暂无响应请稍候再点。' },
-    { tag: 'action', actions: accepted ? searchActions : acceptActions },
+    // 未接单时只有一个业务动作，与工作台并成一行，避免孤行（F4）。
+    { tag: 'action', actions: accepted ? searchActions : [...acceptActions, workbenchButton] },
   ];
   if (accepted) {
     elements.push({
@@ -126,12 +133,9 @@ export function buildProjectLaunchCard(job, { publicBaseUrl, state = null } = {}
     elements.push({ tag: 'action', actions: [
       { tag: 'button', type: 'primary', text: { tag: 'plain_text', content: '按条件找人' },
         value: { text: criteriaCommand } },
+      workbenchButton,
     ] });
   }
-  elements.push({ tag: 'action', actions: [{
-    tag: 'button', type: 'default', text: { tag: 'plain_text', content: '打开职位工作台' },
-    multi_url: { url: detailUrl, pc_url: detailUrl, android_url: detailUrl, ios_url: detailUrl },
-  }] });
   return {
     config: { wide_screen_mode: true },
     header: { template: 'blue', title: { tag: 'plain_text', content: `BrainTex 项目 · ${job.company}` } },

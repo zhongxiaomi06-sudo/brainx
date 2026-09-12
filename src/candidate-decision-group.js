@@ -80,11 +80,15 @@ export function contextCard(job, candidate, summary) {
       { tag: 'markdown', content: '**从原项目群迁移的上下文摘要**' },
       ...splitSections(summary).map((section) => ({ tag: 'markdown', content: section })),
       { tag: 'markdown', content: '**本群讨论目标**\n核实关键风险，并决定：继续评估、进入面试、准备 Offer 或不推进。' },
+      // F1 主次颠倒：primary 曾挂在「查看 TTC 人才」这个纯跳转上，真实业务动作
+      // （生成 / 更新 Offer 决策报告）反而是灰按钮。现在 primary 给「生成报告」，
+      // 跳转降为 default —— 顾问最先该点的是「让机器人产出报告」。
       { tag: 'action', actions: [
-        { tag: 'button', type: 'primary', text: { tag: 'plain_text', content: '查看 TTC 人才' },
-          multi_url: { url: ttcUrl, pc_url: ttcUrl, android_url: ttcUrl, ios_url: ttcUrl } },
-        { tag: 'button', text: { tag: 'plain_text', content: '生成报告' }, value: { text: generate } },
+        { tag: 'button', type: 'primary', text: { tag: 'plain_text', content: '生成报告' },
+          value: { text: generate } },
         { tag: 'button', text: { tag: 'plain_text', content: '更新报告' }, value: { text: update } },
+        { tag: 'button', text: { tag: 'plain_text', content: '查看 TTC 人才' },
+          multi_url: { url: ttcUrl, pc_url: ttcUrl, android_url: ttcUrl, ios_url: ttcUrl } },
       ] },
       { tag: 'note', elements: [{ tag: 'plain_text', content: '本群不展示联系方式或简历原文；有新讨论或电话纪要后也可发送 /report 更新报告。' }] },
     ] };

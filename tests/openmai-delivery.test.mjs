@@ -196,10 +196,13 @@ ${JSON.stringify({ candidates: [
   const rows = card.elements.filter((element) => element.tag === 'column_set');
   assert.equal(rows.length, 3, '一行表头加两行候选人');
   assert.equal(rows[0].columns[0].elements[0].text.content, '候选人 / 当前岗位');
-  assert.equal(rows[0].columns.length, 5, '「操作」列已移除，按钮不再挤在表格列里');
-  assert.equal(rows[0].columns.at(-1).elements[0].text.content, '匹配度');
+  assert.equal(rows[0].columns.length, 4, '「操作」列已移除；F8 再把「经验/城市」与「学历」并成「背景」');
+  assert.deepEqual(rows[0].columns.map((column) => column.elements[0].text.content),
+    ['候选人 / 当前岗位', '背景', '核心匹配', '匹配度']);
   assert.match(rows[1].columns[0].elements[0].text.content, /^1\. 张三/);
-  assert.match(rows[1].columns[3].elements[0].text.content, /91%/);
+  assert.equal(rows[1].columns[1].elements[0].text.content, '待核实',
+    '未提供经历字段时回退为「待核实」，而不是吐一句长文案');
+  assert.match(rows[1].columns[2].elements[0].text.content, /91%/);
   assert.doesNotMatch(JSON.stringify(card), /\|姓名\|详情\||不应把这段/);
   // 「重点关注」移出表格，收成表格下方的动作行；按钮带序号以对应表格行号。
   const focusActions = card.elements.filter((element) => element.tag === 'action'

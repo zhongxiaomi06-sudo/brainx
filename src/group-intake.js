@@ -17,6 +17,7 @@ import {
 import { currentState } from './engagement.js';
 import { jobVisibleTo } from './visibility.js';
 import { buildBrainxDeepLink, productionBaseUrl } from './brainx-deep-links.js';
+import { alignSoloAction } from './card-layout.js';
 
 const BINDING_PURPOSES = ['group_binding'];
 const DEFAULT_INTERVAL_MS = 10 * 60 * 1000;
@@ -74,11 +75,12 @@ export function buildGuidanceCard({ chatName, job, consultantName, publicBaseUrl
     elements: [
       { tag: 'markdown', content: `${consultantName ? `**${consultantName}**，` : ''}你已把群「${String(chatName || '').slice(0, 60) || '未命名群'}」绑定到 ${bound}，现在可以在群里点按钮找人了。` },
       { tag: 'markdown', content: '**如何拉群**\n在飞书任意群 → 群设置 → 群机器人 → 添加应用 → 选「BrainTex」。机器人进群后会自动弹「绑定职位」卡，选职位即可开始找人。' },
-      { tag: 'markdown', content: '⚠️ **不要拉太多群**\n每个群机器人都会处理消息、按职位找人，群太多会让消息过载、token 成本飙升。**只给当前在做的职位建群**，做完的群可移除机器人。' },
-      { tag: 'action', actions: [
+      { tag: 'markdown', content: '**不要拉太多群**\n每个群机器人都会处理消息、按职位找人，群太多会让消息过载、token 成本飙升。**只给当前在做的职位建群**，做完的群可移除机器人。' },
+      // F4：这张卡只有一个动作，右对齐收口。
+      alignSoloAction({ tag: 'action', actions: [
         { tag: 'button', type: 'default', text: { tag: 'plain_text', content: '打开工作台' },
           multi_url: { url: detailUrl, pc_url: detailUrl, android_url: detailUrl, ios_url: detailUrl } },
-      ] },
+      ] }),
     ],
   };
 }

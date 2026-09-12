@@ -18,6 +18,7 @@ import { commitmentDetails } from './commitment.js';
 import { pushCard } from './push.js';
 import { sendInteractiveCard } from './feishu-bot.js';
 import { buildBrainxDeepLink, productionBaseUrl } from './brainx-deep-links.js';
+import { alignSoloAction } from './card-layout.js';
 
 const REMINDER_KIND = 'PROJECT_REMINDER';
 const COOLDOWN_MS = 7 * 86400000;
@@ -100,11 +101,11 @@ export function buildProjectReminderCard(ctx, { publicBaseUrl } = {}) {
       + `**本轮目标**：${ctx.goal || '（未记录——直接在群里回复补充）'}\n${actionLine}` },
     { tag: 'markdown', content:
       `_目标或时间节点不准？直接在群里回复修正（例：目标改为…；时间改为…），我会更新记录。_` },
-    { tag: 'action', actions: [{
+    alignSoloAction({ tag: 'action', actions: [{
       tag: 'button', type: 'primary', text: { tag: 'plain_text', content: '打开职位工作台' },
       multi_url: (() => { const u = buildBrainxDeepLink({ baseUrl, objectType: 'opportunity', objectRef: ctx.project_id });
         return { url: u, pc_url: u, android_url: u, ios_url: u }; })(),
-    }] },
+    }] }),
     { tag: 'note', elements: [{ tag: 'plain_text',
       content: `项目轻量提醒 · ${jobLine} · 回复「暂停」暂不打扰` }] },
   ];

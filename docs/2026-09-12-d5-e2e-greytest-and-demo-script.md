@@ -16,12 +16,15 @@
 
 ## 二、灰测中发现并处理的问题
 
-1. **agent 接单不落 membership → 建群必报 PROJECT_MEMBERSHIP_REQUIRED**：已修代码（commit 1f6ffa5，接单幂等写 MY_JOB），回归测试补齐。
+0. **【演示必读】群内自然语言「把第 N 个候选人加入人才库」目前不可靠**：step-3.5-flash 不走「群名→daily_brief→job_id」解析，固执调用 bind_group_project 并虚报「全部接口权限错误」（审计实证它从未调用 shortlist/talent 工具）。根因之一是插件 prompt 注入被 `allowPromptInjection=false` 长期阻断（playbook 从未生效，本次已改 true 并同步模板），但 /reset + 新 prompt 后仍未纠正。**演示纪律：群内操作一律用卡片按钮（评委可点），自然语言只在私聊用明确公司/职位名（已验证：「帮我接 深圳思博威视 的智能影像产品经理」→ 接单建群全通）**。
+1. **agent 接单不落 membership → 建群必报 PROJECT_MEMBERSHIP_REQUIRED**：已修代码（commit 1f6ffa5，接单幂等写 MY_JOB），回归测试补齐；NL 私聊接单链路已复验。
 2. **测试群 scope senders 缺 mia**：数据修复补入（`agent_group_scopes` UPDATE，未改代码）。
-3. **OpenClaw 新群准入 CLI 失败**（OPENCLAW_COMMAND_FAILED）：手动完成准入（groupAllowFrom + groupSenderAllowFrom + requireMention=false）。根因疑为准入 runner 的环境变量缺失，**列赛后修复**。
-4. **无 @ 群消息被 mention 门静默拦截**：`groups.<chat>.requireMention=false` 配置已写入但运行态对文本消息未生效（带 @ 正常）。**卡片按钮走 dispatchSyntheticCommand 不受影响**，但建议赛后核查该配置语义。
+3. **OpenClaw 新群准入 CLI 失败**（OPENCLAW_COMMAND_FAILED）：根因 = 5 次串行 CLI（get/set×4+requireMention）≈25s 超过 runner 默认 20s 超时。已修：三个服务 env 文件追加 `BRAINX_OPENCLAW_TIMEOUT_MS=90000`（/etc/brainx/openclaw.env、/opt/brainx/.env、/etc/brainx/agent.env，不入库）。
+4. **无 @ 群消息被 mention 门静默拦截**：`groups.<chat>.requireMention=false` 配置已写入但运行态对文本消息未生效（带 @ 正常）。**卡片按钮走 dispatchSyntheticCommand 不受影响**，建议赛后核查该配置语义。
 5. **authorizeGroup 要求每群恰好 1 行 ACTIVE scope，但三个老群各 6 行**（每顾问一行）→ 这些群对所有人生效均失败。**系统性 bug，列赛后修复**；演示只用单测试群，不受影响。
-6. ECS 到 GitHub 网络偶发不通：git pull 首次超时，重试成功。部署如遇此情况直接重试。
+6. **launch 新建群在 openclaw 重启后收到「还没绑定职位」绑定卡**（specs/015 intake 误判，scope 实际存在）：展示层干扰，赛后修。
+7. **agent 接单后跳过「确认岗位」询问与紧接着的建群步骤**（playbook 未注入所致；注入已开启，待观察）：演示时私聊接单后需补一句「把群建起来」。
+8. ECS 到 GitHub 网络偶发不通：git pull 首次超时，重试成功。部署如遇此情况直接重试。
 
 ## 三、演示脚本（评审日）
 
@@ -30,7 +33,7 @@
 
 1. **一键接单**：工作台打开职位详情 → 点「一键接单」→ 10 秒内飞书群拉起 + 职位卡（或群里 @机器人「我要接这个职位」→ 自动接单建群）。
 2. **找人**：群内点「OpenMai 找人」（或接单自动触发）→ 3-5 分钟候选人总览卡回群。
-3. **三按钮**：总览卡点「重点关注」→ 群内出现三按钮候选人卡 → 点「初筛通过」（自动推标准人才卡）→ 点「一键加入人才库」（真实写入 RDS，回执带人才库编号）。
+3. **三按钮**：总览卡点「重点关注」→ 群内出现三按钮候选人卡 → 点「初筛通过」（自动推标准人才卡）→ 点「一键加入人才库」（真实写入 RDS，回执带人才库编号，灰测已产出 #395-#397）。**群内操作一律用按钮**——自然语言「把第 N 个候选人…」当前会被模型误判为未绑定（见第二节第 0 条）；自然语言只在私聊用明确公司/职位名（接单建群已验证）。
 4. **SuperMai 通道**：群内点「SuperMai 找人」→ 服务端公域搜索回群（已实测）。**不演示本地 GUI 猎聘抓取**（cookie 30 分钟、风控需本人现场，赛后处理）。
 5. **工作台联动**：详情页核心匹配要点 + 快捷跳转、OpenMai 顿号切分补充职位信息、画像编辑。
 

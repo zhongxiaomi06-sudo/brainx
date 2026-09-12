@@ -95,7 +95,7 @@
       "brainx-openclaw": {
         "enabled": true,
         "hooks": {
-          "allowPromptInjection": false
+          "allowPromptInjection": true
         }
       }
     }

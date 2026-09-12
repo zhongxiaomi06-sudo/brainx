@@ -1,5 +1,14 @@
 # Agent Commit 记录
 
+## 2026-09-12｜fix(openclaw): 启用插件 prompt 注入 + NL 全链路实测与演示纪律修订
+
+- 触发：自然语言全链路实测（mia 私聊「帮我接 深圳思博威视 的智能影像产品经理」→ 接单/建群/投递全通）暴露群内 NL「把第 N 个候选人加入人才库」必然失败——模型固执调用 bind_group_project 并虚报权限错误（审计实证其从未调用 shortlist/talent 工具）。
+- 根因一（已修）：插件 `before_prompt_build` 的 playbook 注入被 `allowPromptInjection=false` 长期阻断，prompt.js 整套流程纪律从未生效（此前按钮/接单能用全靠工具描述）。模板与生产配置同步改 true。
+- 根因二（未修，演示绕行）：step-3.5-flash 即便在 /reset + 新 prompt 下仍不做「群名→daily_brief→job_id」解析。演示纪律改为：群内一律按钮操作（marker/按钮链路已三度验证，余学庆 #397），NL 只在私聊用明确公司名。
+- 顺带修复：准入 CLI 超时根因定位为 5 次串行调用 ≈25s > 20s 默认超时，三个服务 env 追加 `BRAINX_OPENCLAW_TIMEOUT_MS=90000`（生产环境文件，不入库）；prompt.js 新增项目群 NL 职位解析纪律（commit e260ead）。
+- 文档：灰测结论第二节重写为 0-8 条（NL 风险置顶），演示脚本三按钮步骤补充按钮纪律。
+- 验证：`tests/openclaw-plugin.test.mjs` 8/8 通过；生产 openclaw 重启后注入阻断日志消失。
+
 ## 2026-09-12｜docs(sprint): D5 全链路灰测结论与演示脚本，specs/017 T11 勾选
 
 - 灰测（生产真实链路，mia 账号）全部通过：agent 接单 → 建群职位卡 → OpenMai 找人投递 → KEEP marker 触发初筛通过并自动推三按钮候选人卡 → TALENT_ADD marker 触发一键入库（RDS #395 李燊 / #396 黄俊凯，含幂等标记）→ SuperMai 服务端公域搜索。证据与演示脚本：[D5 灰测结论与演示脚本](2026-09-12-d5-e2e-greytest-and-demo-script.md)。

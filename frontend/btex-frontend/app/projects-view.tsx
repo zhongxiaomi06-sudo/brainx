@@ -113,7 +113,7 @@ export function ProjectsView({ projects, query, setQuery, focusedProjectId, open
   }, [focusedProjectId, projects]);
 
   return <div className="decision-home projects-home">
-    <Heading code="MY PROJECTS" title="我的项目" desc="按行动状态安排今天要推进的项目。" />
+    <Heading title="我的项目" desc="按行动状态安排今天要推进的项目。" />
     <section className="projects-summary">
       <div><span>{isFiltered ? "当前显示" : "项目总数"}</span><b>{isFiltered ? `${visible.length}/${projects.length}` : projects.length}</b><small>个真实项目归属</small></div>
       <p>需处理和逾期项目优先；状态、行动与截止时间均来自后端。</p>

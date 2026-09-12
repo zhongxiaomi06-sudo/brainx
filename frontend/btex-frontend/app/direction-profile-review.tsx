@@ -147,7 +147,7 @@ function ClassificationCard({ item, canCorrect, onCorrect }: { item: DirectionCl
 
 export function DirectionProfileReview({ data, onSaveKeywords, onSaveStructuredProfile, onCorrectClassification }: DirectionProfileReviewProps) {
   return <div className="direction-profile-review">
-    <header className="direction-page-heading"><div><span className="direction-kicker">DIRECTION PROFILE</span><h1>方向画像与职位分类</h1><p>先区分已经生效的数据，再审核结构化画像和分类证据的未来形态。</p></div><div><small>当前顾问</small><b>{data.consultant}</b></div></header>
+    <header className="direction-page-heading"><div><h1>方向画像与职位分类</h1><p>先区分已经生效的数据，再审核结构化画像和分类证据的未来形态。</p></div><div><small>当前顾问</small><b>{data.consultant}</b></div></header>
     <CurrentProfile data={data} onSaveKeywords={onSaveKeywords} />
     <StructuredProfile data={data} onSaveStructuredProfile={onSaveStructuredProfile} />
     <section className="direction-section">

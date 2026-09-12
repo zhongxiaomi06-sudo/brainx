@@ -3,11 +3,11 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import type { DirectSegmentOption } from "./workbench-model";
 
-export function Heading({ code, title, desc, action }: { code: string; title: React.ReactNode; desc: string; action?: React.ReactNode }) {
+// 统一页面标题格式：中文标题 + 一句中文描述，不再渲染英文眉标。
+export function Heading({ title, desc, action }: { title: React.ReactNode; desc: string; action?: React.ReactNode }) {
   return (
     <div className="headline">
       <div>
-        <span className="eyebrow">{code}</span>
         <h1>{title}</h1>
         <p>{desc}</p>
       </div>

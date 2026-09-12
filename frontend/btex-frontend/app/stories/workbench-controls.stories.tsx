@@ -97,7 +97,6 @@ export const HeadingAndSection: Story = {
   render: () => (
     <div className="storybook-stack">
       <Heading
-        code="TODAY / 今日建议"
         title="今天先做什么"
         desc="只展示有事实证据的优先事项。"
         action={<button className="btn primary">刷新推荐</button>}

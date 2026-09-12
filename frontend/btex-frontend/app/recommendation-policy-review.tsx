@@ -114,7 +114,7 @@ export function RecommendationPolicyReview({ data, onRequestPreview, onSave }: R
 
   return <div className="policy-review">
     <header className="policy-review-heading">
-      <div><span className="policy-kicker">RECOMMENDATION POLICY</span><h1>推荐策略</h1><p>先选择业务意图，再检查数据是否足够；权重不能绕过硬规则。</p></div>
+      <div><h1>推荐策略</h1><p>先选择业务意图，再检查数据是否足够；权重不能绕过硬规则。</p></div>
       <div className="policy-version"><small>当前后端策略</small><b>{data.policyVersion}</b><span>{data.profileLabel}</span></div>
     </header>
 

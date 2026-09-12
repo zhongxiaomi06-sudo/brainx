@@ -90,6 +90,20 @@ function displayCoverage(value: number | null) {
   return `${Math.round(value <= 1 ? value * 100 : value)}%`;
 }
 
+// 后端阶段枚举（src/job-extract/schema.js PIPELINE_STAGES）本地化；未知值原样展示。
+const stageLabels: Record<string, string> = {
+  SOURCING: "寻访",
+  SCREENING: "筛选",
+  INTERVIEW: "面试",
+  OFFER: "Offer",
+  ONBOARD: "入职",
+  CLOSED: "已关闭",
+};
+function displayStage(value: string | number | null | undefined) {
+  const raw = display(value);
+  return stageLabels[raw] ?? raw;
+}
+
 function DecisionPriorityBadge({ tier }: { tier: RecommendationDecisionTier }) {
   const meta = tierMeta[tier];
   return <span className={`recommendation-tier is-${tier.toLowerCase()}`} aria-label={`${meta.label}，${meta.signal}格信号`}>
@@ -134,9 +148,9 @@ function RecommendationCard({ item, onOpen, onAction }: {
         <div><dt>关系</dt><dd>{display(item.relation)}</dd></div>
         <div><dt>状态</dt><dd>{display(item.activeState)}</dd></div>
         <div><dt>HC</dt><dd>{display(item.hc)}</dd></div>
-        <div><dt>阶段</dt><dd>{display(item.currentStage)}</dd></div>
+        <div><dt>阶段</dt><dd>{displayStage(item.currentStage)}</dd></div>
         <div><dt>最近活动</dt><dd>{item.recentActivity ? `${item.recentActivity.label}${item.recentActivity.occurredAt ? ` · ${displayDate(item.recentActivity.occurredAt)}` : ""}` : "待确认"}</dd></div>
-        <div><dt>Pipeline</dt><dd>{display(item.pipeline)}</dd></div>
+        <div><dt>进展</dt><dd>{display(item.pipeline)}</dd></div>
       </dl>
     </div>
 

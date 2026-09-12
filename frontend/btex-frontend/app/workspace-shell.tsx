@@ -121,7 +121,7 @@ export function WorkspaceShell({
       {assistantOpen && assistantPlacement === "shell" && (
         <aside className="workspace-assistant" aria-label="BrainX 助手面板">
           <header>
-            <div><small>CONTEXT ASSISTANT</small><b>BrainX 助手</b></div>
+            <div><b>BrainX 助手</b></div>
             <button type="button" onClick={onAssistantToggle} aria-label="关闭 BrainX 助手"><X /></button>
           </header>
           {assistant}

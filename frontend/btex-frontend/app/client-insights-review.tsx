@@ -65,7 +65,7 @@ export function ClientInsightsReview({ clients, onOpenJobs }: ClientInsightsRevi
 
   return <div className="client-insights-review">
     <header className="client-page-heading">
-      <div><span>CLIENT FACTS</span><h1>客户洞察</h1><p>按客户聚合当前可见职位事实，不推断合作意愿、转化率或经营优先级。</p></div>
+      <div><h1>客户洞察</h1><p>按客户聚合当前可见职位事实，不推断合作意愿、转化率或经营优先级。</p></div>
       <dl><div><dt>客户</dt><dd>{totals.clients}</dd></div><div><dt>可见职位</dt><dd>{totals.jobs}</dd></div><div><dt>活跃职位</dt><dd>{totals.active}</dd></div></dl>
     </header>
     <div className="client-honesty"><ShieldAlert /><p><b>事实边界：</b>当前接口没有反馈速度、推荐转化、历史入职、招聘意愿和客户评分；最近活动仅代表职位快照时间，不等同于客户反馈。</p></div>
@@ -84,7 +84,7 @@ export function ClientInsightsReview({ clients, onOpenJobs }: ClientInsightsRevi
         </tr>)}
       </tbody></table>{rendered.length < visible.length && <div className="client-table-more"><span>已显示 {rendered.length} / {visible.length}</span><button type="button" onClick={() => setRowLimit(current => current + CLIENT_BATCH_SIZE)}>继续加载</button></div>}{!visible.length && <div className="client-empty"><Search /><b>没有符合条件的客户</b><p>请清除搜索词或活跃职位筛选。</p></div>}</div>
     </section>
-    {selected && <><button className="client-detail-backdrop" type="button" aria-label="关闭客户事实" onClick={() => setSelected(null)} /><aside className="client-detail" aria-label={`${selected.company} 客户事实`}><header><div><span>CLIENT FACT</span><h2>{selected.company}</h2><p>{selected.companyType || "客户类型未标注"}</p></div><button type="button" aria-label="关闭客户事实" onClick={() => setSelected(null)}><X /></button></header><dl>
+    {selected && <><button className="client-detail-backdrop" type="button" aria-label="关闭客户事实" onClick={() => setSelected(null)} /><aside className="client-detail" aria-label={`${selected.company} 客户事实`}><header><div><h2>{selected.company}</h2><p>{selected.companyType || "客户类型未标注"}</p></div><button type="button" aria-label="关闭客户事实" onClick={() => setSelected(null)}><X /></button></header><dl>
       <div><dt>职位总数</dt><dd>{selected.jobCount}</dd></div><div><dt>活跃职位</dt><dd>{selected.activeJobs}</dd></div><div><dt>已知 HC</dt><dd>{selected.knownHc ?? "—"}</dd></div><div><dt>最近职位快照</dt><dd>{displayDate(selected.lastActivity)}</dd></div>
     </dl>
       <section><h3>顾问关系</h3><FactTags values={selected.relations} labels={relationLabels} /></section>

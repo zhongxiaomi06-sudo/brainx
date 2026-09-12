@@ -210,7 +210,7 @@ export function TodayDecisionQueue(props: TodayDecisionQueueProps) {
           }} />
       </section>}
       <details className="saved-picks"><summary><span>已收藏</span>
-        <small>{trayJobs.length ? `已收藏 ${trayJobs.length} 个职位` : "从上方列表收藏职位，稍后逐个判断"}</small>
+        <small>{trayJobs.length ? `${trayJobs.length} 个职位` : "从上方列表收藏，稍后逐个判断"}</small>
         <ChevronDown/></summary><PickTray trayJobs={trayJobs} featuredJobs={visiblePending.slice(0, 4)}
           allJobs={allJobs} folderMode={folderMode} onFolderMode={onFolderMode} folders={folders}
           onRemoveTray={onRemoveTray} onToggleTray={onToggleTray}

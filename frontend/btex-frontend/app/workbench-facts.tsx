@@ -187,7 +187,7 @@ export function ManualFactSection({ job, mode, onUpdated, notify, editRequest = 
                 setValues((v) => ({ ...v, current_stage: e.target.value }));
                 setClearFields((v) => v.filter((f) => f !== "current_stage"));
               }}
-              placeholder="例如：INTERVIEW / OFFER"
+              placeholder="例如：面试 / Offer"
             />
           </label>
           <label>

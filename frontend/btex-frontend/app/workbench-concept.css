@@ -40,13 +40,9 @@
    approved product surface: cool white, a quiet rail, horizontal job rows,
    and a first-class assistant workspace.
    ─────────────────────────────────────────────────────────────────────── */
+/* 注意：这里不再覆写 --blue/--green/--mint 等共享令牌（曾把全局按钮色改回亮薄荷）。
+   概念层配色一律走 --concept-* 令牌；共享令牌以 globals/workbench-layout 为准。 */
 :root{
-  --blue:#2fd3a7;
-  --green:#2fd3a7;
-  --cyan:#2fd3a7;
-  --mint:#e7f9f3;
-  --mint-soft:#f4fcf9;
-  --mint-ink:#167560;
   --concept-bg:#f3f6f6;
   --concept-surface:#ffffff;
   --concept-ink:#17231f;

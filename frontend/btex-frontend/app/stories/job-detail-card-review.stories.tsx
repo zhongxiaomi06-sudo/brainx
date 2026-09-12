@@ -115,9 +115,6 @@ function EntryHarness({ mode, initialJob = completeJob }: { mode: "today" | "all
   return (
     <div style={{ minHeight: "100vh", padding: 48, background: "#f2f5f3", fontFamily: "Inter, PingFang SC, sans-serif" }}>
       <div style={{ maxWidth: 940, margin: "0 auto" }}>
-        <small style={{ color: "#17856f", fontWeight: 800, letterSpacing: ".12em" }}>
-          {mode === "today" ? "TODAY DECISION" : "ALL POSITIONS"}
-        </small>
         <h1 style={{ margin: "10px 0 24px", fontSize: 28 }}>
           {mode === "today" ? "精选盘" : "全部职位"}
         </h1>
@@ -213,7 +210,7 @@ export const AllPositionsEntry: Story = {
     await expect(dialog).toBeInTheDocument();
     await expect(initialSize.width).toBeGreaterThanOrEqual(900);
     await expect(initialSize.height).toBeGreaterThanOrEqual(560);
-    await expect(canvas.getByText("TTC CRM 职位快照")).toBeInTheDocument();
+    await expect(canvas.getByText("来源快照")).toBeInTheDocument();
     await expect(canvas.getByText("备注与职位描述")).toBeInTheDocument();
     for (const tab of ["判断", "跟进与结果", "决策轨迹", "职位事实"]) {
       await userEvent.click(canvas.getByRole("button", { name: tab }));

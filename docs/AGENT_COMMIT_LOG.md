@@ -1,5 +1,17 @@
 # Agent Commit 记录
 
+## 2026-09-12｜fix(frontend): 视觉规范统一——令牌收敛/对比度/标题格式/术语本地化
+
+- 触发：用户要求按当日前端审计报告（`outputs/2026-09-12-frontend-audit/index.html`）的五个结论共同修复，今天修完、统一格式。
+- **令牌收敛**（三类系统问题的根因）：`globals.css` 与 `workbench-layout.css` 的 `--blue/--green` 统一为深绿 `#176B58`（文字/按钮，对比度约 7:1），亮薄荷 `#2FD3A7` 仅作装饰走 `--accent`；删除 `workbench-concept.css` 对共享令牌的全局覆写（它曾把生效色改回亮薄荷）；补齐 `--font-mono`、`--body-cn` 定义；`.tag.green/.tag.blue` 合并。修复后 `.btn.primary` 默认即深绿，hover 更深（`--mint-ink #125445`），顺序转正。
+- **标题格式统一**：删除全站英文眉标层（MY PROJECTS / CLIENT FACTS / SETTINGS / TTC POSITION FACT / RECOMMENDATION POLICY / DIRECTION PROFILE / PICK FOLDERS / MY PICK TRAY / BRAINX ASSISTANT / CONTEXT ASSISTANT / CLIENT FACT / TTC JOB FACTS 及 story 内 TODAY DECISION 等），统一为「中文标题 + 一句中文描述」；`Heading` 组件移除 `code` 参数及全部调用点。
+- **术语本地化**：推荐队列卡片 `Pipeline`→`进展`；阶段枚举按 `src/job-extract/schema.js#PIPELINE_STAGES` 映射（寻访/筛选/面试/Offer/入职/已关闭）；`TTC CRM 职位快照`→`来源快照`；pipeline 标签补 screening/closed；事实录入占位符改中文。
+- **字号**：推荐队列 V2 微标签 8px→11px、值/按钮/分页 10px→12px。
+- **死代码清理**：删除不可达的假数据「动态预警」页（Alerts）与假「判断依据」抽屉（虚构置信度 91%、固定评分条），`Page` 类型移除 `alerts` 成员；`workbench.tsx` 499→495 行（贴边文件净减）。机会区分组眉标改中文「已加入项目 / 未加入项目」，避开测试禁用的旧「接单」口径；助手「正在查:{tool}…」改「正在查询相关资料…」。
+- 验证：`tsc --noEmit` 0 错误；`npm test`（btex-frontend）44/44；`storybook:test` 85/85；`storybook:build` 成功；计算样式实测 `.btn.primary = rgb(23,107,88)`，Storybook 截图复核对比度/无眉标/本地化/字号。仓库级 `verify:quick` 因 kimi-code-cli 遗留的未提交删除（`.agents` 等 23 处）无法全绿，属环境态非本次改动，已按惯例留证。
+- 文档：新增[视觉规范统一复核](frontend-reviews/2026-09-12-visual-typography-unification.md)，同步[前端审核台账](frontend-reviews/README.md)、[施工清单](frontend-refactor-construction-checklist.md)（新增 M 阶段）、[Storybook 组件库](storybook-component-library.md)（消除「浅绿强调文字对比度不足」存量风险段落）。
+- 仓库外同步修复（不在本仓库提交链路）：BrainTex 静态站（`~/Downloads/braintex/static`：品牌收敛 BrainX、壳页空态引导+重试、相对路径、tab 去蓝、「调权/客户360/我的承接」改人话）；Reloop 网页（`~/Downloads/Reloop-cloud-consolidated`：`api.ts` 错误响应 HTML 检测不再原文渲染、中文标题负字距修正、`webapp/` 已重建，tsc 0 错误、28/28 通过）。
+
 ## 2026-09-12｜chore(cleanup): 清理无用产物与残留项，移除失效的 brainx 子模块引用
 
 - 触发：用户要求「检查当前的文件的不必要的项目，进行完全的清理」。按协作准则先做只读审计，风险项单独确认后再动手，全程不 `rm`。

@@ -104,7 +104,7 @@ export function Rules({ notify, mode, policy, keywords, note, onRefresh, onProfi
   };
   const total = Object.values(weights).reduce((sum, value) => sum + value, 0);
   return <>
-    <Heading code="POLICY / 六维权重" title="判断规则" desc="调整软权重，不会绕过 HC、关闭状态、项目归属或数据冲突等硬规则。" action={<div className={`tag ${customized ? "orange" : "blue"}`}>{customized ? "自定义权重" : "基线权重"}</div>}/>
+    <Heading title="判断规则" desc="调整软权重，不会绕过 HC、关闭状态、项目归属或数据冲突等硬规则。" action={<div className={`tag ${customized ? "orange" : "blue"}`}>{customized ? "自定义权重" : "基线权重"}</div>}/>
     <section className="card section"><div className="card-head"><h2>六维权重</h2><span>Policy {policy || "—"} · 合计 {total}%（保存时自动归一）</span></div>
       <div className="card-body strategy-rules">
         <div className="preference-presets">{PRESETS.map((preset) => <button className="btn quiet" type="button" key={preset.label} onClick={() => setWeights({ ...preset.weights })}>{preset.label}</button>)}<button className="btn quiet" type="button" onClick={() => setAdvisorOpen((open) => !open)}>AI 建议</button></div>

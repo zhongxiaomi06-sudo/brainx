@@ -219,7 +219,7 @@ export function TtcJobsTable({
     <section className="ttc-jobs-table" ref={root}>
       {review && <div className="ttc-jobs-table-notice"><b>审核预览</b><span>示例已脱敏，字段形状与 TTC 职位库一致；正式工作台尚未接入。</span></div>}
       <header className="ttc-jobs-table-heading">
-        <div><span>TTC JOB FACTS</span><h2>全部职位</h2><p>只展示可以从职位源核验的核心事实</p></div>
+        <div><h2>全部职位</h2><p>只展示可以从职位源核验的核心事实</p></div>
         <strong>{visibleRows.length} / {rows.length}</strong>
       </header>
       <div className="ttc-jobs-table-toolbar">

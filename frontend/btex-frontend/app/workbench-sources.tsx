@@ -107,7 +107,7 @@ function TtcSourceCard({ notify }: { notify: Notify }) {
 }
 
 function Sources({ notify }: { notify: Notify }) {
-  return <><Heading code="DATA CONNECTIONS" title="数据连接" desc="只展示已经接入真实接口的数据源；其他设想不进入正式页面。" /><div className="source-grid">
+  return <><Heading title="数据连接" desc="只展示已经接入真实接口的数据源；其他设想不进入正式页面。" /><div className="source-grid">
     <TalentBackendCard />
     <TtcSourceCard notify={notify} />
   </div></>;

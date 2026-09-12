@@ -98,11 +98,13 @@ const actionLabels = {
 
 const pipelineLabels: Record<string, string> = {
   sourcing: "寻访",
+  screening: "筛选",
   recommendation: "推荐",
   recommended: "推荐",
   interview: "面试",
   offer: "Offer",
   onboard: "入职",
+  closed: "已关闭",
 };
 
 function displayDate(value: string | null | undefined) {
@@ -247,7 +249,6 @@ export function JobDetailCard({
         <header className="job-detail-review-header">
           <span className="job-detail-review-mark" aria-hidden="true">{job.company.trim().slice(0, 1) || "?"}</span>
           <div>
-            <span className="job-detail-review-eyebrow">TTC POSITION FACT</span>
             <h2 id={`job-detail-title-${job.projectId}`}>{job.role || "职位待确认"}</h2>
             <p>{job.company || "公司待确认"}</p>
           </div>
@@ -283,7 +284,7 @@ export function JobDetailCard({
 
           <section className="job-detail-review-source">
             <Database />
-            <span><b>TTC CRM 职位快照</b><small>最近同步 {displayDate(job.capturedAt)} · 缺失字段保持待确认</small></span>
+            <span><b>来源快照</b><small>最近同步 {displayDate(job.capturedAt)} · 缺失字段保持待确认</small></span>
             {onOpenSource && <button type="button" onClick={() => onOpenSource(job.projectId)}>查看来源<ExternalLink /></button>}
           </section>
           </> : detailContent || (effectiveTab === "judgement" ? <JudgementContent job={job} recommendation={recommendation} onOpenSource={onOpenSource} onOpenClient={onOpenClient} onOpenCockpit={onOpenCockpit} /> : effectiveTab === "engagement" ? <section className="job-detail-review-section">

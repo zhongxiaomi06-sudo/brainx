@@ -118,7 +118,6 @@ export function PickTray({
       <section className="pick-tray folder-mode" aria-label="职位文件夹">
         <div className="pick-tray-head">
           <div className="pick-tray-title">
-            <span className="decision-zone-kicker">PICK FOLDERS</span>
             <b>文件夹</b>
           </div>
           <button className="btn quiet" onClick={onFolderMode}>
@@ -173,7 +172,6 @@ export function PickTray({
       <div className="pick-tray-head">
         <div className="pick-tray-title">
           <b>已收藏</b>
-          <span className="decision-zone-kicker">MY PICK TRAY</span>
           <em>{trayJobs.length ? `${trayJobs.length} 已收藏` : "推荐预览"}</em>
         </div>
         <div className="pick-tray-actions">

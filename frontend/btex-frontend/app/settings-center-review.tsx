@@ -160,7 +160,7 @@ export function SettingsCenterReview({ data, initialSection = "profile", review 
       <nav aria-label="设置分组">{visibleGroups.map(group => <section key={group.label}><h2>{group.label}</h2>{group.items.map(({ id, label, icon: Icon }) => <button key={id} type="button" className={active === id ? "active" : ""} aria-current={active === id ? "page" : undefined} onClick={() => setActive(id)}><Icon /><span>{label}</span></button>)}</section>)}</nav>
       <div className="settings-sidebar-account"><span>{data.profile.displayName.trim().slice(0, 1) || "M"}</span><div><b>{data.profile.displayName}</b><small>{data.profile.consultantId}</small></div></div>
     </aside>
-    <main className="settings-main"><header><span className="settings-eyebrow">SETTINGS</span><h1>{copy.title}</h1><p>{copy.description}</p></header><div className="settings-section-content">
+    <main className="settings-main"><header><h1>{copy.title}</h1><p>{copy.description}</p></header><div className="settings-section-content">
       {active === "profile" && <ProfilePanel {...props} />}
       {active === "model" && <PersonalModelPanel />}
       {active === "direction" && <DirectionPanel {...props} />}

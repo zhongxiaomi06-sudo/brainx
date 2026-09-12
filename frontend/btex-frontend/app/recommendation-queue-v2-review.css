@@ -17,7 +17,7 @@
   border-bottom: 1px solid #dfe5e2;
 }
 .recommendation-v2-summary h2 { margin: 0; font-size: 21px; letter-spacing: -.035em; }
-.recommendation-v2-summary p { display: flex; gap: 18px; margin: 0; color: #7b8581; font-size: 11px; }
+.recommendation-v2-summary p { display: flex; gap: 18px; margin: 0; color: #7b8581; font-size: 12px; }
 .recommendation-v2-summary p span { white-space: nowrap; }
 .recommendation-v2-summary p b { color: #3c4945; font-weight: 650; }
 
@@ -35,7 +35,7 @@
 .recommendation-v2-new-run > svg,
 .recommendation-v2-page-error > svg { width: 16px; color: #177d68; }
 .recommendation-v2-new-run span,
-.recommendation-v2-page-error span { display: grid; gap: 1px; font-size: 11px; }
+.recommendation-v2-page-error span { display: grid; gap: 1px; font-size: 12px; }
 .recommendation-v2-new-run button,
 .recommendation-v2-page-error button {
   margin-left: auto;
@@ -107,7 +107,7 @@
   flex-wrap: wrap;
   margin: 3px 0 0;
   color: #74807c;
-  font-size: 10px;
+  font-size: 12px;
 }
 .recommendation-v2-identity p svg { width: 11px; height: 11px; }
 .recommendation-v2-identity p span { display: inline-flex; align-items: center; gap: 3px; margin-left: 3px; }
@@ -119,7 +119,7 @@
   padding: 4px 7px;
   border: 1px solid transparent;
   border-radius: 999px;
-  font-size: 9px;
+  font-size: 11px;
   line-height: 1;
   white-space: nowrap;
 }
@@ -154,7 +154,7 @@
 .recommendation-v2-scores dt {
   margin-bottom: 2px;
   color: #8b9692;
-  font-size: 8px;
+  font-size: 11px;
   font-weight: 650;
   letter-spacing: .04em;
 }
@@ -179,7 +179,7 @@
   display: block;
   margin-bottom: 2px;
   color: #949d99;
-  font-size: 8px;
+  font-size: 11px;
   font-weight: 650;
   letter-spacing: .05em;
   text-transform: uppercase;
@@ -188,7 +188,7 @@
   margin: 0;
   overflow: hidden;
   color: #36433f;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 620;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -208,13 +208,13 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  min-height: 29px;
+  min-height: 32px;
   padding: 5px 10px;
   border: 1px solid #d8e0dd;
   border-radius: 7px;
   background: #fff;
   color: #41534d;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 650;
   cursor: pointer;
 }
@@ -224,7 +224,7 @@
 .recommendation-v2-actions button.quiet { border-color: transparent; color: #858f8b; }
 .recommendation-v2-actions button:disabled { cursor: wait; opacity: .55; }
 .recommendation-v2-actions svg { width: 12px; height: 12px; }
-.recommendation-v2-feedback { margin: 0 auto 0 0; font-size: 10px; }
+.recommendation-v2-feedback { margin: 0 auto 0 0; font-size: 12px; }
 .recommendation-v2-feedback.is-error { color: #ac4e43; }
 .spin { animation: recommendation-v2-spin .8s linear infinite; }
 
@@ -236,7 +236,7 @@
   padding: 10px 12px;
   border-top: 1px solid #dfe5e2;
   color: #77827e;
-  font-size: 10px;
+  font-size: 12px;
 }
 .recommendation-v2-pagination b { color: #46544f; }
 .recommendation-v2-pagination > div { display: flex; justify-content: flex-end; gap: 6px; }

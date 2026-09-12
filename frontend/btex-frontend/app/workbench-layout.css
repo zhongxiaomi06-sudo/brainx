@@ -4,9 +4,9 @@
    ═══════════════════════════════════════════════════════════════════ */
 :root{
   --bg:#f5faf8;--ink:#1c2b26;--muted:#71807a;--line:rgba(28,43,38,.08);
-  --blue:#2FD3A7;--green:#2FD3A7;--cyan:#2FD3A7;--amber:#b98a2e;--orange:#c56a24;--red:#b4534a;
+  --blue:#176B58;--green:#176B58;--cyan:#2FD3A7;--accent:#2FD3A7;--amber:#b98a2e;--orange:#c56a24;--red:#b4534a;
   --panel:#ffffff;--soft:rgba(47,211,167,.10);color-scheme:light;
-  --mint:#DDF8EF;--mint-soft:#EFFBF7;--mint-ink:#176B58;--sage:#edf2f1;
+  --mint:#E5F5F0;--mint-soft:#F5FBF8;--mint-ink:#125445;--sage:#edf2f1;
   --font-display:"PingFang SC","PingFang TC","Noto Sans CJK SC","Microsoft YaHei","Helvetica Neue",Arial,sans-serif;
   --surface-shadow:0 1px 2px rgba(21,31,36,.025),0 8px 22px rgba(21,31,36,.045),0 18px 40px rgba(21,31,36,.025);
   --surface-shadow-hover:0 2px 4px rgba(21,31,36,.03),0 12px 28px rgba(21,31,36,.06),0 20px 42px rgba(21,31,36,.03);

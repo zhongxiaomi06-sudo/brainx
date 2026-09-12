@@ -158,7 +158,7 @@ export function DecisionZone({
           <h2>
             {title}
             <span className="decision-zone-kicker">
-              {tone === "accepted" ? "TODAY'S COMMITMENTS" : "NOT YET ACCEPTED"}
+              {tone === "accepted" ? "已加入项目" : "未加入项目"}
             </span>
           </h2>
         </div>

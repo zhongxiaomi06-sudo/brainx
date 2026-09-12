@@ -92,6 +92,23 @@ test('Feishu is websocket-only, allowlisted, and mention-gated in groups', () =>
   assert.equal(feishu.groups, undefined);
 });
 
+test('plugin package ships every locally imported module', async () => {
+  // 2026-09-13 生产实证：files[] 漏掉 candidate-table.js，npm pack 不含它，
+  // --apply 后插件加载失败（Cannot find module），全部 brainx_* 工具注销、机器人只会报错。
+  const pkg = await readJson('plugins/brainx-openclaw/package.json');
+  const shipped = new Set(pkg.files);
+  const sources = [...shipped].filter((name) => name.endsWith('.js'));
+  assert.ok(sources.length > 0, 'files[] 里应至少有一个 js 源文件');
+  for (const name of sources) {
+    const code = await readFile(new URL(`plugins/brainx-openclaw/${name}`, root), 'utf8');
+    for (const match of code.matchAll(/from '(\.[^']+)'|require\('(\.[^']+)'\)/g)) {
+      const specifier = match[1] || match[2];
+      assert.ok(shipped.has(specifier.replace(/^\.\//, '')),
+        `${name} 引用了 ${specifier}，但 package.json files[] 未包含，npm pack 会丢文件`);
+    }
+  }
+});
+
 test('systemd units keep internal services on one host and load secrets from protected files', async () => {
   const names = ['brainx-agent-gateway', 'brainx-worker', 'brainx-integration-worker', 'openclaw-brainx'];
   for (const name of names) {
@@ -176,7 +193,7 @@ test('Agent env template uses the exact variable names consumed by runtime', asy
 
 test('worker has a separate least-DML environment and systemd does not reuse Agent credentials', async () => {
   const template = await readFile(new URL('deploy/openclaw/brainx-worker.env.example', root), 'utf8');
-  assert.match(template, /^BRAINX_DB=\/opt\/brainx\/data\/brainx\.sqlite$/m);
+  assert.match(template, /^BRAINX_DB=\/opt\/brainx\/data\/brainx\.db$/m);
   assert.match(template, /^BRAINX_BASE_URL=https:\/\//m);
   assert.match(template, /^BRAINX_MYSQL_USER=brainx_worker_runtime$/m);
   assert.match(template, /^BRAINX_RELOOP_SYNC_ENABLED=1$/m);

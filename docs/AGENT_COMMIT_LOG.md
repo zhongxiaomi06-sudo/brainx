@@ -1,5 +1,14 @@
 # Agent Commit 记录
 
+## 2026-09-13｜fix(deploy): 插件包补齐 candidate-table.js——修复 --apply 后插件加载失败、工具全灭
+
+- 事故经过（承接 e7bb9d0 条目）：预检修复并重启后，机器人能收到消息但全部回复「Something went wrong」。openclaw 日志显示插件加载失败：`Cannot find module './candidate-table.js'`（response-card.js 引用），导致 27 个 brainx_* 工具全部注销、agent 无工具可用。根因：`plugins/brainx-openclaw/package.json` 的 npm `files[]` 白名单从未包含 candidate-table.js（9/9 引入该文件时漏加），`install.sh --apply` 用 `npm pack` 打包时丢弃它；9/12 12:02 的 --apply 距今插件目录仍是旧完整副本，本次（91a6f72 后首次）--apply 重装才暴露。
+- 修复：`files[]` 补 `candidate-table.js`，插件版本 1.4.3→1.4.4 强制重装生效。
+- 防回归：`openclaw-production-config.test.mjs` 新增「plugin package ships every locally imported module」——扫描插件全部 js 源文件的相对 import，任一未被 `files[]` 覆盖即红（对本次事故反向验证：修复前必红）。
+- 附带对齐（同事故发现的配置漂移）：两份 env 模板 `BRAINX_DB` 由 `brainx.sqlite` 改为 `brainx.db`——生产实际账本自 9/12 15:50 起为 `brainx.db`（gateway 审计/项目/投递全在其中，`brainx.sqlite` 为空库，worker 日志自证「与 API 同库」），预检又强制 agent/worker 两文件一致；同步修订部署手册 §7.1 的过期值。
+- 验证：`openclaw-production-config` + `feishu-bot-send` 18/18 通过。
+- 服务器配套（无密钥外泄）：`/etc/brainx/worker.env` BRAINX_DB 已改 `brainx.db` 并补 BASE_URL/APP_ID/SECRET（值从 feishu-bot.env 服务器本地复制），`openclaw.env` 补 BASE_URL，`agent.env` 补 CREDENTIALS_FROM_OPENCLAW=1 与 OPENCLAW_CONFIG_PATH；原件备份于 `/etc/brainx/backup-20260913/`。部署后需重跑 `install.sh --apply` 重装插件。
+
 ## 2026-09-13｜fix(feishu): 凭证读取兼容生产 openclaw.json accounts 形态——修复预检升级后 openclaw 宕机
 
 - 事故经过：`df78fc7` 部署重跑 `install.sh --apply`（91a6f72 后首次），新 unit 的 ExecStartPre 预检（02a24fe 引入）按现行规则校验三份 env 文件失败，`openclaw-brainx` 进入失败循环，机器人下线。预检指出的真实配置漂移：① `worker.env` BRAINX_DB 指向 9/4 遗留的 `brainx.sqlite`（活跃库实为 `brainx.db`，worker 日志自证「与 API 同库」）；② `worker.env` 缺 BRAINX_BASE_URL/FEISHU_APP_ID/SECRET；③ `openclaw.env` 缺 BRAINX_BASE_URL；④ `agent.env` 缺 BRAINX_FEISHU_CREDENTIALS_FROM_OPENCLAW/BRAINX_OPENCLAW_CONFIG_PATH。

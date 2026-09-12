@@ -168,7 +168,7 @@ sudo deploy/openclaw/install.sh --apply
 | `BRAINX_AGENT_AUDIT_KEY` | 第三个独立随机值 |
 | `BRAINX_AGENT_FEISHU_APP_KEYS_JSON` | account 到独立绑定键的 JSON；键名必须含 `mia` |
 | `BRAINX_AGENT_ADMIN_ID` / `ALLOWLIST` | 经确认的管理员操作员 ID |
-| `BRAINX_DB` | `/opt/brainx/data/brainx.sqlite` |
+| `BRAINX_DB` | `/opt/brainx/data/brainx.db`（生产实际账本；worker 必须用同一路径，预检强制一致） |
 | `BRAINX_MYSQL_*` | `brainx_talent` 只读账号，仅 SELECT，SSL=1 |
 
 ### 7.2 `/etc/brainx/worker.env`

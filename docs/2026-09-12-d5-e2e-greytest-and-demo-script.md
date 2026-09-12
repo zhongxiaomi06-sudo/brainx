@@ -1,0 +1,37 @@
+# D5 全链路灰测结论与演示脚本（2026-09-12）
+
+> 上级：[文档书总目录](README.md) · 清单：[0.9 冲刺交付清单](2026-09-12-sprint-delivery-checklist.md)
+
+## 一、灰测结论（全部在生产真实链路验证，测试账号 mia）
+
+| 环节 | 结果 | 证据 |
+|-|-|-|
+| 接单（agent 侧） | ✅ | mia 调 `brainx_accept_job`（JNOEILO）→ ACCEPTED，membership 同步落 MY_JOB（修复后） |
+| 建群 + 职位卡 | ✅ | `brainx_launch_project_chat` → 新群「智子芯元（深圳）科技有限责任公司-AI产品经理」READY，群卡秒到 |
+| 找人 → 候选人投递 | ✅ | 接单自动触发 OpenMai（om_43a0bb74）→「首轮候选人已就绪」总览卡（6 人，每行重点关注）自动回群 |
+| 初筛通过 → 自动推三按钮卡 | ✅ | marker 消息 → agent 调 KEEP_FOR_REVIEW → FOCUSED + 自动推「BrainTex · 候选人卡片」（查看链接/初筛通过/一键加入人才库 三按钮齐全） |
+| 一键加入人才库 → RDS 真实写入 | ✅ | marker 消息 → agent 调 `brainx_talent_pool_add` → 黄俊凯 #396 写入 RDS；幂等标记 `[ref:...]`；另工具直调李燊 #395 |
+| SuperMai 服务端链路 | ✅ | `brainx_supermai_scout` 直通 done：私域无命中 → TTC 公域 228 命中精选 10 人（与 OpenMai 共用引擎，无需本地 GUI） |
+| Web 端全部 UI 改动 | ✅ | 已随三轮部署上线（T8/T1/T2/T5/T3/T4/T6/T7/T13），门禁三轮 24/24 |
+
+## 二、灰测中发现并处理的问题
+
+1. **agent 接单不落 membership → 建群必报 PROJECT_MEMBERSHIP_REQUIRED**：已修代码（commit 1f6ffa5，接单幂等写 MY_JOB），回归测试补齐。
+2. **测试群 scope senders 缺 mia**：数据修复补入（`agent_group_scopes` UPDATE，未改代码）。
+3. **OpenClaw 新群准入 CLI 失败**（OPENCLAW_COMMAND_FAILED）：手动完成准入（groupAllowFrom + groupSenderAllowFrom + requireMention=false）。根因疑为准入 runner 的环境变量缺失，**列赛后修复**。
+4. **无 @ 群消息被 mention 门静默拦截**：`groups.<chat>.requireMention=false` 配置已写入但运行态对文本消息未生效（带 @ 正常）。**卡片按钮走 dispatchSyntheticCommand 不受影响**，但建议赛后核查该配置语义。
+5. **authorizeGroup 要求每群恰好 1 行 ACTIVE scope，但三个老群各 6 行**（每顾问一行）→ 这些群对所有人生效均失败。**系统性 bug，列赛后修复**；演示只用单测试群，不受影响。
+6. ECS 到 GitHub 网络偶发不通：git pull 首次超时，重试成功。部署如遇此情况直接重试。
+
+## 三、演示脚本（评审日）
+
+**主群**：智子芯元（深圳）科技有限责任公司-AI产品经理（JNOEILO，mia 建，scope 已含 mia）。
+备用群：韬润半导体-业务助理（JPTLM25，scope 已含 york + mia）。
+
+1. **一键接单**：工作台打开职位详情 → 点「一键接单」→ 10 秒内飞书群拉起 + 职位卡（或群里 @机器人「我要接这个职位」→ 自动接单建群）。
+2. **找人**：群内点「OpenMai 找人」（或接单自动触发）→ 3-5 分钟候选人总览卡回群。
+3. **三按钮**：总览卡点「重点关注」→ 群内出现三按钮候选人卡 → 点「初筛通过」（自动推标准人才卡）→ 点「一键加入人才库」（真实写入 RDS，回执带人才库编号）。
+4. **SuperMai 通道**：群内点「SuperMai 找人」→ 服务端公域搜索回群（已实测）。**不演示本地 GUI 猎聘抓取**（cookie 30 分钟、风控需本人现场，赛后处理）。
+5. **工作台联动**：详情页核心匹配要点 + 快捷跳转、OpenMai 顿号切分补充职位信息、画像编辑。
+
+**纪律**：全程只用主群/备用群；按钮由 mia 或 york 操作（评委点击会因未绑定身份失败——如需评委互动，先将其 open_id 加入 scope）；固定输入框提交条件，不自然语言闲聊触发工具；每轮搜索为付费任务，演示前预置好候选人结果，现场尽量不新起搜索。

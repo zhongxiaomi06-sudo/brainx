@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-12｜docs(sprint): D5 全链路灰测结论与演示脚本，specs/017 T11 勾选
+
+- 灰测（生产真实链路，mia 账号）全部通过：agent 接单 → 建群职位卡 → OpenMai 找人投递 → KEEP marker 触发初筛通过并自动推三按钮候选人卡 → TALENT_ADD marker 触发一键入库（RDS #395 李燊 / #396 黄俊凯，含幂等标记）→ SuperMai 服务端公域搜索。证据与演示脚本：[D5 灰测结论与演示脚本](2026-09-12-d5-e2e-greytest-and-demo-script.md)。
+- 灰测中处理的问题：测试群 scope 补 mia（数据修复）；OpenClaw 新群准入 CLI 失败改手动准入（根因列赛后）；发现 authorizeGroup 多行 scope 系统性 bug、requireMention 对无 @ 文本未生效（均列赛后，按钮链路不受影响）。
+- 同步：specs/017 T11 勾选；docs/README.md 登记冲刺清单与灰测文档；前端审核记录回填发布与真实数据验证状态。
+- 验证：纯文档改动；当日三轮 `npm run verify` 均 24/24 通过（最新一轮于 membership 修复 commit）。
+
 ## 2026-09-12｜fix(agent): 接单同步落 MY_JOB 成员关系，修复建群必报 PROJECT_MEMBERSHIP_REQUIRED
 
 - 触发：D5 灰测新链路——mia 私聊调 `brainx_accept_job` 接单成功（JNOEILO），紧接着 `brainx_launch_project_chat` 必报 `PROJECT_MEMBERSHIP_REQUIRED`。agent 接单只写承接状态，不写 `job_memberships`，而 launch 检查的是成员关系；web 一键接单没事（先 PATCH membership 再 launch）。群里自然语言接单 → 建群的演示主链路被卡死。

@@ -50,7 +50,8 @@ function sourceContext(db, sourceChatId, candidate) {
   ].filter(Boolean).join('\n');
 }
 
-function contextCard(job, candidate, summary) {
+// 导出供卡片渲染门禁（scripts/quality-gate/card-render）直接取真实卡片，避免样本漂移。
+export function contextCard(job, candidate, summary) {
   const ttcUrl = `https://app.ttcadvisory.com/app/talent/${encodeURIComponent(candidate.candidate_ref)}`;
   const generate = `请生成当前候选人的 Offer 决策报告。调用 brainx_candidate_report，mode=GENERATE，confirm=true。`;
   const update = `请结合本群最新内容更新当前候选人的 Offer 决策报告。调用 brainx_candidate_report，mode=REGENERATE，confirm=true。`;

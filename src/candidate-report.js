@@ -46,7 +46,8 @@ function sectionsFor(job, candidate, decisionGroup, messages, version) {
   ];
 }
 
-function readyCard(candidate, report) {
+// 导出供卡片渲染门禁（scripts/quality-gate/card-render）直接取真实卡片，避免样本漂移。
+export function readyCard(candidate, report) {
   const url = new URL(report.document_url);
   if (url.protocol !== 'https:' || !url.hostname.endsWith('.feishu.cn')) fail('FEISHU_DOC_URL_INVALID');
   return { config: { wide_screen_mode: true },

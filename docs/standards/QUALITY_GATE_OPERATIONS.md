@@ -50,6 +50,8 @@ verify 和 verify:ci 都是完整门禁，不能用 quick 替代。完整门禁�
 
 Storybook 组件测试使用系统 Chrome 验证隔离状态和 `play` 交互；静态构建证明内部目录可交付。现有调色板的对比度债务在 A11y 面板中记为警告，范围和维护规则见[内部 Storybook 组件库](../storybook-component-library.md)。
 
+渲染回归用真实构建函数产出飞书群卡片、渲染成 DOM 后与基线截图比对，并断言按钮文字截断与卡片横向溢出。它补的是「界面长什么样」这一层：此前所有检查都只断言「有没有这个按钮」。范围、边界与维护方法见[飞书群卡片渲染回归门禁](../2026-09-12-feishu-card-render-gate.md)；基线按平台分档，换平台必须在新平台重建基线。
+
 浏览器链路在生产构建后运行，使用随机回环端口和临时 SQLite，不读取本地 `.env`，并关闭桥接、推送和外部模型。它验证桌面与移动端渲染、开发登录、工作台 API、搜索、导航、静态资源、页面异常、控制台异常和客户端错误上报。测试必须使用断言并以非零退出码报告失败，不能只打印 `PASS/FAIL`。
 
 每个外部命令都有独立硬超时。超时后门禁会终止整个子进程树，记录超时证据并返回失败，避免测试挂死后被误判为通过。
@@ -62,6 +64,8 @@ Storybook 组件测试使用系统 Chrome 验证隔离状态和 `play` 交互；
 - [.quality-gate/baseline.json](../../.quality-gate/baseline.json)：存量超限、超长行、Lint 豁免和秘密误报例外。
 - [scripts/quality-gate.mjs](../../scripts/quality-gate.mjs)：统一编排与报告。
 - [scripts/quality-gate/core.mjs](../../scripts/quality-gate/core.mjs)：可复用检查和超时执行器。
+- [scripts/quality-gate/card-render/](../../scripts/quality-gate/card-render/)：卡片渲染门禁的渲染器、样式、样本与 runner。
+- [fixtures/card-render/known-defects.json](../../fixtures/card-render/known-defects.json)：卡片排版的存量缺陷登记，口径同 baseline.json。
 
 每次运行都会覆盖生成：
 

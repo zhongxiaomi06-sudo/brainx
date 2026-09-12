@@ -18,6 +18,9 @@ import {
   selectRegularFiles,
   versionAtLeast,
 } from "../scripts/quality-gate/core.mjs";
+import { canonicalize } from "../scripts/quality-gate/card-render/run.mjs";
+import { renderCard, renderElements } from "../scripts/quality-gate/card-render/renderer.mjs";
+import { candidateShareCard } from "../src/agent-gateway/tools-candidate-actions.js";
 
 test("Node 22 测试入口显式启用 TypeScript 类型剥离", () => {
   const repoRoot = new URL("../", import.meta.url);
@@ -334,4 +337,59 @@ test("Node 版本比较按语义版本工作", () => {
   assert.equal(versionAtLeast("v22.13.0", "22.13.0"), true);
   assert.equal(versionAtLeast("22.12.9", "22.13.0"), false);
   assert.equal(versionAtLeast("23.0.0", "22.13.0"), true);
+});
+
+test("飞书卡片渲染门禁接入 full 与 ci，但不拖慢 quick", () => {
+  const config = JSON.parse(
+    readFileSync(new URL("../.quality-gate/config.json", import.meta.url), "utf8"),
+  );
+  const names = (profile) => config.profiles[profile].commands.map((item) => item.name);
+  for (const profile of ["full", "ci"]) {
+    const entry = config.profiles[profile].commands
+      .find((item) => item.name.includes("卡片渲染回归"));
+    assert.ok(entry, `${profile} 必须包含飞书群卡片渲染回归`);
+    assert.equal(entry.command, "node");
+    assert.deepEqual(entry.args, ["scripts/quality-gate/card-render/run.mjs"]);
+    assert.ok(entry.timeoutMs > 0, `${profile} 的渲染门禁必须设置超时`);
+  }
+  assert.equal(names("quick").some((name) => name.includes("卡片渲染")), false);
+});
+
+test("卡片渲染门禁归一化可变字段，避免截图基线天天漂移", () => {
+  const card = {
+    header: { content: "2026-09-12T10:42:00Z" },
+    elements: ["run: a1b2c3d4e5f6", "day=2026-09-12", "TTC-8842137", 86, true],
+  };
+  const result = canonicalize(card);
+  assert.deepEqual(result, {
+    header: { content: "«TS»" },
+    elements: ["run: «HEX»", "day=«DATE»", "TTC-8842137", 86, true],
+  });
+});
+
+test("卡片渲染器遇到未覆盖元素类型必须抛错，不得静默跳过", () => {
+  assert.throws(
+    () => renderElements([{ tag: "chart", chart_spec: {} }]),
+    /未覆盖的元素类型：chart/,
+  );
+});
+
+test("卡片渲染器能把真实构建出的候选人卡转成可截图 DOM", () => {
+  const card = candidateShareCard("proj-1", "TTC-8842137", { name: "李燊", role: "影像算法产品经理" });
+  const html = renderCard(card, { cardId: "candidate-share" });
+  assert.match(html, /feishu-card/);
+  assert.match(html, /查看链接/);
+  assert.match(html, /一键加入人才库/);
+});
+
+test("卡片存量缺陷登记必须带到期日，不得无限期挂账", () => {
+  const registry = JSON.parse(
+    readFileSync(new URL("../fixtures/card-render/known-defects.json", import.meta.url), "utf8"),
+  );
+  const defects = registry.defects || [];
+  assert.ok(defects.length > 0);
+  for (const defect of defects) {
+    assert.ok(defect.id && defect.rule && defect.owner && defect.reason, "登记项字段不完整");
+    assert.match(defect.expiresOn, /^\d{4}-\d{2}-\d{2}$/, "登记项必须写明到期日");
+  }
 });

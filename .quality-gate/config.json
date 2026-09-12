@@ -194,6 +194,13 @@
           "timeoutMs": 120000
         },
         {
+          "stage": "渲染",
+          "name": "飞书群卡片渲染回归",
+          "command": "node",
+          "args": ["scripts/quality-gate/card-render/run.mjs"],
+          "timeoutMs": 240000
+        },
+        {
           "stage": "交付",
           "name": "服务烟雾测试",
           "command": "node",
@@ -274,6 +281,13 @@
           "command": "npm",
           "args": ["--prefix", "frontend/btex-frontend", "run", "test:e2e"],
           "timeoutMs": 120000
+        },
+        {
+          "stage": "渲染",
+          "name": "飞书群卡片渲染回归",
+          "command": "node",
+          "args": ["scripts/quality-gate/card-render/run.mjs"],
+          "timeoutMs": 240000
         },
         {
           "stage": "交付",

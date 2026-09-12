@@ -30,7 +30,8 @@ function talentUrl(candidateRef, candidate = {}) {
   return `https://app.ttcadvisory.com/app/talent/${encodeURIComponent(candidateRef)}`;
 }
 
-function candidateShareCard(jobId, candidateRef, candidate = {}) {
+// 导出供卡片渲染门禁（scripts/quality-gate/card-render）直接取真实卡片，避免样本漂移。
+export function candidateShareCard(jobId, candidateRef, candidate = {}) {
   const url = talentUrl(candidateRef, candidate);
   const profile = [candidate.experience, candidate.city, candidate.education]
     .filter(Boolean).map((item) => safeCardText(item, 80)).join(' · ') || '经历信息待核实';

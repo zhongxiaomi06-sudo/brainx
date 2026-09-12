@@ -1,5 +1,17 @@
 # Agent Commit 记录
 
+## 2026-09-12｜feat(quality-gate): 新增飞书群卡片渲染回归硬门禁（补「界面长什么样」这一层）
+
+- 触发：用户指出群里机器人卡片「样式和排版非常不好看」，要求加一道硬门禁做渲染。核查发现原有 24 项门禁里**没有任何一项会渲染卡片并检查排版**，只断言「有没有这个按钮」。
+- 新增 `scripts/quality-gate/card-render/`：`renderer.mjs`（legacy 卡片 JSON → DOM，遇未覆盖元素类型直接抛错）、`theme.css`（420px 飞书近似样式）、`scenarios.mjs`（17 个卡片形态，**全部由生产构建函数产出**，不手写 JSON）、`run.mjs`（归一化可变字段 → 渲染 → 截图 → 基线比对 + 排版断言）。
+- 阻断判据 5 条：`button-truncated`（按钮文字被省略号截断）、`overflow-x`（卡片横向溢出）、`pixel-diff`（与基线差异 > 0.4%，可用 `BRAINX_CARD_DIFF_RATIO` 调整）、`baseline-missing`、`render-error`。基线按平台分档（`<id>.<platform>.png`），换平台须重建。
+- 存量缺陷沿用 `.quality-gate/baseline.json` 口径：新增 `fixtures/card-render/known-defects.json`，只能减少、不得新增、**到期即失效**（两项均 2026-09-20 到期）。
+- **首次运行即抓到两处功能级缺陷**：①每日推荐卡动作行放 4 个按钮，「接单并建群」被截断；②找人结果卡 6 列 column_set，「操作」列仅约 53px，「重点关注」被截断。两处都是「顾问读不到按钮名」。
+- 为扩展性导出 3 个卡片构建函数（`candidateShareCard` / `contextCard` / `readyCard`），供门禁取真实卡片，避免样本漂移。
+- 接入 `.quality-gate/config.json` 的 `full` 与 `ci`（新增「渲染 | 飞书群卡片渲染回归」，两项各 11→12 项），**不接入 quick** 以免拖慢开发反馈。
+- 验证：`node scripts/quality-gate/card-render/run.mjs` 退出码 0（17/17 通过，2 项存量登记）；故意把卡片宽度改 420→440 复测，门禁按 `pixel-diff` 阻断并返回退出码 1，还原后恢复 0；`npm run verify:quick` 16/16 通过；`node --test tests/quality-gate.test.mjs` 24/24 通过（新增 5 条：配置接入、归一化、未覆盖元素抛错、真实卡片渲染、登记项须带到期日）；受影响的 7 个卡片测试 39/39 通过。
+- 文档：[飞书群卡片渲染回归门禁](2026-09-12-feishu-card-render-gate.md)；[质量门禁操作手册](standards/QUALITY_GATE_OPERATIONS.md) 补第 2 节说明与配置清单；`docs/README.md` 登记。
+
 ## 2026-09-12｜docs(sprint): 0.9 冲刺核查报告处置方案（修正 + Reloop 变更）
 
 - 输入：用户提供的《0.9 冲刺前端需求深度核查报告》（2026-09-12 17:30），逐条与仓库代码复核后产出处置方案 [0.9 冲刺核查处置方案](2026-09-12-sprint-0.9-remediation-plan.md)。

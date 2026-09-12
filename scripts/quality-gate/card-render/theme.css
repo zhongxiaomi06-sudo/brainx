@@ -1,0 +1,149 @@
+/* theme.css — 飞书 legacy 互动卡片的本地近似样式（截图回归门禁用）。
+ *
+ * 目标不是像素级复刻飞书客户端，而是把「会被人眼判为不好看」的排版缺陷
+ * 变成确定性的几何事实：按钮行数、按钮被省略号截断、列宽挤压、文本溢出。
+ * 宽度固定 420px（飞书消息卡默认内容宽度），字体栈固定，保证截图可比对。
+ */
+
+.card-stage {
+  margin: 0;
+  padding: 16px;
+  width: 452px;
+  box-sizing: border-box;
+  background: #f2f3f5;
+}
+
+.feishu-card {
+  width: 420px;
+  box-sizing: border-box;
+  border: 1px solid #dee0e3;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #ffffff;
+  color: #1f2329;
+  font-size: 14px;
+  line-height: 22px;
+  font-family: "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", "Helvetica Neue", sans-serif;
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 16px;
+  box-sizing: border-box;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  word-break: break-word;
+}
+
+.card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px 16px;
+}
+
+.el { box-sizing: border-box; }
+
+.el-md {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.el-md code {
+  padding: 0 3px;
+  border-radius: 3px;
+  background: #f0f1f2;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+.el-hr {
+  height: 1px;
+  margin: 4px 0;
+  background: #dee0e3;
+}
+
+.el-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.btn {
+  flex: 1 1 0;
+  min-width: 88px;
+  height: 32px;
+  padding: 0 12px;
+  box-sizing: border-box;
+  border: 1px solid #dee0e3;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #1f2329;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 30px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.btn-primary { border-color: #3370ff; background: #3370ff; color: #ffffff; }
+.btn-danger { border-color: #f54a45; background: #ffffff; color: #f54a45; }
+
+/* 列内按钮：飞书会把按钮压到列宽，文字走省略号，而不是把卡片撑宽。
+   不这样处理，表格卡片的失败原因就会变成「我的近似误差」而非真实排版问题。 */
+.col .el-actions { gap: 4px; }
+.col .btn { min-width: 0; flex: 1 1 0; padding: 0 6px; }
+
+.el-note {
+  color: #8f959e;
+  font-size: 12px;
+  line-height: 18px;
+  word-break: break-word;
+}
+
+.el-input {
+  display: flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid #dee0e3;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.input-placeholder {
+  color: #8f959e;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.el-columns {
+  display: flex;
+  gap: 12px;
+  border-radius: 4px;
+  padding: 8px;
+}
+
+.el-columns.is-grey { background: #f5f6f7; }
+.el-columns.is-plain { background: #ffffff; padding: 8px 0; }
+
+.col {
+  min-width: 0;
+  font-size: 13px;
+  line-height: 20px;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.el-div {
+  font-size: 13px;
+  line-height: 20px;
+  word-break: break-word;
+}

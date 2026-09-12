@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-12｜test(offer-e2e): 决策群动作块改为按元素类型定位，修掉索引漂移
+
+- 承接 commit `9a8abff9`：Offer 决策群首卡的迁移摘要改为按小节拆成多个 markdown 元素后，`tests/candidate-offer-report-e2e.test.mjs` 里 `card.elements[3].actions` 的硬编码下标漂移，读到的是小节元素而非动作块，报 `Cannot read properties of undefined (reading 'map')`。
+- 改为 `elements.find((element) => element.tag === 'action')` 定位，不再依赖元素下标 —— 摘要小节数随讨论条数变化，用下标断言必然再漂移。
+- 该用例是**全量后端测试里唯一被本次改动打破的用例**：`npm test` 由 690/691 恢复为 691/691 通过。
+
 ## 2026-09-12｜docs(review): 同步门禁文档、文字排版规范与按钮审核台账
 
 - 承接同日的卡片排版修复（commit `9a8abff9`），把「文字排版」这条新增纪律登记进文档书，避免只留在代码与聊天记录里。

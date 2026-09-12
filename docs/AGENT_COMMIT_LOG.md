@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-12｜feat(frontend): 判断页核心匹配要点 + 快捷跳转三连，按钮排列修正（冲刺清单 T3/T4）
+
+- T3（综合方案）：`JudgementContent` 删除六维柱状图「评分依据」与「判断依据」区，改为「核心匹配要点」（冻结推荐理由前三条，静态排版、不调大模型）+ 风险与缺失 + 建议动作；新增「快捷跳转」——职位来源/客户公司/驾驶舱三个跳转，全部复用现有路由（TTC 来源页、workbench 客户页、精选盘首页），`onOpenClient`/`onOpenCockpit` 经四层透传到全部职位页详情卡；`scoreDimensions`/`scoreText`/`BarChart3` 随死代码删除。
+- T4：移动端 tab 导航从 5 列改为 4 列（回放 tab 删除的遗留）；footer 桌面端本为横向 flex-wrap，验收满足，未改。
+- 同步：rendered-html 断言与三个 Storybook 场景更新；审核记录追加 T3/T4 段。
+- 验证：前端 44/44、Storybook 85/85、`tsc --noEmit` 全部通过；四个改动文件行数均在 500 以内。
+
 ## 2026-09-12｜feat(agent): 候选人卡三按钮 + brainx_talent_pool_add 一键入库（冲刺清单 T10/T11/T12）
 
 - 架构前提（生产实证）：飞书长连接为集群模式不广播，生产唯一事件连接在 OpenClaw；卡片回调走 OpenClaw 既有 `card.action.trigger` → synthetic 文本命令链路（按钮 `value.text` 原样成为 agent 消息），与 [BRAINTEX_SEARCH_START] 同一模式，不加第二条 WS、不动 OpenClaw 本体、不改现有消息分发。

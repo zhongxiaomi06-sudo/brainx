@@ -181,12 +181,10 @@ export const TodayDecisionEntry: Story = {
     await expect(canvas.getByRole("button", { name: "职位事实" })).toHaveAttribute("aria-current", "page");
     await expect(canvas.queryByText(/AI 匹配分|最终得分|探索价值|证据覆盖/)).not.toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: "判断" }));
-    await expect(canvas.getByText("评分依据")).toBeInTheDocument();
-    await expect(canvas.getByText("职位方向匹配")).toBeInTheDocument();
-    await expect(canvas.getByText("92 / 100")).toBeInTheDocument();
+    await expect(canvas.getByText("核心匹配要点")).toBeInTheDocument();
+    await expect(canvas.getByText("推荐指数")).toBeInTheDocument();
     await expect(canvas.getByText("建议动作")).toBeInTheDocument();
     await expect(canvas.getByText("本周确认客户面试反馈")).toBeInTheDocument();
-    await expect(canvas.getAllByText("待确认").length).toBeGreaterThan(0);
     await userEvent.click(canvas.getByRole("button", { name: "职位事实" }));
     await userEvent.click(canvas.getByRole("button", { name: "一键接单" }));
     await expect(canvas.getByRole("button", { name: "已加入我的项目" })).toBeDisabled();
@@ -223,7 +221,7 @@ export const AllPositionsEntry: Story = {
       await expect(footerLabels()).toEqual(initialFooterLabels);
     }
     await userEvent.click(canvas.getByRole("button", { name: "判断" }));
-    await expect(canvas.getByText("评分依据")).toBeInTheDocument();
+    await expect(canvas.getByText("核心匹配要点")).toBeInTheDocument();
     await expect(canvas.getByText("推荐指数")).toBeInTheDocument();
     await expect(canvas.queryByText("客户真实招聘意愿")).not.toBeInTheDocument();
     const actionFooter = canvasElement.querySelector<HTMLElement>(".job-detail-review-actions");
@@ -257,13 +255,12 @@ export const NarrowReview: Story = {
 };
 
 export const MissingScoreDimension: Story = {
-  name: "真实评分缺失维度",
+  name: "判断页静态匹配要点",
   render: () => <JobDetailCard job={completeJob} onClose={close} activeTab="judgement" />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByText("历史行为与交付结果")).toBeInTheDocument();
-    await expect(canvas.getAllByText("待确认").length).toBeGreaterThan(0);
-    await expect(canvas.queryByText("0 / 100")).not.toBeInTheDocument();
+    await expect(canvas.getByText("核心匹配要点")).toBeInTheDocument();
+    await expect(canvas.getByText("建议动作")).toBeInTheDocument();
     await expect(canvas.getByText("推荐指数")).toBeInTheDocument();
   },
 };

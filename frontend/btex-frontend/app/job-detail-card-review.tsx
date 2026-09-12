@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ArrowRight,
-  BarChart3,
   BriefcaseBusiness,
   Check,
   Clock3,
@@ -75,6 +74,8 @@ export type JobDetailCardProps = {
   onIgnore?: (projectId: string) => Promise<void> | void;
   onDismiss?: (projectId: string) => void;
   onOpenSource?: (projectId: string) => void;
+  onOpenClient?: (company: string) => void;
+  onOpenCockpit?: () => void;
   activeTab?: JobDetailTab;
   initialTab?: JobDetailTab;
   onTabChange?: (tab: JobDetailTab) => void;
@@ -104,15 +105,6 @@ const pipelineLabels: Record<string, string> = {
   onboard: "入职",
 };
 
-const scoreDimensions = [
-  ["direction", "职位方向匹配"],
-  ["activity", "项目活跃度与 Pipeline"],
-  ["similarity", "与历史项目相似度"],
-  ["capacity", "当前跟进容量"],
-  ["outcomes", "历史行为与交付结果"],
-  ["exploration", "探索额度"],
-] as const;
-
 function displayDate(value: string | null | undefined) {
   if (!value) return "待确认";
   const date = new Date(value);
@@ -138,21 +130,18 @@ function pipelineItems(pipeline: JobDetailPipeline) {
     .map(([key, value]) => ({ label: pipelineLabels[key.toLowerCase()] || key, value }));
 }
 
-function scoreText(value: number | null) {
-  return value === null ? "待确认" : `${Number(value.toFixed(1))} / 100`;
-}
-
-function JudgementContent({ job, recommendation }: {
+function JudgementContent({ job, recommendation, onOpenSource, onOpenClient, onOpenCockpit }: {
   job: JobDetailReviewData;
   recommendation: JobDetailRecommendation | null;
+  onOpenSource?: (projectId: string) => void;
+  onOpenClient?: (company: string) => void;
+  onOpenCockpit?: () => void;
 }) {
   if (!recommendation) return <section className="job-detail-review-section is-recommendation">
     <div className="job-detail-review-empty">这个职位尚无真实推荐结果</div>
   </section>;
-  const dimensions = scoreDimensions.map(([dim, label]) => {
-    const found = recommendation.breakdown.find(item => item.dim === dim);
-    return found || { dim, label, weight: null, score: null, weightedScore: null };
-  });
+  // T3 综合方案：排好的静态文字（冻结推荐理由/风险）+ 职位/客户/驾驶舱跳转，不实时生成。
+  const highlights = recommendation.reasons.slice(0, 3);
   const suggestions = [
     { label: actionLabels[recommendation.action], source: "冻结推荐结论" },
     ...(job.nextAction ? [{ label: job.nextAction, source: "当前职位事实" }] : []),
@@ -162,22 +151,22 @@ function JudgementContent({ job, recommendation }: {
       <div><span>推荐指数</span><b>{recommendation.score ?? "待确认"}</b></div>
     </section>
     <section className="job-detail-review-section">
-      <div className="job-detail-review-section-title"><span><BarChart3 /></span><div><h3>评分依据</h3><p>后端冻结六维评分；缺失维度不按 0 分处理</p></div></div>
-      <div className="job-detail-score-list">{dimensions.map(item => <div className={`job-detail-score-row${item.score === null ? " is-missing" : ""}`} key={item.dim}>
-        <span><b>{item.label}</b></span>
-        <div className="job-detail-score-bar" role="progressbar" aria-label={item.label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={item.score ?? undefined}><i style={{ width: `${Math.max(0, Math.min(100, item.score ?? 0))}%` }} /></div>
-        <strong>{scoreText(item.score)}{item.weightedScore !== null && <small>贡献 {Number(item.weightedScore.toFixed(2))}</small>}</strong>
-      </div>)}</div>
+      <div className="job-detail-review-section-title"><span><Check /></span><div><h3>核心匹配要点</h3><p>后端冻结推荐的前三条判断，不实时生成</p></div></div>
+      <div className="job-detail-score-actions">{highlights.map((reason, index) => <div key={reason}><span>{String(index + 1).padStart(2, "0")}</span><p><b>{reason}</b><small>冻结推荐理由</small></p></div>)}</div>
+      {recommendation.risks.length > 0 && <div className="job-detail-review-risks"><b>风险与缺失</b>{recommendation.risks.map(risk => <span key={risk}>{risk}</span>)}</div>}
     </section>
     <section className="job-detail-review-section">
       <div className="job-detail-review-section-title"><span><Check /></span><div><h3>建议动作</h3><p>只展示冻结推荐和当前职位事实</p></div></div>
       <div className="job-detail-score-actions">{suggestions.map((item, index) => <div key={`${item.source}:${item.label}`}><span>{String(index + 1).padStart(2, "0")}</span><p><b>{item.label}</b><small>{item.source}</small></p></div>)}</div>
     </section>
-    <section className="job-detail-review-section is-recommendation">
-      <div className="job-detail-review-section-title"><span><Check /></span><div><h3>判断依据</h3><p>{displayDate(recommendation.generatedAt)}</p></div></div>
-      <ul>{recommendation.reasons.map(reason => <li key={reason}>{reason}</li>)}</ul>
-      {recommendation.risks.length > 0 && <div className="job-detail-review-risks"><b>风险与缺失</b>{recommendation.risks.map(risk => <span key={risk}>{risk}</span>)}</div>}
-    </section>
+    {(onOpenSource || onOpenClient || onOpenCockpit) && <section className="job-detail-review-section">
+      <div className="job-detail-review-section-title"><span><ArrowRight /></span><div><h3>快捷跳转</h3><p>打开对应页面继续处理</p></div></div>
+      <div className="job-detail-quick-links">
+        {onOpenSource && <button type="button" onClick={() => onOpenSource(job.projectId)}>职位来源<ExternalLink /></button>}
+        {onOpenClient && <button type="button" onClick={() => onOpenClient(job.company)}>客户公司<ExternalLink /></button>}
+        {onOpenCockpit && <button type="button" onClick={onOpenCockpit}>驾驶舱<ExternalLink /></button>}
+      </div>
+    </section>}
   </>;
 }
 
@@ -192,6 +181,8 @@ export function JobDetailCard({
   onIgnore,
   onDismiss,
   onOpenSource,
+  onOpenClient,
+  onOpenCockpit,
   activeTab,
   initialTab = "facts",
   onTabChange,
@@ -295,7 +286,7 @@ export function JobDetailCard({
             <span><b>TTC CRM 职位快照</b><small>最近同步 {displayDate(job.capturedAt)} · 缺失字段保持待确认</small></span>
             {onOpenSource && <button type="button" onClick={() => onOpenSource(job.projectId)}>查看来源<ExternalLink /></button>}
           </section>
-          </> : detailContent || (effectiveTab === "judgement" ? <JudgementContent job={job} recommendation={recommendation} /> : effectiveTab === "engagement" ? <section className="job-detail-review-section">
+          </> : detailContent || (effectiveTab === "judgement" ? <JudgementContent job={job} recommendation={recommendation} onOpenSource={onOpenSource} onOpenClient={onOpenClient} onOpenCockpit={onOpenCockpit} /> : effectiveTab === "engagement" ? <section className="job-detail-review-section">
             <div className="job-detail-review-section-title"><span><ArrowRight /></span><div><h3>跟进与结果</h3><p>项目关系、当前阶段和下一步动作</p></div></div>
             <dl className="job-detail-review-facts"><Fact label="跟进状态" value={job.engagementState} /><Fact label="与我的关系" value={job.relation} /><Fact label="当前阶段" value={job.currentStage} /><Fact label="下一步动作" value={job.nextAction} /></dl>
           </section> : <section className="job-detail-review-section">

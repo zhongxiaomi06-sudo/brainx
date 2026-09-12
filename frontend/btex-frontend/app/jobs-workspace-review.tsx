@@ -64,6 +64,8 @@ type JobsWorkspaceReviewProps = {
   onIgnore?: (projectId: string) => Promise<void> | void;
   onDismiss?: (projectId: string) => void;
   onOpenSource?: (projectId: string) => void;
+  onOpenClient?: (company: string) => void;
+  onOpenCockpit?: () => void;
   loadDetail?: (row: JobsWorkspaceReviewRow) => Promise<JobDetailReviewData>;
 };
 
@@ -134,6 +136,8 @@ export function JobsWorkspaceReview({
   onIgnore,
   onDismiss,
   onOpenSource,
+  onOpenClient,
+  onOpenCockpit,
   loadDetail,
 }: JobsWorkspaceReviewProps) {
   const [savedView, setSavedView] = useState<SavedView>("all");
@@ -319,6 +323,8 @@ export function JobsWorkspaceReview({
             setSelectedId(null);
           } : undefined}
           onOpenSource={onOpenSource && (enrichedDetail?.projectId === selected.projectId ? enrichedDetail.sourceUrl : selected.sourceUrl) ? (projectId) => onOpenSource(projectId) : undefined}
+          onOpenClient={onOpenClient}
+          onOpenCockpit={onOpenCockpit}
         />
       )}
     </div>

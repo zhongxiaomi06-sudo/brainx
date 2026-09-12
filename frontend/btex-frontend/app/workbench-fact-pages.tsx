@@ -107,9 +107,11 @@ type WorkbenchJobsPageProps = {
   company?: string | null;
   onAddToProjects: (projectId: string) => Promise<void>;
   onIgnoreProject: (project: ProjectSummary) => Promise<void>;
+  onOpenClient?: (company: string) => void;
+  onOpenCockpit?: () => void;
 };
 
-function WorkbenchJobsPage({ items, capabilities, projects, company, onAddToProjects, onIgnoreProject }: WorkbenchJobsPageProps) {
+function WorkbenchJobsPage({ items, capabilities, projects, company, onAddToProjects, onIgnoreProject, onOpenClient, onOpenCockpit }: WorkbenchJobsPageProps) {
   const rows = useMemo(() => items.map(toJobsWorkspaceRow).filter(row => !company || row.company === company), [company, items]);
   const fields = useMemo(() => capabilities.map(toTtcCapability).filter((field): field is TtcFieldCapability => field !== null), [capabilities]);
   const filterCapabilities = useMemo(() => ({
@@ -144,6 +146,8 @@ function WorkbenchJobsPage({ items, capabilities, projects, company, onAddToProj
       onFollow={onAddToProjects}
       onIgnore={ignoreProject}
       onOpenSource={openSource}
+      onOpenClient={onOpenClient}
+      onOpenCockpit={onOpenCockpit}
     />
   </>;
 }

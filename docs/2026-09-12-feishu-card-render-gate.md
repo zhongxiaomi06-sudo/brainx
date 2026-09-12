@@ -35,7 +35,7 @@ node scripts/quality-gate/card-render/run.mjs --list-defects
 ## 3. 工作原理
 
 1. **样本来自生产代码**：`scenarios.mjs` 调用 `buildDailyCard`、`buildProjectLaunchCard`、`candidateShareCard` 等真实构建函数产出 17 个卡片形态。不手写 JSON —— 手写副本会漂移，门禁就成了摆设。
-2. **可变字段归一化**：时间戳、签名、运行号每次运行都变，不归一化就无法比对。`canonicalize()` 把日期、时间、8 位以上十六进制串替换成占位符后再渲染。
+2. **可变字段归一化**：时间戳、签名、运行号每次运行都变，不归一化就无法比对。`canonicalize()` 把完整时间戳、**只带月日的相对时间戳**（卡片标题用的是 `now().slice(5, 16)` 形式，如「09-12 19:05」）、日期、8 位以上十六进制串替换成占位符后再渲染。
 3. **渲染近似**：`renderer.mjs` 把 legacy 卡片 JSON（markdown / hr / action / note / input / button / column_set / column / div）转成 DOM，`theme.css` 按 420px 卡片宽度近似飞书样式。**遇到未覆盖的元素类型直接抛错**，不静默跳过 —— 静默跳过会让新卡片的排版问题逃过门禁。
 4. **阻断判据**：
    - `button-truncated`：按钮文字被省略号截断（`scrollWidth > clientWidth`）
@@ -43,6 +43,10 @@ node scripts/quality-gate/card-render/run.mjs --list-defects
    - `pixel-diff`：截图与基线差异超过阈值（默认 0.4%，`BRAINX_CARD_DIFF_RATIO` 可调）
    - `baseline-missing`：新卡片没有基线
    - `render-error`：渲染器未覆盖的元素类型
+   - **文字排版 6 条**：`markdown-block-too-long` / `markdown-block-overflow` /
+     `label-run-too-long` / `action-row-too-many-buttons` / `label-colon-halfwidth` /
+     `heading-not-first` —— 规则定义与示例见[飞书群卡片文字排版规范](standards/CARD_TYPOGRAPHY.md)，
+     实现在 `typography.mjs`（纯 JSON 判定，不依赖渲染，因此渲染失败时也会照常报出）。
 
 ## 4. 三处必须知道的边界
 
@@ -50,16 +54,26 @@ node scripts/quality-gate/card-render/run.mjs --list-defects
 2. **渲染是近似，不是飞书本体**：`theme.css` 只能近似飞书的宽度、间距与按钮压缩行为。它能抓到「文字被截断」「横向溢出」「整卡高度异常」这类几何事实，抓不到「配色不协调」「层级看不出来」这类主观判断。后者仍靠人眼审核。
 3. **存量缺陷只报告不阻断**：`known-defects.json` 沿用 `.quality-gate/baseline.json` 的治理口径 —— 只能减少、不得新增、**到期即失效**。到期后同一缺陷会立刻变成阻断项。这是为了让门禁今天就能上线，同时不让既有缺陷无限期挂账。
 
-## 5. 已知缺陷与修复方向（2026-09-12 首次运行结果）
+## 5. 首轮运行抓到的缺陷与处置（2026-09-12）
 
-门禁跑通的当天就抓到两处**功能级**排版缺陷，均已登记、2026-09-20 到期：
+门禁跑通的当天就抓到两处**功能级**排版缺陷，且都已在当日修完，`known-defects.json` 回到空表：
 
-| 卡片 | 缺陷 | 原因 | 修复方向 |
+| 卡片 | 缺陷 | 原因 | 修复 |
 |---|---|---|---|
-| 每日推荐卡 | 「接单并建群」被省略号截断（3 个职位都有） | 动作行放了 4 个按钮，420px 下每个只剩约 88px | 拆成两行 2+2，或缩短按钮文案 |
-| 找人结果卡 | 「重点关注」被省略号截断（6 行都有） | 6 列 column_set，「操作」列按权重只分到约 53px | 6 列合并为 4 列，或把按钮移出表格、收成表格下方一整行 |
+| 每日推荐卡 | 「接单并建群」被省略号截断（3 个职位都有） | 动作行放了 4 个按钮，420px 下每个只剩约 88px | 拆成两行 2+2（主行动组 / 辅助组），并把 🔥 移到标题行尾、指标行改用 ` · ` 分隔 |
+| 找人结果卡 | 「重点关注」被省略号截断（6 行都有） | 6 列 column_set，「操作」列按权重只分到约 53px | 删掉「操作」列（5 列），按钮移出表格收成下方整行动作区，按每行 3 个拆行，按钮文案带序号 |
 
-两处都是**顾问读不到按钮名**，属于功能缺陷而非审美偏好，演示前必须修。
+两处都是**顾问读不到按钮名**，属于功能缺陷而非审美偏好。
+
+同一天另发现并修掉一处**门禁自身**的缺陷：三张卡的标题拼了 `now().slice(5, 16)` 的相对
+时间戳（「09-12 19:05」），而 `canonicalize()` 只认带年份的完整时间戳，导致这几张卡的基线
+每跑一次 `--update` 就被改写一次，甚至可能因分钟数字位数变化而偶发阻断。补上相对时间戳
+规则后，连续两次 `--update` 的产物已逐字节一致。
+
+同时新增 `markdown-block-too-long` 等 6 条文字排版规则，抓到 Offer 决策群首卡把
+「4 个小节」塞进一个 markdown 元素形成的 11 行文字墙；修复方式见
+`src/candidate-decision-group.js#splitSections`（按小节拆成独立元素，落库的
+`context_summary` 保持原样不变）。
 
 ## 6. 维护约定
 

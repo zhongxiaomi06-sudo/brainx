@@ -64,11 +64,14 @@ function numericFact(value: string | undefined) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+// facts 的「决策层级/事实可信度」已映射为用户可读中文（brainx-recommendation-pages-api.ts），
+// 兼容旧枚举值，避免混入旧数据时卡片层级与置信度回退。
+const tierFromFact: Record<string, RecommendationQueueItem["tier"]> = { TODAY: "TODAY", WEEK: "WEEK", VERIFY: "VERIFY", 今日判断: "TODAY", 本周关注: "WEEK", 需先核验: "VERIFY" };
+const confidenceFromFact: Record<string, RecommendationQueueItem["confidence"]> = { SUFFICIENT: "SUFFICIENT", PARTIAL: "PARTIAL", INSUFFICIENT: "INSUFFICIENT", 数据充分: "SUFFICIENT", 数据部分缺失: "PARTIAL", 数据不足: "INSUFFICIENT" };
+
 function toQueueItem(job: DecisionJob, engagement: EngagementState | undefined, joined: boolean): RecommendationQueueItem {
-  const tier = ["TODAY", "WEEK", "VERIFY"].includes(job.facts["决策层级"])
-    ? job.facts["决策层级"] as RecommendationQueueItem["tier"] : "VERIFY";
-  const confidence = ["SUFFICIENT", "PARTIAL", "INSUFFICIENT"].includes(job.facts["事实可信度"])
-    ? job.facts["事实可信度"] as RecommendationQueueItem["confidence"] : "INSUFFICIENT";
+  const tier = tierFromFact[job.facts["决策层级"]] || "VERIFY";
+  const confidence = confidenceFromFact[job.facts["事实可信度"]] || "INSUFFICIENT";
   const legalActions: RecommendationCardAction[] = [];
   if (joined) legalActions.push("GO_PROJECT");
   else {
@@ -140,9 +143,9 @@ export function TodayDecisionQueue(props: TodayDecisionQueueProps) {
       || right.rank - left.rank;
     if (sort === "recent") return String(right.facts["最近活动时间"] || "")
       .localeCompare(String(left.facts["最近活动时间"] || "")) || left.rank - right.rank;
-    const confidenceOrder = { SUFFICIENT: 0, PARTIAL: 1, INSUFFICIENT: 2 };
-    return (confidenceOrder[left.facts["事实可信度"] as keyof typeof confidenceOrder] ?? 3)
-      - (confidenceOrder[right.facts["事实可信度"] as keyof typeof confidenceOrder] ?? 3)
+    const confidenceOrder: Record<string, number> = { SUFFICIENT: 0, PARTIAL: 1, INSUFFICIENT: 2 };
+    return (confidenceOrder[confidenceFromFact[left.facts["事实可信度"]] || "INSUFFICIENT"] ?? 3)
+      - (confidenceOrder[confidenceFromFact[right.facts["事实可信度"]] || "INSUFFICIENT"] ?? 3)
       || left.rank - right.rank;
   });
   const joinedProjects = new Set(projects.map(project => project.project_id));

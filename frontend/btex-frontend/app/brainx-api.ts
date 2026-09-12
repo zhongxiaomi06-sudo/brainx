@@ -345,7 +345,7 @@ export function mapRecommendation(rec: BackendRecommendation): BrainxJob {
     factFields: factFieldsOf(job),
     scoreNotes: rec.reasons || [],
     risks: rec.risks || [],
-    evidence: (rec.evidence_refs || []).map((e) => e.excerpt || e.ref || e.type || "快照记录"),
+    evidence: (rec.evidence_refs || []).filter((e) => e.type !== "decision_presentation").map((e) => (e.excerpt || e.ref || e.type || "快照记录").replace(/快照\s+(?:N\/A|[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12})\s*·\s*/i, "同步快照 · ")),
     actions: actionsOf(rec.action, relation),
   };
 }
@@ -428,7 +428,7 @@ export function mapReplayData(r: BackendReplay): BrainxReplay {
     rank: r.recommendation.rank ?? 0,
     reasons: r.recommendation.reasons || [],
     risks: r.recommendation.risks || [],
-    evidence: (r.recommendation.evidence_refs || []).map((e) => e.excerpt || e.ref || e.type || "快照记录"),
+    evidence: (r.recommendation.evidence_refs || []).filter((e) => e.type !== "decision_presentation").map((e) => (e.excerpt || e.ref || e.type || "快照记录").replace(/快照\s+(?:N\/A|[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12})\s*·\s*/i, "同步快照 · ")),
     events: mapEvents(r.events),
     outcomes: mapOutcomes(r.outcomes),
   };

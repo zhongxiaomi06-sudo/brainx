@@ -1,5 +1,18 @@
 # Agent Commit 记录
 
+## 2026-09-12｜fix(frontend): 判断面板文案精简——去除内部证据噪音，保留关键信息
+
+- 触发：用户打开判断抽屉（真实数据）后指出面板充斥内部证据信息，指令「进一步的精简，很多没有必要的证据信息全部去掉，且就留下关键的信息」。
+- **事实行**（`brainx-recommendation-pages-api.ts`）：`决策层级` TODAY/WEEK/VERIFY → 今日判断/本周关注/需先核验；`事实可信度` SUFFICIENT/PARTIAL/INSUFFICIENT → 数据充分/数据部分缺失/数据不足；删除 `事实可信度规则`（data-confidence-1.0 规则版本号不外显）与 `最近活动来源`（内部来源枚举）两行；`事实更新时间/最近活动时间` 原始 ISO → 本地短格式且仅在有数据时展示。
+- **UNKNOWN 展示**（`workbench-facts.tsx`）：当前事实中 UNKNOWN 统一显示「待确认」（数据层哨兵值不变，编辑回填不受影响）；逐行「同步/未知」来源标签隐藏，仅保留决策相关的「手动修正/本机草稿」。
+- **证据来源**（`brainx-api.ts`）：`decision_presentation` 证据（VERIFY · INSUFFICIENT 内部枚举的元数据载体）不再渲染；快照 UUID 归一为「同步快照 · 日期」；推荐列表与回放面板两处共用同一归一逻辑。新增回归测试「evidence 展示层去掉内部元数据与快照 UUID」。
+- **候选供给**（`workbench.tsx`）：兜底文案去掉 `BRAINX_TALENT_SUPPLY=1` 环境变量提示，改「人才库暂无候选数据」；离线态补「连接 Brain X 后展示人才库候选匹配」；文件 495→493 行（净减）。
+- **队列卡片适配**（`workbench-today.tsx`）：`toQueueItem` 层级/置信度派生与排序比较器兼容中文标签（tierFromFact/confidenceFromFact），修复映射中文化后卡片层级回退 VERIFY 的问题（storybook 实测捕获）。
+- Storybook 演示数据（today-decision-queue fixture）同步为新用户可读口径。
+- 验证：`tsc --noEmit` 0 错误；`npm test`（btex-frontend）45/45；`storybook:build` + `storybook:test` 85/85；仓库级 `verify:quick` 15/16（唯一失败为 kimi-code-cli 遗留未提交删除的「完整检出」环境态，非本次改动）；`brainx-api.ts` 保持 623 行与存量基线精确一致（零增长）。
+- 文档：新增[判断面板文案精简复核](frontend-reviews/2026-09-12-judgement-panel-copy-simplification.md)，同步[前端审核台账](frontend-reviews/README.md)（日期条目+中央状态表行）。
+- 注：与后端 H-1/H-2/H-3 修复（e5040612）文件范围不相交，本次仅触碰前端 app/、前端 tests/ 与文档。
+
 ## 2026-09-12｜fix(backend): 后端链路审计三项高危修复——路由解码崩溃/投递 SENDING 卡死/安装器技能缺口（H-1/H-2/H-3）
 
 - 触发：当日全链路只读审计（报告 `~/Downloads/brainx-backend-audit-2026-09-12.md`）发现三项高危，用户拍板「影响到演示和小部分使用即修」，三项均实际影响：H-1 一条 URL 可打挂演示服务、H-2 锁死项目找人入口、H-3 全新装机三通道找人静默失效。

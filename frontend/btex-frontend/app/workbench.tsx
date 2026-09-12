@@ -486,10 +486,8 @@ function TalentSupplySection({job,mode}:{job:DecisionJob;mode:"connecting"|"conn
   </DrawerSection>;
  }
  return <DrawerSection title="候选供给（人才侧参考）">
-  {mode==="connected"&&<p className="supply-suggestion muted">
-   {state==="loading"?"正在从人才库计算候选供给…":
-    state==="error"?"供给计算暂不可用（人才库接口未响应）":
-    "供给分析未开启（需设 BRAINX_TALENT_SUPPLY=1）或人才库暂无候选。"}
- </p>}
+  <p className="supply-suggestion muted">
+   {mode!=="connected"?"连接 BrainX 后展示人才库候选匹配":state==="loading"?"正在从人才库计算候选供给…":state==="error"?"供给计算暂不可用，请稍后重试":"人才库暂无候选数据"}
+  </p>
  </DrawerSection>;
 }

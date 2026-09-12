@@ -1,10 +1,15 @@
 import type { EngagementCommand, EngagementState } from "./decision-demo";
 import {
+  formatClock,
   mapRecommendation,
   type BackendRecommendation,
   type BrainxJob,
 } from "./brainx-api.ts";
 import { brainxFetch } from "./brainx-http.ts";
+
+// 判断面板只展示用户可理解的信息：内部枚举转中文，规则版本号/来源枚举不外显（2026-09-12 文案精简）。
+const decisionTierLabels: Record<string, string> = { TODAY: "今日判断", WEEK: "本周关注", VERIFY: "需先核验" };
+const confidenceBandLabels: Record<string, string> = { SUFFICIENT: "数据充分", PARTIAL: "数据部分缺失", INSUFFICIENT: "数据不足" };
 
 export type RecommendationSort = "priority" | "activity" | "recent" | "confidence" | "exploration";
 
@@ -70,15 +75,15 @@ export function mapRecommendationPage(payload: BackendRecommendationPage): Recom
     const job = mapRecommendation(item);
     job.facts = {
       ...job.facts,
-      "决策层级": item.decision_tier,
+      "决策层级": decisionTierLabels[item.decision_tier] || item.decision_tier,
       "决策层级原因": item.decision_tier_reason.text,
-      "事实可信度": item.data_confidence.band,
-      "事实可信度规则": item.data_confidence.rule_version,
-      "事实更新时间": item.data_confidence.latest_fact_at || "UNKNOWN",
-      "最近活动": item.recent_activity?.label || "UNKNOWN",
-      "最近活动时间": item.recent_activity?.occurred_at || "UNKNOWN",
-      "最近活动来源": item.recent_activity?.source || "UNKNOWN",
+      "事实可信度": confidenceBandLabels[item.data_confidence.band] || item.data_confidence.band,
     };
+    if (item.data_confidence.latest_fact_at) job.facts["事实更新时间"] = formatClock(item.data_confidence.latest_fact_at);
+    if (item.recent_activity) {
+      job.facts["最近活动"] = item.recent_activity.label;
+      job.facts["最近活动时间"] = formatClock(item.recent_activity.occurred_at);
+    }
     job.recentSignal = item.recent_activity
       ? `${item.recent_activity.label} · ${item.recent_activity.occurred_at.slice(0, 10)}`
       : item.decision_tier_reason.text;

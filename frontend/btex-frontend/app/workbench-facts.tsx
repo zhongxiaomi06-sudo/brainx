@@ -150,12 +150,15 @@ export function ManualFactSection({ job, mode, onUpdated, notify, editRequest = 
       <dl className="facts">
         {Object.entries(displayFacts).map(([key, value]) => {
           const source = sourceOf(key);
+          // 展示层精简：UNKNOWN 统一显示「待确认」；同步/未知来源标签是内部噪音，只保留手动修正与本机草稿提示。
+          const unknown = value === "UNKNOWN";
+          const showSource = source && source.source !== "SYNC" && source.source !== "UNKNOWN";
           return (
             <div key={key}>
               <dt>{key}</dt>
-              <dd className={value === "UNKNOWN" ? "unknown" : ""}>
-                {value}
-                {source && <small className={`fact-source ${source.source.toLowerCase()}`}>{factSourceLabels[source.source]}</small>}
+              <dd className={unknown ? "unknown" : ""}>
+                {unknown ? "待确认" : value}
+                {showSource && <small className={`fact-source ${source.source.toLowerCase()}`}>{factSourceLabels[source.source]}</small>}
               </dd>
             </div>
           );

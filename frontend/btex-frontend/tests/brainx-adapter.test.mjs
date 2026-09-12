@@ -5,6 +5,7 @@ import {
   directionOf,
   eligibilityOf,
   factsOf,
+  formatClock,
   groupOf,
   getRadar,
   getTtcFieldReport,
@@ -118,6 +119,18 @@ test("source_mode 透出：COCKPIT_CONTEXT 不再被前端硬编码吞掉（2026
   assert.equal(market.sourceMode, "MARKET_ONLY");
 });
 
+test("evidence 展示层去掉内部元数据与快照 UUID（2026-09-12 判断面板文案精简）", () => {
+  const job = mapRecommendation({
+    ...sampleRec,
+    evidence_refs: [
+      { type: "source", ref: "feishu://base/xxx", excerpt: "智子芯元/AI产品经理" },
+      { type: "sync", ref: "1a8306cd-5769-46b1-ac81-37f343d11448", excerpt: "快照 1a8306cd-5769-46b1-ac81-37f343d11448 · 2026-08-19" },
+      { type: "decision_presentation", ref: "recommendation-presentation-1.0", excerpt: "VERIFY · INSUFFICIENT" },
+    ],
+  });
+  assert.deepEqual(job.evidence, ["智子芯元/AI产品经理", "同步快照 · 2026-08-19"]);
+});
+
 test("maps run-bound recommendation page metadata and legal state", () => {
   const page = mapRecommendationPage({
     blocked: false,
@@ -141,11 +154,13 @@ test("maps run-bound recommendation page metadata and legal state", () => {
   assert.equal(page.sort, "recent");
   assert.equal(page.engagement["P-FIX-E5FC611B"], "WATCHED");
   assert.deepEqual(page.jobs[0].brainxLegal, ["UNWATCH", "ACCEPT"]);
-  assert.equal(page.jobs[0].facts["决策层级"], "VERIFY");
-  assert.equal(page.jobs[0].facts["事实可信度"], "INSUFFICIENT");
-  assert.equal(page.jobs[0].facts["事实可信度规则"], "data-confidence-1.0");
+  assert.equal(page.jobs[0].facts["决策层级"], "需先核验");
+  assert.equal(page.jobs[0].facts["事实可信度"], "数据不足");
+  assert.equal(page.jobs[0].facts["事实可信度规则"], undefined); // 规则版本号属内部信息，不对用户展示
   assert.equal(page.jobs[0].facts["最近活动"], "职位事实更新");
-  assert.equal(page.jobs[0].facts["最近活动时间"], "2026-08-07T00:40:00.000Z");
+  assert.equal(page.jobs[0].facts["最近活动时间"], formatClock("2026-08-07T00:40:00.000Z"));
+  assert.equal(page.jobs[0].facts["最近活动来源"], undefined); // 来源枚举不外显
+  assert.equal(page.jobs[0].facts["事实更新时间"], formatClock("2026-08-07T00:40:00.000Z"));
 });
 
 test("treats null HC as UNKNOWN, never as 0", () => {

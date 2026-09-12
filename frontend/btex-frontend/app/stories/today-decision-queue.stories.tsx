@@ -49,10 +49,10 @@ export const FormalV2CardIntegration: Story = {
     showVerification: false,
     jobs: [{ ...decisionJobs[0], brainxLegal: ["WATCH", "ACCEPT", "DISMISS"], facts: {
       ...decisionJobs[0].facts,
-      "决策层级": "TODAY", "决策层级原因": "已有明确下一步",
-      "事实可信度": "SUFFICIENT", "事实可信度规则": "data-confidence-1.0",
-      "事实更新时间": "2026-08-29T08:00:00Z", "最近活动": "业务群活动",
-      "最近活动时间": "2026-08-29T07:30:00Z", "最近活动来源": "FEISHU_CHAT",
+      "决策层级": "今日判断", "决策层级原因": "已有明确下一步",
+      "事实可信度": "数据充分",
+      "事实更新时间": "08/29 08:00", "最近活动": "业务群活动",
+      "最近活动时间": "08/29 07:30",
     } }],
     pagination: {
       pageIndex: 0, totalCount: 45, evaluatedCount: 5313, runId: "run-formal-1",

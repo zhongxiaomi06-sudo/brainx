@@ -1,5 +1,13 @@
 # Agent Commit 记录
 
+## 2026-09-12｜fix(agent-gateway): 建群工具 openclaw_status 缺失归一为 null，消除幂等路径 500
+
+- 触发：E19 生产冒烟（mia 账号私聊场景直调 `brainx_launch_project_chat`）发现幂等路径 500 INTERNAL；审计表 `agent_tool_calls` 显示 1ms 内失败。
+- 根因：旧 launch 行无 `openclaw_status` 列值，handler 返回 `openclaw_status: undefined`；`assertSafeAgentProjection`（src/agent-gateway/projection.js:35）把 undefined 字段一律 reject，成功路径在出包前被判成 INTERNAL。mia 无成员身份的调用走不到投影，所以只暴露在有权限的顾问身上。
+- 修法：`tools-actions.js` 建群工具返回时 `openclaw_status ?? null`（null 是投影合法值）。最小一行，不动投影本身。
+- 测试：新增回归「openclaw_status 缺失时归一为 null，不触发投影 500」（tests/agent-action-tools.test.mjs），直接断言结果能过 `assertSafeAgentProjection`。
+- 验证：`tests/agent-action-tools.test.mjs` + `tests/agent-gateway-http.test.mjs` 共 14/14 通过；生产复测待本 commit 部署后执行。
+
 ## 2026-09-12｜fix(openmai): 全站文案「岗位画像」统一为「补充职位信息」（冲刺清单 T8）
 
 - 任务：0.9 冲刺清单 T8（P0），全站不得再出现「岗位画像」字样，统一为「补充职位信息」。

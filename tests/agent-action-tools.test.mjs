@@ -164,6 +164,24 @@ test('建群工具（specs/017）：带确认才建群，幂等键按顾问+职�
   db.close();
 });
 
+// 回归（2026-09-12 生产冒烟）：旧 launch 行没有 openclaw_status 列值时为 undefined，
+// 安全投影会把 undefined 字段判为 INTERNAL 500——工具必须把缺失值归一成 null。
+test('建群工具（specs/017）：openclaw_status 缺失时归一为 null，不触发投影 500', async () => {
+  const { assertSafeAgentProjection } = await import('../src/agent-gateway/projection.js');
+  const db = openDb(':memory:');
+  runSync(db, { source: 'fixture', consultant_id: 'felix' });
+  const jobId = db.prepare(`SELECT jf.project_id FROM job_facts jf
+    JOIN job_memberships jm ON jm.project_id=jf.project_id
+    WHERE jm.consultant_id='felix' LIMIT 1`).get().project_id;
+  const context = { principal: { tenantId: 'tenant-a', consultantId: 'felix', chatType: 'p2p' } };
+  const out = await createActionToolHandlers({ db, launchProjectFn: async () => ({
+    ok: true, already: true, launch: { launch_id: 'L-1', status: 'READY', chat_id: 'oc_project', openclaw_status: undefined },
+  }) }).brainx_launch_project_chat({ job_id: jobId, confirm: true }, context);
+  assert.equal(out.data.openclaw_status, null);
+  assert.doesNotThrow(() => assertSafeAgentProjection(out, { chatType: 'p2p', purpose: 'job_action' }));
+  db.close();
+});
+
 test('建群工具（specs/017）：底层 blocker 错误码原样透出，不被吞成 INTERNAL', async () => {
   const db = openDb(':memory:');
   runSync(db, { source: 'fixture', consultant_id: 'felix' });

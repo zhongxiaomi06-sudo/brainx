@@ -149,7 +149,7 @@ async function launchProjectChat(db, args, principal, launchProjectFn) {
     const launch = result.launch;
     return {
       data: { job_ref: args.job_id, chat_id: launch.chat_id, chat_name: launch.chat_name || null,
-        status: launch.status, already: result.already === true, openclaw_status: launch.openclaw_status },
+        status: launch.status, already: result.already === true, openclaw_status: launch.openclaw_status ?? null },
       facts: [{ job_ref: args.job_id, project_chat: launch.chat_id, status: launch.status }],
       inferences: [], recommendations: [],
       unknowns: result.already

@@ -1,5 +1,14 @@
 # Agent Commit 记录
 
+## 2026-09-13｜test(agent): 建群误报生产复测——定位为会话历史模仿，新会话验证通过
+
+- 触发：用户再次要求「push 到云端、三处代码统一、真实链路自然语言逐步测试」。复核确认本地/origin(分支+main)/生产均为 `f7136ac`、四服务 active、H-1 畸形链接仍 400。
+- **复测发现**：同一会话内再次自然语言接单（LiberAI JFUFSJE），链路地面真相依旧全对（`brainx_launch_project_chat` SUCCEEDED、launch READY、群 `oc_abc46126…c00f` 建成、`openclaw_status=OK`），但机器人回复仍是「建群时服务端暂时有点波动」——`f7136ac` 的回执文案修复未能在该会话生效。
+- **根因定位**：逐项排除——服务器文件已含新文案、gateway 已于 01:44 重启加载、`openclaw_status=OK` 无歧义、全仓 skills/plugins/src 无「波动」静态模板。结论：模型在模仿**同一会话 01:35 修复前自己说过的「波动」措辞**（会话历史 few-shot 污染），与工具回执无关。
+- **验证**：私聊发送 `/new` 开新会话后重测——「推荐几个值得做的职位」正常出卡；「帮我接 自然映射 的 AI产品经理 职位」回复完全准确（「已接单成功！项目群已存在…机器人在群里」），误报消失。附带实证：模型连调 3 次 `brainx_launch_project_chat` 幂等只建一群（`oc_af3a3f70…803a` READY）；一次错误 job_ref 的 `brainx_run_status` 被正确 REFUSED（NOT_FOUND_OR_FORBIDDEN，不泄露对象存在性）。
+- 结论：`f7136ac` 修复对新会话有效；残留误报只存在于含修复前措辞的旧会话上下文，随新会话自然消除，无需进一步代码改动。
+- 验证：本轮为生产真实链路只读审计 + 飞书消息级复测，无代码改动；测试产生真实项目 JFUFSJE（LiberAI）与 JM26DGW（自然映射）及对应项目群，已向用户说明可清理路径。
+
 ## 2026-09-13｜fix(agent): 建群工具回执消除歧义——防止模型把成功误报为「建群波动」
 
 - 触发：0.92 真实链路测试（mia 私聊自然语言「帮我接 杭州小影创新 的 AI工具产品 职位」）中，`brainx_accept_job` + `brainx_launch_project_chat` 在 Gateway 审计均为 ALLOWED/SUCCEEDED，`project_launches` 落 READY 且群 `oc_bdcaadec…9265` 真实建成、职位卡已入群，但机器人对顾问的回复却是「建群的时候服务端暂时有点波动，我稍后再帮你把项目群建起来」——成功被误报为失败。

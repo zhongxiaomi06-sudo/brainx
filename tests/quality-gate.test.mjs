@@ -20,6 +20,12 @@ import {
 } from "../scripts/quality-gate/core.mjs";
 import { canonicalize } from "../scripts/quality-gate/card-render/run.mjs";
 import { renderCard, renderElements } from "../scripts/quality-gate/card-render/renderer.mjs";
+import {
+  checkTypography,
+  MAX_ACTION_BUTTONS,
+  MAX_BLOCK_LINES,
+} from "../scripts/quality-gate/card-render/typography.mjs";
+import { buildScenarios } from "../scripts/quality-gate/card-render/scenarios.mjs";
 import { candidateShareCard } from "../src/agent-gateway/tools-candidate-actions.js";
 
 test("Node 22 测试入口显式启用 TypeScript 类型剥离", () => {
@@ -365,6 +371,12 @@ test("卡片渲染门禁归一化可变字段，避免截图基线天天漂移",
     header: { content: "«TS»" },
     elements: ["run: «HEX»", "day=«DATE»", "TTC-8842137", 86, true],
   });
+  // 卡片标题用的是 now().slice(5, 16) 的相对形式（「09-12 19:05」/「09-12T19:05」）：
+  // 漏掉它，标题就随时钟逐分钟变化，基线每次 --update 都被改写，门禁还可能因为
+  // 分钟数字位数变化而偶发阻断。带年份的完整时间戳不得被它截断成半截。
+  assert.equal(canonicalize("推荐 09-12 19:05"), "推荐 «TS»");
+  assert.equal(canonicalize("提醒 09-12T19:05"), "提醒 «TS»");
+  assert.equal(canonicalize("推荐 2026-09-12T19:05"), "推荐 «TS»");
 });
 
 test("卡片渲染器遇到未覆盖元素类型必须抛错，不得静默跳过", () => {
@@ -386,10 +398,56 @@ test("卡片存量缺陷登记必须带到期日，不得无限期挂账", () =>
   const registry = JSON.parse(
     readFileSync(new URL("../fixtures/card-render/known-defects.json", import.meta.url), "utf8"),
   );
+  // 空表是目标状态（存量缺陷清完就下线登记），一旦登记就必须写清归属与到期日。
   const defects = registry.defects || [];
-  assert.ok(defects.length > 0);
+  assert.ok(Array.isArray(defects), "defects 必须是数组");
   for (const defect of defects) {
     assert.ok(defect.id && defect.rule && defect.owner && defect.reason, "登记项字段不完整");
     assert.match(defect.expiresOn, /^\d{4}-\d{2}-\d{2}$/, "登记项必须写明到期日");
   }
+});
+
+test("排版纪律：单块正文超过行数上限即判文字墙", () => {
+  const wall = Array.from({ length: MAX_BLOCK_LINES + 1 }, (_, index) => `第 ${index + 1} 行正文`);
+  const issues = checkTypography({ elements: [{ tag: "markdown", content: wall.join("\n") }] });
+  assert.deepEqual(issues.map((item) => item.rule), ["markdown-block-too-long"]);
+});
+
+test("排版纪律：列表行不计入正文行数，但总行数仍有上限", () => {
+  const bullets = (count) => Array.from({ length: count }, (_, index) => `- 第 ${index + 1} 条`).join("\n");
+  assert.deepEqual(checkTypography({
+    elements: [{ tag: "markdown", content: `**原项目群候选讨论**\n以下内容只作为业务证据。\n${bullets(8)}` }],
+  }), [], "列表可扫读，不应被当作文字墙");
+  assert.deepEqual(checkTypography({
+    elements: [{ tag: "markdown", content: `**原项目群候选讨论**\n${bullets(20)}` }],
+  }).map((item) => item.rule), ["markdown-block-overflow"], "列表再长也不能无上限");
+});
+
+test("排版纪律：连续标签行超过 3 行必须分组", () => {
+  const content = ["**依据**：A", "**风险**：B", "**行动**：C", "**备注**：D"].join("\n");
+  assert.deepEqual(checkTypography({ elements: [{ tag: "markdown", content }] })
+    .map((item) => item.rule), ["label-run-too-long"]);
+});
+
+test("排版纪律：动作块超过 3 个按钮即判截断风险，列内嵌套同样受检", () => {
+  const card = { elements: [{ tag: "column_set", columns: [{ elements: [
+    { tag: "action", actions: Array.from({ length: MAX_ACTION_BUTTONS + 1 }, () => ({ tag: "button" })) },
+  ] }] }] };
+  const issues = checkTypography(card);
+  assert.deepEqual(issues.map((item) => item.rule), ["action-row-too-many-buttons"]);
+  assert.match(issues[0].detail, /col\[0\]/, "表格列内的动作块也要被检查");
+});
+
+test("排版纪律：标签行必须全角冒号，标题行必须位于块首", () => {
+  assert.deepEqual(checkTypography({ elements: [{ tag: "markdown", content: "**依据**: A" }] })
+    .map((item) => item.rule), ["label-colon-halfwidth"]);
+  assert.deepEqual(checkTypography({ elements: [{ tag: "markdown", content: "元信息行\n**标题**\n正文" }] })
+    .map((item) => item.rule), ["heading-not-first"]);
+});
+
+test("排版纪律：全部生产卡片样本零违规", () => {
+  const failures = buildScenarios()
+    .map((scenario) => [scenario.id, checkTypography(canonicalize(scenario.card))])
+    .filter(([, issues]) => issues.length);
+  assert.deepEqual(failures, [], "生产卡片必须满足 docs/standards/CARD_TYPOGRAPHY.md 的硬规则");
 });

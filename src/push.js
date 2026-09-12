@@ -41,25 +41,36 @@ export function buildDailyCard({ consultant_name, consultant_id, run, items, ite
   const medals = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
   items.slice(0, limit).forEach((r, i) => {
     const j = r.job;
-    const hot = j.priority === 'HIGH' ? '🔥 ' : ''; // 重点高优（还做吗结构化，0007 起）
+    const hot = j.priority === 'HIGH' ? ' 🔥' : ''; // 重点高优（还做吗结构化，0007 起）
     const opportunityUrl = buildBrainxDeepLink({ baseUrl, objectType: 'opportunity', objectRef: j.project_id });
     const launchUrl = consultant_id && quickLink(baseUrl, consultant_id, j.project_id, 'launch', now());
+    // 排版纪律（docs/standards/CARD_TYPOGRAPHY.md）：标题行 → 元信息行 → 结论行 → 指标行，
+    // 空行分组后接最多 3 行标签行。🔥 放在标题的加粗之外，只作强调、不参与标题层级。
     els.push({ tag: 'markdown', content:
-      `**${medals[i]} ${hot}${j.role}**\n${j.company}${j.city ? ' · ' + j.city : ''} · ${REL_LABEL[j.relation] || j.relation}\n`
-      + `\`Fit ${dim(r, 'direction')}  Activity ${dim(r, 'activity')}  Evidence ${Math.round(r.evidence_coverage * 100)}\`\n`
+      `**${medals[i]} ${j.role}**${hot}\n`
+      + `${j.company}${j.city ? ' · ' + j.city : ''} · ${REL_LABEL[j.relation] || j.relation}\n`
       + `综合 **${r.score}** 分 · 置信${{ HIGH: '高', MEDIUM: '中', LOW: '低' }[r.confidence_band]} · ${ACTION_LABEL[r.action]}\n`
+      + `\`Fit ${dim(r, 'direction')} · Activity ${dim(r, 'activity')} · Evidence ${Math.round(r.evidence_coverage * 100)}\`\n`
+      + `\n`
       + `**依据**：${(r.reasons || []).slice(0, 2).join('；') || '暂无充分依据'}\n`
       + `**风险**：${(r.risks || []).slice(0, 2).join('；') || '暂无显著风险'}\n`
       + `**下一步**：${launchUrl ? '点击“接单并建群”，群内再选择找人方式' : '打开职位，在工作台确认接单并建群'}` });
-    const actions = launchUrl
-      ? [btn('接单并建群', launchUrl, 'primary'), btn('查看职位', opportunityUrl),
-        btn('回放', buildBrainxDeepLink({ baseUrl, objectType: 'replay', objectRef: r.decision_id }))]
-      : [btn('打开职位', opportunityUrl, 'primary'),
-        btn('回放', buildBrainxDeepLink({ baseUrl, objectType: 'replay', objectRef: r.decision_id }))];
+    // 按钮必须拆成 2+2：4 个按钮挤在同一行时每个只剩约 88px，「接单并建群」会被
+    // 省略号截断（排版门禁 button-truncated）。第一行是主行动组，第二行是辅助组。
+    const primaryActions = launchUrl
+      ? [btn('接单并建群', launchUrl, 'primary'), btn('查看职位', opportunityUrl)]
+      : [btn('打开职位', opportunityUrl, 'primary')];
+    const secondaryActions = [btn('回放',
+      buildBrainxDeepLink({ baseUrl, objectType: 'replay', objectRef: r.decision_id }))];
     // 一键反馈（F2）：签名当日有效；未配置密钥时 quickLink 返 null，按钮不渲染
     const ignoreUrl = consultant_id && quickLink(baseUrl, consultant_id, j.project_id, 'ignore', now());
-    if (ignoreUrl) actions.push(btn('✕ 忽略', ignoreUrl, 'danger'));
-    els.push({ tag: 'action', actions });
+    if (ignoreUrl) secondaryActions.push(btn('✕ 忽略', ignoreUrl, 'danger'));
+    // 辅助组只剩「回放」时，两行各一个按钮会显得松散，合并回第一行（合计 2 个，不触截断）。
+    if (primaryActions.length === 1 && secondaryActions.length === 1) {
+      primaryActions.push(...secondaryActions.splice(0));
+    }
+    els.push({ tag: 'action', actions: primaryActions });
+    if (secondaryActions.length) els.push({ tag: 'action', actions: secondaryActions });
     if (i < limit - 1) els.push({ tag: 'hr' });
   });
   const shared = items.filter((r) => r.job.relation === 'TEAM_SHARED').length;

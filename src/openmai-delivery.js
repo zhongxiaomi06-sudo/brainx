@@ -71,9 +71,7 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
     : `**${job.company} · ${job.role}**\n\n本轮候选人搜索失败：${groupSafeOpenmaiText(error, 500)}\n\n请修复连接后在工作台重试。`;
   const table = candidates.length ? [
     candidateTableHeading(),
-    ...candidates.flatMap((candidate, index) => candidateTableRow({
-      candidate, index, job, baseUrl,
-    })),
+    ...candidates.map((candidate, index) => candidateTableRow({ candidate, index })),
   ] : [];
   return {
     config: { wide_screen_mode: true },
@@ -84,14 +82,46 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
     elements: [
       { tag: 'markdown', content },
       ...table,
+      ...focusSection(job, candidates),
       ...(candidates.length ? [continueSearchActions(job)] : []),
       ...(!success || !candidates.length ? [{ tag: 'action', actions: [{ tag: 'button', type: 'primary',
         text: { tag: 'plain_text', content: success ? '打开工作台查看与评估' : '打开工作台处理' },
         multi_url: { url: target, pc_url: target, android_url: target, ios_url: target } }] }] : []),
-      { tag: 'note', elements: [{ tag: 'plain_text',
-        content: '“重点关注”会加入项目共同重点名单，并立即在群里投放带 TTC 链接的人才卡' }] },
     ],
   };
+}
+
+/** 「重点关注」动作区：按钮按序号对应表格行，独占表格下方的整行。
+ *  此前按钮塞在 6 列表格的「操作」列里，只分到约 53px，文字必被省略号截断
+ *  （排版门禁 button-truncated）。每行最多 3 个按钮，超过则另起一行。 */
+function focusSection(job, candidates) {
+  const focusable = candidates.map((candidate, index) => ({ candidate, no: index + 1 }))
+    .filter(({ candidate }) => candidate.candidateRefValid !== false);
+  if (!focusable.length) return [];
+  const rows = [];
+  for (let start = 0; start < focusable.length; start += 3) {
+    rows.push({ tag: 'action', actions: focusable.slice(start, start + 3)
+      .map(({ candidate, no }) => keepCandidateAction(job, candidate, no)) });
+  }
+  return [
+    { tag: 'markdown', content:
+      '**重点关注**：点按钮把对应序号的候选人加入项目共同重点名单，并投递带 TTC 链接的人才卡' },
+    ...rows,
+    ...candidateQualityNotes(candidates),
+  ];
+}
+
+/** 表格原来的「操作」列兼作「链接待核实」提示，该列移除后信号改在这里披露，避免静默丢失。 */
+function candidateQualityNotes(candidates) {
+  const numbered = candidates.map((candidate, index) => ({ candidate, no: index + 1 }));
+  const invalid = numbered.filter(({ candidate }) => candidate.candidateRefValid === false);
+  const unverified = numbered.filter(({ candidate }) => candidate.candidateRefValid !== false
+    && !ttcTalentUrl(candidate));
+  const notes = [];
+  if (invalid.length) notes.push(`${invalid.map(({ no }) => no).join('、')} 号候选人编号无效，未生成关注按钮`);
+  if (unverified.length) notes.push(`${unverified.map(({ no }) => no).join('、')} 号 TTC 链接待核实`);
+  return notes.length
+    ? [{ tag: 'note', elements: [{ tag: 'plain_text', content: notes.join('；') }] }] : [];
 }
 
 function continueSearchActions(job) {
@@ -116,7 +146,7 @@ function candidateTableHeading() {
   return {
     tag: 'column_set', flex_mode: 'none', background_style: 'grey',
     columns: [tableCell('候选人 / 当前岗位', 3), tableCell('经验 / 城市', 2),
-      tableCell('学历', 2), tableCell('核心匹配', 4), tableCell('匹配度', 1), tableCell('操作', 2)],
+      tableCell('学历', 2), tableCell('核心匹配', 4), tableCell('匹配度', 1)],
   };
 }
 
@@ -133,35 +163,27 @@ function ttcTalentUrl(candidate) {
   return `https://app.ttcadvisory.com/app/talent/${encodeURIComponent(candidate.candidateRef)}`;
 }
 
-function keepCandidateAction(job, candidate) {
+/** 按钮文案带序号（对应表格行号），使「表格下方的动作行」能唯一指向候选人；
+ *  不带序号时多个同名按钮无法区分，带候选人姓名则长名会被省略号截断。 */
+function keepCandidateAction(job, candidate, no) {
   const projectRef = String(job.project_id || '').trim().slice(0, 64);
   const command = `把项目 ${projectRef} 的候选人 ${candidate.candidateRef} 标记为重点关注。`
     + '这个按钮就是我的明确确认：现在调用 brainx_candidate_workflow，'
     + `传入 job_id=${projectRef}、candidate_ref=${candidate.candidateRef}、`
     + 'action=KEEP_FOR_REVIEW、confirm=true。成功后告诉群里“☑ 已重点关注”，'
     + '并说明此人已进入本项目共享上下文，同时已发送人才卡；不要发送简历。';
-  return { tag: 'button', type: 'primary', text: { tag: 'plain_text', content: '重点关注' },
+  return { tag: 'button', type: 'primary', text: { tag: 'plain_text', content: `重点关注 ${no}` },
     value: { text: command } };
 }
 
-function candidateTableRow({ candidate, index, job, baseUrl }) {
-  void baseUrl;
-  const detailUrl = ttcTalentUrl(candidate);
-  const action = detailUrl ? []
-    : [{ tag: 'div', text: { tag: 'plain_text', content: '链接待核实' } }];
-  if (candidate.candidateRefValid !== false) {
-    action.push(keepCandidateAction(job, candidate));
-  }
-  return [
-    { tag: 'column_set', flex_mode: 'none', background_style: 'default', columns: [
-      tableCell(`${index + 1}. ${groupSafeOpenmaiText(candidate.name, 60)}\n${groupSafeOpenmaiText(candidate.role, 120)}`, 3),
-      tableCell(`${groupSafeOpenmaiText(candidate.experience, 40)} · ${groupSafeOpenmaiText(candidate.city, 40)}`, 2),
-      tableCell(groupSafeOpenmaiText(candidate.education, 80), 2),
-      tableCell(groupSafeOpenmaiText(candidate.evaluation, 300), 4),
-      tableCell(groupSafeOpenmaiText(candidate.score, 20), 1),
-      tableCell('', 2, action),
-    ] },
-  ];
+function candidateTableRow({ candidate, index }) {
+  return { tag: 'column_set', flex_mode: 'none', background_style: 'default', columns: [
+    tableCell(`${index + 1}. ${groupSafeOpenmaiText(candidate.name, 60)}\n${groupSafeOpenmaiText(candidate.role, 120)}`, 3),
+    tableCell(`${groupSafeOpenmaiText(candidate.experience, 40)} · ${groupSafeOpenmaiText(candidate.city, 40)}`, 2),
+    tableCell(groupSafeOpenmaiText(candidate.education, 80), 2),
+    tableCell(groupSafeOpenmaiText(candidate.evaluation, 300), 4),
+    tableCell(groupSafeOpenmaiText(candidate.score, 20), 1),
+  ] };
 }
 
 export function enqueueOpenmaiDeliveries(db, at = now()) {

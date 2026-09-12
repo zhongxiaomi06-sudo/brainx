@@ -1,5 +1,16 @@
 # Agent Commit 记录
 
+## 2026-09-12｜feat(quality-gate): 卡片文字排版硬规则，并按规则修复三张卡片排版
+
+- 触发：用户要求「走 PR / 拆成 2+2 两行排版正确 / 把「重点关注」移出表格收成表格下方一整行 / 主要是格式渲染当前文字给出都没有章法，不好看，先重点改文字的排版」。
+- 新增 `scripts/quality-gate/card-render/typography.mjs`：6 条可在卡片 JSON 层判定的文字排版硬规则 —— `markdown-block-too-long`（单块正文 > 8 行）、`markdown-block-overflow`（单块总行 > 16）、`label-run-too-long`（连续标签行 > 3）、`action-row-too-many-buttons`（动作块 > 3 个按钮）、`label-colon-halfwidth`（标签行半角冒号）、`heading-not-first`（加粗标题不在块首）。列表与引用行不计入正文行数（本身就便于扫读），但总行数仍有上限；列内嵌套元素同样受检。判定是纯 JSON 的，**不依赖渲染，因此渲染失败时也会照常报出**。
+- 修掉门禁自身的缺陷：三张卡的标题用 `now().slice(5, 16)` 拼相对时间戳（「09-12 19:05」），而 `canonicalize()` 只归一化带年份的完整时间戳 → 这几张卡的基线**每跑一次 `--update` 就被改写一次**，且分钟数字位数变化时可能偶发阻断。补规则后连续两次 `--update` 产物逐字节一致。
+- 每日推荐卡（F2 截断）：动作行拆 2+2 —— 第一行主行动组（接单并建群 + 查看职位），第二行辅助组（回放 + ✕忽略）；辅助组只剩「回放」时并回第一行，避免两个孤行。同时重排文字层级：🔥 移到标题行尾（不再参与标题层级）、结论行提到指标行之前、指标行由双空格改用 ` · ` 分隔。
+- 找人结果卡（F3 截断）：删掉 6 列里的「操作」列（降至 5 列），「重点关注」移出表格、收成表格下方整行动作区，按每行 3 个拆行，按钮文案带序号（`重点关注 1`）以对应表格行号（按姓名会因长名再次截断）。原「操作」列兼作的「链接待核实」提示改在动作区用 note 披露，避免删列导致静默丢信息。顺带修掉一处文案 bug：原来卡尾 note 无条件解释「重点关注」，在「搜索失败 / 无候选人」卡上也会出现。
+- Offer 决策群首卡（F8，由门禁新规则当场抓出）：迁移摘要把 4 个小节塞进一个 markdown 元素，形成 11 行文字墙；改为按小节拆成独立元素（`splitSections`），分组交给卡片自身的元素间距。**落库的 `context_summary` 保持原样不变**。同时把概览行分隔符由 `｜` 统一为 ` · `（讨论条目内的 `｜` 保留）。
+- 文档：[飞书群卡片文字排版规范](standards/CARD_TYPOGRAPHY.md)（新增：五级层级、6 条硬规则、拆块与拆行动作示例、自检命令）。
+- 验证：`node scripts/quality-gate/card-render/run.mjs` 17/17 通过、存量登记归零（F2/F3 修复后 `known-defects.json` 回到空表）；`--update` 连跑两次产物逐字节一致；反向验证「门禁有牙」—— 临时把关注按钮改回单行 6 个，门禁同时命中 `action-row-too-many-buttons` 与 `button-truncated` 并返回退出码 1，还原后恢复 0；`node --test tests/quality-gate.test.mjs tests/openmai-delivery.test.mjs tests/candidate-decision-group.test.mjs tests/autopush.test.mjs` 51/51 通过（新增 6 条排版用例与 canonicalize 相对时间戳用例，同步更新 2 个卡片结构断言）。
+
 ## 2026-09-12｜feat(quality-gate): 卡片渲染门禁补出图复核页
 
 - 门禁只判定几何事实（截断、溢出、像素差异），「好不好看」最终要人眼判断。因此每次运行额外产出 `.quality-gate/reports/card-render/gallery.html`：把 17 张卡片截图摊在一页，标注通过 / 存量登记 / 阻断与各自的度量（卡片高、按钮组数、最大列高）。

@@ -9,7 +9,9 @@
  * 三件事：
  *   1) 用真实构建函数产出卡片，归一化可变字段（时间戳/签名/运行号）后渲染成 DOM；
  *   2) 落 PNG 截图，与 fixtures/card-render/baseline 下的基线比对（按平台分档）；
- *   3) 断言可判定的排版硬规则：按钮文字截断、卡片横向溢出、渲染器未覆盖元素。
+ *   3) 断言可判定的排版硬规则：按钮文字截断、卡片横向溢出、渲染器未覆盖元素；
+ *   4) 断言文字排版纪律（typography.mjs）：块行数、连续标签行、动作块按钮数、
+ *      标题位置、冒号全角。规则定义见 docs/standards/CARD_TYPOGRAPHY.md。
  *
  * 用法：
  *   node scripts/quality-gate/card-render/run.mjs              # 校验（CI/门禁用）
@@ -41,8 +43,12 @@ const DIFF_LIMIT = Number(process.env.BRAINX_CARD_DIFF_RATIO || 0.004);
 const PLATFORM = process.env.BRAINX_CARD_PLATFORM || process.platform;
 
 // 卡片里带日期、签名、运行号等每次运行都变的字段；不归一化就无法做基线比对。
+// 顺序有讲究：先吃掉带年份的完整时间戳，再吃只带月日的相对时间戳（卡片标题用的是
+// now().slice(5, 16) 形式，如「09-12 19:05」——漏掉它会让标题随时钟逐分钟变化，
+// 基线每次 --update 都被改写，门禁还可能因分钟数字位数变化而偶发阻断）。
 const VOLATILE_RULES = [
   [/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?Z?/g, '«TS»'],
+  [/\b\d{2}-\d{2}[T ]\d{2}:\d{2}\b/g, '«TS»'],
   [/\d{4}-\d{2}-\d{2}/g, '«DATE»'],
   [/\b[0-9a-f]{8,}\b/gi, '«HEX»'],
 ];
@@ -161,6 +167,7 @@ async function main() {
   process.env.BRAINX_FEEDBACK_SECRET = process.env.BRAINX_FEEDBACK_SECRET || 'card-render-gate-fixture';
   const { renderCardDocument } = await import('./renderer.mjs');
   const { buildScenarios } = await import('./scenarios.mjs');
+  const { checkTypography } = await import('./typography.mjs');
 
   const scenarios = buildScenarios().filter((item) => !ONLY || item.id === ONLY);
   if (!scenarios.length) throw new Error(`没有匹配的卡片样本：${ONLY || '(空)'}`);
@@ -186,6 +193,9 @@ async function main() {
     const reasons = [];
     try {
       const card = canonicalize(scenario.card);
+      // 排版纪律是纯 JSON 判定，不依赖渲染；渲染失败时也要照常报出来。
+      entry.typography = checkTypography(card);
+      reasons.push(...entry.typography);
       const html = renderCardDocument(card, { css: CSS, title: scenario.title, cardId: scenario.id });
       await page.setContent(html, { waitUntil: 'load' });
       const shot = join(SHOT_DIR, `${scenario.id}.png`);
@@ -290,17 +300,18 @@ function renderSummaryMarkdown(summary) {
     `- 结果：${summary.passed}/${summary.total} 通过`,
     `- 截图目录：\`${summary.shots}\``,
     `- 模式：${summary.update ? '重建基线' : '校验基线'}`, '',
-    '| 卡片 | 结果 | 卡片高 | 按钮组 | 每行按钮数 | 最大列高 | 差异 |',
-    '|---|---|---|---|---|---|---|',
+    '| 卡片 | 结果 | 卡片高 | 按钮组 | 每行按钮数 | 最大列高 | 差异 | 排版纪律 |',
+    '|---|---|---|---|---|---|---|---|',
   ];
   for (const entry of summary.results) {
     const m = entry.metrics;
     const rows = m ? m.actionRows.map((row) => row.buttons).join('/') || '—' : '—';
     const diff = entry.diff ? `${(entry.diff.ratio * 100).toFixed(2)}%` : (entry.baseline || '—');
     const verdict = entry.failures.length ? '不通过' : entry.registered.length ? '通过（有存量登记）' : '通过';
+    const typo = entry.typography?.length ? `${entry.typography.length} 项违规` : 'OK';
     lines.push(`| ${entry.id} | ${verdict} | `
       + `${m ? `${m.cardHeight}px` : '—'} | ${m ? m.actionRows.length : '—'} | ${rows} | `
-      + `${m ? `${m.maxColumnHeight}px` : '—'} | ${diff} |`);
+      + `${m ? `${m.maxColumnHeight}px` : '—'} | ${diff} | ${typo} |`);
   }
   const failures = summary.results.filter((entry) => entry.failures.length);
   if (failures.length) {

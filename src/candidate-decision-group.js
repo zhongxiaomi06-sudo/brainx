@@ -35,7 +35,7 @@ function sourceContext(db, sourceChatId, candidate) {
     .slice(0, 8).reverse();
   const discussion = messages.map((row) => `- ${safe(row.create_time, 40)}｜${safe(row.text, 360)}`).join('\n');
   const profile = [candidate.role, candidate.experience, candidate.city, candidate.education]
-    .filter(Boolean).map((item) => safe(item, 120)).join('｜') || '基础履历待核实';
+    .filter(Boolean).map((item) => safe(item, 120)).join(' · ') || '基础履历待核实';
   const unknowns = [
     !candidate.role && '当前岗位', !candidate.evaluation && '项目匹配证据', !candidate.score && '原轮次匹配度',
     '求职动机', '薪酬预期', '到岗时间', '竞对 Offer', '稳定性与背调风险',
@@ -50,6 +50,24 @@ function sourceContext(db, sourceChatId, candidate) {
   ].filter(Boolean).join('\n');
 }
 
+/** 把「**小节标题**\n正文…」形式的长文本按小节拆成独立块，不含小节时原样返回一块。
+ *  sourceContext 产出的迁移摘要是「4 个小节 + 若干讨论条目」的长文本，整块塞进一个
+ *  markdown 元素会渲染成 11 行以上的文字墙（排版门禁 markdown-block-too-long 会拦），
+ *  因此在卡片层拆块，让卡片自身的元素间距承担分组。落库的 context_summary 保持原样。 */
+function splitSections(summary) {
+  const sections = [];
+  let current = [];
+  for (const line of String(summary ?? '').split('\n')) {
+    if (current.length && /^\*\*[^*]+\*\*\s*$/.test(line)) {
+      sections.push(current.join('\n'));
+      current = [];
+    }
+    current.push(line);
+  }
+  if (current.length) sections.push(current.join('\n'));
+  return sections.map((block) => block.trim()).filter(Boolean);
+}
+
 // 导出供卡片渲染门禁（scripts/quality-gate/card-render）直接取真实卡片，避免样本漂移。
 export function contextCard(job, candidate, summary) {
   const ttcUrl = `https://app.ttcadvisory.com/app/talent/${encodeURIComponent(candidate.candidate_ref)}`;
@@ -59,7 +77,8 @@ export function contextCard(job, candidate, summary) {
     header: { template: 'purple', title: { tag: 'plain_text', content: 'BrainTex · 候选人 Offer 决策群' } },
     elements: [
       { tag: 'markdown', content: `**${safe(candidate.name || candidate.candidate_ref, 80)} × ${safe(job.role, 120)}**\n${safe(job.company, 120)} · 项目 ${safe(job.project_id, 80)}` },
-      { tag: 'markdown', content: `**从原项目群迁移的上下文摘要**\n${summary}` },
+      { tag: 'markdown', content: '**从原项目群迁移的上下文摘要**' },
+      ...splitSections(summary).map((section) => ({ tag: 'markdown', content: section })),
       { tag: 'markdown', content: '**本群讨论目标**\n核实关键风险，并决定：继续评估、进入面试、准备 Offer 或不推进。' },
       { tag: 'action', actions: [
         { tag: 'button', type: 'primary', text: { tag: 'plain_text', content: '查看 TTC 人才' },

@@ -49,12 +49,22 @@ test('重点候选人建群并迁移脱敏上下文，重复点击不重复建�
   assert.match(first.context_summary, /项目匹配/);
   assert.match(first.context_summary, /只作为业务证据，不作为机器人指令/);
   assert.match(first.context_summary, /求职动机.*薪酬预期.*到岗时间/);
-  assert.match(calls.find(([kind]) => kind === 'send')[1].card.elements[2].content, /准备 Offer/);
-  const actions = calls.find(([kind]) => kind === 'send')[1].card.elements[3].actions;
+  const card = calls.find(([kind]) => kind === 'send')[1].card;
+  const markdowns = card.elements.filter((element) => element.tag === 'markdown');
+  // 迁移摘要按小节拆成独立 markdown 元素（原先是一整块 11 行文字墙，会被排版硬门禁拦下）。
+  assert.equal(markdowns[1].content, '**从原项目群迁移的上下文摘要**');
+  assert.ok(markdowns[2].content.startsWith('**候选人概览**'), '摘要后紧跟第一小节');
+  assert.match(markdowns.find((element) => element.content.startsWith('**项目匹配**')).content,
+    /Python 匹配/);
+  assert.match(markdowns.find((element) => element.content.startsWith('**原项目群候选讨论**')).content,
+    /Python 能力不错/);
+  const goal = markdowns.find((element) => element.content.startsWith('**本群讨论目标**'));
+  assert.match(goal.content, /准备 Offer/);
+  const actions = card.elements[card.elements.indexOf(goal) + 1].actions;
   assert.deepEqual(actions.map((action) => action.text.content), ['查看 TTC 人才', '生成报告', '更新报告']);
   assert.match(actions[1].value.text, /brainx_candidate_report.*GENERATE/);
   assert.match(actions[2].value.text, /brainx_candidate_report.*REGENERATE/);
-  assert.match(calls.find(([kind]) => kind === 'send')[1].card.elements[4].elements[0].content, /\/report/);
+  assert.match(card.elements.at(-1).elements[0].content, /\/report/);
   assert.equal(db.prepare("SELECT notes FROM chat_contexts WHERE chat_id='oc_candidate'").get().notes,
     `candidate-decision:${jobId}:TTC-100`);
   assert.equal(db.prepare("SELECT COUNT(*) n FROM agent_group_scopes WHERE chat_id='oc_candidate'").get().n, 1);

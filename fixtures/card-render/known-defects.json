@@ -1,20 +1,11 @@
 {
   "schemaVersion": 1,
   "note": "飞书群卡片渲染回归的存量缺陷登记。口径与 .quality-gate/baseline.json 一致：只能减少、不得新增、到期即失效。未登记的同类缺陷一律阻断。登记项只报告、不阻断，因此不会卡住 push，但会在 .quality-gate/reports/card-render/summary.md 里逐条列出。",
-  "defects": [
+  "history": [
     {
-      "id": "daily-recommendation",
-      "rule": "button-truncated",
-      "owner": "product-frontend",
-      "reason": "每日推荐卡动作行放了 4 个按钮（接单并建群 / 查看职位 / 回放 / ✕ 忽略），420px 卡片宽度下每个按钮只剩约 88px，「接单并建群」被省略号截断，顾问读不到按钮名。修法二选一：拆成两行 2+2，或缩短按钮文案。",
-      "expiresOn": "2026-09-20"
-    },
-    {
-      "id": "openmai-delivery-complete",
-      "rule": "button-truncated",
-      "owner": "product-frontend",
-      "reason": "找人结果卡是 6 列 column_set（候选人/经验城市/学历/核心匹配/匹配度/操作），「操作」列按权重只分到约 53px，列内「重点关注」按钮被省略号截断。修法二选一：把 6 列合并为 4 列，或把「重点关注」移出表格、收成表格下方一整行动作。",
-      "expiresOn": "2026-09-20"
+      "clearedOn": "2026-09-12",
+      "summary": "daily-recommendation 与 openmai-delivery-complete 的 button-truncated 均已修复（动作行拆 2+2、「重点关注」移出表格列），登记项随之下线，本文件回到空表。新增同类缺陷必须重新登记并写明到期日。"
     }
-  ]
+  ],
+  "defects": []
 }

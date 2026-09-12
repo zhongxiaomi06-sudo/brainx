@@ -182,7 +182,7 @@ test('OpenMai 澄清语句不得伪装成候选人已就绪', () => {
   assert.doesNotMatch(card.header.title.content, /已就绪/);
 });
 
-test('OpenMai 总览每行提供人才卡片与项目共享保留按钮，不显示建群按钮', () => {
+test('OpenMai 总览把关注按钮收在表格下方整行，不挤表格列也不显示建群按钮', () => {
   const resultText = `不应把这段 Markdown 原文直接发群\n|姓名|详情|\n|---|---|\n<!-- BRAINX_CANDIDATES_V1
 ${JSON.stringify({ candidates: [
     { candidate_ref: 'c-1', name: '张三', evaluation: '匹配 91%，驱动经验待核实',
@@ -196,20 +196,27 @@ ${JSON.stringify({ candidates: [
   const rows = card.elements.filter((element) => element.tag === 'column_set');
   assert.equal(rows.length, 3, '一行表头加两行候选人');
   assert.equal(rows[0].columns[0].elements[0].text.content, '候选人 / 当前岗位');
+  assert.equal(rows[0].columns.length, 5, '「操作」列已移除，按钮不再挤在表格列里');
+  assert.equal(rows[0].columns.at(-1).elements[0].text.content, '匹配度');
   assert.match(rows[1].columns[0].elements[0].text.content, /^1\. 张三/);
   assert.match(rows[1].columns[3].elements[0].text.content, /91%/);
   assert.doesNotMatch(JSON.stringify(card), /\|姓名\|详情\||不应把这段/);
-  const keepButton = rows[1].columns[5].elements[0];
-  assert.equal(keepButton.text.content, '重点关注');
+  // 「重点关注」移出表格，收成表格下方的动作行；按钮带序号以对应表格行号。
+  const focusActions = card.elements.filter((element) => element.tag === 'action'
+    && element.actions[0].text.content.startsWith('重点关注'));
+  assert.equal(focusActions.length, 1, '两人共用一行关注按钮');
+  assert.deepEqual(focusActions[0].actions.map((button) => button.text.content),
+    ['重点关注 1', '重点关注 2']);
+  const keepButton = focusActions[0].actions[0];
   assert.match(keepButton.value.text, /candidate_ref=c-1/);
   assert.match(keepButton.value.text, /action=KEEP_FOR_REVIEW/);
   assert.match(keepButton.value.text, /confirm=true/);
-  assert.equal(rows[1].columns[5].elements.length, 1);
   assert.doesNotMatch(JSON.stringify(card), /action=SEND_TALENT_CARD/);
   assert.doesNotMatch(JSON.stringify(card), /为 TA 建决策群/);
-  const secondButton = rows[2].columns[5].elements[0];
-  assert.match(secondButton.value.text, /candidate_ref=c-2/);
-  assert.match(card.elements.at(-1).elements[0].content, /项目共同重点名单/);
+  assert.match(focusActions[0].actions[1].value.text, /candidate_ref=c-2/);
+  const focusIntro = card.elements.find((element) => element.tag === 'markdown'
+    && /项目共同重点名单/.test(element.content || ''));
+  assert.ok(focusIntro, '关注按钮上方必须说明它会把候选人加入项目共同重点名单');
   assert.match(card.elements[0].content, /第 2 轮/);
   assert.equal(card.header.title.content, 'BrainTex · 第 2 轮候选人不足');
   const completeCandidates = Array.from({ length: 6 }, (_, index) => ({
@@ -221,8 +228,13 @@ ${JSON.stringify({ candidates: [
     publicBaseUrl: 'https://base.yorkteam.cn/',
   });
   assert.equal(completeCard.header.title.content, 'BrainTex · 第 2 轮候选人已就绪');
-  const continueActions = card.elements.filter((element) => element.tag === 'action');
-  assert.equal(continueActions.length, 1, '候选行操作仍在最右侧，名单后只追加继续找人入口');
+  // 6 人时关注按钮按每行 3 个拆行：单行动作块超过 3 个按钮就会在 420px 卡片下被省略号截断。
+  const completeFocus = completeCard.elements.filter((element) => element.tag === 'action'
+    && element.actions[0].text.content.startsWith('重点关注'));
+  assert.deepEqual(completeFocus.map((row) => row.actions.length), [3, 3]);
+  const continueActions = card.elements.filter((element) => element.tag === 'action'
+    && element.actions[0].text.content.includes('继续找人'));
+  assert.equal(continueActions.length, 1, '关注动作与继续找人分成两个动作块');
   assert.deepEqual(continueActions[0].actions.map((button) => button.text.content),
     ['OpenMai 继续找人', 'SuperMai 继续找人']);
   assert.ok(continueActions[0].actions.every((button) => button.value.text.includes('continue_search=true')));

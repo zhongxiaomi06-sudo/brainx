@@ -1,5 +1,13 @@
 # Agent Commit 记录
 
+## 2026-09-12｜docs(sprint): 0.9 冲刺核查报告处置方案（修正 + Reloop 变更）
+
+- 输入：用户提供的《0.9 冲刺前端需求深度核查报告》（2026-09-12 17:30），逐条与仓库代码复核后产出处置方案 [0.9 冲刺核查处置方案](2026-09-12-sprint-0.9-remediation-plan.md)。
+- 复核修正报告 3 处事实：①G7「`migrations/0044` 注释仍是岗位画像」不成立（该文件 0 命中，T8 仅剩 `app/openmai-panel.tsx:26` 按钮文案）；②T5 补漏——`app/engagement-loop-editor.tsx:63-69` 的 accept 三步表单仍在，因 `acceptDirect()` 绕过而成为不可达死分支；③T12 补漏——卡片发送处未持久化 message_id，且 `src/feishu-bot.js` 无任何卡片更新（patch）函数，这是「真置灰」的真实成本来源。
+- 核查确认的硬约束：`app/workbench.tsx` 499 行、`app/engagement-loop.tsx` 496 行紧贴 500 行上限，本轮改动只能等行替换或净减行；全仓行尾为 LF（非 CRLF）。
+- 方案内容：R1–R9 处置清单（含文件:行、改法、验收）、Reloop 专项边界（T10/T11/T12/T13 已完成不动，只动可见态与文案）、本轮不做项（T15–T18 与 Web 候选人收藏列表）、5 段原子 commit 切分、三项待用户拍板决策（T12 可见态 / 本轮范围 / 部署节奏）。
+- 验证：纯文档改动，未触碰代码；`git status` 仅本方案文件、`docs/README.md` 登记与本日志。执行阶段的 `npm run verify` 在方案批准后按第 5 节逐个 commit 执行。
+
 ## 2026-09-12｜docs(sprint): 报告链路打通证据与消息落库管道限制登记
 
 - 报告服务修复过程：`ERR_INVALID_URL`（缺 `BRAINX_FEISHU_DOC_BASE_URL`，已补 `https://jxog8b3tny.feishu.cn` 至 agent.env）→ `FEISHU_DOC_CREATE_FAILED`（应用缺 `docx:document` 权限，用户已在飞书后台开通）。

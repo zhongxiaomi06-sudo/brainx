@@ -13,11 +13,16 @@ function feishuCredentials(appId, appSecret) {
       const feishu = JSON.parse(readFileSync(process.env.BRAINX_OPENCLAW_CONFIG_PATH, 'utf8'))
         .channels?.feishu;
       // 凭证有两种落法：本机开发配置写顶层 appId/appSecret；生产 openclaw.json
-      // 写在 accounts 表里（defaultAccount 指向的账号，如 accounts.mia）。两种都要能取到。
+      // 写在 accounts 表里（defaultAccount 指向的账号，如 accounts.mia）。
+      // 生产值还是 ${VAR} 环境引用形态（OpenClaw 启动时才插值），必须按进程环境解析。
       const account = feishu?.accounts?.[feishu?.defaultAccount || 'mia'];
+      const resolve = (value) => {
+        const match = /^\$\{([A-Z0-9_]+)\}$/.exec(String(value || ''));
+        return match ? process.env[match[1]] : value;
+      };
       return {
-        appId: feishu?.appId || account?.appId,
-        appSecret: feishu?.appSecret || account?.appSecret,
+        appId: feishu?.appId || resolve(account?.appId),
+        appSecret: feishu?.appSecret || resolve(account?.appSecret),
       };
     } catch {
       return { appId: undefined, appSecret: undefined };

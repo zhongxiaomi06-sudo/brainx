@@ -44,17 +44,22 @@ test('飞书机器人可显式复用 OpenClaw 同一应用凭证', async () => {
 test('飞书机器人可从生产形态 openclaw.json 的 accounts 表取凭证', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'brainx-feishu-'));
   const path = join(dir, 'openclaw.json');
-  // 生产 openclaw.json 的真实形态：顶层无 appId，凭证在 accounts[defaultAccount]。
+  // 生产 openclaw.json 的真实形态：顶层无 appId，凭证在 accounts[defaultAccount]，
+  // 且值是 ${VAR} 环境引用（OpenClaw 启动时插值），必须按进程环境解析。
   writeFileSync(path, JSON.stringify({ channels: { feishu: {
     defaultAccount: 'mia',
-    accounts: { mia: { name: 'mia', appId: 'cli_prod', appSecret: 'prod-secret' } },
+    accounts: { mia: { name: 'mia', appId: '${BRAINX_TEST_APP_ID}', appSecret: '${BRAINX_TEST_APP_SECRET}' } },
   } } }));
   const previous = {
     flag: process.env.BRAINX_FEISHU_CREDENTIALS_FROM_OPENCLAW,
     path: process.env.BRAINX_OPENCLAW_CONFIG_PATH,
+    appId: process.env.BRAINX_TEST_APP_ID,
+    appSecret: process.env.BRAINX_TEST_APP_SECRET,
   };
   process.env.BRAINX_FEISHU_CREDENTIALS_FROM_OPENCLAW = '1';
   process.env.BRAINX_OPENCLAW_CONFIG_PATH = path;
+  process.env.BRAINX_TEST_APP_ID = 'cli_prod';
+  process.env.BRAINX_TEST_APP_SECRET = 'prod-secret';
   const calls = [];
   try {
     await sendInteractiveCard({
@@ -73,6 +78,10 @@ test('飞书机器人可从生产形态 openclaw.json 的 accounts 表取凭证'
     else process.env.BRAINX_FEISHU_CREDENTIALS_FROM_OPENCLAW = previous.flag;
     if (previous.path === undefined) delete process.env.BRAINX_OPENCLAW_CONFIG_PATH;
     else process.env.BRAINX_OPENCLAW_CONFIG_PATH = previous.path;
+    if (previous.appId === undefined) delete process.env.BRAINX_TEST_APP_ID;
+    else process.env.BRAINX_TEST_APP_ID = previous.appId;
+    if (previous.appSecret === undefined) delete process.env.BRAINX_TEST_APP_SECRET;
+    else process.env.BRAINX_TEST_APP_SECRET = previous.appSecret;
     rmSync(dir, { recursive: true, force: true });
   }
 });

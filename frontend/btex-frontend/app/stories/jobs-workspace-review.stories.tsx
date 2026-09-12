@@ -37,7 +37,7 @@ export const DesktopReview: Story = {
     await expect(canvas.getByRole("dialog", { name: "高级算法工程师" })).toBeInTheDocument();
     await expect(canvas.getByText("脱敏审核数据 · 字段结构对齐 TTC 职位快照")).toBeInTheDocument();
     await expect(canvas.queryByText(/AI 匹配分/)).not.toBeInTheDocument();
-    await userEvent.click(canvas.getByRole("button", { name: "加入我的项目" }));
+    await userEvent.click(canvas.getByRole("button", { name: "一键接单" }));
     await expect(follow).toHaveBeenCalledWith("TTC-EXAMPLE-001");
     await userEvent.click(canvas.getByRole("button", { name: "查看来源" }));
     await expect(openSource).toHaveBeenCalledWith("TTC-EXAMPLE-001");

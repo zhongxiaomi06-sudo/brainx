@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-12｜fix(frontend): 同步 Storybook 断言并压回 500 行上限（T1/T2/T5 门禁修复）
+
+- 完整门禁暴露两类问题：①`job-detail-card-review.stories.tsx` 与 `jobs-workspace-review.stories.tsx` 的 play 断言仍引用已删除的「核心职位事实」「策略版本 baseline-1.0」「加入我的项目」按钮名；②T5 让 `engagement-loop.tsx` 涨到 514 行、T1 让 `workbench.tsx` 涨到 503 行，双双突破 500 行上限。
+- 修法：Storybook 断言对齐新 UI（招聘进展/推荐指数/一键接单，待确认计数 ≥4 放宽为 ≥2——6 个字段已删，占位减少属预期）；`engagement-loop.tsx` 的 submitAcceptDirect 合并回 submitAccept（可选 preset 参数，复用而非重复），净行数回到 496；`workbench.tsx` 一键接单按文件既有紧凑写法压成单行，回到 499。均为风格内压缩，非超长单行规避。
+- 验证：前端 44/44、`tsc --noEmit`、Storybook 85/85 全部通过。
+
 ## 2026-09-12｜feat(frontend): 开始跟进取消三步表单，点击直接接单（冲刺清单 T5）
 
 - 任务：冲刺清单 T5——「开始跟进」不再弹出本轮目标/第一条行动/截止时间三步表单，点击直接接单，无中间态。

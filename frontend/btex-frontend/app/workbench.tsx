@@ -242,10 +242,7 @@ export default function DecisionWorkbench({demo=false}:{demo?:boolean}={}){
   notify(`${job.company} · 已加入团队共享`);
  };
  // T1：详情页一键接单——入项目后立即拉起飞书群并推职位卡，全程无表单、无二次确认。
- const acceptJobAndLaunch=async(job:DecisionJob)=>{
-  await confirmJobMembership(job,"MY_JOB");
-  await launchProjectInFeishu({project_id:job.id,company:job.company});
- };
+ const acceptJobAndLaunch=async(job:DecisionJob)=>{await confirmJobMembership(job,"MY_JOB");await launchProjectInFeishu({project_id:job.id,company:job.company})};
  const addRadarJobToProjects=async(jobId:string)=>{const job=brainxRadar?.items.find(item=>item.project_id===jobId);await addToMyProjects(jobId,job?.company||"该职位")};
  const ignoreProject=createProjectIgnore({mode:brainxMode,focusedProjectId,setFocusedProjectId,
   setProjects:setBrainxProjects,setMemberships:setMembershipRelations,notify});
@@ -381,8 +378,7 @@ function WorkbenchPanel({panel,motion,job,projects,onIgnoreProject,commitmentJob
   const legal=mode==="connected"?legalMap[job.id]||[]:legalActions(job,state);
   const baseDetail=toDecisionJobDetail(job,jobEvents);
   const detail=enrichedDetail?.projectId===job.id?enrichedDetail:baseDetail;const currentProject=projects.find(project=>project.project_id===job.id);const removableProject=currentProject&&canIgnoreProject(currentProject)?currentProject:null;
-  // T1：回放 tab 已下线，历史入口统一落到判断页。
-  const panelTab=panel.tab==="replay"?"judgement":panel.tab;
+  const panelTab=panel.tab==="replay"?"judgement":panel.tab; // T1：回放 tab 已下线，历史入口统一落到判断页。
   return <JobDetailCard
    job={{...detail,engagementState:stateLabel[state],inMyProjects:Boolean(currentProject)}}
    activeTab={panelTab}

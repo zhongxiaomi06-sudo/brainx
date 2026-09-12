@@ -169,49 +169,33 @@ export function CommitmentLoopPanel({
       await onMembership(membershipRelation);
       setMembershipOpen(false);
     });
-  const submitAccept = () =>
+  // T5：开始跟进免表单——preset 由 acceptDirect 传入，默认值与 agent 侧服务端兜底一致（specs/011）。
+  const submitAccept = (preset?: { goal: string; actionTitle: string; dueAt: string }) =>
     run(async () => {
-      if (!goal.trim() || !actionTitle.trim()) {
-        setError("请完整填写本轮目标和第一条行动");
-        return;
-      }
-      const invalid = dueError(dueAt);
-      if (invalid) {
-        setError(invalid);
-        return;
-      }
+      const finalGoal = preset ? preset.goal : goal.trim();
+      const finalTitle = preset ? preset.actionTitle : actionTitle.trim();
+      if (!finalGoal || !finalTitle) { setError("请完整填写本轮目标和第一条行动"); return; }
+      const invalid = preset ? null : dueError(dueAt);
+      if (invalid) { setError(invalid); return; }
+      const finalDue = preset ? preset.dueAt : toIso(dueAt);
       if (mode === "connected") {
         await brainxFetch(`/api/v1/opportunities/${encodeURIComponent(job.id)}/engagement`, {
           method: "POST",
-          body: { action: "ACCEPT", goal: goal.trim(), action_title: actionTitle.trim(), due_at: toIso(dueAt), idempotency_key: makeIdempotencyKey(`accept:${job.id}`) },
+          body: { action: "ACCEPT", goal: finalGoal, action_title: finalTitle, due_at: finalDue, idempotency_key: makeIdempotencyKey(`accept:${job.id}`) },
         });
-        await refresh("已开始跟进，第一条行动已建立");
+        await refresh(preset ? "已开始跟进，项目群与找人方式将在飞书侧继续" : "已开始跟进，第一条行动已建立");
         return;
       }
-      const action: CommitmentAction = { actionId: `local-${Date.now()}`, title: actionTitle.trim(), dueAt: toIso(dueAt), status: "OPEN", source: "MANUAL", createdAt: new Date().toISOString() };
-      setSnapshot({ goal: goal.trim(), activeAction: action, actionHistory: [], suggestedAction: null, terminalResultMissing: false, terminalResult: null });
+      const action: CommitmentAction = { actionId: `local-${Date.now()}`, title: finalTitle, dueAt: finalDue, status: "OPEN", source: "MANUAL", createdAt: new Date().toISOString() };
+      setSnapshot({ goal: finalGoal, activeAction: action, actionHistory: [], suggestedAction: null, terminalResultMissing: false, terminalResult: null });
       dispatchLocal("ACCEPTED");
       notify("已开始跟进");
       setEditor(null);
     });
-  // T5：取消跟进目标表单——点击「开始跟进」直接接单，默认值与 agent 侧服务端兜底保持一致（specs/011）。
-  const submitAcceptDirect = () =>
-    run(async () => {
-      const defaultDue = new Date(Date.now() + 86400000);
-      defaultDue.setHours(18, 0, 0, 0);
-      if (mode === "connected") {
-        await brainxFetch(`/api/v1/opportunities/${encodeURIComponent(job.id)}/engagement`, {
-          method: "POST",
-          body: { action: "ACCEPT", goal: "完成候选人搜索、筛选与匹配评估", action_title: "启动候选人搜索并跟进交付", due_at: defaultDue.toISOString(), idempotency_key: makeIdempotencyKey(`accept:${job.id}`) },
-        });
-        await refresh("已开始跟进，项目群与找人方式将在飞书侧继续");
-        return;
-      }
-      const action: CommitmentAction = { actionId: `local-${Date.now()}`, title: "启动候选人搜索并跟进交付", dueAt: defaultDue.toISOString(), status: "OPEN", source: "MANUAL", createdAt: new Date().toISOString() };
-      setSnapshot({ goal: "完成候选人搜索、筛选与匹配评估", activeAction: action, actionHistory: [], suggestedAction: null, terminalResultMissing: false, terminalResult: null });
-      dispatchLocal("ACCEPTED");
-      notify("已开始跟进");
-    });
+  const acceptDirect = () => {
+    const due = new Date(Date.now() + 86400000); due.setHours(18, 0, 0, 0);
+    void submitAccept({ goal: "完成候选人搜索、筛选与匹配评估", actionTitle: "启动候选人搜索并跟进交付", dueAt: due.toISOString() });
+  };
   const buildSuggestion = () =>
     run(async () => {
       if (!summary.trim()) {
@@ -498,9 +482,7 @@ export function CommitmentLoopPanel({
               </button>
             ))}
           {legal.includes("ACCEPT") && (
-            <button className="primary" disabled={busy} onClick={() => void submitAcceptDirect()}>
-              {busy ? "开始中…" : "开始跟进"}
-            </button>
+            <button className="primary" disabled={busy} onClick={acceptDirect}>{busy ? "开始中…" : "开始跟进"}</button>
           )}
           {legal.length === 0 && (
             <button className="primary" onClick={onVerify}>

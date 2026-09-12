@@ -174,7 +174,7 @@ export const TodayDecisionEntry: Story = {
     const canvas = within(canvasElement);
     await userEvent.click(canvas.getByRole("button", { name: /打开精选盘职位/ }));
     await expect(canvas.getByRole("dialog", { name: completeJob.role })).toBeInTheDocument();
-    await expect(canvas.getByText("核心职位事实")).toBeInTheDocument();
+    await expect(canvas.getByText("招聘进展")).toBeInTheDocument();
     await expect(canvas.getByText("寻访")).toBeInTheDocument();
     await expect(canvas.getByText("备注与职位描述")).toBeInTheDocument();
     await expect(canvas.getByText(completeJob.notes || "")).toBeInTheDocument();
@@ -243,7 +243,7 @@ export const HonestMissingFields: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(canvas.getByRole("button", { name: /打开全部职位/ }));
-    await expect(canvas.getAllByText("待确认").length).toBeGreaterThanOrEqual(4);
+    await expect(canvas.getAllByText("待确认").length).toBeGreaterThanOrEqual(2);
     await expect(canvas.getByText("暂无可核验进展")).toBeInTheDocument();
     await expect(canvas.queryByText(/HC 0/)).not.toBeInTheDocument();
     await expect(canvas.queryByText("今日建议")).not.toBeInTheDocument();
@@ -264,7 +264,7 @@ export const MissingScoreDimension: Story = {
     await expect(canvas.getByText("历史行为与交付结果")).toBeInTheDocument();
     await expect(canvas.getAllByText("待确认").length).toBeGreaterThan(0);
     await expect(canvas.queryByText("0 / 100")).not.toBeInTheDocument();
-    await expect(canvas.getByText("baseline-1.0")).toBeInTheDocument();
+    await expect(canvas.getByText("推荐指数")).toBeInTheDocument();
   },
 };
 

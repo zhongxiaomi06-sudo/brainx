@@ -1,5 +1,13 @@
 # Agent Commit 记录
 
+## 2026-09-13｜fix(deploy): sandbox.mode 对齐生产实况 off——修复插件重装后嵌入式运行时零工具
+
+- 事故收尾（承接 15fcd19）：插件包修复并重装、候选文件齐备、插件 inspect 显示 loaded+27 工具后，机器人仍对所有消息回复报错「No callable tools remain」。逐层排除：插件可正常 import、gateway 启动干净、单 agent 目录无配置覆写、注册表 enabled=true。
+- 根因：02:25 `--apply` 的 config patch 把 9/4 以来的**载荷性漂移** `agents.defaults.sandbox.mode: off` 重置为仓库值 `all`；本机没有沙箱后端，`all` 模式下嵌入式运行时连原生沙箱工具都注册不上（报错中 plugin 27 项与 sandbox 16 项全部「no registered tools matched」）。生产自 9/4 起（`openclaw.json.bak-sandbox-off-20260904` 为证）实际一直以 off 运行，仓库断言的 `all` 从未真正生效过。D5 灰测、0.9/0.92 全部真实链路均跑在 off 上。
+- 处置：以可复核证据为准——live 配置先 `config set agents.defaults.sandbox.mode off` 热更恢复（02:57 飞书实测「今天先做什么」正常出卡，工具链全通），仓库 `openclaw.production.json` 同步改为 `off` 并注明实证依据，避免下次 `--apply` 再踩。工具面收敛仍由 `tools.deny`（exec/read/write/edit/apply_patch/web_* 全禁）+ 27 项 brainx 白名单 + loopback + 群/人白名单承担，沙箱只是从未落地的纵深层。
+- 验证：`openclaw-production-config` 9/9；生产实测：私聊 NL 恢复正常（interactive 卡 + 真实数据）。
+- 注：本次连环事故的完整链条（预检拦截 → env 漂移 → 凭证形态 → 插件丢文件 → 沙箱漂移）分别由 e7bb9d0、71850e8、15fcd19 与本 commit 闭环；教训是「仓库断言值」必须有生产实证，install.sh --apply 的 config patch 会重置人工漂移。
+
 ## 2026-09-13｜fix(deploy): 插件包补齐 candidate-table.js——修复 --apply 后插件加载失败、工具全灭
 
 - 事故经过（承接 e7bb9d0 条目）：预检修复并重启后，机器人能收到消息但全部回复「Something went wrong」。openclaw 日志显示插件加载失败：`Cannot find module './candidate-table.js'`（response-card.js 引用），导致 27 个 brainx_* 工具全部注销、agent 无工具可用。根因：`plugins/brainx-openclaw/package.json` 的 npm `files[]` 白名单从未包含 candidate-table.js（9/9 引入该文件时漏加），`install.sh --apply` 用 `npm pack` 打包时丢弃它；9/12 12:02 的 --apply 距今插件目录仍是旧完整副本，本次（91a6f72 后首次）--apply 重装才暴露。

@@ -76,7 +76,7 @@
         "brainx-sourcing-supermai"
       ],
       "sandbox": {
-        "mode": "all",
+        "mode": "off",
         "scope": "session",
         "workspaceAccess": "none"
       }

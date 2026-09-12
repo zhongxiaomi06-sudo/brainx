@@ -19,7 +19,10 @@ test('production config loads only Feishu and BrainX plugins', () => {
 test('production config isolates sessions, sandboxes all runs, and exposes no plaintext secrets', () => {
   assert.equal(config.session.dmScope, 'per-account-channel-peer');
   assert.deepEqual(config.agents.defaults.sandbox, {
-    mode: 'all', scope: 'session', workspaceAccess: 'none',
+    // 2026-09-13 生产实证：本机无沙箱后端，mode=all 时嵌入式运行时零工具可注册
+    // （连原生沙箱工具都匹配不到），agent 只会回复报错；生产自 9/4 起实际以 off 运行。
+    // 工具面收敛由 tools.deny + 27 项白名单 + loopback + 群/人白名单承担。
+    mode: 'off', scope: 'session', workspaceAccess: 'none',
   });
   assert.equal(config.gateway.bind, 'loopback');
   assert.deepEqual(config.gateway.auth.token, {

@@ -10,7 +10,8 @@ const contract = await readJson('tests/fixtures/openclaw-production/plugin-contr
 test('production config loads only Feishu and BrainX plugins', () => {
   assert.deepEqual(config.plugins.allow, ['feishu', 'brainx-openclaw']);
   assert.equal(config.plugins.entries['brainx-openclaw'].enabled, true);
-  assert.equal(config.plugins.entries['brainx-openclaw'].hooks.allowPromptInjection, false);
+  // 2026-09-12 起启用：插件 before_prompt_build 注入 BrainTex playbook，NL 流程纪律依赖它（灰测实证 false 时 playbook 从未生效）。
+  assert.equal(config.plugins.entries['brainx-openclaw'].hooks.allowPromptInjection, true);
   assert.deepEqual(config.tools.allow, contract.allowed_tools);
   for (const denied of contract.denied_tool_ids) assert.ok(config.tools.deny.includes(denied), denied);
 });

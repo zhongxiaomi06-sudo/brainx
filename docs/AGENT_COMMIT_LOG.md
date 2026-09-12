@@ -1,5 +1,19 @@
 # Agent Commit 记录
 
+## 2026-09-13｜test(release): 0.9 后最新改动同步测试全绿，以 braintex 小机器人发送 0.92 版本公告
+
+- 触发：用户要求对 0.9 之后的最新改动（`e62c2ce` 前端判断面板文案精简 + `e504061` 后端三项高危修复）以 mia 账号做 Reloop 前后端链路同步测试，「只对最新的修改进行测试」，确认后以 braintex 小机器人身份发送 0.92 版本更新。
+- **锁交接**：开工时发现 workbuddy 遗留工作锁（23:53，范围 push + 生产部署）。核查证据：本地与 origin 已同步（push 完成）、取证用干净 worktree 已清理、无任何部署进程在跑、锁已留存约 80 分钟，判定为任务完成未释放的陈旧锁；owner 副本留存 `~/.Trash/brainx-stale-lock-20260912/` 后重新取锁。
+- **测试范围与结果（全绿，零修复）**：
+  - 后端三项修复（e504061）：`server-routing` 3 + `openmai-delivery` 17 + `project-launch` 14 + `openclaw-production-config` 8 = **42/42**。
+  - Reloop 链路（含 mia 身份）：`agent-candidate-actions`（mia 跨顾问权限路径 + 一键加入人才库幂等/降级）、`reloop-shortlist-sync`（`consultantId: 'mia'` dry-run/失败关闭/tenant 隔离）、`candidate-offer-report-e2e`（初筛通过→建群→推卡→V1/V2）= **11/11**。
+  - 前端判断面板（e62c2ce）：btex-frontend **45/45**、ESLint 0 错误、`tsc --noEmit` 0 错误、Storybook **85/85**。
+  - 前后端同步：浏览器 e2e 通过（自起含新路由代码的服务实例，桌面/移动端、登录、推荐 20 条分页、搜索、控制台均正常）。
+- **结论**：无失败项，无需改正，未做任何代码改动（用户「不对的进行改正」无对象）。
+- **0.92 公告**：以 braintex 小机器人（app `cli_aaf72a911bb9dd21`，复用 `src/feishu-bot.js` token 直连 `im/v1/messages`）向 mia 私聊（`ou_2523c1e4f0844de00db90f810e970507`）发送五条用户可感知变化（判断页口径人话化/全站视觉统一/找人投递卡死修复/畸形链接抗压+装机技能补齐/卡片排版），发送成功 `message_id: om_x100b656cc198e8a4b4a20355f15c097`。说明：机器人所在 8 个群均为客户/项目群，仓库无 0.9 公告发送对象的历史记录，故发 mia 私聊；如需同步到群需另行指定。
+- 边界说明：自动化中「mia 的账号」以 `consultant_id: 'mia'` 覆盖身份/权限/同步链路；真人飞书侧点三按钮的验证需 mia 本人在群内操作，不在自动化范围。
+- 验证：本条仅为测试与公告记录，diff 仅本日志一个文件；工作区其余未提交改动为 kimi-code-cli 迁移遗留，非本任务范围，未触碰。
+
 ## 2026-09-12｜fix(frontend): 判断面板文案精简——去除内部证据噪音，保留关键信息
 
 - 触发：用户打开判断抽屉（真实数据）后指出面板充斥内部证据信息，指令「进一步的精简，很多没有必要的证据信息全部去掉，且就留下关键的信息」。

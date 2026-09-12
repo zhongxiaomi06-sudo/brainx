@@ -19,7 +19,7 @@
 0. **【演示必读】群内自然语言「把第 N 个候选人加入人才库」目前不可靠**：step-3.5-flash 不走「群名→daily_brief→job_id」解析，固执调用 bind_group_project 并虚报「全部接口权限错误」（审计实证它从未调用 shortlist/talent 工具）。根因之一是插件 prompt 注入被 `allowPromptInjection=false` 长期阻断（playbook 从未生效，本次已改 true 并同步模板），但 /reset + 新 prompt 后仍未纠正。**演示纪律：群内操作一律用卡片按钮（评委可点），自然语言只在私聊用明确公司/职位名（已验证：「帮我接 深圳思博威视 的智能影像产品经理」→ 接单建群全通）**。
 1. **agent 接单不落 membership → 建群必报 PROJECT_MEMBERSHIP_REQUIRED**：已修代码（commit 1f6ffa5，接单幂等写 MY_JOB），回归测试补齐；NL 私聊接单链路已复验。
 2. **测试群 scope senders 缺 mia**：数据修复补入（`agent_group_scopes` UPDATE，未改代码）。
-3. **OpenClaw 新群准入 CLI 失败**（OPENCLAW_COMMAND_FAILED）：根因 = 5 次串行 CLI（get/set×4+requireMention）≈25s 超过 runner 默认 20s 超时。已修：三个服务 env 文件追加 `BRAINX_OPENCLAW_TIMEOUT_MS=90000`（/etc/brainx/openclaw.env、/opt/brainx/.env、/etc/brainx/agent.env，不入库）。
+3. **OpenClaw 新群准入 CLI 失败**（OPENCLAW_GROUP_ALLOWLIST_FAILED）：根因链有三层，已全部修复——①串行 5 次 CLI ≈25s 超 20s 默认超时（三个服务 env 追加 `BRAINX_OPENCLAW_TIMEOUT_MS=90000`）；②`brainx-agent-gateway` 生产单元未显式 `User=brainx` 以 root 运行，openclaw CLI 的配置归属校验拒绝 root 直读 600 配置（agent.env 追加 `BRAINX_OPENCLAW_RUN_AS=brainx`，repo 单元旧版即 `User=brainx`，生产与 repo 的分歧待赛后统一）；③`ProtectSystem=strict` 使 `/var/lib/brainx/.openclaw` 对服务只读（单元 `ReadWritePaths` 追加该路径，repo `deploy/systemd/brainx-agent-gateway.service` 已同步）。另：灰测期间曾以 root 手跑 CLI 把 openclaw.json 写成 root:root 600，已 chown 回 brainx——**生产排障不得以 root 直接执行 openclaw CLI**。修复后决策群创建端到端通过：群「黄俊凯-AI产品经理-Offer决策」READY，Offer 首卡（候选人概览/项目匹配/待核实）到群。
 4. **无 @ 群消息被 mention 门静默拦截**：`groups.<chat>.requireMention=false` 配置已写入但运行态对文本消息未生效（带 @ 正常）。**卡片按钮走 dispatchSyntheticCommand 不受影响**，建议赛后核查该配置语义。
 5. **authorizeGroup 要求每群恰好 1 行 ACTIVE scope，但三个老群各 6 行**（每顾问一行）→ 这些群对所有人生效均失败。**系统性 bug，列赛后修复**；演示只用单测试群，不受影响。
 6. **launch 新建群在 openclaw 重启后收到「还没绑定职位」绑定卡**（specs/015 intake 误判，scope 实际存在）：展示层干扰，赛后修。

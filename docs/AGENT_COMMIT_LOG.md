@@ -1,5 +1,13 @@
 # Agent Commit 记录
 
+## 2026-09-12｜fix(deploy): 新群准入三层根因修复——决策群/Offer 群链路打通
+
+- 触发：NL 测「为黄俊凯建一个决策群」连续 INTERNAL；审计锁定 `OPENCLAW_GROUP_ALLOWLIST_FAILED`。借 PrivateTmp 隔离的临时插桩拿到真实 stderr：openclaw CLI「Config file is not readable… chown 993」。
+- 三层根因：①`brainx-agent-gateway` 生产单元缺 `User=brainx` 以 root 运行，CLI 归属校验拒绝 root 直读 600 配置（agent.env 加 `BRAINX_OPENCLAW_RUN_AS=brainx`）；②`ProtectSystem=strict` 使 `/var/lib/brainx/.openclaw` 只读（单元加 `ReadWritePaths`，repo 同步）；③此前排查中以 root 手跑 CLI 把 openclaw.json 写成 root:root 600（已 chown 回 brainx 并验证 openclaw 重启干净、WS ready）。早前判定的「20s 超时」只是表层，90s 环境变量保留。
+- 验证：`CREATE_DECISION_GROUP` 200 READY，群「黄俊凯-AI产品经理-Offer决策」+ Offer 首卡到群（纪要「offer-人名」格式：现为人名-职位-Offer决策，信息更全，验收请用户确认）；调试插桩已全部还原，生产源码树 `git status` 无改动。
+- 文档：灰测结论第 3 条重写为三层根因；`deploy/openclaw/brainx-agent.env.example` 与 `deploy/systemd/brainx-agent-gateway.service` 同步固化。
+- 验证：`tests/openclaw-plugin.test.mjs` 等本地测试不受影响（无代码改动）。
+
 ## 2026-09-12｜fix(openclaw): 启用插件 prompt 注入 + NL 全链路实测与演示纪律修订
 
 - 触发：自然语言全链路实测（mia 私聊「帮我接 深圳思博威视 的智能影像产品经理」→ 接单/建群/投递全通）暴露群内 NL「把第 N 个候选人加入人才库」必然失败——模型固执调用 bind_group_project 并虚报权限错误（审计实证其从未调用 shortlist/talent 工具）。

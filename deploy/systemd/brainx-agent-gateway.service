@@ -27,7 +27,11 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/opt/brainx/data
+# /var/lib/brainx/.openclaw：新群准入需要 openclaw CLI 读写其配置（2026-09-12 生产实证：
+# ProtectSystem=strict 下该路径只读会报 OPENCLAW_GROUP_ALLOWLIST_FAILED）。
+# 另注意：agent.env 必须配 BRAINX_OPENCLAW_RUN_AS=brainx——本单元若未显式 User=brainx
+# 而以 root 运行，openclaw CLI 的配置归属校验会拒绝 root 直读 600 配置。
+ReadWritePaths=/opt/brainx/data /var/lib/brainx/.openclaw
 
 [Install]
 WantedBy=multi-user.target

@@ -10,8 +10,15 @@ function feishuCredentials(appId, appSecret) {
   if (appId !== undefined || appSecret !== undefined) return { appId, appSecret };
   if (process.env.BRAINX_FEISHU_CREDENTIALS_FROM_OPENCLAW === '1') {
     try {
-      const config = JSON.parse(readFileSync(process.env.BRAINX_OPENCLAW_CONFIG_PATH, 'utf8'));
-      return { appId: config.channels?.feishu?.appId, appSecret: config.channels?.feishu?.appSecret };
+      const feishu = JSON.parse(readFileSync(process.env.BRAINX_OPENCLAW_CONFIG_PATH, 'utf8'))
+        .channels?.feishu;
+      // 凭证有两种落法：本机开发配置写顶层 appId/appSecret；生产 openclaw.json
+      // 写在 accounts 表里（defaultAccount 指向的账号，如 accounts.mia）。两种都要能取到。
+      const account = feishu?.accounts?.[feishu?.defaultAccount || 'mia'];
+      return {
+        appId: feishu?.appId || account?.appId,
+        appSecret: feishu?.appSecret || account?.appSecret,
+      };
     } catch {
       return { appId: undefined, appSecret: undefined };
     }

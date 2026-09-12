@@ -41,6 +41,42 @@ test('飞书机器人可显式复用 OpenClaw 同一应用凭证', async () => {
   }
 });
 
+test('飞书机器人可从生产形态 openclaw.json 的 accounts 表取凭证', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'brainx-feishu-'));
+  const path = join(dir, 'openclaw.json');
+  // 生产 openclaw.json 的真实形态：顶层无 appId，凭证在 accounts[defaultAccount]。
+  writeFileSync(path, JSON.stringify({ channels: { feishu: {
+    defaultAccount: 'mia',
+    accounts: { mia: { name: 'mia', appId: 'cli_prod', appSecret: 'prod-secret' } },
+  } } }));
+  const previous = {
+    flag: process.env.BRAINX_FEISHU_CREDENTIALS_FROM_OPENCLAW,
+    path: process.env.BRAINX_OPENCLAW_CONFIG_PATH,
+  };
+  process.env.BRAINX_FEISHU_CREDENTIALS_FROM_OPENCLAW = '1';
+  process.env.BRAINX_OPENCLAW_CONFIG_PATH = path;
+  const calls = [];
+  try {
+    await sendInteractiveCard({
+      target: 'ou_test', card: {}, fetchImpl: async (url, options) => {
+        calls.push({ url, options });
+        return calls.length === 1
+          ? response({ code: 0, tenant_access_token: 'token' })
+          : response({ code: 0, data: { message_id: 'om_test' } });
+      },
+    });
+    assert.deepEqual(JSON.parse(calls[0].options.body), {
+      app_id: 'cli_prod', app_secret: 'prod-secret',
+    });
+  } finally {
+    if (previous.flag === undefined) delete process.env.BRAINX_FEISHU_CREDENTIALS_FROM_OPENCLAW;
+    else process.env.BRAINX_FEISHU_CREDENTIALS_FROM_OPENCLAW = previous.flag;
+    if (previous.path === undefined) delete process.env.BRAINX_OPENCLAW_CONFIG_PATH;
+    else process.env.BRAINX_OPENCLAW_CONFIG_PATH = previous.path;
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('飞书机器人直连接口：获取 tenant token 后向 open_id 发送互动卡片', async () => {
   const calls = [];
   const out = await sendInteractiveCard({

@@ -1,5 +1,13 @@
 # Agent Commit 记录
 
+## 2026-09-13｜fix(feishu): 凭证读取兼容生产 openclaw.json accounts 形态——修复预检升级后 openclaw 宕机
+
+- 事故经过：`df78fc7` 部署重跑 `install.sh --apply`（91a6f72 后首次），新 unit 的 ExecStartPre 预检（02a24fe 引入）按现行规则校验三份 env 文件失败，`openclaw-brainx` 进入失败循环，机器人下线。预检指出的真实配置漂移：① `worker.env` BRAINX_DB 指向 9/4 遗留的 `brainx.sqlite`（活跃库实为 `brainx.db`，worker 日志自证「与 API 同库」）；② `worker.env` 缺 BRAINX_BASE_URL/FEISHU_APP_ID/SECRET；③ `openclaw.env` 缺 BRAINX_BASE_URL；④ `agent.env` 缺 BRAINX_FEISHU_CREDENTIALS_FROM_OPENCLAW/BRAINX_OPENCLAW_CONFIG_PATH。
+- 代码根因：预检（9131cb4）要求 agent.env 置 `BRAINX_FEISHU_CREDENTIALS_FROM_OPENCLAW=1`，即 gateway 从 openclaw.json 取飞书凭证；但 `feishu-bot.js#feishuCredentials` 只读 `channels.feishu.appId` 顶层形态（e71b4d5 为本机开发而写），生产 openclaw.json 的凭证在 `channels.feishu.accounts[defaultAccount]`——直接置 flag=1 会让 gateway 凭证取空、发卡全挂。
+- 修复：`feishuCredentials` 顶层缺省时回退读 `accounts[defaultAccount || 'mia']`，两种形态兼容；新增生产形态（accounts 表）回归用例。env 文件对齐在服务器侧一次性落地（密钥只在服务器文件间复制，不进聊天/仓库），与本 commit 配套生效。
+- 验证：`tests/feishu-bot-send.test.mjs` 9/9（含新 accounts 用例）。
+- 部署顺序约束：必须先部本修复再改 agent.env，否则 gateway 重启后凭证取空。
+
 ## 2026-09-13｜feat(card): 找人结果卡重做——候选人名字即关注按钮，去掉按钮矩阵
 
 - 触发：用户截图指出投递卡「重点关注 1–8」按钮矩阵太难用（「按钮实在太雷霆了，重新做」），先要求「按钮放到候选人后面」，随后明确为「可以点击名字就是重点关注，然后发送链接，下面的按钮去掉」。

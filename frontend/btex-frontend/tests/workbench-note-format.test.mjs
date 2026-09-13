@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { clipNoteSegments, formatNoteSegments } from "../app/workbench-note-format.ts";
+import { clipNoteSegments, formatNoteSegments, noteCells } from "../app/workbench-note-format.ts";
 
 // 样本取自生产 TTC 同步备注的真实形态：一段长文内联多个 **标签**：值 + xiaomai-sync 注释块。
 const sampleNote =
@@ -47,6 +47,28 @@ test("备注折叠：按预算截断并标记 clipped，展开返回全部", () 
   const full = clipNoteSegments(segments, Number.MAX_SAFE_INTEGER);
   assert.equal(full.clipped, false);
   assert.equal(full.shown.length, segments.length);
+});
+
+test("田字宫格：标签块各自成格，长块跨两列，标题与列表打包成一个整块", () => {
+  const raw =
+    "**岗位要求**：需要有Agent产品经验（非客服类），有用户端落地项目，理工科优先但不强制；汇报给AI Catch产品负责人，紧急程度高。" +
+    "**薪资信息**：薪资范围30-40K*14薪，薪资结构为14薪固定+0-2个月绩效（达标默认拿满2个月）。" +
+    "**人才倾向**：接受创业背景/流动率高人选，不迷信大厂背景。" +
+    "**组织优势**：扁平化管理、沟通柔和、加班少（常规9:00-18:30，弹性1小时）。" +
+    "**注意事项**：该岗位可能服务多个解决方案项目（非仅AI Catch），对外沟通以AI Catch为主，需避免引发人选预期偏差，且该岗位远程工资高无期权，外地候选人可能因薪资或地域犹豫，对接时需提前沟通说明清楚。" +
+    "<!-- xiaomai-sync-begin --> # 小麦同步画像（最后更新 2026-09-08 02:21） ## 必备经验和能力 " +
+    "- 当前需求偏增长方向 - 重点核验广告素材运营及投放数据优化经验 <!-- xiaomai-sync-end -->";
+  const cells = noteCells(formatNoteSegments(raw));
+  const fields = cells.filter((c) => c.kind === "field");
+  assert.deepEqual(fields.map((c) => c.label), ["岗位要求", "薪资信息", "人才倾向", "组织优势", "注意事项"]);
+  // 前四格是普通格（横两个竖两个 = 田字），超过 70 字的长块才跨两列。
+  assert.deepEqual(fields.slice(0, 4).map((c) => c.wide), [false, false, false, false]);
+  assert.equal(fields.at(-1).wide, true, "长标签块应跨两列");
+  const groups = cells.filter((c) => c.kind === "group");
+  assert.equal(groups.length, 2, "标题各自带后续列表收成整块");
+  assert.equal(groups[0].title, "小麦同步画像（最后更新 2026-09-08 02:21）");
+  assert.deepEqual(groups[1].items, ["当前需求偏增长方向", "重点核验广告素材运营及投放数据优化经验"]);
+  assert.ok(!cells.some((c) => JSON.stringify(c).includes("xiaomai-sync")));
 });
 
 function usedWithin(segments, budget) {

@@ -24,20 +24,35 @@ export function formatNoteSegments(raw: string): NoteSegment[] {
     if (last && (last.kind === "pair" || last.kind === "text")) last.text = `${last.text} ${extra}`.trim();
     else segments.push({ kind: "text", text: extra });
   };
-  for (const line of cleaned.split("\n").map((line) => line.trim()).filter(Boolean)) {
+  // 同步备注常把 # 标题与 - 列表内联在同一行（例："# 小麦同步画像 ## 必备经验和能力 - A - B"），
+  // 先在标题行里把内联列表拆成独立行，再按 # 切块，否则整行会被当成一个标题。
+  for (const raw of cleaned.split("\n")) {
+    const line = raw.trim();
+    if (!line) continue;
+    const lines = (line.includes("#") ? line.replace(/\s+[-•]\s+/g, "\n- ") : line).split("\n");
+    for (const piece of lines.map((piece) => piece.trim()).filter(Boolean)) {
+      const chunks = /#{1,6}\s/.test(piece) ? piece.split(/(?=\s#{1,6}\s)/).map((chunk) => chunk.trim()).filter(Boolean) : [piece];
+      for (const chunk of chunks) {
+        pushLine(chunk);
+      }
+    }
+  }
+  return segments;
+
+  function pushLine(line: string): void {
     const heading = line.match(HEADING_MATCH);
     if (heading) {
       segments.push({ kind: "caption", text: heading[1].trim() });
-      continue;
+      return;
     }
     const bullet = line.match(BULLET_MATCH);
     if (bullet) {
       segments.push({ kind: "item", text: bullet[1].trim() });
-      continue;
+      return;
     }
     if (!PAIR_LOOKBEHIND.test(line)) {
       appendToLast(line);
-      continue;
+      return;
     }
     for (const part of line.split(PAIR_LOOKBEHIND).map((piece) => piece.trim()).filter(Boolean)) {
       const pair = part.match(PAIR_MATCH);
@@ -46,6 +61,42 @@ export function formatNoteSegments(raw: string): NoteSegment[] {
     }
   }
   return segments;
+}
+
+// 田字格宫格组装（2026-09-13 三轮）：备注块按「横两个、竖两个」的 2×2 宫格排布。
+// 每个「标签 + 内容」占一格；过长的标签块跨两列；标题与其下的列表打包成一个整块格子，
+// 一起收放，不再零散地散落在宫格里。
+export type NoteCell =
+  | { kind: "field"; label: string; text: string; wide: boolean }
+  | { kind: "group"; title: string; items: string[] }
+  | { kind: "note"; text: string };
+
+// 超过这个字数的标签块单独占满一行，避免宫格里塞进一整段长文。
+const WIDE_FIELD_CHARS = 70;
+
+export function noteCells(segments: NoteSegment[]): NoteCell[] {
+  const cells: NoteCell[] = [];
+  for (let index = 0; index < segments.length; index += 1) {
+    const segment = segments[index];
+    if (segment.kind === "pair") {
+      cells.push({ kind: "field", label: segment.label, text: segment.text, wide: segment.text.length > WIDE_FIELD_CHARS });
+      continue;
+    }
+    if (segment.kind === "caption") {
+      // 标题连同后续所有列表项/文本收成一个整块，一起收放。
+      const items: string[] = [];
+      let cursor = index + 1;
+      while (cursor < segments.length && segments[cursor].kind !== "caption" && segments[cursor].kind !== "pair") {
+        items.push(segments[cursor].text);
+        cursor += 1;
+      }
+      cells.push({ kind: "group", title: segment.text, items });
+      index = cursor - 1;
+      continue;
+    }
+    cells.push({ kind: "note", text: segment.text });
+  }
+  return cells;
 }
 
 export function noteSegmentChars(segment: NoteSegment): number {

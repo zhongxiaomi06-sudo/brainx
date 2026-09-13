@@ -6,39 +6,52 @@ import { Pencil, X } from "lucide-react";
 import { BrainxApiError, makeIdempotencyKey, updateOpportunityFacts, type ManualFactField } from "./brainx-api";
 import { DrawerSection } from "./workbench-controls";
 import { judgementRows } from "./workbench-facts-model";
-import { clipNoteSegments, formatNoteSegments, type NoteSegment } from "./workbench-note-format";
+import { formatNoteSegments, noteCells, type NoteCell } from "./workbench-note-format";
 import type { DecisionJob } from "./workbench-model";
 
-const NOTE_COLLAPSE_BUDGET = 200;
+// 田字宫格：默认只露出前四格（横两个、竖两个），其余整块收放，避免信息散乱。
+const NOTE_VISIBLE_CELLS = 4;
 
-// 备注结构化渲染（2026-09-13）：同步来的原始 markdown 解析成田字格（标签列 + 内容列），
-// 长文默认折叠，不再糊成右对齐的整段墙。
 function NoteValue({ raw }: { raw: string }) {
   const [expanded, setExpanded] = useState(false);
-  const segments = formatNoteSegments(raw);
-  const { shown, clipped } = expanded ? { shown: segments, clipped: false } : clipNoteSegments(segments, NOTE_COLLAPSE_BUDGET);
+  const cells = noteCells(formatNoteSegments(raw));
+  const shown = expanded ? cells : cells.slice(0, NOTE_VISIBLE_CELLS);
+  const clipped = cells.length > NOTE_VISIBLE_CELLS;
   return (
     <div className="note-value">
       <div className="note-grid">
-        {shown.map((segment, index) => (
-          <NoteSegmentView key={index} segment={segment} />
+        {shown.map((cell, index) => (
+          <NoteCellView key={index} cell={cell} />
         ))}
       </div>
-      {(clipped || expanded) && segments.length > 1 && (
-        <button type="button" className="note-toggle" onClick={() => setExpanded((v) => !v)}>
-          {expanded ? "收起" : "展开全部"}
+      {clipped && (
+        <button type="button" className="note-toggle" onClick={() => setExpanded((v) => !v)} aria-expanded={expanded}>
+          {expanded ? "收起备注" : `展开其余 ${cells.length - NOTE_VISIBLE_CELLS} 项`}
         </button>
       )}
     </div>
   );
 }
 
-// 田字格：pair 直接吐出「标签格 + 内容格」两个网格单元；标题、列表、纯文本跨两列。
-function NoteSegmentView({ segment }: { segment: NoteSegment }) {
-  if (segment.kind === "caption") return <small className="note-caption">{segment.text}</small>;
-  if (segment.kind === "pair") return [<b key="label">{segment.label}</b>, <span key="text">{segment.text}</span>];
-  if (segment.kind === "item") return <div className="note-item">{segment.text}</div>;
-  return <p className="note-text">{segment.text}</p>;
+function NoteCellView({ cell }: { cell: NoteCell }) {
+  if (cell.kind === "group")
+    return (
+      <div className="note-cell wide">
+        <b>{cell.title}</b>
+        <ul>
+          {cell.items.map((item, index) => (
+            <li key={index}>{item}</li>
+          ))}
+        </ul>
+      </div>
+    );
+  if (cell.kind === "note") return <div className="note-cell wide">{cell.text}</div>;
+  return (
+    <div className={cell.wide ? "note-cell wide" : "note-cell"}>
+      <b>{cell.label}</b>
+      <span>{cell.text}</span>
+    </div>
+  );
 }
 
 // 判断依据是内部合成字段，决策时不重要：从事实表移出，默认折叠在底部。

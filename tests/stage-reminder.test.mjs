@@ -24,7 +24,9 @@ function seedAcceptedProject(db, projectId, { consultantId = 'felix' } = {}) {
   const accepted = acceptCommitment(db, consultantId, projectId, {
     goal: '两周内交付 5 名匹配候选人',
     action_title: '启动找人并确认首批候选人',
-    due_at: new Date(Date.parse(AT) + 3 * 86400000).toISOString(),
+    // 截止时间锚定「现在 + 3 天」而非 AT：用固定日期会在该日期过后变成
+    // 「截止时间必须晚于现在」的时间炸弹（2026-09-13 13:00 实证）。
+    due_at: new Date(Date.now() + 3 * 86400000).toISOString(),
     idempotency_key: `fixture:accept:${projectId}:${consultantId}`,
   });
   if (!accepted.ok) throw new Error(`accept failed: ${accepted.error}`);

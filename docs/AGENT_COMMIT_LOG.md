@@ -1,5 +1,16 @@
 # Agent Commit 记录
 
+## 2026-09-13｜test(stage-reminder): 截止时间锚定相对现在，拆除固定日期时间炸弹
+
+- 触发：7767e66 门禁后端全量测试拦出 4 例 stage-reminder 失败，与本次改动无关——fixture `seedAcceptedProject` 的 `due_at` 用固定日期 `AT(2026-09-10)+3天`，2026-09-13 13:00(CST) 一过期就变成「截止时间必须晚于现在」。
+- 修复：`due_at` 改为 `Date.now() + 3天`。时间窗口逻辑仍用 AT/OLD 回拨，不受影响。
+- 验证：`stage-reminder` + `openclaw-plugin` 14/14。
+
+## 2026-09-13｜test(plugin): 插件版本断言同步 1.4.5
+
+- 7767e66 把插件版本 1.4.4→1.4.5（直调功能），`openclaw-plugin.test.mjs` 的 client 断言仍写 1.4.3 被门禁拦出，同步更新。
+- 验证：`openclaw-plugin` 全绿。
+
 ## 2026-09-13｜fix(search): 继续找人链路确定性修复——插件直调 + 复用话术硬化
 
 - 触发：自然映射群核查发现「继续找人」按钮两次被点击后，模型调 `brainx_openmai_search` 均**未传 `continue_search=true`**（按钮指令明确要求首次调用必传），实际复用第 1 轮结果重述，并自编「已避开杨佳宪、张隆强、刘奕龙」；库中 `search_round` 停留在 1、排除名单为空。用户指令「进行修复，让这个链路一定要跑通」。

@@ -393,7 +393,7 @@ test("卡片渲染器能把真实构建出的候选人卡转成可截图 DOM", (
   const html = renderCard(card, { cardId: "candidate-share" });
   assert.match(html, /feishu-card/);
   assert.match(html, /查看 TTC 链接/);
-  assert.match(html, /加入人才库/);
+  assert.match(html, /加入reloop/);
 });
 
 test("卡片渲染门禁只在已人工确认基线的平台把「缺基线」当阻断", () => {

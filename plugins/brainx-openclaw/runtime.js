@@ -61,7 +61,7 @@ export const BRAINX_OPENCLAW_TOOLS = Object.freeze([
   }, ['mode', 'confirm']), description: '在当前候选人 Offer 决策群生成或更新飞书云文档报告。' },
   { name: 'brainx_talent_pool_add', purpose: () => 'candidate_action', parameters: object({
     job_id: string(), candidate_ref: string(), confirm: boolean(),
-  }, ['job_id', 'candidate_ref', 'confirm']), description: '把授权候选人一键加入团队人才库（RDS，幂等）。候选人卡上的「一键加入人才库」按钮点击后调用；重复调用只返回已存在。' },
+  }, ['job_id', 'candidate_ref', 'confirm']), description: '把授权候选人一键加入团队人才库（RDS，幂等）。候选人卡上的「加入reloop」按钮点击后调用；重复调用只返回已存在。' },
 ]);
 
 function canonicalJson(value) {

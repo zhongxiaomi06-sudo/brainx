@@ -133,7 +133,7 @@ ${JSON.stringify({ candidates: [{ candidate_ref: 'openmai-card-1', name: '李四
     candidate_ref: 'openmai-card-1', action: 'SEND_TALENT_CARD', confirm: true }, context);
   assert.equal(shared.data.talent_card_status, 'sent');
   assert.equal(sent[0].target, 'oc_project');
-  assert.match(JSON.stringify(sent[0].card), /李四|88%|查看 TTC 链接|初筛通过|加入人才库/);
+  assert.match(JSON.stringify(sent[0].card), /李四|88%|查看 TTC 链接|初筛通过|加入reloop/);
   assert.match(JSON.stringify(sent[0].card), /\[BRAINTEX_CANDIDATE_KEEP\] 职位 \S+ 候选人 openmai-card-1/);
   assert.match(JSON.stringify(sent[0].card), /\[BRAINTEX_TALENT_ADD\] 职位 \S+ 候选人 openmai-card-1/);
   // F1：primary 已从「查看 TTC 链接」这个纯跳转交给「初筛通过」，跳转按钮降到末位。

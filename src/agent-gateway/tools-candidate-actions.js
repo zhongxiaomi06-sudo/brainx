@@ -41,7 +41,7 @@ export function candidateShareCard(jobId, candidateRef, candidate = {}) {
       { tag: 'markdown', content: `**${safeCardText(candidate.name || candidateRef, 80)}**\n${safeCardText(candidate.role || '当前岗位待核实', 120)}` },
       { tag: 'markdown', content: `**经历**：${profile}\n**匹配度**：${safeCardText(candidate.score || '待核实', 20)}\n**核心匹配点**：${safeCardText(candidate.evaluation, 500)}` },
       // F1 主次颠倒：primary 曾挂在「查看链接」这个纯跳转上，真实业务动作
-      // （初筛通过 / 加入人才库）反而是灰按钮 → 顾问会先点最显眼的跳转，
+      // （初筛通过 / 加入reloop）反而是灰按钮 → 顾问会先点最显眼的跳转，
       // 业务闭环入口被忽视。现在 primary 给「初筛通过」，跳转降为 default。
       { tag: 'action', actions: [
         // 冲刺 T10/T11/T12：按钮点击由 OpenClaw 转成带标记的群消息，
@@ -50,7 +50,7 @@ export function candidateShareCard(jobId, candidateRef, candidate = {}) {
           text: { tag: 'plain_text', content: '初筛通过' },
           value: { text: `[BRAINTEX_CANDIDATE_KEEP] 职位 ${jobId} 候选人 ${candidateRef}` } },
         { tag: 'button',
-          text: { tag: 'plain_text', content: '加入人才库' },
+          text: { tag: 'plain_text', content: '加入reloop' },
           value: { text: `[BRAINTEX_TALENT_ADD] 职位 ${jobId} 候选人 ${candidateRef}` } },
         { tag: 'button',
           text: { tag: 'plain_text', content: '查看 TTC 链接' },

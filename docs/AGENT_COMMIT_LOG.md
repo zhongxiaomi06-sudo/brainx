@@ -1,5 +1,16 @@
 # Agent Commit 记录
 
+## 2026-09-13｜feat(card): 候选人卡按钮改名「加入reloop」+ reloop 短名单数据准确性核查
+
+- 触发：用户看到机器人回复「Reloop 内部短名单暂无授权数据…」，要求 ① 核查数据准确性与 reloop 授权链路 ② 把「加入人才库」按钮文案改为「加入reloop」③ 验证授权能否接通。
+- **按钮改名**：`tools-candidate-actions.js` 候选人卡「加入人才库」→「加入reloop」（动作不变，仍走 `brainx_talent_pool_add` 真写 RDS 幂等）；`plugins/brainx-openclaw/prompt.js` 与 `runtime.js` 的按钮名引用同步；渲染基线 candidate-share 重建并人眼复核（无截断、主次不变）。
+- **reloop 数据核查结论**（生产 RDS 只读实测）：
+  - 授权链路完好：mia 在 tenant `yorkteam` 有 1169 条 ACTIVE `talent_access_grants`、`ttc-york-team` 10 条；`job_access_grants` 覆盖 `reloop-position:26`（yorkteam）与 `reloop-position:31`（ttc-york-team）——「没有完成授权验证」不成立，授权是接通的。
+  - 真实缺口是**匹配数据**而非授权：`match_runs` 全库仅 5 次跑批（最新 2026-09-04），只覆盖上述 2 个 reloop 演示职位；当前找的 TTC 职位（LiberAI JFUFSJE 等）没有 match_run 也没有 job grant → `brainx_candidate_shortlist` 按授权谓词过滤后为空是**该职位从未跑批**，不是「暂无授权数据」。
+  - 机器人话术「Reloop 内部短名单暂无授权数据」不准确（模型对空结果的转述），正确口径应为「该职位暂无 reloop 内部匹配数据（仅 reloop-position:26/31 两个职位有 9/4 前的匹配跑批）」。
+  - 另：`candidate_job_matches` 全库 50 条、`talent` 397 条；两个 tenant 并存（yorkteam / ttc-york-team），mia 在两个 tenant 均有授权。
+- 验证：`agent-candidate-actions` + `quality-gate` 40/40；卡片渲染门禁 17/17（基线已更新）。
+
 ## 2026-09-13｜fix(deploy): sandbox.mode 对齐生产实况 off——修复插件重装后嵌入式运行时零工具
 
 - 事故收尾（承接 15fcd19）：插件包修复并重装、候选文件齐备、插件 inspect 显示 loaded+27 工具后，机器人仍对所有消息回复报错「No callable tools remain」。逐层排除：插件可正常 import、gateway 启动干净、单 agent 目录无配置覆写、注册表 enabled=true。

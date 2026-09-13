@@ -29,6 +29,10 @@ export const Facts: Story = {
   ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    // 判断面板只留决策必需行：数据来源、Offer/入职状态等内部字段不得出现（2026-09-13 二轮精简）
+    await expect(canvas.getByText("职位关系")).toBeInTheDocument();
+    await expect(canvas.queryByText("数据来源")).not.toBeInTheDocument();
+    await expect(canvas.queryByText("入职状态")).not.toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: "编辑" }));
     await expect(canvas.getByRole("button", { name: "保存并重新判断" })).toBeInTheDocument();
   },

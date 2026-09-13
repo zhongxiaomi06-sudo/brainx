@@ -21,6 +21,7 @@ import {
 import { mergeOpportunityDetail, newestEvents, toDecisionJobDetail, toRadarJobDetail } from "../app/job-detail-data.ts";
 import { projectToDecisionJob } from "../app/brainx-projects-api.ts";
 import { mapRecommendationPage } from "../app/brainx-recommendation-pages-api.ts";
+import { judgementRows } from "../app/workbench-facts-model.ts";
 import { openmaiToHtml } from "../app/openmai-markdown.ts";
 
 const sampleRec = {
@@ -129,6 +130,23 @@ test("evidence 展示层去掉内部元数据与快照 UUID（2026-09-12 判断�
     ],
   });
   assert.deepEqual(job.evidence, ["智子芯元/AI产品经理", "同步快照 · 2026-08-19"]);
+});
+
+test("判断面板只保留决策必需行，判断依据由层级与可信度合成（2026-09-13 二轮精简）", () => {
+  const rows = judgementRows({
+    职位关系: "我的职位", 数据来源: "职位市场", 职位状态: "招聘中", 当前阶段: "招聘中",
+    "剩余 HC": "1", "历史 Pipeline": "Interview×1 Recommendation×7", 城市: "杭州市",
+    备注: "岗位要求…", 主做顾问: "Nina 张宁娜", 决策层级: "本周关注", 事实可信度: "数据部分缺失",
+    事实可信度规则: "data-confidence-1.0", 事实更新时间: "09/08 02:21",
+    最近活动: "业务群活动", 最近活动时间: "09/13 01:44", 最近活动来源: "FEISHU_CHAT",
+  });
+  assert.deepEqual(
+    rows.map(([label]) => label),
+    ["职位关系", "主做顾问", "职位状态", "当前阶段", "剩余 HC", "历史 Pipeline", "城市", "备注", "判断依据"],
+  );
+  assert.equal(rows.at(-1)[1], "本周关注 · 数据部分缺失");
+  assert.ok(rows.some(([label, value]) => label === "备注" && value === "岗位要求…"));
+  assert.deepEqual(judgementRows({ 职位关系: "我的职位" }), [["职位关系", "我的职位"]]);
 });
 
 test("maps run-bound recommendation page metadata and legal state", () => {

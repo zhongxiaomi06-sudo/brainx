@@ -5,6 +5,7 @@ import { useEffect, useEffectEvent, useState } from "react";
 import { Pencil, X } from "lucide-react";
 import { BrainxApiError, makeIdempotencyKey, updateOpportunityFacts, type ManualFactField } from "./brainx-api";
 import { DrawerSection } from "./workbench-controls";
+import { judgementRows } from "./workbench-facts-model";
 import type { DecisionJob } from "./workbench-model";
 
 const factFieldByLabel: Record<string, ManualFactField> = { 职位状态: "active_state", 当前阶段: "current_stage", "剩余 HC": "remaining_hc", "历史 Pipeline": "pipeline_snapshot", 下一步动作: "next_action", 备注: "notes" };
@@ -148,7 +149,7 @@ export function ManualFactSection({ job, mode, onUpdated, notify, editRequest = 
       }
     >
       <dl className="facts">
-        {Object.entries(displayFacts).map(([key, value]) => {
+        {judgementRows(displayFacts).map(([key, value]) => {
           const source = sourceOf(key);
           // 展示层精简：UNKNOWN 统一显示「待确认」；同步/未知来源标签是内部噪音，只保留手动修正与本机草稿提示。
           const unknown = value === "UNKNOWN";

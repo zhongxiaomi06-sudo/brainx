@@ -105,7 +105,8 @@ test('OpenMai done 结果返回带 present_result 呈现指引，不能只回「
   assert.ok(out.data.result_text.includes('张三'), 'done 结果必须把 result_text 原样带出');
   assert.ok(out.recommendations.some((r) => r.action === 'present_result' && r.note.includes('完整')),
     'done 分支必须带 present_result 指引，防止模型只回“已就绪”不交付候选人');
-  assert.equal(out.unknowns.length, 0);
+  assert.ok(out.unknowns.some((u) => u.includes('复用') && u.includes('不要声称启动了新一轮')
+    && u.includes('已避开')), 'done 复用必须硬写「不是新一轮、不得编造排除名单」（2026-09-13 模型自编已避开事故）');
 });
 
 test('OpenMai 项目入口接收可选找人条件并在无凭证时也如实留痕', () => {
@@ -249,6 +250,8 @@ test('SuperMai 入口（specs/007）：done 结果带结构化 candidates + pres
   assert.equal(out.data.candidates.length, 1, '机器块解析为结构化 candidates');
   assert.equal(out.data.candidates[0].name, '王五');
   assert.ok(out.recommendations.some((r) => r.action === 'present_result'));
+  assert.ok(out.unknowns.some((u) => u.includes('复用') && u.includes('已避开')),
+    'SuperMai done 复用同样要硬写「不是新一轮、不得编造排除名单」');
 });
 
 test('SuperMai 入口（specs/007）：无 TTC 凭证 → error + 引导语，不臆断成功', async () => {

@@ -309,7 +309,13 @@ function openmaiSearch(db, args, principal) {
               started_at: cur.started_at || null, finished_at: cur.finished_at || null,
               ...(disc ? { elapsed_seconds: disc.elapsed_seconds, elapsed_minutes: disc.elapsed_minutes } : {}) },
       facts: [], inferences: [], recommendations: [],
-      unknowns: disc ? [disc.discipline] : [],
+      unknowns: [
+        ...(disc ? [disc.discipline] : []),
+        // 2026-09-13 实证：模型在复用分支自编「已避开 N 人」并冒充新一轮。
+        // 复用时必须明说，排除名单只在显式新一轮由 BrainX 生成。
+        ...(cur.status === 'done' ? [`这是第 ${cur.search_round || 1} 轮已完成结果的复用，不是新一轮找人；`
+          + '不要声称启动了新一轮，也不要声称「已避开」任何候选人——排除名单只在显式新一轮（continue_search=true）时由 BrainX 生成。'] : []),
+      ],
       // done：结果就在 result_text（markdown 候选人清单），必须完整呈现给顾问，
       // 不能只回「已就绪」三个字（2026-09-04 wendy 案例：结果躺在表里 3 小时没人交付）。
       ...(cur.status === 'done' ? { recommendations: [{ action: 'present_result',
@@ -376,7 +382,10 @@ function supermaiScout(db, args, principal) {
       recommendations: cur.status === 'done' && !noReply ? [{ action: 'present_result',
         note: '结果已就绪——请把 data.result_text 里的候选人列表完整、结构化地呈现给顾问，并询问下一步（约面/推荐）。' }] : [],
       unknowns: disc ? [disc.discipline]
-        : noReply ? ['本轮未搜到匹配候选人——建议放宽判据（去掉具体公司名、缩短方向、拆成 2-3 个宽方向）后重新触发'] : [],
+        : noReply ? ['本轮未搜到匹配候选人——建议放宽判据（去掉具体公司名、缩短方向、拆成 2-3 个宽方向）后重新触发']
+        : cur.status === 'done' ? [`这是第 ${cur.search_round || 1} 轮已完成结果的复用，不是新一轮找人；`
+          + '不要声称启动了新一轮，也不要声称「已避开」任何候选人——排除名单只在显式新一轮（continue_search=true）时由 BrainX 生成。']
+        : [],
       evidence_refs: [`supermai:${cur.task_id || project_id}`],
     };
   }

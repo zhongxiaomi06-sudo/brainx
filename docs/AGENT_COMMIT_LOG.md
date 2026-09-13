@@ -1,5 +1,14 @@
 # Agent Commit 记录
 
+## 2026-09-13｜fix(search): 继续找人链路确定性修复——插件直调 + 复用话术硬化
+
+- 触发：自然映射群核查发现「继续找人」按钮两次被点击后，模型调 `brainx_openmai_search` 均**未传 `continue_search=true`**（按钮指令明确要求首次调用必传），实际复用第 1 轮结果重述，并自编「已避开杨佳宪、张隆强、刘奕龙」；库中 `search_round` 停留在 1、排除名单为空。用户指令「进行修复，让这个链路一定要跑通」。
+- **根因**：按钮命令文本到工具调用之间完全依赖模型如实传参，step-3.5-flash 在长指令下丢参数，且复用分支返回没有任何「不得冒充新一轮」约束，模型自由发挥。
+- **修复①（确定性，插件）**：`search-start-notice.js` 的 `[BRAINTEX_SEARCH_START]` 拦截器在发状态通知之外，新增**插件侧直调网关**——按标记解析出的入口（OpenMai/SuperMai）与 continuing 直接以点击人 principal 调用 `brainx_openmai_search`/`brainx_supermai_scout`（`continue_search` 由插件按标记确定，不经过模型）。取不到点击人 ou_ 标识时不构造 principal，原模型路径兜底；直调被拒/失败只记警告。模型随后按命令文本的补调命中 running/防重（内存 running 集合 + DB 主键），不重复计费。新增 `runtime.js#callBrainxGatewayTool`（与工具工厂同一签名契约），插件版本 1.4.4→1.4.5。
+- **修复②（话术硬化，工具端）**：`tools-jobs.js` openmai/supermai 两个 done 复用分支的 unknowns 硬写「这是第 N 轮已完成结果的复用，不是新一轮找人；不要声称启动了新一轮，也不要声称『已避开』任何候选人——排除名单只在显式新一轮（continue_search=true）时由 BrainX 生成」。
+- 验证：新增 3 例插件直调用例（continue_search=true 确定性/SuperMai 映射与首次 false/无点击人不直调+网关拒绝只警告）+ 2 例工具复用话术断言；`openclaw-search-notice` + `agent-job-tools` + `openclaw-production-config` + `openmai-delivery` 47/47。
+- 部署提示：插件改动需 `install.sh --apply` 重装；工具端改动需重启 brainx-agent-gateway。
+
 ## 2026-09-13｜feat(card): 候选人卡按钮改名「加入reloop」+ reloop 短名单数据准确性核查
 
 - 触发：用户看到机器人回复「Reloop 内部短名单暂无授权数据…」，要求 ① 核查数据准确性与 reloop 授权链路 ② 把「加入人才库」按钮文案改为「加入reloop」③ 验证授权能否接通。

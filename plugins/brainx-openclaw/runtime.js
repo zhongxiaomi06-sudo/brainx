@@ -1,7 +1,7 @@
 import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
 
 const GATEWAY_URL = 'http://127.0.0.1:3102/internal/v1/agent/tools';
-const PLUGIN_VERSION = '1.4.3';
+const PLUGIN_VERSION = '1.4.5';
 const OPENCLAW_VERSION = '2026.7.1-2';
 const string = (extra = {}) => ({ type: 'string', minLength: 1, maxLength: 512, ...extra });
 const integer = (minimum, maximum) => ({ type: 'integer', minimum, maximum });
@@ -121,6 +121,38 @@ export function resolveTrustedPrincipal(ctx) {
 
 function toolResult(body) {
   return { content: [{ type: 'text', text: JSON.stringify(body) }], details: body };
+}
+
+/** 插件侧确定性直调网关工具（不经模型）。用于按钮命令这类参数必须精确的场景：
+ *  2026-09-13 实证：模型两次漏传 continue_search=true，「继续找人」变成复用旧结果。
+ *  与 createBrainxToolFactory 同一签名与契约，区别只在 principal 由调用方构造。 */
+export async function callBrainxGatewayTool(toolName, args, principal, dependencies = {}) {
+  const fetchImpl = dependencies.fetchImpl || globalThis.fetch;
+  const gatewayToken = dependencies.gatewayToken ?? process.env.BRAINX_AGENT_GATEWAY_TOKEN;
+  const assertionSecret = dependencies.assertionSecret ?? process.env.BRAINX_AGENT_ASSERTION_SECRET;
+  const now = dependencies.now || (() => new Date());
+  const tool = BRAINX_OPENCLAW_TOOLS.find((row) => row.name === toolName);
+  if (!tool) throw new Error('PLUGIN_TOOL_UNKNOWN');
+  if (!gatewayToken || !assertionSecret) throw new Error('PLUGIN_NOT_CONFIGURED');
+  const signed = createAssertion(principal, tool, args, assertionSecret, now);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10_000);
+  try {
+    const response = await fetchImpl(`${GATEWAY_URL}/${tool.name}`, {
+      method: 'POST', signal: controller.signal,
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${gatewayToken}` },
+      body: JSON.stringify({
+        schema_version: 'agent_tool_request.v1',
+        request_id: signed.requestId,
+        principal_assertion: signed.assertion,
+        arguments: args,
+        client: { plugin_version: PLUGIN_VERSION, openclaw_version: OPENCLAW_VERSION, model_ref: null },
+      }),
+    });
+    return await response.json();
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export function createBrainxToolFactory(tool, dependencies = {}) {

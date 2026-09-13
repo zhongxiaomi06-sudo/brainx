@@ -94,16 +94,17 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
   };
 }
 
-/** 「重点关注」按钮与候选人随行：每个候选人一行，信息在左、本人的关注按钮在右列，
+/** 「重点关注」按钮与候选人随行：每个候选人一行，名字按钮在左、信息在右，
  *  取代「4 列表格 + 序号按钮矩阵」——矩阵要靠序号对号入座，8 个 primary 按钮视觉过载。
  *  候选人名字本身就是按钮（点名字 = 重点关注，随后人才卡带 TTC 链接发到群里），
  *  不再有任何独立「关注」按钮。按钮作为裸 button 元素放在列内（飞书与渲染门禁均支持），
- *  type=default 弱化。历史教训：按钮曾塞进 6 列表格的「操作」列，只分到约 53px 必被
- *  省略号截断（排版门禁 button-truncated）；因此右列固定 2/7 宽度、名字截到 12 字。 */
+ *  type=default 弱化；斑马纹（灰/白交替）让多行候选人扫读时不串行。
+ *  历史教训：按钮曾塞进 6 列表格的「操作」列，只分到约 53px 必被省略号截断
+ *  （排版门禁 button-truncated）；因此左列固定 2/7 宽度、名字截到 12 字。 */
 function candidateFocusRows(job, candidates) {
   return [
     { tag: 'column_set', flex_mode: 'none', background_style: 'grey',
-      columns: [tableCell('匹配与背景 · 核心匹配', 5), tableCell('点名字关注', 2)] },
+      columns: [tableCell('点名字关注', 2), tableCell('匹配与背景 · 核心匹配', 5)] },
     ...candidates.map((candidate, index) => {
       const info = [
         `**匹配度 ${groupSafeOpenmaiText(candidate.score, 20)}** · ${groupSafeOpenmaiText(candidate.role, 120)}`,
@@ -111,14 +112,15 @@ function candidateFocusRows(job, candidates) {
         groupSafeOpenmaiText(candidate.evaluation, 300),
       ].filter(Boolean).join('\n');
       const name = groupSafeOpenmaiText(candidate.name, 12);
-      return { tag: 'column_set', flex_mode: 'none', background_style: 'default', columns: [
-        { tag: 'column', width: 'weighted', weight: 5, vertical_align: 'top',
-          elements: [{ tag: 'markdown', content: info }] },
-        { tag: 'column', width: 'weighted', weight: 2, vertical_align: 'center',
-          elements: [candidate.candidateRefValid === false
-            ? { tag: 'div', text: { tag: 'plain_text', content: `${index + 1}. ${name}` } }
-            : keepCandidateAction(job, candidate, index + 1, name)] },
-      ] };
+      return { tag: 'column_set', flex_mode: 'none',
+        background_style: index % 2 === 0 ? 'default' : 'grey', columns: [
+          { tag: 'column', width: 'weighted', weight: 2, vertical_align: 'center',
+            elements: [candidate.candidateRefValid === false
+              ? { tag: 'div', text: { tag: 'plain_text', content: `${index + 1}. ${name}` } }
+              : keepCandidateAction(job, candidate, index + 1, name)] },
+          { tag: 'column', width: 'weighted', weight: 5, vertical_align: 'top',
+            elements: [{ tag: 'markdown', content: info }] },
+        ] };
     }),
   ];
 }

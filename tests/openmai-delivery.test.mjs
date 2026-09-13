@@ -196,16 +196,16 @@ ${JSON.stringify({ candidates: [
   const rows = card.elements.filter((element) => element.tag === 'column_set');
   assert.equal(rows.length, 3, '一行表头加两行候选人');
   assert.deepEqual(rows[0].columns.map((column) => column.elements[0].text.content),
-    ['匹配与背景 · 核心匹配', '点名字关注']);
-  const firstInfo = rows[1].columns[0].elements[0];
+    ['点名字关注', '匹配与背景 · 核心匹配']);
+  const firstInfo = rows[1].columns[1].elements[0];
   assert.equal(firstInfo.tag, 'markdown');
   assert.match(firstInfo.content, /^\*\*匹配度 /);
   assert.match(firstInfo.content, /待核实/,
     '未提供经历字段时回退为「待核实」，而不是吐一句长文案');
   assert.match(firstInfo.content, /91%/);
   assert.doesNotMatch(JSON.stringify(card), /\|姓名\|详情\||不应把这段/);
-  // 候选人名字本身就是「重点关注」按钮：右列一个裸 button，文案为「序号. 名字」，type=default 弱化。
-  const focusButtons = rows.slice(1).map((row) => row.columns[1].elements[0]);
+  // 候选人名字本身就是「重点关注」按钮：左列一个裸 button，文案为「序号. 名字」，type=default 弱化。
+  const focusButtons = rows.slice(1).map((row) => row.columns[0].elements[0]);
   assert.ok(focusButtons.every((button) => button.tag === 'button' && button.type === 'default'));
   assert.match(focusButtons[0].text.content, /^1\. 张三$/);
   assert.match(focusButtons[1].text.content, /^2\. 李四$/);
@@ -214,6 +214,8 @@ ${JSON.stringify({ candidates: [
   assert.match(focusButtons[0].value.text, /confirm=true/);
   assert.match(focusButtons[0].value.text, /已发送人才卡/);
   assert.match(focusButtons[1].value.text, /candidate_ref=c-2/);
+  // 斑马纹：奇数行灰底，扫读不串行。
+  assert.deepEqual(rows.slice(1).map((row) => row.background_style), ['default', 'grey']);
   // 全卡不再出现独立「重点关注 N」按钮矩阵。
   assert.doesNotMatch(JSON.stringify(card), /重点关注 \d/);
   assert.doesNotMatch(JSON.stringify(card), /action=SEND_TALENT_CARD/);
@@ -235,7 +237,7 @@ ${JSON.stringify({ candidates: [
   // 6 人：每行一个名字按钮共 6 个，不再有 3×N 按钮矩阵。
   const completeRows = completeCard.elements.filter((element) => element.tag === 'column_set');
   assert.equal(completeRows.length, 7, '一行表头加六行候选人');
-  const completeFocus = completeRows.slice(1).map((row) => row.columns[1].elements[0]);
+  const completeFocus = completeRows.slice(1).map((row) => row.columns[0].elements[0]);
   assert.ok(completeFocus.every((button) => button.tag === 'button' && button.type === 'default'));
   assert.deepEqual(completeFocus.map((button) => button.text.content),
     completeCandidates.map((_, index) => `${index + 1}. 候选人${index + 1}`));

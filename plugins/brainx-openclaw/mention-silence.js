@@ -31,23 +31,30 @@ export function createMentionSilenceHandler(dependencies = {}) {
   const lastInbound = new Map();
   const lastActionableAt = new Map();
 
+  /** 入站（message_received）：群聊以 oc_ 会话 id 关联（此时 sessionKey 不一定下发，
+   *  conversationId/metadata.chatId 是实证存在的字段，与 search-start-notice 一致）。 */
   const onMessageReceived = (event, context = {}) => {
-    const key = String(event?.sessionKey || context?.sessionKey || '');
-    if (!key.includes(':group:')) return;
+    const chatId = [context?.conversationId, event?.metadata?.chatId]
+      .map((value) => String(value || '').trim())
+      .find((value) => /^oc_[A-Za-z0-9_-]+$/.test(value));
+    if (!chatId) return;
     const actionable = isActionable(event?.content);
-    lastInbound.set(key, { actionable, at: now() });
-    if (actionable) lastActionableAt.set(key, now());
+    lastInbound.set(chatId, { actionable, at: now() });
+    if (actionable) lastActionableAt.set(chatId, now());
     if (lastInbound.size > 500) lastInbound.delete(lastInbound.keys().next().value);
     if (lastActionableAt.size > 500) lastActionableAt.delete(lastActionableAt.keys().next().value);
   };
 
+  /** 出站（reply_payload_sending）：event.sessionKey 形如
+   *  agent:<agentId>:feishu:group:oc_xxx（私聊为 :direct:，不适用本纪律）。 */
   const onReplySending = (event, context = {}) => {
-    const key = String(event?.sessionKey || context?.sessionKey || '');
-    if (!key.includes(':group:')) return undefined;
-    const inbound = lastInbound.get(key);
+    const sessionKey = String(event?.sessionKey || context?.sessionKey || '');
+    const chatId = /:group:(oc_[A-Za-z0-9_-]+)/.exec(sessionKey)?.[1];
+    if (!chatId) return undefined;
+    const inbound = lastInbound.get(chatId);
     if (!inbound) return undefined; // 进程重启丢入站记录：fail-open 不错杀
     if (inbound.actionable) return undefined;
-    const last = lastActionableAt.get(key) || 0;
+    const last = lastActionableAt.get(chatId) || 0;
     if (now() - last <= FOLLOW_UP_WINDOW_MS) return undefined;
     return { cancel: true, reason: 'group-no-mention-silence' };
   };

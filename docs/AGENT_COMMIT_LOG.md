@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-13｜fix(plugin): 沉默纪律关联键改 oc_ 会话 id——reply 事件 sessionKey 与入站不互通
+
+- 生产实测（16:08/16:10 两次非竞态复现）：`786440e` 版仍放行闲聊。根因：`message_received` 不下发 sessionKey（search-start-notice 只用 conversationId/metadata.chatId 即为明证），而入站记录按 sessionKey 存、出站按 sessionKey 取，永远 miss → fail-open 放过。
+- 改法：入站按 `conversationId/metadata.chatId` 的 oc_ 群 id 记录；出站从 `event.sessionKey`（`agent:<id>:feishu:group:oc_xxx`）解析 `:group:` 与 oc_ 关联；私聊（:direct:）不适用。
+- 插件版本 1.4.7→1.4.8；测试补「入站 sessionKey 缺失也能关联」用例，5/5。
+
 ## 2026-09-13｜fix(plugin): 沉默纪律改挂 reply 阶段 cancel——before_agent_reply 对动态 agent 不触发
 
 - 生产实测：`df16be5` 的 `before_agent_reply` 版沉默纪律部署后闲聊仍被接话（15:48/15:50 两次复现）。排查确认 `before_prompt_build` 生效走的是 prompt-guidance 独立注册表，不能类推通用钩子；`message_received` 与 `reply_payload_sending` 才是本部署实证会触发的钩子（搜索通知、富卡片格式化都走它们），且 `reply_payload_sending` 结果支持 `cancel: true`。

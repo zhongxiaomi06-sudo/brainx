@@ -3,8 +3,9 @@ import test from 'node:test';
 
 import { createMentionSilenceHandler } from '../plugins/brainx-openclaw/mention-silence.js';
 
-const GROUP_KEY = 'agent:feishu-mia-x:feishu:group:oc_g1';
-const P2P_KEY = 'agent:feishu-mia-x:feishu:mia:direct:ou_u1';
+const GROUP_CHAT = 'oc_g1';
+const GROUP_SESSION = `agent:feishu-mia-x:feishu:group:${GROUP_CHAT}`;
+const P2P_SESSION = 'agent:feishu-mia-x:feishu:mia:direct:ou_u1';
 
 function make() {
   let clock = 1_000_000;
@@ -12,14 +13,17 @@ function make() {
   return { silence, advance: (ms) => { clock += ms; } };
 }
 
+const inbound = (silence, content, chatId = GROUP_CHAT) =>
+  silence.onMessageReceived({ content, metadata: { chatId } }, { channelId: 'feishu', conversationId: chatId });
+
 test('群内没有 @ 的闲聊回复被取消，@ 消息的回复照常', () => {
   const { silence } = make();
-  silence.onMessageReceived({ content: '推人选的时候，要不然叫Reloop', sessionKey: GROUP_KEY });
+  inbound(silence, '推人选的时候，要不然叫Reloop');
   assert.deepEqual(
-    silence.onReplySending({ sessionKey: GROUP_KEY, kind: 'final' }),
+    silence.onReplySending({ sessionKey: GROUP_SESSION, kind: 'final' }),
     { cancel: true, reason: 'group-no-mention-silence' });
-  silence.onMessageReceived({ content: '<at user_id="ou_bot"></at> 今天先做什么', sessionKey: GROUP_KEY });
-  assert.equal(silence.onReplySending({ sessionKey: GROUP_KEY, kind: 'final' }), undefined);
+  inbound(silence, '<at user_id="ou_bot"></at> 今天先做什么');
+  assert.equal(silence.onReplySending({ sessionKey: GROUP_SESSION, kind: 'final' }), undefined);
 });
 
 test('按钮命令（标记或工具指令）、控制命令、找人条件触发的回复放行', () => {
@@ -32,28 +36,36 @@ test('按钮命令（标记或工具指令）、控制命令、找人条件触�
     '/brainx',
     '找人条件：北京、半导体、总监',
   ]) {
-    silence.onMessageReceived({ content: body, sessionKey: GROUP_KEY });
-    assert.equal(silence.onReplySending({ sessionKey: GROUP_KEY, kind: 'final' }), undefined, body);
+    inbound(silence, body);
+    assert.equal(silence.onReplySending({ sessionKey: GROUP_SESSION, kind: 'final' }), undefined, body);
   }
 });
 
 test('可见动作后的 10 分钟内追问放行，超过窗口恢复沉默', () => {
   const { silence, advance } = make();
-  silence.onMessageReceived({ content: '<at user_id="ou_bot"></at> 帮我接 J1', sessionKey: GROUP_KEY });
+  inbound(silence, '<at user_id="ou_bot"></at> 帮我接 J1');
   advance(3 * 60 * 1000);
-  silence.onMessageReceived({ content: '确认，就是这个', sessionKey: GROUP_KEY });
-  assert.equal(silence.onReplySending({ sessionKey: GROUP_KEY, kind: 'final' }), undefined,
+  inbound(silence, '确认，就是这个');
+  assert.equal(silence.onReplySending({ sessionKey: GROUP_SESSION, kind: 'final' }), undefined,
     '10 分钟窗口内的会话追问不能掐断');
   advance(11 * 60 * 1000);
-  silence.onMessageReceived({ content: '大家中午吃啥', sessionKey: GROUP_KEY });
-  assert.deepEqual(silence.onReplySending({ sessionKey: GROUP_KEY, kind: 'final' }),
+  inbound(silence, '大家中午吃啥');
+  assert.deepEqual(silence.onReplySending({ sessionKey: GROUP_SESSION, kind: 'final' }),
     { cancel: true, reason: 'group-no-mention-silence' });
 });
 
 test('私聊不适用沉默纪律；无入站记录 fail-open 不错杀', () => {
   const { silence } = make();
-  silence.onMessageReceived({ content: '在吗', sessionKey: P2P_KEY });
-  assert.equal(silence.onReplySending({ sessionKey: P2P_KEY, kind: 'final' }), undefined);
-  assert.equal(silence.onReplySending({ sessionKey: GROUP_KEY, kind: 'final' }), undefined,
+  assert.equal(silence.onReplySending({ sessionKey: P2P_SESSION, kind: 'final' }), undefined);
+  assert.equal(silence.onReplySending({ sessionKey: GROUP_SESSION, kind: 'final' }), undefined,
     '进程重启丢入站记录时宁可放过');
+});
+
+test('入站 sessionKey 缺失也能关联（用 conversationId/metadata.chatId）', () => {
+  const { silence } = make();
+  silence.onMessageReceived({ content: '随便聊聊', metadata: { chatId: 'oc_g2' } },
+    { channelId: 'feishu', conversationId: 'oc_g2' });
+  assert.deepEqual(
+    silence.onReplySending({ sessionKey: 'agent:feishu-mia-x:feishu:group:oc_g2', kind: 'final' }),
+    { cancel: true, reason: 'group-no-mention-silence' });
 });

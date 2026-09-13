@@ -72,16 +72,26 @@
   .saved-picks > summary small { order: 3; width: 100%; margin-left: 0; }
 }
 
-/* 备注结构化渲染（2026-09-13）：备注行改块级左对齐，标签对/标题/列表分层，长文折叠。 */
+/* 备注结构化渲染（2026-09-13）：田字格布局 + 区块底部折叠开关。 */
 .facts div.note-row { display: block; }
 .facts div.note-row dd { text-align: left; margin-top: 6px; }
-.note-value { display: grid; gap: 7px; }
-.note-caption { display: block; font-size: 10px; font-weight: 650; color: #66788a; letter-spacing: .02em; margin-top: 3px; }
-.note-pair { display: grid; grid-template-columns: auto 1fr; gap: 8px; font-size: 12px; line-height: 1.55; color: #33485d; }
-.note-pair b { color: #172940; font-weight: 650; white-space: nowrap; }
-.note-pair span { min-width: 0; }
-.note-item { position: relative; padding-left: 12px; font-size: 12px; line-height: 1.55; color: #536577; }
-.note-item::before { content: "·"; position: absolute; left: 2px; color: #8290a0; }
-.note-text { margin: 0; font-size: 12px; line-height: 1.55; color: #33485d; }
+.note-value { display: grid; gap: 6px; }
+/* 田字格：标签列 + 内容列，1px gap 透出底色即网格线，天然完整不缺边 */
+.note-grid { display: grid; grid-template-columns: auto 1fr; gap: 1px; background: #e6ebe8; border: 1px solid #dde4e0; border-radius: 6px; overflow: hidden; }
+.note-grid > * { padding: 7px 9px; font-size: 12px; line-height: 1.55; background: #fff; }
+.note-grid > b { background: #f7faf8; color: #172940; font-weight: 650; white-space: nowrap; }
+.note-grid > span { color: #33485d; min-width: 0; }
+.note-caption { grid-column: 1 / -1; background: #f2f6f4; font-size: 10px; font-weight: 650; color: #66788a; letter-spacing: .02em; }
+.note-item { grid-column: 1 / -1; position: relative; padding-left: 20px; color: #536577; }
+.note-item::before { content: "\00B7"; position: absolute; left: 9px; color: #8290a0; }
+.note-text { grid-column: 1 / -1; margin: 0; color: #33485d; }
 .note-toggle { justify-self: start; border: 0; background: transparent; padding: 0; font-size: 11px; font-weight: 600; color: #284b40; cursor: pointer; }
 .note-toggle:hover { text-decoration: underline; }
+/* 判断依据：默认折叠在事实表下方 */
+.fact-basis { display: grid; gap: 4px; padding-top: 10px; border-top: 1px dashed #e6eae7; margin-top: 12px; }
+.fact-basis span { font-size: 11px; color: #738292; line-height: 1.5; }
+/* 区块折叠开关统一置底 */
+.section-toggle { margin-top: 10px; display: inline-flex; align-items: center; gap: 4px; border: 0; background: transparent; padding: 0; font-size: 11px; font-weight: 600; color: #284b40; cursor: pointer; }
+.section-toggle:hover { text-decoration: underline; }
+.section-toggle svg { width: 14px; transition: transform .16s; }
+.section-toggle svg.turned { transform: rotate(180deg); }

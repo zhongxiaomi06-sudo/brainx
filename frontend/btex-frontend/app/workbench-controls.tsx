@@ -20,14 +20,23 @@ export function StatusTag({ s }: { s: string }) {
   return <span className={`tag ${cls}`}>{s}</span>;
 }
 
-export function DrawerSection({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
+// 折叠开关统一放在区块底部（2026-09-13 用户要求）：标题只留标题与动作，展开/收起不抢位。
+export function DrawerSection({ title, children, action, collapsible = false, defaultOpen = true, forceOpen = false }: { title: string; children: React.ReactNode; action?: React.ReactNode; collapsible?: boolean; defaultOpen?: boolean; forceOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
+  const expanded = forceOpen || !collapsible || open;
   return (
     <section className="drawer-section">
       <div className="drawer-section-head">
         <h2>{title}</h2>
         {action}
       </div>
-      {children}
+      {expanded && children}
+      {collapsible && !forceOpen && (
+        <button type="button" className="section-toggle" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
+          {open ? "收起" : `展开${title}`}
+          <ChevronDown className={open ? "turned" : ""} aria-hidden="true" />
+        </button>
+      )}
     </section>
   );
 }

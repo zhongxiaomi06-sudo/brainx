@@ -11,7 +11,7 @@ import type { DecisionJob } from "./workbench-model";
 
 const NOTE_COLLAPSE_BUDGET = 200;
 
-// 备注结构化渲染（2026-09-13）：同步来的原始 markdown 解析成标签对/标题/列表，
+// 备注结构化渲染（2026-09-13）：同步来的原始 markdown 解析成田字格（标签列 + 内容列），
 // 长文默认折叠，不再糊成右对齐的整段墙。
 function NoteValue({ raw }: { raw: string }) {
   const [expanded, setExpanded] = useState(false);
@@ -19,9 +19,11 @@ function NoteValue({ raw }: { raw: string }) {
   const { shown, clipped } = expanded ? { shown: segments, clipped: false } : clipNoteSegments(segments, NOTE_COLLAPSE_BUDGET);
   return (
     <div className="note-value">
-      {shown.map((segment, index) => (
-        <NoteSegmentView key={index} segment={segment} />
-      ))}
+      <div className="note-grid">
+        {shown.map((segment, index) => (
+          <NoteSegmentView key={index} segment={segment} />
+        ))}
+      </div>
       {(clipped || expanded) && segments.length > 1 && (
         <button type="button" className="note-toggle" onClick={() => setExpanded((v) => !v)}>
           {expanded ? "收起" : "展开全部"}
@@ -31,17 +33,25 @@ function NoteValue({ raw }: { raw: string }) {
   );
 }
 
+// 田字格：pair 直接吐出「标签格 + 内容格」两个网格单元；标题、列表、纯文本跨两列。
 function NoteSegmentView({ segment }: { segment: NoteSegment }) {
   if (segment.kind === "caption") return <small className="note-caption">{segment.text}</small>;
-  if (segment.kind === "pair")
-    return (
-      <div className="note-pair">
-        <b>{segment.label}</b>
-        <span>{segment.text}</span>
-      </div>
-    );
+  if (segment.kind === "pair") return [<b key="label">{segment.label}</b>, <span key="text">{segment.text}</span>];
   if (segment.kind === "item") return <div className="note-item">{segment.text}</div>;
   return <p className="note-text">{segment.text}</p>;
+}
+
+// 判断依据是内部合成字段，决策时不重要：从事实表移出，默认折叠在底部。
+function BasisRow({ value }: { value: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="fact-basis">
+      <button type="button" className="note-toggle" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
+        {open ? "收起判断依据" : "展开判断依据"}
+      </button>
+      {open && <span>{value}</span>}
+    </div>
+  );
 }
 
 const factFieldByLabel: Record<string, ManualFactField> = { 职位状态: "active_state", 当前阶段: "current_stage", "剩余 HC": "remaining_hc", "历史 Pipeline": "pipeline_snapshot", 下一步动作: "next_action", 备注: "notes" };
@@ -161,6 +171,8 @@ export function ManualFactSection({ job, mode, onUpdated, notify, editRequest = 
     if (value !== null && value !== undefined && value !== "")
       displayFacts[label] = field === "active_state" ? ({ OPEN: "招聘中", COOLING: "冷却期", CLOSED: "已关闭", COMPLETED: "已完成" } as Record<string, string>)[String(value)] || String(value) : String(value);
   });
+  const allRows = judgementRows(displayFacts);
+  const basisRow = allRows.find(([key]) => key === "判断依据");
   return (
     <DrawerSection
       title="当前事实"
@@ -183,9 +195,14 @@ export function ManualFactSection({ job, mode, onUpdated, notify, editRequest = 
           <span className="fact-readonly">正在连接</span>
         )
       }
+      collapsible
+      defaultOpen
+      forceOpen={editing}
     >
       <dl className="facts">
-        {judgementRows(displayFacts).map(([key, value]) => {
+        {judgementRows(displayFacts)
+          .filter(([key]) => key !== "判断依据")
+          .map(([key, value]) => {
           const source = sourceOf(key);
           // 展示层精简：UNKNOWN 统一显示「待确认」；同步/未知来源标签是内部噪音，只保留手动修正与本机草稿提示。
           const unknown = value === "UNKNOWN";
@@ -200,6 +217,7 @@ export function ManualFactSection({ job, mode, onUpdated, notify, editRequest = 
           );
         })}
       </dl>
+      {basisRow && <BasisRow value={basisRow[1]} />}
       {editing && (
         <form className="fact-edit-form" onSubmit={save}>
           <label>

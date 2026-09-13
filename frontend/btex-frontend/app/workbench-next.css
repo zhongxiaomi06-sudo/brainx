@@ -72,24 +72,27 @@
   .saved-picks > summary small { order: 3; width: 100%; margin-left: 0; }
 }
 
-/* 备注田字宫格（2026-09-13 三轮）：两列宫格，横两个竖两个；1px gap 透底色成网格线。 */
+/* 备注田字宫格（2026-09-13 四轮）：两列宫格，横两个竖两个。
+   注意：.facts div 的 flex 会压过单类选择器（0,1,1 > 0,1,0），note 系列必须带 .facts 前缀提权。 */
 .facts div.note-row { display: block; }
-.facts div.note-row dd { text-align: left; margin-top: 6px; }
-.note-value { display: grid; gap: 6px; }
-.note-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: #e2e8e5; border: 1px solid #d8e0dc; border-radius: 7px; overflow: hidden; }
-.note-cell { display: grid; gap: 3px; align-content: start; padding: 8px 10px; background: #fff; }
-.note-cell.wide { grid-column: 1 / -1; }
-.note-cell > b { font-size: 10px; font-weight: 650; color: #7b8b99; letter-spacing: .04em; }
-.note-cell > span { font-size: 11.5px; line-height: 1.5; color: #2f4356; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-.note-cell > ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; }
-.note-cell > ul li { position: relative; padding-left: 10px; font-size: 11.5px; line-height: 1.5; color: #536577; }
-.note-cell > ul li::before { content: "\00B7"; position: absolute; left: 2px; color: #93a2ad; }
-.note-cell > div, .note-cell > p { margin: 0; font-size: 11.5px; line-height: 1.5; color: #33485d; }
-.note-toggle { justify-self: start; border: 0; background: transparent; padding: 0; font-size: 11px; font-weight: 600; color: #284b40; cursor: pointer; }
-.note-toggle:hover { text-decoration: underline; }
-/* 判断依据：默认折叠在事实表下方 */
-.fact-basis { display: grid; gap: 4px; padding-top: 10px; border-top: 1px dashed #e6eae7; margin-top: 12px; }
+.facts div.note-row dd { display: block; max-width: none; text-align: left; margin-top: 6px; }
+.facts .note-value { display: grid; gap: 6px; }
+.facts .note-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: #e2e8e5; border: 1px solid #d8e0dc; border-radius: 7px; overflow: hidden; }
+.facts .note-cell { display: grid; gap: 3px; align-content: start; padding: 8px 10px; background: #fff; }
+.facts .note-cell.wide { grid-column: 1 / -1; }
+.facts .note-cell > b { font-size: 10px; font-weight: 650; color: #7b8b99; letter-spacing: .04em; }
+.facts .note-cell > span { font-size: 11.5px; line-height: 1.5; color: #2f4356; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.facts .note-cell > ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; }
+.facts .note-cell > ul li { position: relative; padding-left: 10px; font-size: 11.5px; line-height: 1.5; color: #536577; }
+.facts .note-cell > ul li::before { content: "\00B7"; position: absolute; left: 2px; color: #93a2ad; }
+.facts .note-cell > div, .facts .note-cell > p { margin: 0; font-size: 11.5px; line-height: 1.5; color: #33485d; }
+.facts .note-toggle { justify-self: start; border: 0; background: transparent; padding: 0; font-size: 11px; font-weight: 600; color: #284b40; cursor: pointer; }
+.facts .note-toggle:hover { text-decoration: underline; }
+/* 判断依据：默认折叠在事实表下方（不在 .facts 内，note-toggle 需在此补样式） */
+.fact-basis { display: grid; gap: 4px; justify-items: start; padding-top: 10px; border-top: 1px dashed #e6eae7; margin-top: 12px; }
 .fact-basis span { font-size: 11px; color: #738292; line-height: 1.5; }
+.fact-basis .note-toggle { justify-self: start; border: 0; background: transparent; padding: 0; font-size: 11px; font-weight: 600; color: #284b40; cursor: pointer; }
+.fact-basis .note-toggle:hover { text-decoration: underline; }
 /* 区块折叠开关统一置底 */
 .section-toggle { margin-top: 10px; display: inline-flex; align-items: center; gap: 4px; border: 0; background: transparent; padding: 0; font-size: 11px; font-weight: 600; color: #284b40; cursor: pointer; }
 .section-toggle:hover { text-decoration: underline; }

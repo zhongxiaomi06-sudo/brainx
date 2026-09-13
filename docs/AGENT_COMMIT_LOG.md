@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-13|fix(frontend): 备注宫格样式提权——.facts div 的 flex 压垮了单类选择器（真机截图验证）
+
+- 触发：用户四轮反馈「排版不行」后不再盲改，搭建临时 vite 入口用**真实组件+真实 CSS+真实备注数据**渲染并 Playwright 截图，一眼定位：宫格被压成竖条、按钮竖排。
+- 根因：`.facts div { display:flex }`（specificity 0,1,1）压过 `.note-value/.note-grid/.note-cell` 等单类选择器（0,1,0），此前三轮的宫格样式在生产上**从未真正生效**——静态手抄预览稿看不出这种层叠冲突，只有真机渲染能暴露。
+- 修复：note 系列选择器全部加 `.facts` 前缀提权（`.facts .note-value/.note-grid/.note-cell...`）；dd 显式 `display:block; max-width:none`；「展开判断依据」按钮不在 .facts 内，单独补 `.fact-basis .note-toggle` 样式。
+- 验证：Playwright 截图（默认态=2×2 田字、展开态=注意事项收尾大格+小麦画像整块+判断依据展开）确认全部生效；ESLint/TypeScript/前端单测 51/51 通过。临时验证目录用后即删，不入库。
+
 ## 2026-09-13｜fix(frontend): 备注宫格收尾大格——最后一个标签块恒跨两列
 
 - 触发：用户四轮反馈「注意事项最后一个大格子，不然不好看」——展开态里注意事项并排占半格，右侧留空洞。

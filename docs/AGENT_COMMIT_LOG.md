@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-13｜fix(frontend): 判断面板备注结构化渲染——剥离小麦同步标记、标签对分层、长文折叠
+
+- 触发：用户截图反馈「备注的结构还是很丑，文字的精简都没有」。备注值是 TTC/小麦同步来的原始 markdown（`**岗位要求**：…` 内联标签对、`# 小麦同步画像` 标题、`- ` 列表、`<!-- xiaomai-sync-begin/end -->` 注释），此前原样塞进 `.facts` 的右对齐 dd，糊成一坨居中长墙。
+- 改法：新增纯模块 `app/workbench-note-format.ts`——剥 HTML 注释、解析 `**标签**：值` 为标签对、`#`/`##` 转 caption、`-` 转列表项、无标记续行并入上一段；`clipNoteSegments` 按字符预算截断（默认 200 字折叠，末段就地省略）。`workbench-facts.tsx` 备注行改 `NoteValue` 组件（展开/收起），备注行块级左对齐（`workbench-next.css` 新增 `.note-row/.note-pair/.note-caption/.note-item` 样式）。
+- 验证：新增 `tests/workbench-note-format.test.mjs` 4 例（样本取生产同步备注真实形态）；前端单测 712/712 通过。full 门禁结果见提交后 `.quality-gate/reports/latest.md`。
+
 ## 2026-09-13｜fix(plugin): 沉默纪律关联键改 oc_ 会话 id——reply 事件 sessionKey 与入站不互通
 
 - 生产实测（16:08/16:10 两次非竞态复现）：`786440e` 版仍放行闲聊。根因：`message_received` 不下发 sessionKey（search-start-notice 只用 conversationId/metadata.chatId 即为明证），而入站记录按 sessionKey 存、出站按 sessionKey 取，永远 miss → fail-open 放过。

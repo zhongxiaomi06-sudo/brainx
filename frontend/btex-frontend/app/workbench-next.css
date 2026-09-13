@@ -71,3 +71,17 @@
   .saved-picks > summary { align-items: flex-start; flex-wrap: wrap; }
   .saved-picks > summary small { order: 3; width: 100%; margin-left: 0; }
 }
+
+/* 备注结构化渲染（2026-09-13）：备注行改块级左对齐，标签对/标题/列表分层，长文折叠。 */
+.facts div.note-row { display: block; }
+.facts div.note-row dd { text-align: left; margin-top: 6px; }
+.note-value { display: grid; gap: 7px; }
+.note-caption { display: block; font-size: 10px; font-weight: 650; color: #66788a; letter-spacing: .02em; margin-top: 3px; }
+.note-pair { display: grid; grid-template-columns: auto 1fr; gap: 8px; font-size: 12px; line-height: 1.55; color: #33485d; }
+.note-pair b { color: #172940; font-weight: 650; white-space: nowrap; }
+.note-pair span { min-width: 0; }
+.note-item { position: relative; padding-left: 12px; font-size: 12px; line-height: 1.55; color: #536577; }
+.note-item::before { content: "·"; position: absolute; left: 2px; color: #8290a0; }
+.note-text { margin: 0; font-size: 12px; line-height: 1.55; color: #33485d; }
+.note-toggle { justify-self: start; border: 0; background: transparent; padding: 0; font-size: 11px; font-weight: 600; color: #284b40; cursor: pointer; }
+.note-toggle:hover { text-decoration: underline; }

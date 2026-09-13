@@ -6,7 +6,43 @@ import { Pencil, X } from "lucide-react";
 import { BrainxApiError, makeIdempotencyKey, updateOpportunityFacts, type ManualFactField } from "./brainx-api";
 import { DrawerSection } from "./workbench-controls";
 import { judgementRows } from "./workbench-facts-model";
+import { clipNoteSegments, formatNoteSegments, type NoteSegment } from "./workbench-note-format";
 import type { DecisionJob } from "./workbench-model";
+
+const NOTE_COLLAPSE_BUDGET = 200;
+
+// 备注结构化渲染（2026-09-13）：同步来的原始 markdown 解析成标签对/标题/列表，
+// 长文默认折叠，不再糊成右对齐的整段墙。
+function NoteValue({ raw }: { raw: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const segments = formatNoteSegments(raw);
+  const { shown, clipped } = expanded ? { shown: segments, clipped: false } : clipNoteSegments(segments, NOTE_COLLAPSE_BUDGET);
+  return (
+    <div className="note-value">
+      {shown.map((segment, index) => (
+        <NoteSegmentView key={index} segment={segment} />
+      ))}
+      {(clipped || expanded) && segments.length > 1 && (
+        <button type="button" className="note-toggle" onClick={() => setExpanded((v) => !v)}>
+          {expanded ? "收起" : "展开全部"}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function NoteSegmentView({ segment }: { segment: NoteSegment }) {
+  if (segment.kind === "caption") return <small className="note-caption">{segment.text}</small>;
+  if (segment.kind === "pair")
+    return (
+      <div className="note-pair">
+        <b>{segment.label}</b>
+        <span>{segment.text}</span>
+      </div>
+    );
+  if (segment.kind === "item") return <div className="note-item">{segment.text}</div>;
+  return <p className="note-text">{segment.text}</p>;
+}
 
 const factFieldByLabel: Record<string, ManualFactField> = { 职位状态: "active_state", 当前阶段: "current_stage", "剩余 HC": "remaining_hc", "历史 Pipeline": "pipeline_snapshot", 下一步动作: "next_action", 备注: "notes" };
 const factEditorLabels: Record<ManualFactField, string> = { active_state: "职位状态", current_stage: "当前阶段", pipeline_snapshot: "Pipeline", remaining_hc: "剩余 HC", next_action: "下一步动作", notes: "备注" };
@@ -155,10 +191,9 @@ export function ManualFactSection({ job, mode, onUpdated, notify, editRequest = 
           const unknown = value === "UNKNOWN";
           const showSource = source && source.source !== "SYNC" && source.source !== "UNKNOWN";
           return (
-            <div key={key}>
+            <div key={key} className={key === "备注" ? "note-row" : undefined}>
               <dt>{key}</dt>
-              <dd className={unknown ? "unknown" : ""}>
-                {unknown ? "待确认" : value}
+              <dd className={unknown ? "unknown" : ""}>{unknown ? "待确认" : key === "备注" ? <NoteValue raw={String(value)} /> : value}
                 {showSource && <small className={`fact-source ${source.source.toLowerCase()}`}>{factSourceLabels[source.source]}</small>}
               </dd>
             </div>

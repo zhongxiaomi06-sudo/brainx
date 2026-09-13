@@ -5,6 +5,7 @@ import { BRAINX_OPENCLAW_TOOLS, createBrainxToolFactory } from './runtime.js';
 import { formatBrainxReplyPayload } from './response-card.js';
 import { createBraintexPromptContext } from './prompt.js';
 import { createSearchStartNoticeHandler } from './search-start-notice.js';
+import { createMentionSilenceHandler } from './mention-silence.js';
 
 export default definePluginEntry({
   id: 'brainx-openclaw',
@@ -18,6 +19,7 @@ export default definePluginEntry({
       return prependSystemContext ? { prependSystemContext } : undefined;
     });
     api.on('message_received', createSearchStartNoticeHandler(api));
+    api.on('before_agent_reply', createMentionSilenceHandler());
     api.on('reply_payload_sending', (event, context) => {
       const result = formatBrainxReplyPayload(event, context);
       api.logger?.info?.(`[brainx-rich-replies] kind=${event?.kind || 'unknown'} channel=${event?.channel || context?.channelId || 'unknown'} applied=${Boolean(result)}`);

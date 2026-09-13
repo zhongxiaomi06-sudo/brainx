@@ -64,6 +64,7 @@ test("田字宫格：标签块各自成格，长块跨两列，标题与列表�
   // 前四格是普通格（横两个竖两个 = 田字），超过 70 字的长块才跨两列。
   assert.deepEqual(fields.slice(0, 4).map((c) => c.wide), [false, false, false, false]);
   assert.equal(fields.at(-1).wide, true, "长标签块应跨两列");
+  assert.equal(fields.at(-1).label, "注意事项", "最后一个标签块恒为收尾大格，避免末行剩半格");
   const groups = cells.filter((c) => c.kind === "group");
   assert.equal(groups.length, 2, "标题各自带后续列表收成整块");
   assert.equal(groups[0].title, "小麦同步画像（最后更新 2026-09-08 02:21）");

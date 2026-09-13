@@ -96,6 +96,13 @@ export function noteCells(segments: NoteSegment[]): NoteCell[] {
     }
     cells.push({ kind: "note", text: segment.text });
   }
+  // 收尾大格：最后一个标签块恒跨两列，避免宫格末行只剩半格、边上留空洞。
+  for (let index = cells.length - 1; index >= 0; index -= 1) {
+    if (cells[index].kind === "field") {
+      (cells[index] as Extract<NoteCell, { kind: "field" }>).wide = true;
+      break;
+    }
+  }
   return cells;
 }
 

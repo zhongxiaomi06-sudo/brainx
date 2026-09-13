@@ -62,10 +62,10 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
   const candidates = success ? extractOpenmaiCandidates(resultText) : [];
   const searchRound = Math.max(1, Number(job.search_round || 1));
   const roundLabel = searchRound > 1 ? `第 ${searchRound} 轮 · ` : '';
-  const readyTitle = searchRound > 1 ? `BrainTex · 第 ${searchRound} 轮候选人已就绪`
-    : 'BrainTex · 首轮候选人已就绪';
-  const partialTitle = searchRound > 1 ? `BrainTex · 第 ${searchRound} 轮候选人不足`
-    : 'BrainTex · 首轮候选人不足';
+  const readyTitle = searchRound > 1 ? `Reloop 候选人推荐 · 第 ${searchRound} 轮已就绪`
+    : 'Reloop 候选人推荐 · 首轮已就绪';
+  const partialTitle = searchRound > 1 ? `Reloop 候选人推荐 · 第 ${searchRound} 轮候选人不足`
+    : 'Reloop 候选人推荐 · 首轮候选人不足';
   const content = success
     ? (candidates.length
       ? `**${job.company} · ${job.role}**\n\n${roundLabel}本轮共找到 ${candidates.length} 位候选人。`
@@ -77,8 +77,8 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
     config: { wide_screen_mode: true },
     header: { template: complete ? 'green' : success ? 'orange' : 'red', title: { tag: 'plain_text',
       content: complete ? readyTitle
-        : needsInput ? 'BrainTex · 请补充职位信息'
-          : success ? partialTitle : 'BrainTex · 候选人搜索失败' } },
+        : needsInput ? 'Reloop 候选人推荐 · 请补充职位信息'
+          : success ? partialTitle : 'Reloop 候选人推荐 · 搜索失败' } },
     elements: [
       { tag: 'markdown', content },
       // 说明收成一行小灰字 note：按钮与候选人随行后不再需要长段教学。

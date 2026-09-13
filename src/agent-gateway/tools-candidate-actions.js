@@ -36,7 +36,7 @@ export function candidateShareCard(jobId, candidateRef, candidate = {}) {
   const profile = [candidate.experience, candidate.city, candidate.education]
     .filter(Boolean).map((item) => safeCardText(item, 80)).join(' · ') || '经历信息待核实';
   return { config: { wide_screen_mode: true },
-    header: { template: 'blue', title: { tag: 'plain_text', content: 'BrainTex · 候选人卡片' } },
+    header: { template: 'blue', title: { tag: 'plain_text', content: 'Reloop · 候选人卡片' } },
     elements: [
       { tag: 'markdown', content: `**${safeCardText(candidate.name || candidateRef, 80)}**\n${safeCardText(candidate.role || '当前岗位待核实', 120)}` },
       { tag: 'markdown', content: `**经历**：${profile}\n**匹配度**：${safeCardText(candidate.score || '待核实', 20)}\n**核心匹配点**：${safeCardText(candidate.evaluation, 500)}` },

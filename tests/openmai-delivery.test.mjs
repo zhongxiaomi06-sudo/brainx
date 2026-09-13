@@ -224,7 +224,7 @@ ${JSON.stringify({ candidates: [
     && (element.elements || []).some((note) => /项目共同重点名单/.test(note.content || '')));
   assert.ok(focusIntro, '候选人行上方必须说明点名字会把候选人加入项目共同重点名单');
   assert.match(card.elements[0].content, /第 2 轮/);
-  assert.equal(card.header.title.content, 'BrainTex · 第 2 轮候选人不足');
+  assert.equal(card.header.title.content, 'Reloop 候选人推荐 · 第 2 轮候选人不足');
   const completeCandidates = Array.from({ length: 6 }, (_, index) => ({
     candidate_ref: `c-${index + 1}`, name: `候选人${index + 1}`, evaluation: '匹配',
   }));
@@ -233,7 +233,7 @@ ${JSON.stringify({ candidates: [
     status: 'done', resultText: `<!-- BRAINX_CANDIDATES_V1\n${JSON.stringify({ candidates: completeCandidates })}\n-->`,
     publicBaseUrl: 'https://base.yorkteam.cn/',
   });
-  assert.equal(completeCard.header.title.content, 'BrainTex · 第 2 轮候选人已就绪');
+  assert.equal(completeCard.header.title.content, 'Reloop 候选人推荐 · 第 2 轮已就绪');
   // 6 人：每行一个名字按钮共 6 个，不再有 3×N 按钮矩阵。
   const completeRows = completeCard.elements.filter((element) => element.tag === 'column_set');
   assert.equal(completeRows.length, 7, '一行表头加六行候选人');

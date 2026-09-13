@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-13｜fix(plugin): 沉默纪律改挂 reply 阶段 cancel——before_agent_reply 对动态 agent 不触发
+
+- 生产实测：`df16be5` 的 `before_agent_reply` 版沉默纪律部署后闲聊仍被接话（15:48/15:50 两次复现）。排查确认 `before_prompt_build` 生效走的是 prompt-guidance 独立注册表，不能类推通用钩子；`message_received` 与 `reply_payload_sending` 才是本部署实证会触发的钩子（搜索通知、富卡片格式化都走它们），且 `reply_payload_sending` 结果支持 `cancel: true`。
+- 改法：`mention-silence.js` 改为双钩子——`message_received` 记录群会话最近入站（是否可见动作 + 时间），`reply_payload_sending` 对「非可见动作且超出 10 分钟追问窗口」的群回复返回 `cancel: true`。无入站记录（进程重启）fail-open 不拦截。行为规则不变（@ / 按钮命令 / `/` 命令 / 找人条件 / 10 分钟窗口追问放行，私聊不适用）。
+- 插件版本 1.4.6→1.4.7。
+- 验证：重写 `openclaw-mention-silence.test.mjs` 4 例 + 相关 19/19；首轮测试抓出「只记动作不记入站导致冷场闲聊 fail-open 漏拦」并已修正（双 Map：最近入站 + 最近动作）。
+
 ## 2026-09-13｜feat(plugin): 群聊沉默纪律——没有 @ 的闲聊机器人不再接话
 
 - 触发：york 在 LiberAI 项目群随口一句「推人选的时候，要不然叫Reloop」（无 @），机器人立刻接话「收到 York…」；用户明确指令「小机器人没有@就不要说话好吵」。

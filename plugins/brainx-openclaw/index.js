@@ -19,7 +19,9 @@ export default definePluginEntry({
       return prependSystemContext ? { prependSystemContext } : undefined;
     });
     api.on('message_received', createSearchStartNoticeHandler(api));
-    api.on('before_agent_reply', createMentionSilenceHandler());
+    const mentionSilence = createMentionSilenceHandler();
+    api.on('message_received', mentionSilence.onMessageReceived);
+    api.on('reply_payload_sending', mentionSilence.onReplySending, { priority: 100 });
     api.on('reply_payload_sending', (event, context) => {
       const result = formatBrainxReplyPayload(event, context);
       api.logger?.info?.(`[brainx-rich-replies] kind=${event?.kind || 'unknown'} channel=${event?.channel || context?.channelId || 'unknown'} applied=${Boolean(result)}`);

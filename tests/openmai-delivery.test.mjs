@@ -196,7 +196,7 @@ ${JSON.stringify({ candidates: [
   const rows = card.elements.filter((element) => element.tag === 'column_set');
   assert.equal(rows.length, 3, '一行表头加两行候选人');
   assert.deepEqual(rows[0].columns.map((column) => column.elements[0].text.content),
-    ['点名字关注', '匹配与背景 · 核心匹配']);
+    ['点名字关注', '匹配与背景 · 核心匹配', '人才库']);
   const firstInfo = rows[1].columns[1].elements[0];
   assert.equal(firstInfo.tag, 'markdown');
   assert.match(firstInfo.content, /^\*\*匹配度 /);
@@ -214,6 +214,12 @@ ${JSON.stringify({ candidates: [
   assert.match(focusButtons[0].value.text, /confirm=true/);
   assert.match(focusButtons[0].value.text, /已发送人才卡/);
   assert.match(focusButtons[1].value.text, /candidate_ref=c-2/);
+  // 最右列：每行一个 TTC 人才库纯跳转链接（multi_url，不走回调与授权判定）。
+  const ttcLinks = rows.slice(1).map((row) => row.columns[2].elements[0]);
+  assert.ok(ttcLinks.every((link) => link.tag === 'button' && link.text.content === 'TTC'));
+  assert.equal(ttcLinks[0].multi_url.url, 'https://app.ttcadvisory.com/app/talent/c-1');
+  assert.equal(ttcLinks[1].multi_url.url, 'https://app.ttcadvisory.com/app/talent/c-2');
+  assert.ok(ttcLinks.every((link) => !link.value), 'TTC 链接必须是纯跳转，不带回调 value');
   // 斑马纹：奇数行灰底，扫读不串行。
   assert.deepEqual(rows.slice(1).map((row) => row.background_style), ['default', 'grey']);
   // 全卡不再出现独立「重点关注 N」按钮矩阵。

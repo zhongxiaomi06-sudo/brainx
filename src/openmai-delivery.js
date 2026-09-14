@@ -94,17 +94,18 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
   };
 }
 
-/** 「重点关注」按钮与候选人随行：每个候选人一行，名字按钮在左、信息在右，
+/** 「重点关注」按钮与候选人随行：每个候选人一行，名字按钮在左、信息在中、TTC 人才库链接在右，
  *  取代「4 列表格 + 序号按钮矩阵」——矩阵要靠序号对号入座，8 个 primary 按钮视觉过载。
  *  候选人名字本身就是按钮（点名字 = 重点关注，随后人才卡带 TTC 链接发到群里），
  *  不再有任何独立「关注」按钮。按钮作为裸 button 元素放在列内（飞书与渲染门禁均支持），
  *  type=default 弱化；斑马纹（灰/白交替）让多行候选人扫读时不串行。
+ *  TTC 链接是纯跳转（multi_url），不经过回调与授权判定——非项目成员的群成员也能打开人才页。
  *  历史教训：按钮曾塞进 6 列表格的「操作」列，只分到约 53px 必被省略号截断
- *  （排版门禁 button-truncated）；因此左列固定 2/7 宽度、名字截到 12 字。 */
+ *  （排版门禁 button-truncated）；因此左列固定 2/7 宽度、名字截到 12 字，链接列固定 1/7。 */
 function candidateFocusRows(job, candidates) {
   return [
     { tag: 'column_set', flex_mode: 'none', background_style: 'grey',
-      columns: [tableCell('点名字关注', 2), tableCell('匹配与背景 · 核心匹配', 5)] },
+      columns: [tableCell('点名字关注', 2), tableCell('匹配与背景 · 核心匹配', 4), tableCell('人才库', 1)] },
     ...candidates.map((candidate, index) => {
       const info = [
         `**匹配度 ${groupSafeOpenmaiText(candidate.score, 20)}** · ${groupSafeOpenmaiText(candidate.role, 120)}`,
@@ -112,14 +113,20 @@ function candidateFocusRows(job, candidates) {
         groupSafeOpenmaiText(candidate.evaluation, 300),
       ].filter(Boolean).join('\n');
       const name = groupSafeOpenmaiText(candidate.name, 12);
+      const talentUrl = ttcTalentUrl(candidate);
       return { tag: 'column_set', flex_mode: 'none',
         background_style: index % 2 === 0 ? 'default' : 'grey', columns: [
           { tag: 'column', width: 'weighted', weight: 2, vertical_align: 'center',
             elements: [candidate.candidateRefValid === false
               ? { tag: 'div', text: { tag: 'plain_text', content: `${index + 1}. ${name}` } }
               : keepCandidateAction(job, candidate, index + 1, name)] },
-          { tag: 'column', width: 'weighted', weight: 5, vertical_align: 'top',
+          { tag: 'column', width: 'weighted', weight: 4, vertical_align: 'top',
             elements: [{ tag: 'markdown', content: info }] },
+          { tag: 'column', width: 'weighted', weight: 1, vertical_align: 'center',
+            elements: [talentUrl
+              ? { tag: 'button', type: 'default', text: { tag: 'plain_text', content: 'TTC' },
+                  multi_url: { url: talentUrl, pc_url: talentUrl, android_url: talentUrl, ios_url: talentUrl } }
+              : { tag: 'div', text: { tag: 'plain_text', content: '' } }] },
         ] };
     }),
   ];
@@ -128,7 +135,7 @@ function candidateFocusRows(job, candidates) {
 /** 按钮说明收成一行 note（小号灰字）：名字即按钮，一句话说清动作与结果。 */
 function focusIntroNote() {
   return { tag: 'note', elements: [{ tag: 'plain_text',
-    content: '点候选人名字，即把该候选人加入项目共同重点名单，并收到带 TTC 链接的人才卡。' }] };
+    content: '点候选人名字加入项目共同重点名单并收到人才卡；右侧 TTC 直达人才库链接。' }] };
 }
 
 /** 表格原来的「操作」列兼作「链接待核实」提示，该列移除后信号改在这里披露，避免静默丢失。 */

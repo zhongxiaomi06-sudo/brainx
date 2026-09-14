@@ -16,6 +16,7 @@
 import { parseCsvFile } from './csv.js';
 import { tokenize } from './scorer.js';
 import { parseResumeText } from './resume.js';
+import { buildTalentListQuery } from './talent-mysql-query.js';
 
 // ---------------------------------------------------------------------------
 // 后端选择：优先真 MySQL；未配置/连不通则回退内存库。
@@ -296,10 +297,8 @@ function makeMysqlBackend(db) {
     },
     async listTalents({ limit, offset, status }) {
       return withMysql(async (conn) => {
-        const where = status ? `WHERE status=?` : '';
-        const args = status ? [status, limit, offset] : [limit, offset];
-        const [rows] = await conn.execute(
-          `SELECT * FROM talent ${where} ORDER BY last_active_time DESC, id DESC LIMIT ? OFFSET ?`, args);
+        const { sql, args } = buildTalentListQuery({ limit, offset, status });
+        const [rows] = await conn.execute(sql, args);
         return rows;
       });
     },

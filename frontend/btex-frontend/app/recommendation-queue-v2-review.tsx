@@ -12,6 +12,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import "./recommendation-queue-v2-review.css";
+import { displayPipeline } from "./recommendation-display";
 
 export type RecommendationDecisionTier = "TODAY" | "WEEK" | "VERIFY";
 export type RecommendationConfidence = "SUFFICIENT" | "PARTIAL" | "INSUFFICIENT";
@@ -37,6 +38,7 @@ export type RecommendationQueueItem = {
   currentStage: string | null;
   recentActivity: { label: string; occurredAt: string | null } | null;
   pipeline: string | null;
+  summary: string | null;
   score: number | string;
   evidenceCoverage: number | null;
   explorationScore: number | string;
@@ -150,8 +152,9 @@ function RecommendationCard({ item, onOpen, onAction }: {
         <div><dt>HC</dt><dd>{display(item.hc)}</dd></div>
         <div><dt>阶段</dt><dd>{displayStage(item.currentStage)}</dd></div>
         <div><dt>最近活动</dt><dd>{item.recentActivity ? `${item.recentActivity.label}${item.recentActivity.occurredAt ? ` · ${displayDate(item.recentActivity.occurredAt)}` : ""}` : "待确认"}</dd></div>
-        <div><dt>进展</dt><dd>{display(item.pipeline)}</dd></div>
+        <div><dt>进展</dt><dd>{displayPipeline(item.pipeline)}</dd></div>
       </dl>
+      {item.summary && <p className="recommendation-v2-summary-line"><span>推荐摘要</span>{item.summary}</p>}
     </div>
 
     <footer onClick={event => event.stopPropagation()}>

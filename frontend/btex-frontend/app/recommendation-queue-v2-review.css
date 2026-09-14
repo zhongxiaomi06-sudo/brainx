@@ -193,6 +193,16 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.recommendation-v2-summary-line {
+  display: flex;
+  gap: 9px;
+  margin: 0;
+  padding: 8px 0 0;
+  color: #43514d;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.recommendation-v2-summary-line span { flex: 0 0 auto; color: #17866d; font-weight: 700; }
 
 .recommendation-v2-card > footer {
   display: flex;
@@ -270,6 +280,7 @@
   .recommendation-v2-card > header { grid-template-columns: 36px minmax(0, 1fr) auto; align-items: start; }
   .recommendation-v2-card > header .recommendation-tier { margin-top: 0; margin-right: 8px; }
   .recommendation-v2-body { padding-left: 44px; }
+  .recommendation-v2-summary-line { align-items: flex-start; }
   .recommendation-v2-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .recommendation-v2-facts div:nth-child(odd) { padding-left: 0; border-left: 0; }
   .recommendation-v2-facts div:nth-child(4) { padding-left: 10px; border-left: 1px solid #edf0ef; }

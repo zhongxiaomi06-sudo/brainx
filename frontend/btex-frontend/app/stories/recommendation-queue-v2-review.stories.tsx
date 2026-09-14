@@ -26,6 +26,7 @@ function itemAt(index: number): RecommendationQueueItem {
     currentStage: rank % 3 === 0 ? "面试" : "寻访",
     recentActivity: { label: rank % 3 === 0 ? "新增面试" : "职位事实更新", occurredAt: "2026-08-28T09:00:00+08:00" },
     pipeline: rank % 3 === 0 ? "推荐 8 · 面试 2" : "寻访 12 · 推荐 3",
+    summary: "画像关键词与全球化增长方向重合；当前职位已有可核验进展。",
     score: 96 - rank / 2,
     evidenceCoverage: rank % 6 === 0 ? 68 : 92,
     explorationScore: rank % 5 === 0 ? 100 : 50,
@@ -81,6 +82,7 @@ export const FirstPage: Story = {
     await expect(canvas.getAllByText("AI 匹配分")[0]).toBeInTheDocument();
     await expect(canvas.getAllByText("证据覆盖")[0]).toBeInTheDocument();
     await expect(canvas.getAllByText("探索价值")[0]).toBeInTheDocument();
+    await expect(canvas.getAllByText("推荐摘要")[0]).toBeInTheDocument();
     const firstCard = canvas.getByRole("article", { name: "高级算法工程师 · 脱敏客户 A" });
     await expect(within(firstCard).getByLabelText("今天推进，3格信号")).toBeInTheDocument();
     await expect(within(firstCard).queryByRole("button", { name: "查看 高级算法工程师 判断" })).not.toBeInTheDocument();

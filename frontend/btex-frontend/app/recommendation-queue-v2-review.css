@@ -1,6 +1,7 @@
 .recommendation-v2-queue {
   display: grid;
   gap: 12px;
+  width: 100%;
   max-width: 1180px;
   margin: 0 auto;
   color: #1f2926;

@@ -139,6 +139,7 @@
 - [职位名称 Markdown 泄漏清理复核](2026-09-15-job-title-display-cleanup.md)
 - [推荐卡简明摘要与中文进展复核](2026-09-15-recommendation-card-summary.md)
 - [推荐卡快速筛选层级复核](2026-09-15-recommendation-card-hierarchy.md)
+- [推荐列表工作区宽度复核](2026-09-15-recommendation-list-width.md)
 - [候选人保留与项目共享上下文复核](2026-09-09-candidate-focus-context.md)
 - [候选人 Offer 决策群复核](2026-09-09-candidate-decision-group.md)
 - [候选卡片与对话建群复核](2026-09-09-candidate-card-conversation-group.md)

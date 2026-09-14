@@ -71,6 +71,8 @@ export const FirstPage: Story = {
   name: "首批 20 条与新版卡片",
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    const queue = canvas.getByRole("region", { name: "推荐队列" });
+    await expect((queue.parentElement?.getBoundingClientRect().width || 0) - queue.getBoundingClientRect().width).toBeLessThanOrEqual(48);
     await expect(canvas.getAllByRole("article")).toHaveLength(20);
     await expect(canvas.getByRole("heading", { name: "推荐队列" })).toBeInTheDocument();
     await expect(canvas.getByText("岗位数量：", { exact: false })).toHaveTextContent("45");

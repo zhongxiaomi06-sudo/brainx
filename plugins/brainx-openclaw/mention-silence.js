@@ -4,22 +4,22 @@
  * （卡片回调合成消息没有 @ 元数据，全局 mention 门会把按钮一起挡掉），但它同时
  * 放行了所有闲聊，机器人逢话必接「好吵」。
  *
- * @机器人 判定的最终方案（2026-09-14 五轮源码实证后的结论）：
- *   - feishu 插件把机器人自己的 at 标签从 content 剥掉，文本探测 @机器人 不可行；
- *   - inbound_claim 事件虽带 wasMentioned，但只在插件自有绑定会话触发，普通群聊不触发；
- *   - message_received / before_agent_reply 均不带 wasMentioned（metadata 已逐字段核对）；
- *   - 因此：对「无命令特征、无 @别人 标签」的歧义消息，在 message_received 阶段
- *     按 messageId 回查飞书 im/v1/messages 的 mentions 数组，判定是否 @ 了机器人
- *     （每个歧义消息一次 API 调用，量极小；凭证取进程环境变量）。
+ * @机器人 判定终案（2026-09-14 五轮源码实证）：
+ *   - feishu 插件把机器人自己的 at 标签从 content 剥掉（文本探测不可行）；
+ *   - inbound_claim 的 wasMentioned 只在插件自有绑定会话触发（普通群聊不触发）；
+ *   - 因此：message_received 只记原始 messageId，真正的 mentions 回查放在
+ *     before_agent_reply 里做——该钩子会被 await，判定与消息一一对应，无竞态
+ *     （message_received 是 fire-and-forget，放那里必然慢半拍）。
+ *   - mentions 元素形态 { id: 'ou_...', id_type, key, name }，id 是字符串（生产实测）。
  *
  * 放行规则（可见动作，回复照发）：
- *   1. @ 了机器人本人（API 回查 mentions 命中 bot open_id）；
+ *   1. @ 了机器人本人（回查 mentions：id 命中 bot open_id 或名为 braintex的小机器人）；
  *   2. 含 `[BRAINTEX_` 标记或 `brainx_` 工具指令（全部按钮命令文本的特征）；
  *   3. `/` 开头的控制命令；
  *   4. 会话追问：最近 10 分钟内有可见动作的会话，后续普通消息放行（多轮业务流不掐断）。
- * 「找人条件：…」永远静默（被动登记，由 search-start-notice 注入下一轮搜索）。
- * @别人（content 保留 `<at user_id="非 bot">` 形态）按非 @机器人 处理。
- * 私聊不适用本纪律。API 回查失败时按「未 @」处理（宁可静默，不扰群）。
+ * 「找人条件：…」永远静默（优先级高于追问窗口；被动登记，由 search-start-notice 注入）。
+ * @别人（content 保留非 bot 的 at 标签）按非 @机器人 处理，不回查。
+ * 私聊不适用本纪律。回查失败按未 @（宁可静默，不扰群）。
  */
 const FOLLOW_UP_WINDOW_MS = 10 * 60 * 1000;
 const BOT_OPEN_ID = 'ou_aa41e31506cb6dbd4bc96e0e48f46b93'; // braintex 小机器人（生产 resolved bot open_id）
@@ -31,7 +31,7 @@ function hasMarkerCommand(content) {
 }
 
 function hasOtherMention(content) {
-  return /<at user_id="(?!ou_aa41e31506cb6dbd4bc96e0e48f46b93")ou_[A-Za-z0-9_-]+"/.test(String(content || ''));
+  return new RegExp(`<at user_id="(?!${BOT_OPEN_ID}")ou_[A-Za-z0-9_-]+"`).test(String(content || ''));
 }
 
 export function createMentionSilenceHandler(dependencies = {}) {
@@ -39,8 +39,9 @@ export function createMentionSilenceHandler(dependencies = {}) {
   const fetchImpl = dependencies.fetchImpl || globalThis.fetch;
   const appId = dependencies.appId ?? process.env.BRAINX_FEISHU_APP_ID;
   const appSecret = dependencies.appSecret ?? process.env.BRAINX_FEISHU_APP_SECRET;
-  const lastInbound = new Map();
-  const lastActionableAt = new Map();
+  const lastInbound = new Map(); // chatId -> { content, messageId, at }
+  const lastActionableAt = new Map(); // chatId -> ts
+  const mentionVerdicts = new Map(); // messageId -> boolean
   let tokenCache = null;
 
   async function tenantToken() {
@@ -55,57 +56,69 @@ export function createMentionSilenceHandler(dependencies = {}) {
     return tokenCache.value;
   }
 
-  /** 回查消息的 mentions 数组，判定是否 @ 了机器人。失败按未 @（静默优先）。 */
   async function isBotMentioned(messageId) {
-    if (!messageId || !appId || !appSecret) return false;
-    try {
-      const token = await tenantToken();
-      const resp = await fetchImpl(`${FEISHU_BASE}/open-apis/im/v1/messages/${messageId}`, {
-        headers: { authorization: `Bearer ${token}` },
-      });
-      const body = await resp.json();
-      const mentions = body?.data?.items?.[0]?.mentions || [];
-      return mentions.some((m) => m?.id?.open_id === BOT_OPEN_ID);
-    } catch {
-      return false;
+    if (mentionVerdicts.has(messageId)) return mentionVerdicts.get(messageId);
+    let verdict = false;
+    if (messageId && appId && appSecret) {
+      try {
+        const token = await tenantToken();
+        const resp = await fetchImpl(`${FEISHU_BASE}/open-apis/im/v1/messages/${messageId}`, {
+          headers: { authorization: `Bearer ${token}` },
+        });
+        const body = await resp.json();
+        const mentions = body?.data?.items?.[0]?.mentions || [];
+        verdict = mentions.some((m) => m?.id?.open_id === BOT_OPEN_ID || m?.id === BOT_OPEN_ID
+          || m?.name === 'braintex的小机器人');
+      } catch {
+        verdict = false; // 回查失败按未 @（宁可静默，不扰群）
+      }
     }
+    if (mentionVerdicts.size > 500) mentionVerdicts.delete(mentionVerdicts.keys().next().value);
+    mentionVerdicts.set(messageId, verdict);
+    return verdict;
   }
 
-  const remember = (chatId, actionable, condition = false) => {
-    lastInbound.set(chatId, { actionable, condition, at: now() });
-    if (actionable) lastActionableAt.set(chatId, now());
+  const onMessageReceived = (event, context = {}) => {
+    const chatId = [context?.conversationId, event?.metadata?.chatId, event?.metadata?.to]
+      .map((value) => String(value || '').trim().replace(/^chat:/, ''))
+      .find((value) => /^oc_[A-Za-z0-9_-]+$/.test(value));
+    if (!chatId) return;
+    lastInbound.set(chatId, {
+      content: String(event?.content || ''),
+      messageId: String(event?.messageId || event?.metadata?.messageId || '').trim(),
+      at: now(),
+    });
+    // 按钮/命令类可见动作在入站即开窗（出站钩子的会话追问窗口以此为准）。
+    if (hasMarkerCommand(String(event?.content || ''))) lastActionableAt.set(chatId, now());
     if (lastInbound.size > 500) lastInbound.delete(lastInbound.keys().next().value);
     if (lastActionableAt.size > 500) lastActionableAt.delete(lastActionableAt.keys().next().value);
   };
 
-  const extractChatId = (event, context) => [context?.conversationId, event?.metadata?.chatId, event?.metadata?.to]
-    .map((value) => String(value || '').trim().replace(/^chat:/, ''))
-    .find((value) => /^oc_[A-Za-z0-9_-]+$/.test(value));
-
-  const onMessageReceived = async (event, context = {}) => {
-    const chatId = extractChatId(event, context);
-    if (!chatId) return;
-    const content = String(event?.content || '');
-    if (content.trim().startsWith('找人条件')) return remember(chatId, false, true);
-    if (hasMarkerCommand(content)) return remember(chatId, true);
-    if (hasOtherMention(content)) return remember(chatId, false);
-    // 歧义消息（无标记、无 @别人）：回查 mentions 判定是否 @机器人。
-    const messageId = String(event?.messageId || event?.metadata?.messageId || '').trim();
-    return remember(chatId, await isBotMentioned(messageId));
-  };
-
-  const onBeforeAgentReply = (event, context = {}) => {
+  const onBeforeAgentReply = async (event, context = {}) => {
     const sessionKey = String(event?.sessionKey || context?.sessionKey || '');
     const chatId = /:group:(oc_[A-Za-z0-9_-]+)/.exec(sessionKey)?.[1];
     if (!chatId) return undefined;
     const inbound = lastInbound.get(chatId);
     if (!inbound) return undefined; // 进程重启丢入站记录：fail-open 不错杀
-    // 「找人条件」永远静默——即使在追问窗口内（被动登记，不需要回声）。
-    if (inbound.condition) return { handled: true, reply: { text: 'NO_REPLY' }, reason: 'group-no-mention-silence' };
-    if (inbound.actionable) return undefined;
+    const content = inbound.content;
+    const silence = { handled: true, reply: { text: 'NO_REPLY' }, reason: 'group-no-mention-silence' };
+    // 「找人条件」永远静默（优先级高于追问窗口）
+    if (content.trim().startsWith('找人条件')) return silence;
+    if (hasMarkerCommand(content)) {
+      lastActionableAt.set(chatId, now());
+      if (lastActionableAt.size > 500) lastActionableAt.delete(lastActionableAt.keys().next().value);
+      return undefined;
+    }
+    if (hasOtherMention(content)) return silence; // @别人 不算 @机器人
+    // 歧义消息：回查 mentions（await，判定与本消息一一对应）
+    if (await isBotMentioned(inbound.messageId)) {
+      lastActionableAt.set(chatId, now());
+      if (lastActionableAt.size > 500) lastActionableAt.delete(lastActionableAt.keys().next().value);
+      return undefined;
+    }
     const last = lastActionableAt.get(chatId) || 0;
     if (now() - last <= FOLLOW_UP_WINDOW_MS) return undefined;
-    return { handled: true, reply: { text: 'NO_REPLY' }, reason: 'group-no-mention-silence' };
+    return silence;
   };
 
   return { onMessageReceived, onBeforeAgentReply };

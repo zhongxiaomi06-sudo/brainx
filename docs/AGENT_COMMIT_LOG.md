@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-14｜fix(plugin): @机器人 判定终案——before_agent_reply 内回查飞书 mentions（无竞态）
+
+- 五轮源码实证的最终结论：① feishu 插件把机器人自己的 at 标签从 content 剥掉（文本探测不可行）；② inbound_claim 带 wasMentioned 但只在插件自有绑定会话触发（普通群聊不触发）；③ message_received/before_agent_reply 的 metadata 逐字段核对均无 wasMentioned；④ mentions 元素形态 `{ id: 'ou_...', id_type, name }`，id 是字符串不是 `{open_id}` 对象（生产实测，首版回查按对象取永远 false）；⑤ message_received 是 fire-and-forget 不 await，异步回查放那里必然与 before_agent_reply 竞态。
+- 终案实现：message_received 只记原始 `{content, messageId}`；before_agent_reply（会被 await）内完成全部判定——「找人条件」永远静默（优先级高于追问窗口）；`[BRAINTEX_`/`brainx_`/`/` 放行并在入站即开追问窗口；@别人 at 标签非 bot id 直接吞；其余歧义消息 await 回查 `im/v1/messages` mentions（id 字符串命中 bot open_id 或名为 braintex的小机器人；失败宁可静默），判定与本消息一一对应、无竞态。按钮/命令动作在 message_received 入站即开 10 分钟追问窗口（不依赖出站钩子触发次序）。
+- 生产联动验证（部署 7a1458e 后实测）：@bot 回复 ✓、闲聊吞且 0 次模型调用（吞在模型调用前，省 token）✓；并现场用生产凭证回查消息 mentions 确认字段形态。
+- 插件 1.4.12→1.4.14（叠加两个实测修正）。验证：31/31（silence/search/plugin/config）。
+
 ## 2026-09-14｜fix(plugin): @机器人 判定终案——message_received 按 messageId 回查飞书 mentions
 
 - 五轮源码实证的最终结论：① feishu 插件把机器人自己的 at 标签从 content 剥掉（文本探测不可行）；② inbound_claim 带 wasMentioned 但只在插件自有绑定会话触发（普通群聊不触发，13:49 实测 dispatch 照跑）；③ message_received/before_agent_reply 的 metadata 逐字段核对均无 wasMentioned。插件侧唯一可靠路径：歧义消息按 messageId 回查 `im/v1/messages` 的 mentions 数组。

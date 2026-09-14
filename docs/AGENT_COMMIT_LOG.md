@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-14｜fix(plugin): 沉默纪律终版——inbound_claim 认领阶段 + wasMentioned 原生判定
+
+- 根因（逐层源码实证）：@机器人 判定不能用文本探测——feishu 插件 `normalizeMentions` 会把**机器人自己的 at 标签从 content 剥掉**（@别人 保留为 `<at user_id>` 形态），「文本里没 @」既可能是闲聊也可能是 @机器人，导致 4d33386 版本把 @机器人 也误吞（13:32/13:37 两次实测 dispatch 后 0 回复）。
+- 正解：核心 dispatch 层把 `ctx.WasMentioned`（渠道自己的提及检测）注入 **inbound_claim** 事件（`dispatch-DnzGTpPs.js#toPluginInboundClaimEvent`，事件还带 `isGroup`/`commandAuthorized`）。沉默判定改挂 `inbound_claim`：`wasMentioned===true` 或按钮命令特征（`[BRAINTEX_`/`brainx_`/`/` 开头）放行；「找人条件」显式永远静默（即使在追问窗口内）；其余群消息 `{handled:true}` 在认领阶段吞掉——比 before_agent_reply 的 NO_REPLY 短路更早，连模型调用都省掉。
+- 同步移除 message_received/before_agent_reply 两路旧挂法；插件 1.4.11→1.4.12。
+- 验证：测试重写为 inbound_claim 事件形态 5 例（@机器人放行/@别人吞/按钮放行/找人条件吞/窗口追问/私聊与非飞书不适用），相关 22/22。
+
 ## 2026-09-14｜fix(plugin): @机器人 判定补纯文本名形态——飞书把 at 标签渲染成「@braintex的小机器人」
 
 - 生产实测：2832d78 部署后，测试群里 @Mia（别人）正确沉默 ✓，但 @机器人 也被误吞（日志：dispatch 后 0 回复）。根因：lark-cli 发出的 `<at user_id="ou_bot">` 标签经飞书平台后，message_received 的 content 已渲染成纯文本「@braintex的小机器人 在吗」，bot open_id 形态与 `</at>` 形态都不命中。

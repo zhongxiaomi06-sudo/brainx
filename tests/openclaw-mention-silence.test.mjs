@@ -25,6 +25,9 @@ test('群内没有 @ 的闲聊回复被短路为 NO_REPLY，@ 机器人的消息
   assert.deepEqual(silence.onBeforeAgentReply({ cleanedBody: 'x' }, { sessionKey: GROUP_SESSION }), NO_REPLY_RESULT);
   inbound(silence, `<at user_id="${BOT}"></at> 今天先做什么`);
   assert.equal(silence.onBeforeAgentReply({ cleanedBody: 'x' }, { sessionKey: GROUP_SESSION }), undefined);
+  inbound(silence, '@braintex的小机器人 在吗');
+  assert.equal(silence.onBeforeAgentReply({ cleanedBody: 'x' }, { sessionKey: GROUP_SESSION }), undefined,
+    '飞书把 @机器人 渲染成纯文本名时也要识别（生产实证形态）');
 });
 
 test('@ 别人不算 @ 机器人（硬规则一：没点机器人名就不出声）', () => {

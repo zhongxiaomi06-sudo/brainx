@@ -30,7 +30,11 @@ const BOT_OPEN_ID = 'ou_aa41e31506cb6dbd4bc96e0e48f46b93'; // braintex 小机器
 
 function isBotMentioned(content) {
   const text = String(content || '');
-  return text.includes(`<at user_id="${BOT_OPEN_ID}"`) || text.includes('braintex的小机器人</at>');
+  return text.includes(`<at user_id="${BOT_OPEN_ID}"`)
+    || text.includes('braintex的小机器人</at>')
+    // 飞书把 @机器人 渲染成纯文本「@braintex的小机器人」（2026-09-14 生产实证：
+    // lark-cli 发的 <at> 标签入站后变成纯文本名），两种形态都要认。
+    || text.includes('@braintex的小机器人');
 }
 
 function isActionable(content) {

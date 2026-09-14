@@ -5,7 +5,7 @@ import { listProjectCandidateFocus, projectSearchCandidate,
   setProjectCandidateFocus } from '../candidate-focus.js';
 import { jobVisibleTo } from '../visibility.js';
 import { downloadResumePdf, extractOpenmaiCandidates } from '../openmai-delivery.js';
-import { sendInteractiveCard, sendPdfFile } from '../feishu-bot.js';
+import { sendPdfFile, sendTextMessage } from '../feishu-bot.js';
 import { getAuthorizedTtcJwt } from '../ttcsdk/auth.js';
 import { downloadTtcResumePdf, listTtcResumeAttachments } from '../ttcsdk/resume.js';
 import { createCandidateDecisionGroup } from '../candidate-decision-group.js';
@@ -15,7 +15,7 @@ function fail(code) { throw Object.assign(new Error(code), { code }); }
 const PHONE = /(?<!\d)(?:\+?86[-\s]?)?1[3-9]\d{9}(?!\d)/g;
 const EMAIL = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
 
-function safeCardText(value, max = 300) {
+function safeCandidateText(value, max = 300) {
   const text = String(value || '').replace(PHONE, '[联系方式已隐藏]')
     .replace(EMAIL, '[联系方式已隐藏]').replace(/\s+/g, ' ').trim();
   return (text || '待核实').slice(0, max);
@@ -28,37 +28,6 @@ function talentUrl(candidateRef, candidate = {}) {
         && target.pathname.startsWith('/app/talent/')) return target.toString();
   } catch { /* 使用受控候选编号回退。 */ }
   return `https://app.ttcadvisory.com/app/talent/${encodeURIComponent(candidateRef)}`;
-}
-
-// 导出供卡片渲染门禁（scripts/quality-gate/card-render）直接取真实卡片，避免样本漂移。
-export function candidateShareCard(jobId, candidateRef, candidate = {}) {
-  const url = talentUrl(candidateRef, candidate);
-  const profile = [candidate.experience, candidate.city, candidate.education]
-    .filter(Boolean).map((item) => safeCardText(item, 80)).join(' · ') || '经历信息待核实';
-  return { config: { wide_screen_mode: true },
-    header: { template: 'blue', title: { tag: 'plain_text', content: 'Reloop · 候选人卡片' } },
-    elements: [
-      { tag: 'markdown', content: `**${safeCardText(candidate.name || candidateRef, 80)}**\n${safeCardText(candidate.role || '当前岗位待核实', 120)}` },
-      { tag: 'markdown', content: `**经历**：${profile}\n**匹配度**：${safeCardText(candidate.score || '待核实', 20)}\n**核心匹配点**：${safeCardText(candidate.evaluation, 500)}` },
-      // F1 主次颠倒：primary 曾挂在「查看链接」这个纯跳转上，真实业务动作
-      // （初筛通过 / 加入reloop）反而是灰按钮 → 顾问会先点最显眼的跳转，
-      // 业务闭环入口被忽视。现在 primary 给「初筛通过」，跳转降为 default。
-      { tag: 'action', actions: [
-        // 冲刺 T10/T11/T12：按钮点击由 OpenClaw 转成带标记的群消息，
-        // agent 按标记调 brainx_candidate_workflow / brainx_talent_pool_add。
-        { tag: 'button', type: 'primary',
-          text: { tag: 'plain_text', content: '初筛通过' },
-          value: { text: `[BRAINTEX_CANDIDATE_KEEP] 职位 ${jobId} 候选人 ${candidateRef}` } },
-        { tag: 'button',
-          text: { tag: 'plain_text', content: '加入reloop' },
-          value: { text: `[BRAINTEX_TALENT_ADD] 职位 ${jobId} 候选人 ${candidateRef}` } },
-        { tag: 'button',
-          text: { tag: 'plain_text', content: '查看 TTC 链接' },
-          multi_url: { url, pc_url: url, android_url: url, ios_url: url } },
-      ] },
-      { tag: 'note', elements: [{ tag: 'plain_text',
-        content: `项目 ${safeCardText(jobId, 80)} · 链接仍由 TTC 登录与权限控制 · 不发送简历附件` }] },
-    ] };
 }
 
 function isSourceProjectGroup(db, principal, jobId) {
@@ -158,7 +127,7 @@ export function createCandidateActionToolHandlers({
   listTtcResumeAttachmentsFn = listTtcResumeAttachments,
   downloadTtcResumePdfFn = downloadTtcResumePdf,
   createCandidateDecisionGroupFn = createCandidateDecisionGroup,
-  sendInteractiveCardFn = sendInteractiveCard,
+  sendTextMessageFn = sendTextMessage,
   addTalentFn = defaultAddTalent,
 } = {}) {
   return {
@@ -182,18 +151,18 @@ export function createCandidateActionToolHandlers({
           jobId: args.job_id, candidateRef: args.candidate_ref,
           sourceTaskId: discovered?.sourceTaskId || null, candidateSnapshot: discovered,
         }, args.action === 'KEEP_FOR_REVIEW');
-        let talentCardStatus = 'not_requested';
+        let talentLinkStatus = 'not_requested';
         if (args.action === 'KEEP_FOR_REVIEW' && isSourceProjectGroup(db, context.principal, args.job_id)) {
           const candidate = discovered || focusedCandidate || { candidateRef: args.candidate_ref };
           const key = createHash('sha256')
             .update(`${args.job_id}\0${args.candidate_ref}\0${context.principal.chatId}`)
             .digest('hex').slice(0, 32);
-          await sendInteractiveCardFn({ target: context.principal.chatId,
-            card: candidateShareCard(args.job_id, args.candidate_ref, candidate),
-            idempotencyKey: `candidate-card-${key}` });
-          talentCardStatus = 'sent';
+          await sendTextMessageFn({ target: context.principal.chatId,
+            text: talentUrl(args.candidate_ref, candidate),
+            idempotencyKey: `candidate-link-${key}` });
+          talentLinkStatus = 'sent';
         }
-        return { data: { ...row, talent_card_status: talentCardStatus }, facts: [{ candidate_ref: args.candidate_ref,
+        return { data: { ...row, talent_link_status: talentLinkStatus }, facts: [{ candidate_ref: args.candidate_ref,
           project_focus: row.focus_status === 'FOCUSED' }], inferences: [], recommendations: [], unknowns: [],
         evidence_refs: [`candidate_focus:${args.job_id}:${args.candidate_ref}`],
         next_allowed_actions: row.focus_status === 'FOCUSED'
@@ -220,13 +189,13 @@ export function createCandidateActionToolHandlers({
         const candidate = discovered || focusedCandidate || { candidateRef: args.candidate_ref };
         const key = createHash('sha256').update(`${args.job_id}\0${args.candidate_ref}\0${context.principal.chatId}`)
           .digest('hex').slice(0, 32);
-        await sendInteractiveCardFn({ target: context.principal.chatId,
-          card: candidateShareCard(args.job_id, args.candidate_ref, candidate),
-          idempotencyKey: `candidate-card-${key}` });
-        return { data: { candidate_ref: args.candidate_ref, talent_card_status: 'sent' },
-          facts: [{ candidate_ref: args.candidate_ref, talent_card_sent_to_current_group: true }],
+        await sendTextMessageFn({ target: context.principal.chatId,
+          text: talentUrl(args.candidate_ref, candidate),
+          idempotencyKey: `candidate-link-${key}` });
+        return { data: { candidate_ref: args.candidate_ref, talent_link_status: 'sent' },
+          facts: [{ candidate_ref: args.candidate_ref, talent_link_sent_to_current_group: true }],
           inferences: [], recommendations: [], unknowns: [],
-          evidence_refs: [`candidate_card:${args.job_id}:${args.candidate_ref}`], next_allowed_actions: [] };
+          evidence_refs: [`candidate_link:${args.job_id}:${args.candidate_ref}`], next_allowed_actions: [] };
       }
       const row = transition(db, context.principal, args);
       return { data: row, facts: [{ candidate_ref: args.candidate_ref, milestone: row.milestone,
@@ -279,9 +248,9 @@ export function createCandidateActionToolHandlers({
         .find((candidate) => candidate.candidate_ref === args.candidate_ref);
       const candidate = discovered || focusedCandidate || openmaiResume(db, args.job_id, args.candidate_ref);
       if (!candidate) fail('NOT_FOUND_OR_FORBIDDEN');
-      const name = safeCardText(candidate.name || args.candidate_ref, 80);
-      const summary = `[ref:${args.candidate_ref}] 职位:${safeCardText(args.job_id, 40)}｜`
-        + `${safeCardText(candidate.role || '岗位待核实', 120)}｜${safeCardText(candidate.evaluation || '', 300)}`;
+      const name = safeCandidateText(candidate.name || args.candidate_ref, 80);
+      const summary = `[ref:${args.candidate_ref}] 职位:${safeCandidateText(args.job_id, 40)}｜`
+        + `${safeCandidateText(candidate.role || '岗位待核实', 120)}｜${safeCandidateText(candidate.evaluation || '', 300)}`;
       try {
         const result = await addTalentFn({ name, summary, sourceRef: args.candidate_ref });
         return { data: { candidate_ref: args.candidate_ref, talent_id: result.id, already: result.already === true },

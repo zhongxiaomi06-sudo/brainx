@@ -17,7 +17,7 @@
 node scripts/quality-gate/card-render/run.mjs
 
 # 只看一张卡
-node scripts/quality-gate/card-render/run.mjs --only candidate-share
+node scripts/quality-gate/card-render/run.mjs --only openmai-delivery-complete
 
 # 改了卡片排版、确认新截图无误后重建基线（必须人眼看过再提交）
 node scripts/quality-gate/card-render/run.mjs --update
@@ -34,7 +34,7 @@ node scripts/quality-gate/card-render/run.mjs --list-defects
 
 ## 3. 工作原理
 
-1. **样本来自生产代码**：`scenarios.mjs` 调用 `buildDailyCard`、`buildProjectLaunchCard`、`candidateShareCard` 等真实构建函数产出 17 个卡片形态。不手写 JSON —— 手写副本会漂移，门禁就成了摆设。
+1. **样本来自生产代码**：`scenarios.mjs` 调用 `buildDailyCard`、`buildProjectLaunchCard`、`buildOpenmaiDeliveryCard` 等真实构建函数产出当前 16 个卡片形态。不手写 JSON —— 手写副本会漂移，门禁就成了摆设。
 2. **可变字段归一化**：时间戳、签名、运行号每次运行都变，不归一化就无法比对。`canonicalize()` 把完整时间戳、**只带月日的相对时间戳**（卡片标题用的是 `now().slice(5, 16)` 形式，如「09-12 19:05」）、日期、8 位以上十六进制串替换成占位符后再渲染。
 3. **渲染近似**：`renderer.mjs` 把 legacy 卡片 JSON（markdown / hr / action / note / input / button / column_set / column / div）转成 DOM，`theme.css` 按 420px 卡片宽度近似飞书样式。**遇到未覆盖的元素类型直接抛错**，不静默跳过 —— 静默跳过会让新卡片的排版问题逃过门禁。
 4. **阻断判据**：
@@ -115,6 +115,8 @@ node scripts/quality-gate/card-render/run.mjs --list-defects
 本轮全量门禁里，卡片渲染回归 **17/17 通过**；单元测试 **694/694 通过**。
 
 ## 7. 维护约定
+
+2026-09-15：独立候选人卡已按新产品口径下线，OpenMai 总览姓名直接打开 TTC；“初筛通过”后发送纯 TTC 链接，由飞书展开标准卡片。因此删除 `candidate-share` 场景及其基线，当前全量为 16 个场景；本轮 16/16 通过。
 
 - 新增或修改任何卡片构建函数后，必须跑 `--update` 看新截图，确认无误再提交基线；只改基线不看图等于把门禁关掉。
 - 新增卡片必须在 `scenarios.mjs` 里登记，否则不会被覆盖。

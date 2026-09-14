@@ -182,7 +182,7 @@ test('OpenMai 澄清语句不得伪装成候选人已就绪', () => {
   assert.doesNotMatch(card.header.title.content, /已就绪/);
 });
 
-test('OpenMai 总览候选人名字即关注按钮，不再有独立关注按钮矩阵', () => {
+test('OpenMai 总览姓名直达 TTC，右侧保留初筛通过与加入 reloop', () => {
   const resultText = `不应把这段 Markdown 原文直接发群\n|姓名|详情|\n|---|---|\n<!-- BRAINX_CANDIDATES_V1
 ${JSON.stringify({ candidates: [
     { candidate_ref: 'c-1', name: '张三', evaluation: '匹配 91%，驱动经验待核实',
@@ -196,7 +196,7 @@ ${JSON.stringify({ candidates: [
   const rows = card.elements.filter((element) => element.tag === 'column_set');
   assert.equal(rows.length, 3, '一行表头加两行候选人');
   assert.deepEqual(rows[0].columns.map((column) => column.elements[0].text.content),
-    ['点名字关注', '匹配与背景 · 核心匹配', '人才库']);
+    ['候选人', '匹配与背景 · 核心匹配', '操作']);
   const firstInfo = rows[1].columns[1].elements[0];
   assert.equal(firstInfo.tag, 'markdown');
   assert.match(firstInfo.content, /^\*\*匹配度 /);
@@ -204,31 +204,27 @@ ${JSON.stringify({ candidates: [
     '未提供经历字段时回退为「待核实」，而不是吐一句长文案');
   assert.match(firstInfo.content, /91%/);
   assert.doesNotMatch(JSON.stringify(card), /\|姓名\|详情\||不应把这段/);
-  // 候选人名字本身就是「重点关注」按钮：左列一个裸 button，文案为「序号. 名字」，type=default 弱化。
-  const focusButtons = rows.slice(1).map((row) => row.columns[0].elements[0]);
-  assert.ok(focusButtons.every((button) => button.tag === 'button' && button.type === 'default'));
-  assert.match(focusButtons[0].text.content, /^1\. 张三$/);
-  assert.match(focusButtons[1].text.content, /^2\. 李四$/);
-  assert.match(focusButtons[0].value.text, /candidate_ref=c-1/);
-  assert.match(focusButtons[0].value.text, /action=KEEP_FOR_REVIEW/);
-  assert.match(focusButtons[0].value.text, /confirm=true/);
-  assert.match(focusButtons[0].value.text, /已发送人才卡/);
-  assert.match(focusButtons[1].value.text, /candidate_ref=c-2/);
-  // 最右列：每行一个 TTC 人才库纯跳转链接（multi_url，不走回调与授权判定）。
-  const ttcLinks = rows.slice(1).map((row) => row.columns[2].elements[0]);
-  assert.ok(ttcLinks.every((link) => link.tag === 'button' && link.text.content === 'TTC'));
-  assert.equal(ttcLinks[0].multi_url.url, 'https://app.ttcadvisory.com/app/talent/c-1');
-  assert.equal(ttcLinks[1].multi_url.url, 'https://app.ttcadvisory.com/app/talent/c-2');
-  assert.ok(ttcLinks.every((link) => !link.value), 'TTC 链接必须是纯跳转，不带回调 value');
+  const names = rows.slice(1).map((row) => row.columns[0].elements[0]);
+  assert.ok(names.every((name) => name.tag === 'button' && name.type === 'default'));
+  assert.deepEqual(names.map((name) => name.text.content), ['1. 张三', '2. 李四']);
+  assert.equal(names[0].multi_url.url, 'https://app.ttcadvisory.com/app/talent/c-1');
+  assert.equal(names[1].multi_url.url, 'https://app.ttcadvisory.com/app/talent/c-2');
+  const actions = rows.slice(1).map((row) => row.columns[2].elements);
+  assert.deepEqual(actions[0].map((button) => button.text.content), ['初筛通过', '加入reloop']);
+  assert.match(actions[0][0].value.text, /candidate_ref=c-1/);
+  assert.match(actions[0][0].value.text, /action=KEEP_FOR_REVIEW/);
+  assert.match(actions[0][0].value.text, /confirm=true/);
+  assert.match(actions[0][0].value.text, /已发送 TTC 人才链接/);
+  assert.match(actions[0][1].value.text, /\[BRAINTEX_TALENT_ADD\]/);
   // 斑马纹：奇数行灰底，扫读不串行。
   assert.deepEqual(rows.slice(1).map((row) => row.background_style), ['default', 'grey']);
-  // 全卡不再出现独立「重点关注 N」按钮矩阵。
+  // 全卡不再出现独立「重点关注 N」按钮矩阵或二次人才卡动作。
   assert.doesNotMatch(JSON.stringify(card), /重点关注 \d/);
   assert.doesNotMatch(JSON.stringify(card), /action=SEND_TALENT_CARD/);
   assert.doesNotMatch(JSON.stringify(card), /为 TA 建决策群/);
-  const focusIntro = card.elements.find((element) => element.tag === 'note'
-    && (element.elements || []).some((note) => /项目共同重点名单/.test(note.content || '')));
-  assert.ok(focusIntro, '候选人行上方必须说明点名字会把候选人加入项目共同重点名单');
+  const actionIntro = card.elements.find((element) => element.tag === 'note'
+    && (element.elements || []).some((note) => /点姓名直接查看 TTC/.test(note.content || '')));
+  assert.ok(actionIntro, '候选人行上方必须说明姓名直达与两个动作');
   assert.match(card.elements[0].content, /第 2 轮/);
   assert.equal(card.header.title.content, 'Reloop 候选人推荐 · 第 2 轮候选人不足');
   const completeCandidates = Array.from({ length: 6 }, (_, index) => ({
@@ -240,13 +236,13 @@ ${JSON.stringify({ candidates: [
     publicBaseUrl: 'https://base.yorkteam.cn/',
   });
   assert.equal(completeCard.header.title.content, 'Reloop 候选人推荐 · 第 2 轮已就绪');
-  // 6 人：每行一个名字按钮共 6 个，不再有 3×N 按钮矩阵。
+  // 6 人：每行一个姓名链接和两个动作。
   const completeRows = completeCard.elements.filter((element) => element.tag === 'column_set');
   assert.equal(completeRows.length, 7, '一行表头加六行候选人');
-  const completeFocus = completeRows.slice(1).map((row) => row.columns[0].elements[0]);
-  assert.ok(completeFocus.every((button) => button.tag === 'button' && button.type === 'default'));
-  assert.deepEqual(completeFocus.map((button) => button.text.content),
-    completeCandidates.map((_, index) => `${index + 1}. 候选人${index + 1}`));
+  const completeNames = completeRows.slice(1).map((row) => row.columns[0].elements[0]);
+  assert.ok(completeNames.every((name) => name.tag === 'button'
+    && /app\/talent\//.test(name.multi_url.url)));
+  assert.ok(completeRows.slice(1).every((row) => row.columns[2].elements.length === 2));
   const continueActions = card.elements.filter((element) => element.tag === 'action'
     && element.actions[0].text.content.includes('继续找人'));
   assert.equal(continueActions.length, 1, '关注动作与继续找人分成两个动作块');

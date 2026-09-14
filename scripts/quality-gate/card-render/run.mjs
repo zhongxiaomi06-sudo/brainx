@@ -16,7 +16,7 @@
  * 用法：
  *   node scripts/quality-gate/card-render/run.mjs              # 校验（CI/门禁用）
  *   node scripts/quality-gate/card-render/run.mjs --update      # 重建基线（需人眼确认后提交）
- *   node scripts/quality-gate/card-render/run.mjs --only candidate-share
+ *   node scripts/quality-gate/card-render/run.mjs --only openmai-delivery-complete
  *
  * 环境变量：
  *   BRAINX_CARD_DIFF_RATIO  允许的像素差异比例，默认 0.004（0.4%）

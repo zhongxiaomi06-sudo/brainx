@@ -20,9 +20,9 @@ const inbound = (silence, content, chatId = GROUP_CHAT) =>
 test('群内没有 @ 的闲聊回复被短路为 NO_REPLY，@ 消息的回复照常', () => {
   const { silence } = make();
   inbound(silence, '推人选的时候，要不然叫Reloop');
-  assert.deepEqual(silence.onBeforeAgentReply({ sessionKey: GROUP_SESSION }), NO_REPLY_RESULT);
+  assert.deepEqual(silence.onBeforeAgentReply({ cleanedBody: 'x' }, { sessionKey: GROUP_SESSION }), NO_REPLY_RESULT);
   inbound(silence, '<at user_id="ou_bot"></at> 今天先做什么');
-  assert.equal(silence.onBeforeAgentReply({ sessionKey: GROUP_SESSION }), undefined);
+  assert.equal(silence.onBeforeAgentReply({ cleanedBody: 'x' }, { sessionKey: GROUP_SESSION }), undefined);
 });
 
 test('按钮命令（标记或工具指令）、控制命令、找人条件触发的回复放行', () => {
@@ -36,7 +36,7 @@ test('按钮命令（标记或工具指令）、控制命令、找人条件触�
     '找人条件：北京、半导体、总监',
   ]) {
     inbound(silence, body);
-    assert.equal(silence.onBeforeAgentReply({ sessionKey: GROUP_SESSION }), undefined, body);
+    assert.equal(silence.onBeforeAgentReply({ cleanedBody: 'x' }, { sessionKey: GROUP_SESSION }), undefined, body);
   }
 });
 
@@ -45,17 +45,17 @@ test('可见动作后的 10 分钟内追问放行，超过窗口恢复沉默', (
   inbound(silence, '<at user_id="ou_bot"></at> 帮我接 J1');
   advance(3 * 60 * 1000);
   inbound(silence, '确认，就是这个');
-  assert.equal(silence.onBeforeAgentReply({ sessionKey: GROUP_SESSION }), undefined,
+  assert.equal(silence.onBeforeAgentReply({ cleanedBody: 'x' }, { sessionKey: GROUP_SESSION }), undefined,
     '10 分钟窗口内的会话追问不能掐断');
   advance(11 * 60 * 1000);
   inbound(silence, '大家中午吃啥');
-  assert.deepEqual(silence.onBeforeAgentReply({ sessionKey: GROUP_SESSION }), NO_REPLY_RESULT);
+  assert.deepEqual(silence.onBeforeAgentReply({ cleanedBody: 'x' }, { sessionKey: GROUP_SESSION }), NO_REPLY_RESULT);
 });
 
 test('私聊不适用沉默纪律；无入站记录 fail-open 不错杀', () => {
   const { silence } = make();
-  assert.equal(silence.onBeforeAgentReply({ sessionKey: P2P_SESSION }), undefined);
-  assert.equal(silence.onBeforeAgentReply({ sessionKey: GROUP_SESSION }), undefined,
+  assert.equal(silence.onBeforeAgentReply({ cleanedBody: 'x' }, { sessionKey: P2P_SESSION }), undefined);
+  assert.equal(silence.onBeforeAgentReply({ cleanedBody: 'x' }, { sessionKey: GROUP_SESSION }), undefined,
     '进程重启丢入站记录时宁可放过');
 });
 
@@ -63,7 +63,7 @@ test('入站 sessionKey 缺失也能关联（裸 oc_ 与 chat: 前缀两种 conv
   const { silence } = make();
   silence.onMessageReceived({ content: '随便聊聊', metadata: { chatId: 'oc_g2' } },
     { channelId: 'feishu', conversationId: 'oc_g2' });
-  assert.deepEqual(silence.onBeforeAgentReply({ sessionKey: 'agent:feishu-mia-x:feishu:group:oc_g2' }),
+  assert.deepEqual(silence.onBeforeAgentReply({ cleanedBody: 'x' }, { sessionKey: 'agent:feishu-mia-x:feishu:group:oc_g2' }),
     NO_REPLY_RESULT);
 
   // 2026-09-14 生产探针实证：conversationId 实际为 "chat:oc_..." 前缀形态
@@ -71,6 +71,6 @@ test('入站 sessionKey 缺失也能关联（裸 oc_ 与 chat: 前缀两种 conv
   probe.silence.onMessageReceived(
     { content: '再聊一句', metadata: { to: 'chat:oc_g3', senderId: 'ou_x' } },
     { channelId: 'feishu', conversationId: 'chat:oc_g3' });
-  assert.deepEqual(probe.silence.onBeforeAgentReply({ sessionKey: 'agent:feishu-mia-x:feishu:group:oc_g3' }),
+  assert.deepEqual(probe.silence.onBeforeAgentReply({ cleanedBody: 'x' }, { sessionKey: 'agent:feishu-mia-x:feishu:group:oc_g3' }),
     NO_REPLY_RESULT);
 });

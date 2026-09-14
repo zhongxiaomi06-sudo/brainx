@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-14｜fix(plugin): 沉默纪律补 sessionKey 取值——改从 context 参数读取
+
+- 生产探针实证：before_agent_reply 的 event 只携带 `cleanedBody`，`sessionKey` 在第二个 context 参数（event.sessionKey 恒为空，上一版形同虚设）。
+- 修法：`onBeforeAgentReply(event, context)` 兼容两处取值；测试同步改为 context 传参。
+- 生产三场景验证（1.4.9 + context 修复）：①窗口外闲聊「房价最近怎么样」沉默 ✓；②@ 消息正常回复 ✓（注：09:22 首次 NO_REPLY 短路曾使群会话僵死，/reset 后恢复，列为观察项）；③按钮标记 KEEP 放行并自动推卡 ✓；④@ 后 10 分钟内追问按设计放行（「股票今天涨了吗」被接话属预期的会话追问窗口，非缺陷）。
+- 验证：`tests/openclaw-mention-silence.test.mjs` 5/5 通过；生产探针已全部清除，openclaw 运行干净 1.4.9。
+
 ## 2026-09-14｜fix(plugin): 沉默纪律改挂 before_agent_reply——出站钩子对普通回复不触发
 
 - 现象：1.4.8 上线后群内无 @ 闲聊机器人照回（用户实测「今天天气怎么样」被接话）。

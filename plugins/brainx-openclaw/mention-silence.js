@@ -54,10 +54,11 @@ export function createMentionSilenceHandler(dependencies = {}) {
     if (lastActionableAt.size > 500) lastActionableAt.delete(lastActionableAt.keys().next().value);
   };
 
-  /** 出站（before_agent_reply，claiming hook）：event.sessionKey 形如
+  /** 出站（before_agent_reply，claiming hook）：event 只携带 cleanedBody，
+   *  sessionKey 在第二个 context 参数（2026-09-14 生产探针实证），形如
    *  agent:<agentId>:feishu:group:oc_xxx（私聊为 :direct:，不适用本纪律）。 */
-  const onBeforeAgentReply = (event) => {
-    const sessionKey = String(event?.sessionKey || '');
+  const onBeforeAgentReply = (event, context = {}) => {
+    const sessionKey = String(event?.sessionKey || context?.sessionKey || '');
     const chatId = /:group:(oc_[A-Za-z0-9_-]+)/.exec(sessionKey)?.[1];
     if (!chatId) return undefined;
     const inbound = lastInbound.get(chatId);

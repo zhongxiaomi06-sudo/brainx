@@ -2,6 +2,7 @@ import type { BackendOpportunity, BackendRadarRow } from "./brainx-api";
 import type { DecisionEvent } from "./decision-demo";
 import type { JobDetailRecommendation, JobDetailReviewData } from "./job-detail-card-review";
 import type { DecisionJob } from "./workbench-model";
+import { plainDisplayText } from "./display-text.ts";
 
 const relationLabels: Record<string, string> = {
   MY_JOB: "我的职位",
@@ -71,7 +72,7 @@ function recommendationOf(detail: BackendOpportunity): JobDetailRecommendation |
 export function toRadarJobDetail(row: BackendRadarRow): JobDetailReviewData {
   return {
     projectId: row.project_id,
-    role: row.role || "职位待确认",
+    role: plainDisplayText(row.role || "", "职位待确认"),
     company: row.company || "公司待确认",
     cities: row.cities || citiesOf(row.city),
     activeState: jobStatus(row.active_state),
@@ -95,7 +96,7 @@ export function mergeOpportunityDetail(base: JobDetailReviewData, detail: Backen
   const job = detail.job;
   return {
     ...base,
-    role: job.role || base.role,
+    role: plainDisplayText(job.role || base.role, "职位待确认"),
     company: job.company || base.company,
     cities: job.cities?.length ? job.cities : citiesOf(job.city).length ? citiesOf(job.city) : base.cities,
     activeState: jobStatus(job.active_state),
@@ -127,7 +128,7 @@ export function toDecisionJobDetail(job: DecisionJob, events: DecisionEvent[]): 
   const relation = facts["职位关系"] || null;
   return {
     projectId: job.id,
-    role: job.role,
+    role: plainDisplayText(job.role, "职位待确认"),
     company: job.company,
     cities: citiesOf(facts["城市"]),
     activeState: jobStatus(facts["职位状态"] || facts["当前状态"]),

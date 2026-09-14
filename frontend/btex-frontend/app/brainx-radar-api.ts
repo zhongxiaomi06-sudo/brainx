@@ -1,4 +1,5 @@
 import { brainxFetch } from "./brainx-http.ts";
+import { plainDisplayText } from "./display-text.ts";
 
 export type BackendRadarRow = {
   project_id: string;
@@ -173,6 +174,7 @@ function radarStatusOf(activeState?: string | null): RadarJobStatus {
 
 export function mapRadarRow(row: BackendRadarRow): RadarJob {
   const cockpit = row.cockpit || null;
+  const role = plainDisplayText(row.role || "", "未知职位");
   const pm = relationLabels[row.relation || ""] || row.relation || "团队共享";
   let reason = "市场信号 · 待后端同步";
   if (cockpit) {
@@ -181,7 +183,7 @@ export function mapRadarRow(row: BackendRadarRow): RadarJob {
   } else if (row.pipeline) reason = `Pipeline · ${row.pipeline}`;
   return {
     id: row.project_id,
-    name: row.role || "未知职位",
+    name: role,
     client: row.company || "未知客户",
     industry: row.company_type || "未标注业务方向",
     city: row.city || "待确认",
@@ -199,7 +201,7 @@ export function mapRadarRow(row: BackendRadarRow): RadarJob {
     reason,
     salary: "待同步",
     source: cockpit ? "驾驶舱导入" : "市场信号",
-    positionType: classifyRadarPositionType(row.role || ""),
+    positionType: classifyRadarPositionType(role),
     sourceColumn: cockpit ? "驾驶舱导入" : undefined,
   };
 }

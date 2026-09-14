@@ -1,5 +1,6 @@
 import type { EngagementCommand, EngagementState } from "./decision-demo";
 import { brainxFetch } from "./brainx-http.ts";
+import { plainDisplayText } from "./display-text.ts";
 import type { DecisionDirection, DecisionGroup, DecisionJob } from "./workbench-model";
 
 export type ProjectStatus = "PENDING_START" | "IN_PROGRESS" | "NEEDS_ACTION" | "COMPLETED" | "RELEASED";
@@ -136,6 +137,7 @@ function groupOf(project: ProjectSummary): DecisionGroup {
 }
 
 export function projectToDecisionJob(project: ProjectSummary): DecisionJob {
+  const role = plainDisplayText(project.role, "职位待确认");
   const facts: Record<string, string> = {
     "职位关系": project.relation === "MY_JOB" ? "我的职位" : "团队共享",
     "数据来源": project.source_mode === "COCKPIT_CONTEXT" ? "驾驶舱上下文" : "职位市场",
@@ -152,8 +154,8 @@ export function projectToDecisionJob(project: ProjectSummary): DecisionJob {
     id: project.project_id,
     rank: 0,
     company: project.company,
-    role: project.role,
-    direction: directionOf(project.role),
+    role,
+    direction: directionOf(role),
     sourceMode: "MARKET_ONLY",
     group: groupOf(project),
     eligibility: "ELIGIBLE",

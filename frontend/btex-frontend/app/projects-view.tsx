@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Bot, CheckCircle2, ChevronRight, Clock3, Search } from "lucide-react";
 import type { ProjectStatus, ProjectSummary } from "./brainx-projects-api";
+import { plainDisplayText } from "./display-text";
 import { Heading } from "./workbench-controls";
 
 type ProjectFilter = "ALL" | ProjectStatus;
@@ -125,15 +126,16 @@ export function ProjectsView({ projects, query, setQuery, focusedProjectId, open
     </div>
     <div className="project-action-list">
       {visible.length ? visible.map(project => {
+        const role = plainDisplayText(project.role, "职位待确认");
         const due = dueText(project);
         const urgent = project.project_status === "NEEDS_ACTION";
         const canLaunch = project.project_status === "PENDING_START"
           || project.launch?.status === "FAILED" || project.launch?.search_status === "FAILED";
         const launching = launchingId === project.project_id;
-        return <article id={`project-${project.project_id}`} className={`project-action-card status-${project.project_status.toLocaleLowerCase()}${focusedProjectId === project.project_id ? " is-focused" : ""}`} key={project.project_id} aria-label={`${project.role} · ${project.company}`}>
+        return <article id={`project-${project.project_id}`} className={`project-action-card status-${project.project_status.toLocaleLowerCase()}${focusedProjectId === project.project_id ? " is-focused" : ""}`} key={project.project_id} aria-label={`${role} · ${project.company}`}>
           <div className="project-identity">
             <div><span className="project-status">{urgent ? <AlertTriangle /> : project.project_status === "COMPLETED" ? <CheckCircle2 /> : <Clock3 />}{statusLabels[project.project_status]}</span><small>{project.relation === "MY_JOB" ? "我的职位" : "团队共享"}</small></div>
-            <h2>{project.role}</h2><p>{project.company}{project.city ? ` · ${project.city}` : ""}</p>
+            <h2>{role}</h2><p>{project.company}{project.city ? ` · ${project.city}` : ""}</p>
           </div>
           <div className="project-action-copy">
             <span>{project.active_action ? "当前行动" : project.project_status === "PENDING_START" ? "下一步" : "项目状态"}</span>

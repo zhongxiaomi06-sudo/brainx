@@ -23,7 +23,6 @@ import { projectToDecisionJob } from "../app/brainx-projects-api.ts";
 import { mapRecommendationPage } from "../app/brainx-recommendation-pages-api.ts";
 import { judgementRows } from "../app/workbench-facts-model.ts";
 import { openmaiToHtml } from "../app/openmai-markdown.ts";
-
 const sampleRec = {
   decision_id: "d-1",
   rank: 1,
@@ -48,7 +47,7 @@ const sampleRec = {
   job: {
     project_id: "P-FIX-E5FC611B",
     company: "Rockflow",
-    role: "产品、工程、运营增长（多岗）",
+    role: "**产品、工程、运营增长（多岗）**",
     city: "北京",
     pipeline: "有，正常招/常年招",
     hc: null,
@@ -61,7 +60,6 @@ const sampleRec = {
     relation: "PRIMARY_PM",
   },
 };
-
 const samplePresentation = {
   decision_tier: "VERIFY",
   decision_tier_reason: { code: "FACTS_REQUIRE_VERIFICATION", text: "关键事实不足，先核验再推进" },
@@ -97,6 +95,7 @@ test("maps a backend recommendation into a workbench decision job", () => {
   const job = mapRecommendation(sampleRec);
   assert.equal(job.id, "P-FIX-E5FC611B");
   assert.equal(job.company, "Rockflow");
+  assert.equal(job.role, "产品、工程、运营增长（多岗）");
   assert.equal(job.rank, 1);
   assert.equal(job.finalScore, 79.9);
   assert.equal(job.globalScore, 68); // activity 维
@@ -298,7 +297,7 @@ test("maps backend radar rows without inventing operational metrics", () => {
   const row = mapRadarRow({
     project_id: "P-FIX-ABC",
     company: "蝴蝶梦境",
-    role: "海外增长负责人",
+    role: "[海外增长负责人](https://example.com)",
     city: "上海",
     cities: ["上海市", "北京市"],
     pipeline: "推荐 3 · 面试 1",
@@ -312,6 +311,7 @@ test("maps backend radar rows without inventing operational metrics", () => {
   });
   assert.equal(row.id, "P-FIX-ABC");
   assert.equal(row.client, "蝴蝶梦境");
+  assert.equal(row.name, "海外增长负责人");
   assert.equal(row.status, "活跃");
   assert.equal(row.source, "市场信号");
   assert.equal(row.hc, null); // UNKNOWN 原样为 null，绝不写 0
@@ -445,13 +445,14 @@ test("classifies radar position types from role text", () => {
 test("maps a real project summary without inventing score or HC", () => {
   const job = projectToDecisionJob({
     project_id: "P-MY-1", relation: "MY_JOB", membership_source: "MANUAL_CONFIRMATION",
-    joined_at: "2026-08-29T00:00:00.000Z", company: "真实客户", role: "增长负责人",
+    joined_at: "2026-08-29T00:00:00.000Z", company: "真实客户", role: "**增长负责人**",
     city: "上海", active_state: "OPEN", hc: null, pipeline: "面试 2", current_stage: "面试",
     pipeline_snapshot: null, next_action: null, owner_name: "Mia", captured_at: "2026-08-28T00:00:00.000Z",
     engagement_state: "NEW", state_since: null, project_status: "PENDING_START", active_action: null,
     legal_actions: ["WATCH", "ACCEPT", "DISMISS"],
   });
   assert.equal(job.id, "P-MY-1");
+  assert.equal(job.role, "增长负责人");
   assert.equal(job.finalScore, "—");
   assert.equal(job.facts["剩余 HC"], "UNKNOWN");
   assert.equal(job.recentSignal, "面试");

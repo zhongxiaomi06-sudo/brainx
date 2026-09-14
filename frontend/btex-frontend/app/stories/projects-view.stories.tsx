@@ -87,6 +87,17 @@ export const FocusedNewProject: Story = {
   },
 };
 
+export const RawMarkdownTitle: Story = {
+  args: {
+    projects: [project("P-MARKDOWN", "PENDING_START", { role: "**嵌入式 Linux BSP 开发工程师**" })],
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("heading", { name: "嵌入式 Linux BSP 开发工程师" })).toBeInTheDocument();
+    await expect(canvas.queryByText(/\*\*/)).not.toBeInTheDocument();
+  },
+};
+
 export const LaunchFromPending: Story = {
   args: { projects: [project("P-LAUNCH", "PENDING_START", { company: "海马云", role: "产品经理" })] },
   play: async ({ canvasElement }) => {

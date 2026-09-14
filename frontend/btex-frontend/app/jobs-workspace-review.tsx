@@ -77,14 +77,14 @@ const ttcStatusLabel: Record<TtcJobStatus, string> = {
 };
 
 const workflowLabel: Record<JobsWorkspaceReviewRow["workflowState"], string> = {
-  PENDING: "待处理",
+  PENDING: "待判断",
   FOLLOWING: "跟进中",
   WATCHING: "已关注",
 };
 
 const views: Array<{ id: SavedView; label: string }> = [
   { id: "all", label: "全部" },
-  { id: "pending", label: "待处理" },
+  { id: "pending", label: "待判断" },
   { id: "following", label: "跟进中" },
   { id: "new", label: "本周新增" },
 ];
@@ -278,7 +278,7 @@ export function JobsWorkspaceReview({
                       <td>{row.hc ?? "待确认"}</td>
                       <td>{formatDate(row.capturedAt)}</td>
                       <td><span className={`jobs-review-status is-${row.workflowState.toLowerCase()}`}>{workflowLabel[row.workflowState]}</span></td>
-                      <td><span className="jobs-review-owner" title={row.ownerName || "待确认"}>{row.ownerName?.slice(0, 1) || "?"}</span></td>
+                      <td><span className="jobs-review-owner" aria-label={`负责人 ${row.ownerName || "待确认"}`}><i>{row.ownerName?.slice(0, 1) || "?"}</i><b>{row.ownerName || "待确认"}</b></span></td>
                     </tr>
                   ))}
                 </tbody>

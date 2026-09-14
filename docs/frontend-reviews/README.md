@@ -45,7 +45,7 @@
 | `ClientInsightsReview` 客户事实索引 | 已完成 | 已通过 | 已接入 | 待确认 | 已验证（本地） | 正式应用代码已使用 |
 | `WorkspaceEntry` 真实数据入口三态 | 已完成 | 未单独审核 | 已接入 | 待确认 | 部分验证 | 连接、登录和异常入口已接入，仍归全链路验收 |
 | `JobDetailCard` 居中职位弹窗 | 已完成 | 退回修改 | 已接入 | 未发布 | 部分验证 | 2026-09-12 冲刺 T1/T2：回放 tab 下线、主按钮改「一键接单」（入项目+拉群+推卡一次完成）、删除 6 个无意义字段与权重/版本/覆盖率展示，见[一键接单与字段精简](2026-09-12-job-detail-quick-accept.md)；待用户复看与目标环境复核 |
-| `JobsWorkspaceReview` 现代职位工作区 | 已完成 | 部分通过 | 已接入 | 未发布 | 已验证（本地真实库） | 用户退回原搜索与禁用筛选后已完成本地修复：删除 `⌘K`、增加绿色搜索按钮，城市下拉只保留“北京 / 上海 / 杭州”式城市级标准项，并用21330条真实职位验证城市/状态筛选；修复后视觉与目标环境待复看 |
+| `JobsWorkspaceReview` 现代职位工作区 | 已完成 | 部分通过 | 已接入 | 未发布 | 已验证（本地真实库） | 列表将未跟进的 `PENDING` 显示为“待判断”而非带任务压力的“待处理”，负责人列同时展示头像首字与完整姓名；本地 23245 个待判断职位、首屏 100 行已验证，见[状态与负责人可读性复核](2026-09-15-jobs-status-owner-readability.md)；新视觉与目标环境待复看 |
 | `RecommendationPolicyReview` 推荐策略 | 已完成 | 未审核 | 未接入 | 未发布 | 未验证 | 缺少只读 dry-run 契约 |
 | `DirectionProfileReview` 方向画像与分类 | 已完成 | 未审核 | 未接入 | 未发布 | 未验证 | 缺少结构化保存和人工修订契约 |
 | `TodayDecisionQueue` 精选盘队列 | 已完成 | 退回修改 | 已接入 | 未发布 | 部分验证 | 五种完整队列视图继续使用冻结运行；最新修复为请求增加取消和 12 秒恢复边界，避免列表永久变灰，组件与目标环境待复看 |
@@ -140,6 +140,7 @@
 - [推荐卡简明摘要与中文进展复核](2026-09-15-recommendation-card-summary.md)
 - [推荐卡快速筛选层级复核](2026-09-15-recommendation-card-hierarchy.md)
 - [推荐列表工作区宽度复核](2026-09-15-recommendation-list-width.md)
+- [全部职位状态与负责人可读性复核](2026-09-15-jobs-status-owner-readability.md)
 - [候选人保留与项目共享上下文复核](2026-09-09-candidate-focus-context.md)
 - [候选人 Offer 决策群复核](2026-09-09-candidate-decision-group.md)
 - [候选卡片与对话建群复核](2026-09-09-candidate-card-conversation-group.md)

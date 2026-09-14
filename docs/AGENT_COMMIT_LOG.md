@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-14｜fix(plugin): @机器人 判定终案——message_received 按 messageId 回查飞书 mentions
+
+- 五轮源码实证的最终结论：① feishu 插件把机器人自己的 at 标签从 content 剥掉（文本探测不可行）；② inbound_claim 带 wasMentioned 但只在插件自有绑定会话触发（普通群聊不触发，13:49 实测 dispatch 照跑）；③ message_received/before_agent_reply 的 metadata 逐字段核对均无 wasMentioned。插件侧唯一可靠路径：歧义消息按 messageId 回查 `im/v1/messages` 的 mentions 数组。
+- 实现：`mention-silence.js` 重写——message_received 阶段分类：「找人条件」记 condition（出站永远静默，优先级高于追问窗口）；`[BRAINTEX_`/`brainx_`/`/` 直接放行；@别人（at 标签非 bot open_id）不回查直接吞；其余歧义消息回查 mentions 判定 @机器人（API 失败宁可静默）。before_agent_reply 按记录短路 NO_REPLY。插件 1.4.12→1.4.13。
+- 验证：重写 5 例（回查命中放行/未命中吞/@别人不回查/按钮不回查/条件窗口内也静默/API 失败静默/私聊 fail-open），相关 22/22。
+
 ## 2026-09-14｜fix(plugin): 沉默纪律终版——inbound_claim 认领阶段 + wasMentioned 原生判定
 
 - 根因（逐层源码实证）：@机器人 判定不能用文本探测——feishu 插件 `normalizeMentions` 会把**机器人自己的 at 标签从 content 剥掉**（@别人 保留为 `<at user_id>` 形态），「文本里没 @」既可能是闲聊也可能是 @机器人，导致 4d33386 版本把 @机器人 也误吞（13:32/13:37 两次实测 dispatch 后 0 回复）。

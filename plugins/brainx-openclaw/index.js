@@ -20,9 +20,9 @@ export default definePluginEntry({
     });
     api.on('message_received', createSearchStartNoticeHandler(api));
     const mentionSilence = createMentionSilenceHandler();
-    // inbound_claim 才能拿到 wasMentioned 原生判定并在认领阶段吞掉闲聊
-    // （before_agent_reply 的 NO_REPLY 短路晚一拍且仍消耗模型调用）。
-    api.on('inbound_claim', mentionSilence.onInboundClaim);
+    api.on('message_received', (event, context) => mentionSilence.onMessageReceived(event, context));
+    // before_agent_reply 拦普通文本回复（reply_payload_sending 只覆盖富负载，2026-09-14 探针实证）。
+    api.on('before_agent_reply', mentionSilence.onBeforeAgentReply, { priority: 100 });
     api.on('reply_payload_sending', (event, context) => {
       const result = formatBrainxReplyPayload(event, context);
       api.logger?.info?.(`[brainx-rich-replies] kind=${event?.kind || 'unknown'} channel=${event?.channel || context?.channelId || 'unknown'} applied=${Boolean(result)}`);

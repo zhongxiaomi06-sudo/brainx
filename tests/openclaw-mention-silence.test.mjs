@@ -84,11 +84,18 @@ test('API 失败按未 @ 处理（宁可静默）；追问窗口内放行', asyn
   assert.deepEqual(await silence.onBeforeAgentReply({ cleanedBody: 'x' }, { sessionKey: GROUP_SESSION }),
     NO_REPLY_RESULT, 'API 失败宁可静默');
 
-  // 可见动作开窗口：用带标记命令开路，随后普通追问放行
+  // 可见动作开窗口：用带标记命令开路，随后业务形态追问放行、闲聊照样静默
   await send('/brainx');
   advance(3 * 60 * 1000);
   await send('确认，就是这个');
-  assert.equal(await silence.onBeforeAgentReply({ cleanedBody: 'x' }, { sessionKey: GROUP_SESSION }), undefined);
+  assert.equal(await silence.onBeforeAgentReply({ cleanedBody: 'x' }, { sessionKey: GROUP_SESSION }), undefined,
+    '窗口内业务追问（确认/选择）放行');
+  await send('选第 2 个');
+  assert.equal(await silence.onBeforeAgentReply({ cleanedBody: 'x' }, { sessionKey: GROUP_SESSION }), undefined,
+    '窗口内数字/序号选择放行');
+  await send('这家外卖真不错，推荐大家试试');
+  assert.deepEqual(await silence.onBeforeAgentReply({ cleanedBody: 'x' }, { sessionKey: GROUP_SESSION }),
+    NO_REPLY_RESULT, '窗口内闲聊照样静默（2026-09-14 外卖实证）');
   advance(11 * 60 * 1000);
   await send('大家中午吃啥');
   assert.deepEqual(await silence.onBeforeAgentReply({ cleanedBody: 'x' }, { sessionKey: GROUP_SESSION }),

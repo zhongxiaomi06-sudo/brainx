@@ -22,6 +22,12 @@
  * 私聊不适用本纪律。回查失败按未 @（宁可静默，不扰群）。
  */
 const FOLLOW_UP_WINDOW_MS = 10 * 60 * 1000;
+
+/** 追问窗口内的放行只限业务形态回复（确认/选择/短指令），防止窗口变成闲聊通道
+ *  （2026-09-14 实证：@bot 后 10 分钟内机器人把外卖闲聊也接了）。
+ *  覆盖：确认/确定/接吧/可以/嗯/好/行/对/OK/取消/算了/不了/数字/第 N 个/选 N/就这个。 */
+const BUSINESS_FOLLOWUP = new RegExp('^(?:确认|确定|接吧|可以|嗯+|好的?|行|对|是的?|没错|OK|ok|收到'
+  + '|取消|算了|不了|先不|不|选?第?\\s*\\d+\\s*个?|\\d{1,2}|就[这那].{0,6}|绑定|接单|找人).{0,30}$', 's');
 const BOT_OPEN_ID = 'ou_aa41e31506cb6dbd4bc96e0e48f46b93'; // braintex 小机器人（生产 resolved bot open_id）
 const FEISHU_BASE = 'https://open.feishu.cn';
 
@@ -117,7 +123,8 @@ export function createMentionSilenceHandler(dependencies = {}) {
       return undefined;
     }
     const last = lastActionableAt.get(chatId) || 0;
-    if (now() - last <= FOLLOW_UP_WINDOW_MS) return undefined;
+    // 追问窗口内也只放行业务形态回复（确认/选择/短指令）；闲聊即使在窗口内也静默。
+    if (now() - last <= FOLLOW_UP_WINDOW_MS && BUSINESS_FOLLOWUP.test(content.trim())) return undefined;
     return silence;
   };
 

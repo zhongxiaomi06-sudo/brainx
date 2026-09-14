@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-14｜fix(plugin): 追问窗口收紧为业务形态——@bot 后 10 分钟内外卖闲聊也照吞
+
+- 生产实测（20a1386）：@bot 正常回复 ✓，但随后的纯闲聊（「这家外卖真不错」）在 10 分钟追问窗口内被放行，机器人接话了（15:35 实测）。窗口原意是保护按钮→「确认/选第 N 个」多轮业务流，不是闲聊通道。
+- 收紧：窗口内放行仅限业务形态回复（确认/确定/接吧/可以/嗯/好/行/对/OK/取消/算了/不了/纯数字/第 N 个/选 N/就这个/绑定/接单/找人，≤40 字），其余即使在窗口内也 NO_REPLY。代价：自由文本答案（如直接打公司名）会被吞——可用序号或 @ 代替，已在代码注释标明。
+- 插件 1.4.14→1.4.15。验证：窗口内「确认」「选第 2 个」放行、「这家外卖真不错」静默的新用例，5/5。
+
 ## 2026-09-14｜fix(plugin): @机器人 判定终案——before_agent_reply 内回查飞书 mentions（无竞态）
 
 - 五轮源码实证的最终结论：① feishu 插件把机器人自己的 at 标签从 content 剥掉（文本探测不可行）；② inbound_claim 带 wasMentioned 但只在插件自有绑定会话触发（普通群聊不触发）；③ message_received/before_agent_reply 的 metadata 逐字段核对均无 wasMentioned；④ mentions 元素形态 `{ id: 'ou_...', id_type, name }`，id 是字符串不是 `{open_id}` 对象（生产实测，首版回查按对象取永远 false）；⑤ message_received 是 fire-and-forget 不 await，异步回查放那里必然与 before_agent_reply 竞态。

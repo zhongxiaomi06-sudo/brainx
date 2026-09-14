@@ -1,5 +1,13 @@
 # Agent Commit 记录
 
+## 2026-09-14｜fix(chat): 消息发送判断层三条硬规则落地——bot 专属@判定/Offer 群不弹绑定卡/找人条件静默注入
+
+- 触发：用户给出硬规则「① 没有 @ 时除非私聊不要出现声音；② Offer 决策群不要弹没有绑定职位的消息；③ 按条件找人的决策必须正确」，并判定当前链路测试失败。
+- **规则①（bot 专属 @）**：`mention-silence.js` 的放行条件从「任意 `<at `」收紧为「at 标签指向 bot open_id（`ou_aa41e31506cb6dbd4bc96e0e48f46b93`）或 braintex 小机器人名称」——此前群里 @ 别人也会被当成 @ 机器人而放行接话；「找人条件：…」移出放行清单（非 @ 不出声，无「已记录」回声）。注：本 commit 叠加在另一会话 9/14 探针修复（b07d9cd 改挂 before_agent_reply + allowConversationAccess 配置、4904503 sessionKey 取 context）之上，前两版（reply cancel / before_agent_reply 缺 conversation 配置）均已被探针证伪。
+- **规则②（Offer 群不弹绑定卡）**：`group-intake.js#listKnownChatIds` 补 `project_launches.chat_id` 与 `candidate_decision_groups.target_chat_id`——此前「已知群」只查自身 intake 表，Offer 决策群（决策建群链路，不走 project_launches）建群 2 分钟即被误弹「还没绑定职位」卡（黄俊凯 Offer 群 15:19 建群、15:21 误弹实证）。
+- **规则③（找人条件决策正确）**：9/13 的按钮确定性直调只传 `{job_id, continue_search}`，**条件永远到不了搜索**（模型不再有机会读群历史）。改为插件在 `message_received` 按群静默记录最近一次「找人条件：…」，直调时作为 `criteria` 注入（按群隔离、无则不传）；prompt 同步改为「不回复、不在这条消息上调用找人工具、条件由系统静默记录」。
+- 验证：新增/更新 10 例（@别人短路/找人条件短路/条件注入与按群隔离/项目群+Offer 群跳过绑定卡/prompt 断言同步），相关 61/61 全绿。插件版本 1.4.9→1.4.10。
+
 ## 2026-09-14｜fix(plugin): 沉默纪律补 sessionKey 取值——改从 context 参数读取
 
 - 生产探针实证：before_agent_reply 的 event 只携带 `cleanedBody`，`sessionKey` 在第二个 context 参数（event.sessionKey 恒为空，上一版形同虚设）。

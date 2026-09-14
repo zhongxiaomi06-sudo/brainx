@@ -14,18 +14,32 @@ function make() {
   return { silence, advance: (ms) => { clock += ms; } };
 }
 
+const BOT = 'ou_aa41e31506cb6dbd4bc96e0e48f46b93'; // braintex 小机器人 bot open_id
+
 const inbound = (silence, content, chatId = GROUP_CHAT) =>
   silence.onMessageReceived({ content, metadata: { chatId } }, { channelId: 'feishu', conversationId: chatId });
 
-test('群内没有 @ 的闲聊回复被短路为 NO_REPLY，@ 消息的回复照常', () => {
+test('群内没有 @ 的闲聊回复被短路为 NO_REPLY，@ 机器人的消息回复照常', () => {
   const { silence } = make();
   inbound(silence, '推人选的时候，要不然叫Reloop');
   assert.deepEqual(silence.onBeforeAgentReply({ cleanedBody: 'x' }, { sessionKey: GROUP_SESSION }), NO_REPLY_RESULT);
-  inbound(silence, '<at user_id="ou_bot"></at> 今天先做什么');
+  inbound(silence, `<at user_id="${BOT}"></at> 今天先做什么`);
   assert.equal(silence.onBeforeAgentReply({ cleanedBody: 'x' }, { sessionKey: GROUP_SESSION }), undefined);
 });
 
-test('按钮命令（标记或工具指令）、控制命令、找人条件触发的回复放行', () => {
+test('@ 别人不算 @ 机器人（硬规则一：没点机器人名就不出声）', () => {
+  const { silence } = make();
+  inbound(silence, '<at user_id="ou_someone_else"></at> 这个候选人你觉得怎么样');
+  assert.deepEqual(silence.onBeforeAgentReply({ cleanedBody: 'x' }, { sessionKey: GROUP_SESSION }), NO_REPLY_RESULT);
+});
+
+test('「找人条件：…」不再回声——静默记录，由搜索启动时注入（硬规则一/三）', () => {
+  const { silence } = make();
+  inbound(silence, '找人条件：北京、半导体、总监');
+  assert.deepEqual(silence.onBeforeAgentReply({ cleanedBody: 'x' }, { sessionKey: GROUP_SESSION }), NO_REPLY_RESULT);
+});
+
+test('按钮命令（标记或工具指令）、控制命令触发的回复放行', () => {
   const { silence } = make();
   for (const body of [
     '[BRAINTEX_SEARCH_START] 为项目 J1 使用 OpenMai 继续找人。',
@@ -33,7 +47,6 @@ test('按钮命令（标记或工具指令）、控制命令、找人条件触�
     '把项目 J1 的候选人 c-1 标记为重点关注。现在调用 brainx_candidate_workflow',
     '为当前群绑定一个职位。先调用 brainx_bind_group_project',
     '/brainx',
-    '找人条件：北京、半导体、总监',
   ]) {
     inbound(silence, body);
     assert.equal(silence.onBeforeAgentReply({ cleanedBody: 'x' }, { sessionKey: GROUP_SESSION }), undefined, body);
@@ -42,7 +55,7 @@ test('按钮命令（标记或工具指令）、控制命令、找人条件触�
 
 test('可见动作后的 10 分钟内追问放行，超过窗口恢复沉默', () => {
   const { silence, advance } = make();
-  inbound(silence, '<at user_id="ou_bot"></at> 帮我接 J1');
+  inbound(silence, `<at user_id="${BOT}"></at> 帮我接 J1`);
   advance(3 * 60 * 1000);
   inbound(silence, '确认，就是这个');
   assert.equal(silence.onBeforeAgentReply({ cleanedBody: 'x' }, { sessionKey: GROUP_SESSION }), undefined,

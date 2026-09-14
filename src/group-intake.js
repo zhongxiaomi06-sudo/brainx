@@ -23,7 +23,17 @@ const BINDING_PURPOSES = ['group_binding'];
 const DEFAULT_INTERVAL_MS = 10 * 60 * 1000;
 
 export function listKnownChatIds(db) {
-  return new Set(db.prepare('SELECT chat_id FROM bot_chat_intake').all().map((row) => row.chat_id));
+  const known = new Set(db.prepare('SELECT chat_id FROM bot_chat_intake').all().map((row) => row.chat_id));
+  // 已有归属的群不是「未绑定旧群」，不得发「绑定职位」卡（2026-09-14 实证：
+  // Offer 决策群建群 2 分钟后被误弹绑定卡——它只在 candidate_decision_groups 里有记录）。
+  for (const row of db.prepare('SELECT chat_id FROM project_launches WHERE chat_id IS NOT NULL').all()) {
+    known.add(row.chat_id);
+  }
+  for (const row of db.prepare(`SELECT target_chat_id AS chat_id FROM candidate_decision_groups
+    WHERE target_chat_id IS NOT NULL`).all()) {
+    known.add(row.chat_id);
+  }
+  return known;
 }
 
 function intakeRow(db, chatId) {

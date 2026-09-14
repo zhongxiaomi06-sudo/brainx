@@ -13,21 +13,30 @@
  *     plugins.entries.brainx-openclaw.hooks.allowConversationAccess=true。
  *
  * 放行规则（可见动作，回复照发）：
- *   1. 含 `<at `（@ 了机器人）；
+ *   1. @ 了机器人本人（含 bot open_id 的 at 标签；@ 其他人不算，2026-09-14 硬规则一）；
  *   2. 含 `[BRAINTEX_` 标记或 `brainx_` 工具指令（全部按钮命令文本的特征）；
  *   3. `/` 开头的控制命令；
- *   4. 「找人条件」开头的条件登记（prompt 约定只回「已记录」）；
- *   5. 会话追问：最近 10 分钟内有可见动作的会话，后续普通消息视为同一会话上下文
+ *   4. 会话追问：最近 10 分钟内有可见动作的会话，后续普通消息视为同一会话上下文
  *      （按钮 → 模型追问 → 顾问答「确认/选第 2 个」这类多轮流程不被掐断）。
- * 其余群消息的 agent 回复短路为 NO_REPLY。私聊（:direct:）不适用本纪律。
- * 进程重启丢入站记录时宁可放过不拦截（fail-open，不错杀正常回复）。
+ * 「找人条件：…」不再放行（硬规则一：非 @ 不出声）——它是被动输入，由
+ * search-start-notice 静默记录并在下一次按钮找人时作为 criteria 注入，
+ * 不需要「已记录」回声。其余群消息的 agent 回复短路为 NO_REPLY。
+ * 私聊（:direct:）不适用本纪律。进程重启丢入站记录时宁可放过不拦截
+ * （fail-open，不错杀正常回复）。
  */
 const FOLLOW_UP_WINDOW_MS = 10 * 60 * 1000;
 
+const BOT_OPEN_ID = 'ou_aa41e31506cb6dbd4bc96e0e48f46b93'; // braintex 小机器人（生产 resolved bot open_id）
+
+function isBotMentioned(content) {
+  const text = String(content || '');
+  return text.includes(`<at user_id="${BOT_OPEN_ID}"`) || text.includes('braintex的小机器人</at>');
+}
+
 function isActionable(content) {
   const text = String(content || '');
-  return text.includes('<at ') || text.includes('[BRAINTEX_') || text.includes('brainx_')
-    || text.startsWith('/') || text.startsWith('找人条件');
+  return isBotMentioned(text) || text.includes('[BRAINTEX_') || text.includes('brainx_')
+    || text.startsWith('/');
 }
 
 /** 入站 chatId 提取：conversationId/metadata.to 带 `chat:` 前缀（2026-09-14 生产探针实证），

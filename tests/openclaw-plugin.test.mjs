@@ -61,9 +61,13 @@ test('BrainTex prompt routes natural-language job recommendations to authorized 
   assert.match(prompt, /不得凭常识编造职位方向/);
   assert.match(prompt, /OpenMai 找人.*SuperMai 找人/s);
   assert.match(prompt, /找人条件：/);
-  assert.match(prompt, /只是在保存下一次搜索的可选条件/);
-  assert.match(prompt, /不得在这条消息上调用任何找人工具/);
+  assert.match(prompt, /登记下一次搜索的可选条件/);
+  assert.match(prompt, /不要回复/);
+  assert.match(prompt, /条件已由系统静默记录/);
+  assert.match(prompt, /不要在这条消息上调用任何找人工具/);
   assert.match(prompt, /否则会与随后按钮形成重复付费任务/);
+  assert.match(prompt, /criteria 已由插件按本群最近一次/);
+  assert.match(prompt, /不要自行编造排除名单/);
   assert.match(prompt, /第一次调用传 continue_search=true/);
   assert.match(prompt, /后续轮询必须改为 continue_search=false/);
   assert.match(prompt, /按钮本身就是.*明确选择/);
@@ -170,7 +174,7 @@ test('tool request is fixed to loopback and produces a BrainX-verifiable asserti
   const body = JSON.parse(calls[0].options.body);
   assert.equal(body.schema_version, 'agent_tool_request.v1');
   assert.deepEqual(body.client, {
-    plugin_version: '1.4.9', openclaw_version: '2026.7.1-2', model_ref: 'openai/gpt-5',
+    plugin_version: '1.4.10', openclaw_version: '2026.7.1-2', model_ref: 'openai/gpt-5',
   });
   const payload = verifyPrincipalAssertion(body.principal_assertion, {
     secret,

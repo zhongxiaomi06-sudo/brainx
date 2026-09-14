@@ -149,3 +149,62 @@ test('取不到点击人时不直调，留给 agent 按命令文本兜底；网�
   assert.equal(calls.length, 1);
   assert.ok(warnings.some((message) => /direct search start refused: NOT_FOUND_OR_FORBIDDEN/.test(message)));
 });
+
+test('「找人条件：…」静默记录，并在下一次按钮直调时作为 criteria 注入', async () => {
+  const calls = [];
+  const api = {
+    runtime: { channel: { outbound: { loadAdapter: async () => ({ sendText: async () => {} }) } } },
+    logger: { warn: () => {} },
+  };
+  const handler = createSearchStartNoticeHandler(api, {
+    gatewayToken: 't'.repeat(40),
+    assertionSecret: 's'.repeat(40),
+    fetchImpl: async (url, options) => {
+      calls.push({ url, body: JSON.parse(options.body) });
+      return { json: async () => ({ ok: true }) };
+    },
+  });
+  const context = { channelId: 'feishu', conversationId: 'oc_g', accountId: 'mia' };
+  // 顾问先登记条件：不触发通知、不触发任何工具调用
+  assert.equal(await handler(
+    { content: '找人条件：北京、半导体、总监', messageId: 'c1', senderId: 'ou_1' }, context), false);
+  assert.equal(calls.length, 0, '条件登记本身不得触发工具调用');
+  // 随后点「继续找人」按钮：直调必须带上 criteria
+  await handler({
+    content: '[BRAINTEX_SEARCH_START] 为项目 J1 使用 OpenMai 继续找人。', messageId: 'c2', senderId: 'ou_1',
+  }, context);
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0].body.arguments, {
+    job_id: 'J1', continue_search: true, criteria: '北京、半导体、总监',
+  });
+});
+
+test('没有登记条件时直调不传 criteria；条件按群隔离', async () => {
+  const calls = [];
+  const api = {
+    runtime: { channel: { outbound: { loadAdapter: async () => ({ sendText: async () => {} }) } } },
+    logger: { warn: () => {} },
+  };
+  const handler = createSearchStartNoticeHandler(api, {
+    gatewayToken: 't'.repeat(40),
+    assertionSecret: 's'.repeat(40),
+    fetchImpl: async (url, options) => {
+      calls.push({ url, body: JSON.parse(options.body) });
+      return { json: async () => ({ ok: true }) };
+    },
+  });
+  await handler({ content: '找人条件：上海、算法', messageId: 'd1', senderId: 'ou_1' },
+    { channelId: 'feishu', conversationId: 'oc_a', accountId: 'mia' });
+  await handler({ content: '[BRAINTEX_SEARCH_START] 为项目 J2 使用 OpenMai 继续找人。', messageId: 'd2', senderId: 'ou_1' },
+    { channelId: 'feishu', conversationId: 'oc_b', accountId: 'mia' });
+  assert.deepEqual(calls[0].body.arguments, { job_id: 'J2', continue_search: true },
+    '别的群登记的条件不得串到本群');
+});
+
+test('parseSearchCondition 只认「找人条件」前缀', async () => {
+  const { parseSearchCondition } = await import('../plugins/brainx-openclaw/search-start-notice.js');
+  assert.equal(parseSearchCondition('找人条件：北京、半导体'), '北京、半导体');
+  assert.equal(parseSearchCondition('找人条件:  深圳'), '深圳');
+  assert.equal(parseSearchCondition('顺便说下找人条件很重要'), null);
+  assert.equal(parseSearchCondition('[BRAINTEX_SEARCH_START] 为项目 J1 使用 OpenMai 继续找人。'), null);
+});

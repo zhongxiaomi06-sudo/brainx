@@ -207,3 +207,22 @@ test('注册表：brainx_bind_group_project 标记 groupIntakeBinding，非 p2p�
   assert.equal(registry.requiresP2p('brainx_bind_group_project'), false);
   assert.equal(registry.requiresGroupProject('brainx_bind_group_project'), false);
 });
+
+test('已有归属的群不发绑定卡：项目群与 Offer 决策群跳过（硬规则二）', async () => {
+  const db = readyDb();
+  // 基线：oc_old 进表
+  await runGroupIntakeOnce(db, { listChats: async () => fakeChats(['oc_old']),
+    sendCard: async () => ({ message_id: 'om' }), ensureOpenClawGroup: async () => {} });
+  // oc_launch 是项目群（project_launches 有记录）；oc_offer 是 Offer 决策群（candidate_decision_groups 有记录）
+  db.prepare(`INSERT INTO project_launches (launch_id, consultant_id, project_id, idempotency_key, status, current_step, chat_id, created_at, updated_at)
+    VALUES ('l1', 'felix', ?, 'k1', 'READY', 'READY', 'oc_launch', ?, ?)`).run(PID, now(), now());
+  db.prepare(`INSERT INTO candidate_decision_groups (decision_group_id, tenant_id, position_id, candidate_ref, created_by, source_chat_id, target_chat_id, context_summary, status, created_at, updated_at)
+    VALUES ('dg1', 'tenant-a', ?, 'c-1', 'felix', 'oc_src', 'oc_offer', '摘要', 'READY', ?, ?)`).run(PID, now(), now());
+  const sent = [];
+  const listChats = async () => fakeChats(['oc_old', 'oc_launch', 'oc_offer', 'oc_new']);
+  await runGroupIntakeOnce(db, { listChats, sendCard: async (i) => { sent.push(i); return { message_id: 'om2' }; },
+    ensureOpenClawGroup: async () => {} });
+  assert.deepEqual(sent.map((input) => input.target), ['oc_new'],
+    '只有真正无归属的新群才发绑定卡；项目群/Offer 决策群不得误弹');
+  db.close();
+});

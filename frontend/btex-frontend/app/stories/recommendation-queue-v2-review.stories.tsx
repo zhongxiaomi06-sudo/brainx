@@ -79,12 +79,13 @@ export const FirstPage: Story = {
     await expect(canvas.queryByText("为什么值得看")).not.toBeInTheDocument();
     await expect(canvas.queryByText("需要注意")).not.toBeInTheDocument();
     await expect(canvas.queryByLabelText("判断状态")).not.toBeInTheDocument();
-    await expect(canvas.getAllByText("AI 匹配分")[0]).toBeInTheDocument();
-    await expect(canvas.getAllByText("证据覆盖")[0]).toBeInTheDocument();
-    await expect(canvas.getAllByText("探索价值")[0]).toBeInTheDocument();
+    await expect(canvas.getAllByLabelText(/AI 匹配分/)[0]).toBeInTheDocument();
+    await expect(canvas.queryByText("证据覆盖")).not.toBeInTheDocument();
+    await expect(canvas.queryByText("探索价值")).not.toBeInTheDocument();
     await expect(canvas.getAllByText("推荐摘要")[0]).toBeInTheDocument();
     const firstCard = canvas.getByRole("article", { name: "高级算法工程师 · 脱敏客户 A" });
     await expect(within(firstCard).getByLabelText("今天推进，3格信号")).toBeInTheDocument();
+    await expect(within(firstCard).getByText("画像关键词与全球化增长方向重合；当前职位已有可核验进展。")).toBeInTheDocument();
     await expect(within(firstCard).queryByRole("button", { name: "查看 高级算法工程师 判断" })).not.toBeInTheDocument();
     await expect(Array.from(firstCard.querySelectorAll(".recommendation-v2-actions button"), button => button.textContent?.trim())).toEqual(["暂不考虑", "观察", "加入我的项目"]);
     firstCard.focus();
@@ -131,7 +132,9 @@ export const MissingFacts: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getAllByText("待确认").length).toBeGreaterThanOrEqual(5);
+    await expect(canvas.getAllByText("待确认").length).toBeGreaterThanOrEqual(3);
+    await expect(canvas.queryByText("状态")).not.toBeInTheDocument();
+    await expect(canvas.queryByText("阶段")).not.toBeInTheDocument();
     await expect(canvas.queryByText("暂无第二条已验证理由")).not.toBeInTheDocument();
     await expect(canvas.queryByRole("button", { name: "加入我的项目" })).not.toBeInTheDocument();
   },

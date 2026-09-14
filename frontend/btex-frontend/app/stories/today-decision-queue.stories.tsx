@@ -81,9 +81,10 @@ export const FormalV2CardIntegration: Story = {
     await expect(canvas.queryByRole("combobox", { name: "数据来源" })).not.toBeInTheDocument();
     await userEvent.selectOptions(canvas.getByRole("combobox", { name: "队列视图" }), "exploration");
     await expect(sortQueue).toHaveBeenCalledWith("exploration");
-    await expect(canvas.getByText("AI 匹配分")).toBeInTheDocument();
-    await expect(canvas.getByText("证据覆盖")).toBeInTheDocument();
-    await expect(canvas.getByText("探索价值")).toBeInTheDocument();
+    await expect(canvas.getByLabelText(/AI 匹配分/)).toBeInTheDocument();
+    await expect(canvas.queryByText("证据覆盖")).not.toBeInTheDocument();
+    await expect(canvas.queryByText("探索价值")).not.toBeInTheDocument();
+    await expect(canvas.getByText("推荐摘要")).toBeInTheDocument();
     const card = canvas.getByRole("article", { name: `${decisionJobs[0].role} · ${decisionJobs[0].company}` });
     await expect(card).toHaveAttribute("tabindex", "0");
     await expect(Array.from(card.querySelectorAll(".recommendation-v2-actions button"), button => button.textContent?.trim()))

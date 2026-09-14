@@ -49,6 +49,8 @@
 
 推荐卡在六项事实之后增加“推荐摘要”，只压缩冻结推荐中的方向匹配、职位关系和 Pipeline，不调用前端模型也不补造事实；Pipeline 的 `Interview / Recommendation / Sourcing / Onboarding` 等枚举在展示时统一转为面试、推荐、寻访、入职。无理由时整行隐藏，无进展时保持待确认。
 
+默认列表态按快速筛选重新分层：摘要紧跟职位身份，AI 匹配分收进标题区；证据覆盖和探索价值不再占列表空间，但继续保留在统一详情和冻结数据中；状态、阶段只有真实已知时才显示，避免整页重复“待确认”。
+
 飞书卡片对象深链不新增视觉组件，复用完整工作台、`JobDetailCard` 和真实数据入口三态的既有 Storybook。生产代码只接受 HTTPS 基址，职位与回放在正式数据加载并完成 Web 会话鉴权后打开；候选引用只用于预填对话问题。深链不携带 consultant、tenant、open_id、token 或 scope，也不能替代后端对象权限检查。接入状态见[飞书卡片 HTTPS 深链接入记录](frontend-reviews/2026-09-03-feishu-card-deep-links.md)。
 
 BrainTex 飞书功能首页不在 React Storybook 里复制一套仿真卡片；仓库输出 OpenClaw 通用 `presentation`，由锁定版官方飞书渠道生成真实卡片 2.0。因此 Storybook 状态保持“未开始”，视觉验收必须在真实飞书客户端完成，自动测试只验证内容、首次开工指引、脱敏就绪状态、按钮命令、HTTPS 和授权边界。状态见 [BrainTex 飞书功能首页审核记录](frontend-reviews/2026-09-03-braintex-feishu-home.md)。

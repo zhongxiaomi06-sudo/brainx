@@ -42,7 +42,7 @@
 | `SettingsCenterReview` 设置中心 | 已完成 | 已通过 | 已接入 | 待确认 | 已验证（本地） | 正式应用代码已使用；个人资料页可退出当前会话并切换本地测试账号，真实 Dykes 切换证据见 9 月 8 日记录 |
 | `PersonalModelPanel` 顾问个人模型 | 已完成 | 未审核 | 已接入 | 未发布 | 部分验证（脱敏契约） | 正式设置中心与飞书 HTTPS 深链已接入；真实凭据必须由所有者在生产页提交，待用户视觉复看和双账号真机问答 |
 | `TtcJobsTable` 真实职位表 | 已完成 | 退回修改 | 未接入 | 待确认 | 已验证（本地） | 原正式入口已由现代职位工作区替换；组件保留为历史事实表与 Storybook 参考 |
-| `ClientInsightsReview` 客户事实索引 | 已完成 | 已通过 | 已接入 | 待确认 | 已验证（本地） | 正式应用代码已使用 |
+| `ClientInsightsReview` 客户事实索引 | 已完成 | 已通过 | 已接入 | 未发布 | 已验证（本地真实库） | 已清理列表中重复的空类型占位和后端 `UNKNOWN` 原始枚举；本地 4020 个客户、23245 个职位、首屏 100 行验证无原始枚举泄漏，见[未知字段噪音清理复核](2026-09-15-client-fact-noise-cleanup.md)；新视觉待用户复看 |
 | `WorkspaceEntry` 真实数据入口三态 | 已完成 | 未单独审核 | 已接入 | 待确认 | 部分验证 | 连接、登录和异常入口已接入，仍归全链路验收 |
 | `JobDetailCard` 居中职位弹窗 | 已完成 | 退回修改 | 已接入 | 未发布 | 部分验证 | 2026-09-12 冲刺 T1/T2：回放 tab 下线、主按钮改「一键接单」（入项目+拉群+推卡一次完成）、删除 6 个无意义字段与权重/版本/覆盖率展示，见[一键接单与字段精简](2026-09-12-job-detail-quick-accept.md)；待用户复看与目标环境复核 |
 | `JobsWorkspaceReview` 现代职位工作区 | 已完成 | 部分通过 | 已接入 | 未发布 | 已验证（本地真实库） | 列表将未跟进的 `PENDING` 显示为“待判断”而非带任务压力的“待处理”，负责人列同时展示头像首字与完整姓名；本地 23245 个待判断职位、首屏 100 行已验证，见[状态与负责人可读性复核](2026-09-15-jobs-status-owner-readability.md)；新视觉与目标环境待复看 |
@@ -141,6 +141,7 @@
 - [推荐卡快速筛选层级复核](2026-09-15-recommendation-card-hierarchy.md)
 - [推荐列表工作区宽度复核](2026-09-15-recommendation-list-width.md)
 - [全部职位状态与负责人可读性复核](2026-09-15-jobs-status-owner-readability.md)
+- [客户洞察未知字段噪音清理复核](2026-09-15-client-fact-noise-cleanup.md)
 - [候选人保留与项目共享上下文复核](2026-09-09-candidate-focus-context.md)
 - [候选人 Offer 决策群复核](2026-09-09-candidate-decision-group.md)
 - [候选卡片与对话建群复核](2026-09-09-candidate-card-conversation-group.md)

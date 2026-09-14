@@ -39,7 +39,9 @@ function displayDate(value: string | null) {
 }
 
 function FactTags({ values, labels }: { values: string[]; labels: Record<string, string> }) {
-  return values.length ? <div className="client-fact-tags">{values.map(value => <span key={value}>{labels[value] || value}</span>)}</div> : <span className="client-muted">—</span>;
+  const known = [...new Set(values)].filter(value => labels[value]);
+  if (known.length) return <div className="client-fact-tags">{known.map(value => <span key={value}>{labels[value]}</span>)}</div>;
+  return values.length ? <span className="client-muted">待确认</span> : <span className="client-muted">—</span>;
 }
 
 export function ClientInsightsReview({ clients, onOpenJobs }: ClientInsightsReviewProps) {
@@ -77,7 +79,7 @@ export function ClientInsightsReview({ clients, onOpenJobs }: ClientInsightsRevi
       </div>
       <div className="client-table-wrap"><table><thead><tr><th>客户</th><th>职位总数</th><th>活跃职位</th><th>已知 HC</th><th>最近职位快照</th><th>顾问关系</th><th>职位状态</th><th aria-label="操作" /></tr></thead><tbody>
         {rendered.map(client => <tr key={client.company}>
-          <td><button className="client-name" type="button" onClick={() => setSelected(client)}><Building2 /><span><b>{client.company}</b><small>{client.companyType || "类型未标注"}</small></span></button></td>
+          <td><button className="client-name" type="button" onClick={() => setSelected(client)}><Building2 /><span><b>{client.company}</b>{client.companyType && <small>{client.companyType}</small>}</span></button></td>
           <td>{client.jobCount}</td><td>{client.activeJobs}</td><td>{client.knownHc ?? "—"}</td><td>{displayDate(client.lastActivity)}</td>
           <td><FactTags values={client.relations} labels={relationLabels} /></td><td><FactTags values={client.states} labels={stateLabels} /></td>
           <td><button className="client-open" type="button" aria-label={`查看 ${client.company} 事实`} onClick={() => setSelected(client)}><ChevronRight /></button></td>

@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Bot, CheckCircle2, ChevronRight, Clock3, Search } from "lucide-react";
 import type { ProjectStatus, ProjectSummary } from "./brainx-projects-api";
-import { canIgnoreProject } from "./project-ignore-action";
 import { Heading } from "./workbench-controls";
 
 type ProjectFilter = "ALL" | ProjectStatus;
@@ -82,18 +81,16 @@ function matches(project: ProjectSummary, query: string) {
     .filter(Boolean).join(" ").toLocaleLowerCase().includes(keyword);
 }
 
-export function ProjectsView({ projects, query, setQuery, focusedProjectId, openDetails, openAction, onIgnore, onLaunch }: {
+export function ProjectsView({ projects, query, setQuery, focusedProjectId, openDetails, openAction, onLaunch }: {
   projects: ProjectSummary[];
   query: string;
   setQuery: (value: string) => void;
   focusedProjectId: string | null;
   openDetails: (project: ProjectSummary) => void;
   openAction: (project: ProjectSummary) => void;
-  onIgnore: (project: ProjectSummary) => Promise<void>;
   onLaunch: (project: ProjectSummary) => Promise<void>;
 }) {
   const [filter, setFilter] = useState<ProjectFilter>("ALL");
-  const [ignoringId, setIgnoringId] = useState<string | null>(null);
   const [launchingId, setLaunchingId] = useState<string | null>(null);
   const [launchErrors, setLaunchErrors] = useState<Record<string, string>>({});
   const counts = useMemo(() => Object.fromEntries(filters.map(({ id }) => [id,
@@ -130,7 +127,6 @@ export function ProjectsView({ projects, query, setQuery, focusedProjectId, open
       {visible.length ? visible.map(project => {
         const due = dueText(project);
         const urgent = project.project_status === "NEEDS_ACTION";
-        const canIgnore = canIgnoreProject(project);
         const canLaunch = project.project_status === "PENDING_START"
           || project.launch?.status === "FAILED" || project.launch?.search_status === "FAILED";
         const launching = launchingId === project.project_id;
@@ -150,11 +146,6 @@ export function ProjectsView({ projects, query, setQuery, focusedProjectId, open
           <div className="project-action-side">
             <span className={urgent ? "urgent" : ""}>{due || `更新于 ${dateText(project.state_since || project.joined_at)}`}</span>
             <div className="project-card-actions">
-              {canIgnore && <button
-                type="button" className="is-ignore" disabled={ignoringId === project.project_id}
-                onClick={() => { setIgnoringId(project.project_id); void onIgnore(project).finally(() => setIgnoringId(null)); }}>
-                {ignoringId === project.project_id ? "忽略中…" : "忽略"}
-              </button>}
               <button type="button" className="is-primary" disabled={launching || project.launch?.search_status === "RUNNING"}
                 onClick={() => {
                   if (!canLaunch) { openAction(project); return; }

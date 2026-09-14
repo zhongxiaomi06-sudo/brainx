@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-14｜fix(plugin): 沉默纪律改挂 before_agent_reply——出站钩子对普通回复不触发
+
+- 现象：1.4.8 上线后群内无 @ 闲聊机器人照回（用户实测「今天天气怎么样」被接话）。
+- 双重根因（生产探针实证）：①`reply_payload_sending`/`message_sending` 只在带 hook 配置的富负载回复上触发，普通文本回复两个钩子都不触发——1.4.8 的 cancel 逻辑从未执行；②入站 `conversationId` 实为 `chat:oc_` 前缀形态，正则只认裸 oc_ id，入站关联从未成功（fail-open 兜底）。
+- 修法：`mention-silence.js` 改挂 `before_agent_reply`（get-reply 主路径稳定触发，claiming hook），非动作消息返回 `{handled:true, reply:{text:'NO_REPLY'}}`——channel-outbound 以 `/^NO_REPLY$/iu` 抑制外发；入站 chatId 归一剥离 `chat:` 前缀。该钩子属 conversation hook，生产模板与生产配置同步 `allowConversationAccess=true`。插件 bump 1.4.9。
+- 验证：`tests/openclaw-mention-silence.test.mjs` 重写 5/5 通过（含 chat: 前缀形态用例）；插件相关 22/22 通过。生产三场景（闲聊/@/按钮标记）验证见后续记录。
+
 ## 2026-09-13|fix(frontend): 备注宫格样式提权——.facts div 的 flex 压垮了单类选择器（真机截图验证）
 
 - 触发：用户四轮反馈「排版不行」后不再盲改，搭建临时 vite 入口用**真实组件+真实 CSS+真实备注数据**渲染并 Playwright 截图，一眼定位：宫格被压成竖条、按钮竖排。

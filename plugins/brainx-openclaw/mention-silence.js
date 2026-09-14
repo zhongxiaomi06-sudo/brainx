@@ -1,12 +1,16 @@
-/** 群聊沉默纪律：没被点名的普通群聊，回复阶段直接取消（reply_payload_sending cancel）。
+/** 群聊沉默纪律：没被点名的普通群聊，在 before_agent_reply 阶段直接短路为 NO_REPLY。
  *
  * 背景（2026-09-13 york 案例）：项目群的 requireMention=false 是按钮回调的载荷
  * （卡片回调合成消息没有 @ 元数据，全局 mention 门会把按钮一起挡掉），但它同时
  * 放行了所有闲聊，机器人逢话必接「好吵」。
  *
- * 为什么挂在 reply 阶段而不是 before_agent_reply：message_received 与
- * reply_payload_sending 是本部署里实证会触发的两个钩子（搜索通知、富卡片格式化
- * 都走它们），before_agent_reply 是否对动态 agent 触发不可控。
+ * 钩子选型（2026-09-14 生产探针实证）：
+ *   - reply_payload_sending / message_sending 只在带 hook 配置的富负载回复上触发，
+ *     普通文本回复不会触发（探针两次回复均无任何 outbound 钩子日志）；
+ *   - before_agent_reply 在 get-reply 主路径稳定触发，返回 {handled:true} 可短路回复；
+ *   - 返回 {text:'NO_REPLY'} 由 channel-outbound 的 /^NO_REPLY$/iu 抑制，不会外发。
+ *   - before_agent_reply 是 conversation hook，需要 openclaw.json 配置
+ *     plugins.entries.brainx-openclaw.hooks.allowConversationAccess=true。
  *
  * 放行规则（可见动作，回复照发）：
  *   1. 含 `<at `（@ 了机器人）；
@@ -15,7 +19,7 @@
  *   4. 「找人条件」开头的条件登记（prompt 约定只回「已记录」）；
  *   5. 会话追问：最近 10 分钟内有可见动作的会话，后续普通消息视为同一会话上下文
  *      （按钮 → 模型追问 → 顾问答「确认/选第 2 个」这类多轮流程不被掐断）。
- * 其余群消息的 agent 回复 cancel 掉。私聊（:direct:）不适用本纪律。
+ * 其余群消息的 agent 回复短路为 NO_REPLY。私聊（:direct:）不适用本纪律。
  * 进程重启丢入站记录时宁可放过不拦截（fail-open，不错杀正常回复）。
  */
 const FOLLOW_UP_WINDOW_MS = 10 * 60 * 1000;
@@ -26,17 +30,22 @@ function isActionable(content) {
     || text.startsWith('/') || text.startsWith('找人条件');
 }
 
+/** 入站 chatId 提取：conversationId/metadata.to 带 `chat:` 前缀（2026-09-14 生产探针实证），
+ *  metadata.chatId 为裸 oc_ id，两种形态都归一成裸 id。 */
+function extractInboundChatId(event, context) {
+  return [context?.conversationId, event?.metadata?.chatId, event?.metadata?.to]
+    .map((value) => String(value || '').trim().replace(/^chat:/, ''))
+    .find((value) => /^oc_[A-Za-z0-9_-]+$/.test(value));
+}
+
 export function createMentionSilenceHandler(dependencies = {}) {
   const now = dependencies.now || (() => Date.now());
   const lastInbound = new Map();
   const lastActionableAt = new Map();
 
-  /** 入站（message_received）：群聊以 oc_ 会话 id 关联（此时 sessionKey 不一定下发，
-   *  conversationId/metadata.chatId 是实证存在的字段，与 search-start-notice 一致）。 */
+  /** 入站（message_received）：记录每个群最近一条消息是否可见动作。 */
   const onMessageReceived = (event, context = {}) => {
-    const chatId = [context?.conversationId, event?.metadata?.chatId]
-      .map((value) => String(value || '').trim())
-      .find((value) => /^oc_[A-Za-z0-9_-]+$/.test(value));
+    const chatId = extractInboundChatId(event, context);
     if (!chatId) return;
     const actionable = isActionable(event?.content);
     lastInbound.set(chatId, { actionable, at: now() });
@@ -45,10 +54,10 @@ export function createMentionSilenceHandler(dependencies = {}) {
     if (lastActionableAt.size > 500) lastActionableAt.delete(lastActionableAt.keys().next().value);
   };
 
-  /** 出站（reply_payload_sending）：event.sessionKey 形如
+  /** 出站（before_agent_reply，claiming hook）：event.sessionKey 形如
    *  agent:<agentId>:feishu:group:oc_xxx（私聊为 :direct:，不适用本纪律）。 */
-  const onReplySending = (event, context = {}) => {
-    const sessionKey = String(event?.sessionKey || context?.sessionKey || '');
+  const onBeforeAgentReply = (event) => {
+    const sessionKey = String(event?.sessionKey || '');
     const chatId = /:group:(oc_[A-Za-z0-9_-]+)/.exec(sessionKey)?.[1];
     if (!chatId) return undefined;
     const inbound = lastInbound.get(chatId);
@@ -56,8 +65,8 @@ export function createMentionSilenceHandler(dependencies = {}) {
     if (inbound.actionable) return undefined;
     const last = lastActionableAt.get(chatId) || 0;
     if (now() - last <= FOLLOW_UP_WINDOW_MS) return undefined;
-    return { cancel: true, reason: 'group-no-mention-silence' };
+    return { handled: true, reply: { text: 'NO_REPLY' }, reason: 'group-no-mention-silence' };
   };
 
-  return { onMessageReceived, onReplySending };
+  return { onMessageReceived, onBeforeAgentReply };
 }

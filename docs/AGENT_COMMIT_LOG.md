@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-15｜feat(人才): 人才匹配跑批独立模块 talent-match-run
+
+- 起因：brainx_candidate_shortlist 只读 RDS 预计算短名单，现网仅 reloop 源两轮旧数据，普通职位全返回 NO_AUTHORIZED_SHORTLIST（荆华密算群实证）；用户决策做成独立可插拔模块，不影响主模块。
+- 只新增三文件：src/talent-match-run.js（活跃职位 × RDS 人才池，supply-match-v1 打分，预计算链路 + 项目/顾问双授权幂等落库）、bin/brainx-talent-match-run.mjs（默认 dry-run，--write 落库，--job 单职位）、tests/talent-match-run.test.mjs。
+- candidate_ref 规则 talent-db:<id>；联系方式不进事实契约；SQLite 决策库只读；全部 INSERT IGNORE + 内容寻址确定性 id，可任意重跑。
+- 验证：新测试 5/5（含 write 后 candidateShortlist 全链返回与双授权 fail-closed）；talent/candidate-shortlist/reloop/group-member-access 回归 34/34。权威说明：docs/2026-09-15-talent-match-run.md。
+
 ## 2026-09-15｜fix(群权限): intake 绑定群纳入群上下文放行
 
 - 起因（荆华密算实证）：一职位多群时 `job_facts.chat_id` 被后续 launch 覆盖，intake 绑定群（bot_chat_intake BOUND）里的成员点候选人动作仍 NOT_FOUND_OR_FORBIDDEN（生产 14 连拒）。

@@ -16,6 +16,13 @@
 - 写入只发生在 RDS 预计算链路与两张授权账本，全部幂等（INSERT IGNORE + 内容寻址确定性 id），可任意重跑。
 - 模块自身不启动循环；接入方式二选一：CLI 手动/定时执行，或 worker 里 `await runTalentMatchRun({ db, dryRun:false })`。
 
+## 配套：talent-tag-backfill（标签回填）
+
+人才池全员零标签时匹配只剩文本维。`src/talent-tag-backfill.js` 从既有数据回填标签：
+技能标签取每人才最新 skills 非空的 READY reloop 事实（344/401 人覆盖），意向标签取
+summary 岗位段 tokenize。CLI：`node bin/brainx-talent-tag-backfill.mjs [--write] [--talent <id>]`，
+同样 dry-run 默认、幂等可重跑。标准流程：先回填标签 → 再重跑 talent-match-run。
+
 ## 用法
 
 ```bash

@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-15｜feat(人才): 人才标签回填模块 talent-tag-backfill
+
+- 起因：talent-match-run 生产首跑发现 RDS 人才池 401 人全员零标签，supply-match-v1 只剩文本维、大量职位零召回（销售岗实证）。
+- 只新增三文件：src/talent-tag-backfill.js（技能标签取每人才最新 skills 非空的 READY reloop 事实；意向标签取 summary 岗位段 tokenize，口径同 syncTalentsFromCsv 先例）、bin/brainx-talent-tag-backfill.mjs（dry-run 默认，--write/--talent）、tests/talent-tag-backfill.test.mjs。
+- 幂等靠 tag.uk(name,category) 与 talent_tag.uk(talent_id,tag_id) + INSERT IGNORE；同名多人各自打标不合并；单事务。
+- 验证：新测试 6/6（含回填前后召回衔接用例）；talent-match-run/talent/candidate-shortlist 回归 26/26。
+
 ## 2026-09-15｜feat(人才): 人才匹配跑批独立模块 talent-match-run
 
 - 起因：brainx_candidate_shortlist 只读 RDS 预计算短名单，现网仅 reloop 源两轮旧数据，普通职位全返回 NO_AUTHORIZED_SHORTLIST（荆华密算群实证）；用户决策做成独立可插拔模块，不影响主模块。

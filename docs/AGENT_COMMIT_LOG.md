@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-15｜fix(群准入): intake 旧群白名单补偿重试
+
+- 起因：LD-荆华密算-销售、LD-Unipat-销售 两次实证——intake 加白结果被静默丢弃且 launch 补偿不覆盖 intake 群，群 CARD_SENT 多天却不在 groupAllowFrom，@机器人消息被 allowlist 丢弃、绑定无响应；配置也可能被运维操作回滚。
+- openclaw-group-retry.js 每轮 sweep 在 launch PENDING 重放后新增 intake 自愈：对 SEEN/CARD_SENT/BOUND 的 bot_chat_intake 群逐群幂等 ensure（SKIPPED 不碰、单群失败隔离、新增 healIntakeGroups 可注入），实际补白后按既有节流重启 gateway 一次。
+- 验证：新增 5/5（状态覆盖/重启节流/失败隔离/单元/launch 回归），相关 13/13，全量 747/747。
+
 ## 2026-09-15｜feat(卡片): 群内候选人呈现一律系统卡片
 
 - 起因（用户决策）：多轮对话后模型把候选名单写成不规范 markdown（自制匹配百分比排版）。改为代码确定性渲染：brainx_candidate_shortlist 群调用发短名单卡（新增 src/shortlist-card.js，按钮指令复用 openmai-delivery action builder）、brainx_openmai_search done 读回发标准投递卡；模型只回引导语，prompt.js 硬规则不得罗列名单。

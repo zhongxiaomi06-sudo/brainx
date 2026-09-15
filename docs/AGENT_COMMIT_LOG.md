@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-16｜fix(建群): READY 项目群不再误挡其他协作者
+
+- 起因（linda 私聊实证）：JLPJBV9（恒星力量·战略研究）的 READY 项目群由 york 创建，linda 加入职位后调 brainx_launch_project_chat（force）被 `launch.consultant_id !== consultantId` 卡口反复 409「其他协作者创建中」，机器人无限重试。
+- 修复：launch 已 READY 时，本人 force 才走重发卡；其他协作者（含 force）一律按 already 返回既有群——群客观存在不存在抢占。非 READY（创建中）的他人卡口保持 409 不变。
+- 验证：新增 2 例（READY+他人 already 放行含 force；RUNNING+他人仍 409），project-launch 16/16，全量回归见提交。
+- 配套动作：linda 已被拉入恒星力量-战略研究群（生产一次性 API 调用，code 0）。
+
 ## 2026-09-15｜fix(群准入): intake 旧群白名单补偿重试
 
 - 起因：LD-荆华密算-销售、LD-Unipat-销售 两次实证——intake 加白结果被静默丢弃且 launch 补偿不覆盖 intake 群，群 CARD_SENT 多天却不在 groupAllowFrom，@机器人消息被 allowlist 丢弃、绑定无响应；配置也可能被运维操作回滚。

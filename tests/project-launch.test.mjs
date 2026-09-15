@@ -402,3 +402,58 @@ test('H-2 preflight：一小时内的 RUNNING 仍复用，不新增 TTC 凭证�
     '活跃 RUNNING 应继续复用，不要求重新配置凭证');
   db.close();
 });
+
+test('项目启动：READY 群归他人时，协作者（含 force）按 already 返回，不再误报 IN_PROGRESS', async () => {
+  // 2026-09-15 linda/JLPJBV9 实证：york 建的 READY 群把 linda 的 force 调用挡死成无限重试。
+  const db = readyDb();
+  const deps = {
+    appConfigured: true,
+    publicBaseUrl: 'https://base.yorkteam.cn/',
+    createProjectChat: async (input) => ({ chat_id: 'oc_owner', name: input.name }),
+    ensureOpenClawGroupAllowed: async () => {},
+    sendInteractiveCard: async () => ({ message_id: 'om_job' }),
+  };
+  const owner = await launchProject(db, 'felix', PID, { idempotency_key: 'launch-owner' }, deps);
+  assert.equal(owner.launch.status, 'READY');
+
+  // mia 也是该职位成员且已完成身份绑定（与 linda 情形一致）
+  confirmMembership(db, 'mia', PID, { relation: 'MY_JOB', idempotency_key: 'join-mia' });
+  const miaOpenId = db.prepare("SELECT open_id FROM consultants WHERE consultant_id='mia'").get().open_id;
+  db.prepare(`INSERT INTO feishu_identity_bindings
+    (binding_id, tenant_id, channel_account_id, feishu_app_key_hash, open_id, consultant_id,
+     binding_status, verified_at, verified_by, created_at, updated_at)
+    VALUES ('binding-mia-launch','tenant-a','brainx-prod',?,?,'mia','ACTIVE',?,'system',?,?)`).run(
+    'b'.repeat(64), miaOpenId, now(), now(), now(),
+  );
+
+  const plain = await launchProject(db, 'mia', PID, { idempotency_key: 'launch-mia-1' }, deps);
+  assert.equal(plain.already, true);
+  assert.equal(plain.launch.chat_id, 'oc_owner', '返回既有群而不是新建');
+  const forced = await launchProject(db, 'mia', PID, { idempotency_key: 'launch-mia-2', force: true }, deps);
+  assert.equal(forced.already, true, '他人 force 同样按 already，不得 409');
+  assert.equal(forced.launch.chat_id, 'oc_owner');
+  db.close();
+});
+
+test('项目启动：他人创建中的群（RUNNING）仍报 IN_PROGRESS，不误放行', async () => {
+  const db = readyDb();
+  confirmMembership(db, 'mia', PID, { relation: 'MY_JOB', idempotency_key: 'join-mia-2' });
+  const miaOpenId = db.prepare("SELECT open_id FROM consultants WHERE consultant_id='mia'").get().open_id;
+  db.prepare(`INSERT INTO feishu_identity_bindings
+    (binding_id, tenant_id, channel_account_id, feishu_app_key_hash, open_id, consultant_id,
+     binding_status, verified_at, verified_by, created_at, updated_at)
+    VALUES ('binding-mia-launch2','tenant-a','brainx-prod',?,?,'mia','ACTIVE',?,'system',?,?)`).run(
+    'c'.repeat(64), miaOpenId, now(), now(), now(),
+  );
+  const at = now();
+  db.prepare(`INSERT INTO project_launches
+    (launch_id, consultant_id, project_id, idempotency_key, status, current_step, created_at, updated_at)
+    VALUES ('l-running', 'felix', ?, 'k-running', 'CREATING_CHAT', 'CREATE_CHAT', ?, ?)`).run(PID, at, at);
+  await assert.rejects(
+    () => launchProject(db, 'mia', PID, { idempotency_key: 'launch-mia-3', force: true }, {
+      appConfigured: true, publicBaseUrl: 'https://base.yorkteam.cn/',
+    }),
+    (error) => error?.code === 'PROJECT_LAUNCH_IN_PROGRESS',
+  );
+  db.close();
+});

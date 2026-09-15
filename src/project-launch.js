@@ -261,8 +261,14 @@ export async function launchProject(db, consultantId, projectId, input = {}, dep
   ensureSingleProjectLaunch(db, projectId);
   let launch = getProjectLaunch(db, consultantId, projectId);
   // specs/014：force 用于「卡片内容变了，要按当前状态重发一张」——群不重建，只重发卡 + 重试准入。
-  if (launch?.status === 'READY' && input.force !== true) return { ok: true, already: true, launch };
-  if (launch && launch.consultant_id !== consultantId) {
+  if (launch?.status === 'READY') {
+    // 群已就绪：本人 force 才走重发卡；其他协作者（含 force）一律 already——群客观存在
+    // 不存在抢占。此前他人 force 也 409「其他协作者创建中」，是误报且会无限重试
+    // （2026-09-15 linda 私聊建群 JLPJBV9 实证：york 的 READY 群挡死所有重试）。
+    if (input.force !== true || launch.consultant_id !== consultantId) {
+      return { ok: true, already: true, launch };
+    }
+  } else if (launch && launch.consultant_id !== consultantId) {
     fail(409, 'PROJECT_LAUNCH_IN_PROGRESS', '该职位的项目群正由其他协作者创建，请稍后重试');
   }
   if (!launch) {

@@ -47,10 +47,12 @@ export function intentionTagsFromSummary(summary, limit = MAX_INTENTION_TAGS) {
   return [...tokenize(roleText)].slice(0, limit);
 }
 
-/** 单条 candidate_fact_v1 → 技能标签名列表（去重、保序）。 */
+/** 单条 candidate_fact_v1 → 技能标签名列表（去重、保序）。
+ *  tag.name 为 varchar(50)：超过 50 的名字会被 INSERT IGNORE 静默丢弃（真库实证），
+ *  必须先在源头截断，INSERT/SELECT 用同一截断值才能对上。 */
 export function skillTagsFromFact(fact, limit = MAX_SKILL_TAGS) {
   const skills = Array.isArray(fact?.skills) ? fact.skills : [];
-  return [...new Set(skills.map((s) => clean(s?.name, 120)).filter(Boolean))].slice(0, limit);
+  return [...new Set(skills.map((s) => clean(s?.name, 50)).filter(Boolean))].slice(0, limit);
 }
 
 /** 读取人才清单（可选单人/限量；limit 已清洗为整数内联）。 */

@@ -9,6 +9,7 @@ import { openDb } from '../src/db.js';
 import { runSync } from '../src/sync.js';
 import {
   intentionTagsFromSummary,
+  skillTagsFromFact,
   runTalentTagBackfill,
 } from '../src/talent-tag-backfill.js';
 import { runTalentMatchRun } from '../src/talent-match-run.js';
@@ -123,6 +124,8 @@ test('意向分词口径：最后一个斜杠段；无斜杠用整条；空则�
   assert.deepEqual(intentionTagsFromSummary('资深销售主管'), ['资深', '深销', '销售', '售主', '主管']);
   assert.deepEqual(intentionTagsFromSummary(null), []);
   assert.deepEqual(intentionTagsFromSummary('公司 /'), ['公司'], '斜杠后为空回退到最后非空段');
+  // tag.name varchar(50) 上限：超长技能名在源头截断，INSERT/SELECT 才能对上（真库实证）
+  assert.deepEqual(skillTagsFromFact({ skills: [{ name: 'x'.repeat(80) }] }), ['x'.repeat(50)]);
 });
 
 test('dry-run（默认）：零写入，报告统计正确', async () => {

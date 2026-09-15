@@ -188,8 +188,11 @@ export function createToolRegistry(options = {}) {
 }
 
 export function createProductionToolRegistry({ db, talentDependencies = {}, actionDependencies = {},
-  reportDependencies = {} }) {
-  const jobs = createJobToolHandlers({ db });
+  reportDependencies = {}, jobDependencies = {} }) {
+  // 2026-09-15：群里呈现候选人一律改标准卡片——shortlist/openmai_search 的 handler
+  // 默认接上飞书发卡通道；未配置飞书凭证时 sendInteractiveCard 抛错，handler 内
+  // try/catch 兜底吞掉（降级为不发卡，工具返回不受影响）。
+  const jobs = createJobToolHandlers({ db, sendCardFn: sendInteractiveCard, ...jobDependencies });
   // specs/014：默认接上飞书发卡通道，用于接单成功后把接单卡换成找人卡；
   // 未配置飞书凭证时 sendInteractiveCard 抛错，已由 sendAcceptedCard 兜底吞掉。
   const actions = createActionToolHandlers({ db, sendCardFn: sendInteractiveCard, ...actionDependencies });
@@ -199,6 +202,7 @@ export function createProductionToolRegistry({ db, talentDependencies = {}, acti
   const reports = createCandidateReportToolHandlers({ db, ...reportDependencies });
   const talent = createTalentToolHandlers({
     db, // 供 shortlist 空结果溯源（区分「OpenMai 找人岗」与「未授权岗」，2026-09-04 wendy 案例）
+    sendCardFn: sendInteractiveCard,
     ...talentDependencies,
     jobGapHandler: jobs.brainx_gap_questions,
   });

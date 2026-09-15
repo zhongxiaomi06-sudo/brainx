@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-15｜feat(卡片): 群内候选人呈现一律系统卡片
+
+- 起因（用户决策）：多轮对话后模型把候选名单写成不规范 markdown（自制匹配百分比排版）。改为代码确定性渲染：brainx_candidate_shortlist 群调用发短名单卡（新增 src/shortlist-card.js，按钮指令复用 openmai-delivery action builder）、brainx_openmai_search done 读回发标准投递卡；模型只回引导语，prompt.js 硬规则不得罗列名单。
+- 幂等防刷屏（job+chat+page/round+日期）；发卡 best-effort，失败时 envelope 保留名单兜底；私聊维持原样。wiring：tool-registry 生产实例自动接 sendInteractiveCard。
+- 验证：新增 7/7，相关回归 88/88，卡片渲染门禁 17/17（新增 shortlist-card 基线），全量 742/742。权威说明：docs/2026-09-15-group-candidate-cards.md。
+
 ## 2026-09-15｜build(人才): 匹配跑批接入每日 systemd timer
 
 - deploy/systemd/brainx-talent-match.{service,timer}：每天 06:17 依次跑 talent-tag-backfill --write 与 talent-match-run --write，brainx 用户 + worker.env 凭证，Persistent 补漏跑；不动 worker 主流程。

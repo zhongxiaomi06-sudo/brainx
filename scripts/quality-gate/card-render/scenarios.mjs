@@ -10,6 +10,7 @@
 import { buildDailyCard, buildSyncAlertCard, buildHeatingAlertCard } from '../../../src/push.js';
 import { buildProjectLaunchCard } from '../../../src/project-launch.js';
 import { buildOpenmaiDeliveryCard } from '../../../src/openmai-delivery.js';
+import { buildShortlistCard } from '../../../src/shortlist-card.js';
 import { buildCandidateShortlistCard } from '../../../src/candidate-shortlist-card.js';
 import { buildStageReminderCard } from '../../../src/stage-reminder.js';
 import { buildBindCard, buildGuidanceCard } from '../../../src/group-intake.js';
@@ -118,6 +119,26 @@ export function buildScenarios() {
         analysisMarkdown: `**内部人才库匹配 ${CANDIDATE.name}**\n\n`
           + '- 现岗：影像算法产品经理 · 7 年\n- 学历：硕士 · 哈工大\n- 匹配：端侧影像 pipeline 经验完整\n\n'
           + '**风险**：近两年换岗较频繁，稳定性需面谈确认。', publicBaseUrl: BASE })],
+    ['shortlist-card', '内部人才库短名单群卡（3 人一页）',
+      buildShortlistCard({ job: JOB, total: 7, items: [
+        { candidate_ref: 'reloop-profile:8842137', display_name_masked: '李*', rank: 1,
+          profile: { current_city: '深圳', skills: ['影像产品'],
+            recent_experiences: [{ company: '某科技公司', title: '影像算法产品经理' }],
+            education: [{ school: '哈工大', degree: '硕士' }] },
+          strength: { score: 84, summary: '端侧影像 pipeline 与算法团队管理经验完整' },
+          job_fit: { score: 86 } },
+        { candidate_ref: 'reloop-profile:7791042', display_name_masked: '黄*', rank: 2,
+          profile: { current_city: '深圳', skills: ['AI 产品'],
+            recent_experiences: [{ company: '某互联网公司', title: 'AI 产品经理' }],
+            education: [{ school: '华南理工', degree: '本科' }] },
+          strength: { score: 79, summary: 'AI 产品从 0 到 1 经验完整，影像硬件协同待确认' },
+          job_fit: { score: 81 } },
+        { candidate_ref: 'talent-db:301', display_name_masked: '余*', rank: 3,
+          profile: { current_city: null, skills: [],
+            recent_experiences: [], education: [] },
+          strength: { score: 71, summary: '视觉产品线经验丰富，跨城市通勤意愿待确认' },
+          job_fit: { score: 74 } },
+      ] })],
     ['decision-group-context', 'Offer 决策群首卡',
       contextCard({ project_id: JOB.project_id, role: JOB.role, company: JOB.company }, CANDIDATE,
         // 结构与 src/candidate-decision-group.js#sourceContext 的真实输出一致：4 个小节 + 讨论条目。

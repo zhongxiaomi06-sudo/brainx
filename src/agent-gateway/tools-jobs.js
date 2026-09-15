@@ -5,7 +5,7 @@ import { relationOf } from '../relations.js';
 import { currentState } from '../engagement.js';
 import { startOpenmaiTask, getOpenmaiResult } from '../openmai-task.js';
 import { supermaiCriteriaKey, startSupermaiScoutTask } from '../supermai-sourcing.js';
-import { extractOpenmaiCandidates, STALE_SEARCH_MS } from '../openmai-delivery.js';
+import { extractOpenmaiCandidates, buildOpenmaiDeliveryCard, STALE_SEARCH_MS } from '../openmai-delivery.js';
 import { getPushPreferences } from '../push-preferences.js';
 import { nextSearchExclusions } from '../search-rounds.js';
 import { ttcOpenmaiAuthStatus } from '../ttcsdk/auth.js';
@@ -292,10 +292,27 @@ function pollDiscipline(startedAt, entry, autoDeliver = false) {
   };
 }
 
+/** 群上下文 done 读回：把标准候选人卡确定性发到本群（best-effort，失败不阻断）。
+ *  幂等键按 职位×群×轮次×日 去重防刷屏；只有发卡调用成功才返回 true。 */
+function trySendOpenmaiResultCard(sendCardFn, publicBaseUrl, args, principal, row, cur) {
+  if (!sendCardFn || principal.chatType !== 'group' || !principal.chatId) return false;
+  try {
+    Promise.resolve(sendCardFn({
+      target: principal.chatId,
+      card: buildOpenmaiDeliveryCard({
+        job: { ...row, search_round: cur.search_round || 1 },
+        status: 'done', resultText: cur.result_text, publicBaseUrl,
+      }),
+      idempotencyKey: `openmai-result-card:${args.job_id}:${principal.chatId}:round${cur.search_round || 1}:${shanghaiDate()}`,
+    })).catch(() => {});
+    return true;
+  } catch { return false; }
+}
+
 /** OpenMai 找人（第 11 工具，2026-09-03）：纪律与承接路由一致——
  * 仅本人 ACCEPTED/COMPLETED 的职位可触发/读取（fail-closed，不泄露存在性）。
  * 费用门控：done 读缓存、running 报状态、其他才触发新任务（防重复费用）。 */
-function openmaiSearch(db, args, principal) {
+function openmaiSearch(db, args, principal, sendCardFn, publicBaseUrl) {
   const row = db.prepare('SELECT * FROM job_facts WHERE project_id=?').get(args.job_id);
   if (!row || (!jobVisibleTo(db, principal.consultantId, args.job_id)
       && !jobAccessibleFromGroup(db, principal, args.job_id))) fail('NOT_FOUND_OR_FORBIDDEN');
@@ -308,8 +325,14 @@ function openmaiSearch(db, args, principal) {
   const cur = getOpenmaiResult(db, principal.consultantId, args.job_id) || {};
   if (cur.status === 'running' || (cur.status === 'done' && !continuing)) {
     const disc = cur.status === 'running' ? pollDiscipline(cur.started_at, 'openmai', true) : null;
+    // 群上下文 done 读回：候选人名单由标准卡片承担（代码渲染），envelope 只留引导语；
+    // 私聊 / 缺 sendCardFn / 发卡失败维持原样（result_text 原样带出）。
+    const cardSent = cur.status === 'done'
+      && trySendOpenmaiResultCard(sendCardFn, publicBaseUrl, args, principal, row, cur);
     return {
-      data: { job_ref: args.job_id, status: cur.status, result_text: cur.result_text || null,
+      data: { job_ref: args.job_id, status: cur.status,
+              result_text: cardSent ? null : cur.result_text || null,
+              ...(cardSent ? { card_delivered: true } : {}),
               started_at: cur.started_at || null, finished_at: cur.finished_at || null,
               ...(disc ? { elapsed_seconds: disc.elapsed_seconds, elapsed_minutes: disc.elapsed_minutes } : {}) },
       facts: [], inferences: [], recommendations: [],
@@ -322,8 +345,13 @@ function openmaiSearch(db, args, principal) {
       ],
       // done：结果就在 result_text（markdown 候选人清单），必须完整呈现给顾问，
       // 不能只回「已就绪」三个字（2026-09-04 wendy 案例：结果躺在表里 3 小时没人交付）。
-      ...(cur.status === 'done' ? { recommendations: [{ action: 'present_result',
-        note: '结果已就绪——请把 data.result_text 里的候选人列表完整、结构化地呈现给顾问，并询问下一步（约面/推荐）。' }] } : {}),
+      // 群上下文已发卡时改为引导纪律：名单在卡片上，模型不得再罗列。
+      ...(cur.status === 'done' ? { recommendations: [cardSent
+        ? { action: 'guide_only',
+          note: '候选人结果卡片已发到本群——只回一句话引导群友点卡片上的按钮（初筛通过 / 加入reloop / 继续找人），'
+            + '不要在回复里罗列候选人名单、评分或匹配百分比。' }
+        : { action: 'present_result',
+          note: '结果已就绪——请把 data.result_text 里的候选人列表完整、结构化地呈现给顾问，并询问下一步（约面/推荐）。' }] } : {}),
       evidence_refs: [`openmai:${cur.task_id || args.job_id}`],
     };
   }
@@ -423,7 +451,7 @@ function supermaiScout(db, args, principal) {
   };
 }
 
-export function createJobToolHandlers({ db }) {
+export function createJobToolHandlers({ db, sendCardFn = null, publicBaseUrl = process.env.BRAINX_BASE_URL } = {}) {
   return {
     brainx_me_context: (args, context) => meContext(db, context.principal),
     brainx_daily_brief: (args, context) => dailyBrief(db, args, context.principal),
@@ -431,7 +459,7 @@ export function createJobToolHandlers({ db }) {
     brainx_gap_questions: (args, context) => gapQuestions(db, args, context.principal),
     brainx_personal_review: (args, context) => personalReview(db, args, context.principal),
     brainx_run_status: (args, context) => runStatus(db, args, context.principal),
-    brainx_openmai_search: (args, context) => openmaiSearch(db, args, context.principal),
+    brainx_openmai_search: (args, context) => openmaiSearch(db, args, context.principal, sendCardFn, publicBaseUrl),
     brainx_supermai_scout: (args, context) => supermaiScout(db, args, context.principal),
   };
 }

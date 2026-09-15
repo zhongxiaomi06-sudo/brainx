@@ -2,6 +2,7 @@ import { withMysql } from '../db.js';
 import { candidateShortlist, maskCandidateName } from '../candidate-shortlist.js';
 import { listProjectCandidateFocus } from '../candidate-focus.js';
 import { parseCandidateFact } from '../talent-contracts.js';
+import { buildShortlistCard } from '../shortlist-card.js';
 
 function fail(code) {
   throw Object.assign(new Error(code), { code });
@@ -162,10 +163,52 @@ function shortlistResult(bundle, focusedCandidates = []) {
   };
 }
 
+function shanghaiDate() {
+  return new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10);
+}
+
+/** 群上下文：把本页短名单渲染成标准卡片发到本群（best-effort，失败不阻断）。
+ *  幂等键同日同页去重，防模型重复调用刷屏。只有真的发了卡才返回 true——
+ *  envelope 只有在卡片确实送达的前提下才能换成「不列名单」引导。 */
+function trySendShortlistCard(options, sendCard, args, principal, bundle) {
+  if (!sendCard || principal.chatType !== 'group' || !principal.chatId || !bundle.items?.length) {
+    return false;
+  }
+  const jobRow = options.db?.prepare?.('SELECT project_id, company, role FROM job_facts WHERE project_id=?')
+    ?.get?.(args.job_id) || {};
+  const job = { project_id: args.job_id, company: jobRow.company || '',
+    role: jobRow.role || bundle.job_context?.title || '' };
+  const page = args.page_token ? String(args.page_token).slice(0, 64) : 'first';
+  try {
+    Promise.resolve(sendCard({
+      target: principal.chatId,
+      card: buildShortlistCard({ job, items: bundle.items }),
+      idempotencyKey: `shortlist-card:${args.job_id}:${principal.chatId}:${page}:${shanghaiDate()}`,
+    })).catch(() => {});
+    return true;
+  } catch { return false; }
+}
+
+/** 卡片已发后的 envelope：名单从工具返回里撤下，只留引导纪律（防模型照着数据再排一版）。 */
+function cardDeliveredEnvelope(envelope, bundle) {
+  const count = bundle.items.length;
+  return {
+    ...envelope,
+    data: { ...envelope.data, items: [], card_delivered: true, items_count: count },
+    facts: [{ kind: 'card_delivered', job_ref: bundle.job_ref, items_count: count }],
+    inferences: [],
+    recommendations: [{ action: 'guide_only',
+      note: '候选人名单卡片已发到本群——只回一句话引导群友点卡片上的按钮'
+        + '（初筛通过 / 加入reloop），不要在回复里罗列候选人名单、评分或匹配百分比。' }],
+    evidence_refs: bundle.match_run ? [`match_run:${bundle.match_run.match_run_id}`] : [],
+  };
+}
+
 export function createTalentToolHandlers(options = {}) {
   const shortlistFn = options.candidateShortlistFn || candidateShortlist;
   const loadFact = options.loadCandidateFactFn || ((input) => loadAuthorizedCandidateFact(input, options));
   const loadContact = options.loadCandidateContactFn || ((input) => loadAuthorizedCandidateContact(input, options));
+  const sendCard = options.sendCardFn || null; // 缺注入时降级为不发卡（群 envelope 维持原样）
   const getShortlist = async (args, context, purpose = context.principal.purpose) => {
     const limit = Math.min(args.limit || 5, context.principal.chatType === 'group' ? 3 : 5);
     const bundle = await shortlistFn({
@@ -206,6 +249,11 @@ export function createTalentToolHandlers(options = {}) {
       const focusedCandidates = listProjectCandidateFocus(options.db,
         context.principal.tenantId, args.job_id);
       const envelope = shortlistResult(bundle, focusedCandidates);
+      // 群上下文：名单由标准卡片承担（代码渲染），envelope 只留引导语；
+      // 私聊 / 缺 sendCardFn / 发卡失败维持原 envelope（模型仍可读到名单交付）。
+      if (trySendShortlistCard(options, sendCard, args, context.principal, bundle)) {
+        return cardDeliveredEnvelope(envelope, bundle);
+      }
       if (!bundle.items?.length) {
         const guidance = emptyShortlistGuidance(options.db, context.principal.consultantId, args.job_id);
         if (guidance) envelope.unknowns.push(guidance);

@@ -181,7 +181,7 @@ function ttcTalentUrl(candidate) {
   return `https://app.ttcadvisory.com/app/talent/${encodeURIComponent(candidate.candidateRef)}`;
 }
 
-function screenCandidateAction(job, candidate) {
+export function screenCandidateAction(job, candidate) {
   const projectRef = String(job.project_id || '').trim().slice(0, 64);
   const command = `[BRAINTEX_CANDIDATE_KEEP] 把项目 ${projectRef} 的候选人 ${candidate.candidateRef} 初筛通过。`
     + '这个按钮就是我的明确确认：现在调用 brainx_candidate_workflow，'
@@ -192,7 +192,7 @@ function screenCandidateAction(job, candidate) {
     value: { text: command } };
 }
 
-function addToReloopAction(job, candidate) {
+export function addToReloopAction(job, candidate) {
   const projectRef = String(job.project_id || '').trim().slice(0, 64);
   return { tag: 'button', type: 'default', text: { tag: 'plain_text', content: '加入reloop' },
     value: { text: `[BRAINTEX_TALENT_ADD] 职位 ${projectRef} 候选人 ${candidate.candidateRef}` } };

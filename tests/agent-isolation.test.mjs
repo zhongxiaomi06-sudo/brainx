@@ -40,13 +40,18 @@ test('相同工具请求按 App sender 分别解析本人，不存在默认 Mia'
   assert.throws(() => authorizePrincipal(db, principalPayload('ou_unknown'), { feishuAppKeyHash: APP_HASH }), /UNBOUND_IDENTITY/);
 });
 
-test('群 sender 不能跨群，群 scope 不能跨项目', () => {
+test('群 scope 不能跨项目；群成员不限 sender（2026-09-15 决策），未登记身份仍拒', () => {
   const db = setup();
   const groupA = principalPayload('ou_mia', { chat_type: 'group', chat_id: 'oc_a' });
   assert.equal(authorizePrincipal(db, groupA, { feishuAppKeyHash: APP_HASH, projectRef: 'job-shared' }).consultantId, 'mia');
-  assert.throws(() => authorizePrincipal(db, { ...groupA, requester_sender_id: 'ou_felix' }, {
+  // ou_felix 是已登记顾问：不在 allowed_senders 也放行（群即信任边界）
+  assert.equal(authorizePrincipal(db, { ...groupA, requester_sender_id: 'ou_felix' }, {
     feishuAppKeyHash: APP_HASH, projectRef: 'job-shared',
-  }), /NOT_FOUND_OR_FORBIDDEN/);
+  }).consultantId, 'felix');
+  // 未登记身份与跨项目仍 fail-closed
+  assert.throws(() => authorizePrincipal(db, { ...groupA, requester_sender_id: 'ou_unknown' }, {
+    feishuAppKeyHash: APP_HASH, projectRef: 'job-shared',
+  }), /UNBOUND_IDENTITY|NOT_FOUND_OR_FORBIDDEN/);
   assert.throws(() => authorizePrincipal(db, groupA, { feishuAppKeyHash: APP_HASH, projectRef: 'job-b' }), /NOT_FOUND_OR_FORBIDDEN/);
 });
 

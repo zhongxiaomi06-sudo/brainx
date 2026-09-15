@@ -1,7 +1,7 @@
 import { acceptCommitment, recordProgress } from '../commitment.js';
 import { currentState } from '../engagement.js';
 import { confirmMembership } from '../membership.js';
-import { jobVisibleTo } from '../visibility.js';
+import { jobVisibleTo, jobAccessibleFromGroup } from '../visibility.js';
 import { startOpenmaiTask } from '../openmai-task.js';
 import { getPushPreferences, updatePushPreferences } from '../push-preferences.js';
 import { buildProjectLaunchCard, launchProject, workflowDueAt } from '../project-launch.js';
@@ -13,7 +13,9 @@ function fail(code) {
 
 function requireVisible(db, principal, jobId) {
   const job = db.prepare('SELECT * FROM job_facts WHERE project_id=?').get(jobId);
-  if (!job || !jobVisibleTo(db, principal.consultantId, jobId)) fail('NOT_FOUND_OR_FORBIDDEN');
+  // 2026-09-15：职位绑定群里的成员放行（群即信任边界），私聊仍按 jobVisibleTo fail-closed。
+  if (!job || (!jobVisibleTo(db, principal.consultantId, jobId)
+    && !jobAccessibleFromGroup(db, principal, jobId))) fail('NOT_FOUND_OR_FORBIDDEN');
   return job;
 }
 
@@ -71,7 +73,9 @@ function acceptJob(db, args, principal, startSearch) {
 function startSearchForJob(db, args, principal, startSearch) {
   requireConfirmation(args);
   requireVisible(db, principal, args.job_id);
-  if (currentState(db, principal.consultantId, args.job_id).state !== 'ACCEPTED') fail('JOB_NOT_ACCEPTED');
+  // 群内点击找人：按项目级共享搜索处理，不要求点击者本人先接单（2026-09-15 群权限放开）。
+  if (currentState(db, principal.consultantId, args.job_id).state !== 'ACCEPTED'
+      && !jobAccessibleFromGroup(db, principal, args.job_id)) fail('JOB_NOT_ACCEPTED');
   const search = startSearch(db, principal.consultantId, args.job_id, { force: args.force === true });
   return {
     data: { job_ref: args.job_id, search }, facts: [{ job_ref: args.job_id, search_status: search.status }],
@@ -106,7 +110,7 @@ function recordJobProgress(db, args, principal) {
  * job_id 可选：不传返回顾问名下可绑职位清单让模型呈现给顾问选；传了 + confirm=true 才绑定。
  * 绑定由 bindGroupToProject 完成激活范围、回填 chat_id、发找人卡与拉群指引卡。
  */
-async function bindGroupProject(db, args, principal, sendCardFn) {
+async function bindGroupProject(db, args, principal, sendCardFn, listChatsFn) {
   if (!args.job_id) {
     const jobs = listBindableJobs(db, principal.consultantId);
     return {
@@ -123,7 +127,7 @@ async function bindGroupProject(db, args, principal, sendCardFn) {
   try {
     const result = await bindGroupToProject(db, {
       consultantId: principal.consultantId, projectId: args.job_id, chatId: principal.chatId,
-      publicBaseUrl: process.env.BRAINX_BASE_URL, sendCardFn,
+      publicBaseUrl: process.env.BRAINX_BASE_URL, sendCardFn, listChatsFn,
     });
     return {
       data: { bound: true, project_id: result.project_id, chat_id: result.chat_id, state: result.state },
@@ -193,7 +197,7 @@ function sendAcceptedCard(db, jobId, sendCard) {
   }
 }
 
-export function createActionToolHandlers({ db, startSearchFn, sendCardFn, launchProjectFn } = {}) {
+export function createActionToolHandlers({ db, startSearchFn, sendCardFn, launchProjectFn, listChatsFn } = {}) {
   const startSearch = startSearchFn || ((store, consultantId, jobId, options) => (
     startOpenmaiTask(store, null, consultantId, jobId, options)
   ));
@@ -227,7 +231,7 @@ export function createActionToolHandlers({ db, startSearchFn, sendCardFn, launch
     brainx_start_candidate_search: (args, context) => startSearchForJob(db, args, context.principal, startSearch),
     brainx_record_job_progress: (args, context) => recordJobProgress(db, args, context.principal),
     // specs/015：旧群绑定职位。chat_id 取自 principal；job_id 可选——不传列职位，传了+confirm 绑定。
-    brainx_bind_group_project: async (args, context) => bindGroupProject(db, args, context.principal, sendCardFn),
+    brainx_bind_group_project: async (args, context) => bindGroupProject(db, args, context.principal, sendCardFn, listChatsFn),
     // specs/017：agent 侧建群入口（飞书私聊接单后补建项目群）。
     brainx_launch_project_chat: async (args, context) => launchProjectChat(db, args, context.principal, launchProjectFn),
   };

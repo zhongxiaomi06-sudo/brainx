@@ -96,13 +96,14 @@ test('群内接单：工具不再限定私聊，群 scope 含 job_action 时放�
   });
   assert.equal(allowed.consultantId, 'mia');
 
-  // 仍然受 sender / 项目范围 / 未登记群约束，放开的是"必须私聊"这一条
+  // 仍受项目范围 / 未登记群约束，放开的是"必须私聊"与 sender 白名单（2026-09-15 决策）；
+  // 未登记身份仍被 resolveBinding 拒
   for (const changed of [
-    { requester_sender_id: 'ou_felix' }, { chat_id: 'oc_unknown' },
+    { requester_sender_id: 'ou_unknown' }, { chat_id: 'oc_unknown' },
   ]) {
     assert.throws(() => authorizePrincipal(db, { ...groupPayload(), ...changed }, {
       feishuAppKeyHash: APP_HASH, projectRef: 'P-CARD-1', requireProjectScope: true,
-    }), /NOT_FOUND_OR_FORBIDDEN/);
+    }), /UNBOUND_IDENTITY|NOT_FOUND_OR_FORBIDDEN/);
   }
   assert.throws(() => authorizePrincipal(db, groupPayload(), {
     feishuAppKeyHash: APP_HASH, projectRef: 'P-OTHER', requireProjectScope: true,

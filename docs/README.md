@@ -33,7 +33,8 @@
 | 飞书群聊工作流、BrainTex 机器人、事件/卡片回调或信息鉴权分工 | [BrainTex 群聊工作流技术 PRD](prd-2026-09-01-braintex-group-workflow.md)、[Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) |
 | **拉群后卡片没弹出来、OpenClaw 群准入失败、要补发职位卡或排查"群建了但机器人不响应"** | **[拉群即见卡规格](../specs/013-launch-card-first/spec.md)**（卡片先发 + 准入降级 best-effort + 补偿重放 + 节流重启 gateway + launch-redeliver 补发）、[OpenClaw 多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md) |
 | **群内接单被拒、卡片没有找人按钮、要在项目群里直接接单或按条件找人** | **[项目群卡片动作规格](../specs/014-launch-card-actions/spec.md)**（群内接单放开、卡片按承接状态分岔、OpenMai/Reloop/SuperMai 三按钮 + 条件输入框、存量群 scope 补齐 job_action）、[拉群即见卡规格](../specs/013-launch-card-first/spec.md) |
-| **机器人被拉进已有群后没反应、想让它自动发「绑定职位」卡、或在旧群里绑定职位开始找人** | **[机器人进群接管规格](../specs/015-group-intake/spec.md)**（轮询发现新群发绑定卡 + groupIntakeBinding 特例授权 + 绑定后发找人卡与拉群指引/防滥用提醒） |
+| **机器人被拉进已有群后没反应、想让它自动发「绑定职位」卡、或在旧群里绑定职位开始找人** | **[机器人进群接管规格](../specs/015-group-intake/spec.md)**（轮询发现新群发绑定卡 + groupIntakeBinding 特例授权 + 绑定后发找人卡与拉群指引/防滥用提醒）、[群成员权限放开与绑定自愈](2026-09-15-group-member-access-and-bind-selfheal.md)（旧群绑定不再依赖轮询登记，@机器人 即绑） |
+| **共享职位群里非协作者点找人/候选工具被拒、想在项目群里放开给所有成员** | **[群成员找人权限放开与旧群绑定自愈](2026-09-15-group-member-access-and-bind-selfheal.md)**（绑定群即信任边界，群成员都能点找人/自助接单；私聊与非绑定群仍 fail-closed） |
 | **顾问点了「绑定我的职位」却绑不上（群绑定停在 CARD_SENT、project_id 一直为空）** | 先查 `agent_tool_calls.error_code`：`BRAINX_BASE_URL_REQUIRED` = `brainx-agent-gateway` 缺生产基址 —— 本服务以 `brainx` 用户运行读不到 `root:600` 的 `/opt/brainx/.env`，须单独挂 `/etc/brainx/base-url.env`（见 [提交日志 2026-09-11](AGENT_COMMIT_LOG.md)、[机器人进群接管规格](../specs/015-group-intake/spec.md)） |
 | **顾问在飞书里接单后没拉到群、私聊里让机器人建群它却去绑定群、或私聊绑定报错反复重试** | **[agent 侧建群入口与私聊 bind 早失败规格](../specs/017-agent-project-launch/spec.md)**（新增 `brainx_launch_project_chat` 建群工具 + 私聊 bind 直接 GROUP_REQUIRED + 业务错误码文案补全） |
 | OpenClaw 壳子、Skill 编写、飞书渠道接入或外部 Agent 边界 | [OpenClaw 壳子 + 自写 Skill 架构](2026-09-02-openclaw-shell-architecture.md)、[复用与自建边界及权限需求 PRD](prd-2026-09-01-reuse-selfbuild-boundary.md) |

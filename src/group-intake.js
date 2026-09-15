@@ -160,12 +160,20 @@ export function startGroupIntakeWorker(db, opts = {}) {
 
 /**
  * 把一个旧群绑定到职位（specs/015 bind 工具调用）。前置：chat 已在 bot_chat_intake 且
- * 未 BOUND（由 authorization 的 allowIntakeBinding 卡口保证）；顾问对职位可见。
+ * 未 BOUND；轮询未登记时实时核对机器人在群并补登记（自愈，2026-09-15）；顾问对职位可见。
  * 激活群范围 → 回填 job_facts.chat_id → 群里发找人卡 → 私聊发拉群指引。发卡 best-effort。
  */
-export async function bindGroupToProject(db, { consultantId, projectId, chatId, publicBaseUrl, sendCardFn }) {
-  const intake = intakeRow(db, chatId);
-  if (!intake) throw Object.assign(new Error('GROUP_NOT_INTAKED'), { code: 'GROUP_NOT_INTAKED' });
+export async function bindGroupToProject(db, { consultantId, projectId, chatId, publicBaseUrl, sendCardFn, listChatsFn }) {
+  let intake = intakeRow(db, chatId);
+  if (!intake) {
+    // 授权层已放行未登记群：这里实时核对机器人确实在群里（防越权绑定陌生 chat_id），
+    // 在群则补登记继续，不在群仍按 GROUP_NOT_INTAKED 拒。
+    const listChats = listChatsFn || ((opts) => listBotChats({ ...opts }));
+    const found = (await listChats() || []).find((chat) => chat.chat_id === chatId);
+    if (!found) throw Object.assign(new Error('GROUP_NOT_INTAKED'), { code: 'GROUP_NOT_INTAKED' });
+    markIntake(db, chatId, found.name, 'SEEN');
+    intake = intakeRow(db, chatId);
+  }
   if (intake.status === 'BOUND') throw Object.assign(new Error('GROUP_ALREADY_BOUND'), { code: 'GROUP_ALREADY_BOUND' });
   const preflight = projectLaunchPreflight(db, consultantId, projectId, { appConfigured: true, publicBaseUrl });
   if (!preflight.ready) {

@@ -1,5 +1,13 @@
 # Agent Commit 记录
 
+## 2026-09-15｜feat(群权限): 绑定群成员放开找人 + 旧群绑定自愈
+
+- 起因：共享职位群里非协作者点找人/候选工具被拒（9/14 恒星力量群实证）；旧群绑定依赖 10 分钟轮询登记，基线抑制/静默失败导致 `GROUP_NOT_INTAKED`。用户决策：绑定群里的人都可以点找人，绑定链路修好。
+- 新增 `jobAccessibleFromGroup`（visibility.js）：调用发生在职位绑定群（job_facts.chat_id 或 READY project_launches）即放行；`authorizeGroup` 不再校验 allowed_senders（群即信任边界，发送人身份仍由 resolveBinding 兜底）；gateway 三处工具文件的全部 jobVisibleTo 检查追加群上下文放行，找人类工具的"本人须 ACCEPTED"在绑定群上下文同样放行（项目级共享搜索）。
+- `bindGroupToProject` 自愈：轮询未登记群实时调 listBotChats 核对机器人在群后补登记再绑定，不在群仍 GROUP_NOT_INTAKED；授权层对无登记群放行到 handler。
+- 私聊与非绑定群仍 fail-closed 不变。权威说明：docs/2026-09-15-group-member-access-and-bind-selfheal.md。
+- 验证：后端全量 724/724（含新增 group-member-access 4 例、group-intake 自愈正反 2 例）；verify:quick 代码项全过，仅"Git/完整检出"因另一协作者未提交的 speckit 迁移删除 22 个被跟踪文件而失败，与本改动无关、未代为处理。
+
 ## 2026-09-15｜docs(git): 保留远端候选入口核查历史
 
 - 线性整合远端 `975c793` 时保留其恒星力量权限核查结论，避免冲突解决覆盖协作者记录。

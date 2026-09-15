@@ -25,6 +25,20 @@ export function jobVisibleTo(db, consultant_id, project_id) {
       .get(project_id, consultant_id);
 }
 
+/**
+ * 群上下文放行（2026-09-15 用户决策）：调用发生在职位当前绑定的群里时，群成员不另做
+ * 职位成员关系校验——飞书事件投递本身已证明发送人在群内，群即信任边界。
+ * 仅 agent-gateway 的群内工具调用使用；web/私聊仍走 jobVisibleTo fail-closed。
+ */
+export function jobAccessibleFromGroup(db, principal, projectId) {
+  if (!principal || principal.chatType !== 'group' || !principal.chatId) return false;
+  return !!db.prepare('SELECT 1 FROM job_facts WHERE project_id=? AND chat_id=? LIMIT 1')
+    .get(projectId, principal.chatId)
+    || !!db.prepare(`SELECT 1 FROM project_launches
+        WHERE project_id=? AND chat_id=? AND status='READY' LIMIT 1`)
+      .get(projectId, principal.chatId);
+}
+
 /** 该顾问可见的消息 id 集合（他自己的令牌+群成员身份拉到的）。 */
 export function visibleMessageIds(db, consultant_id) {
   return new Set(db.prepare('SELECT message_id FROM job_message_visibility WHERE consultant_id=?')

@@ -3,7 +3,7 @@ import { now, uuid, withMysql, insertTalent } from '../db.js';
 import { candidateShortlist } from '../candidate-shortlist.js';
 import { listProjectCandidateFocus, projectSearchCandidate,
   setProjectCandidateFocus } from '../candidate-focus.js';
-import { jobVisibleTo } from '../visibility.js';
+import { jobVisibleTo, jobAccessibleFromGroup } from '../visibility.js';
 import { downloadResumePdf, extractOpenmaiCandidates } from '../openmai-delivery.js';
 import { sendPdfFile, sendTextMessage } from '../feishu-bot.js';
 import { getAuthorizedTtcJwt } from '../ttcsdk/auth.js';
@@ -132,7 +132,8 @@ export function createCandidateActionToolHandlers({
 } = {}) {
   return {
     brainx_candidate_workflow: async (args, context) => {
-      if (args.confirm !== true || !jobVisibleTo(db, context.principal.consultantId, args.job_id)) {
+      if (args.confirm !== true || (!jobVisibleTo(db, context.principal.consultantId, args.job_id)
+          && !jobAccessibleFromGroup(db, context.principal, args.job_id))) {
         fail(args.confirm === true ? 'NOT_FOUND_OR_FORBIDDEN' : 'INVALID_ARGUMENT');
       }
       const existing = current(db, context.principal, args);
@@ -204,7 +205,8 @@ export function createCandidateActionToolHandlers({
     },
     brainx_send_candidate_resume: async (args, context) => {
       if (args.confirm !== true || context.principal.chatType !== 'group'
-          || !jobVisibleTo(db, context.principal.consultantId, args.job_id)) {
+          || (!jobVisibleTo(db, context.principal.consultantId, args.job_id)
+            && !jobAccessibleFromGroup(db, context.principal, args.job_id))) {
         fail(args.confirm === true ? 'NOT_FOUND_OR_FORBIDDEN' : 'INVALID_ARGUMENT');
       }
       const candidate = openmaiResume(db, args.job_id, args.candidate_ref);
@@ -240,7 +242,8 @@ export function createCandidateActionToolHandlers({
     },
     // 冲刺 T12：一键加入人才库。真实写 RDS（幂等）；RDS 不可写时明确返回待同步，不阻塞群里的演示闭环。
     brainx_talent_pool_add: async (args, context) => {
-      if (args.confirm !== true || !jobVisibleTo(db, context.principal.consultantId, args.job_id)) {
+      if (args.confirm !== true || (!jobVisibleTo(db, context.principal.consultantId, args.job_id)
+          && !jobAccessibleFromGroup(db, context.principal, args.job_id))) {
         fail(args.confirm === true ? 'NOT_FOUND_OR_FORBIDDEN' : 'INVALID_ARGUMENT');
       }
       const discovered = projectSearchCandidate(db, args.job_id, args.candidate_ref);

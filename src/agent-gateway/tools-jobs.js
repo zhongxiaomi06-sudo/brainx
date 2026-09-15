@@ -1,6 +1,6 @@
 import { listConsultants } from '../roster.js';
 import { latestRun } from '../recommend.js';
-import { jobVisibleTo } from '../visibility.js';
+import { jobVisibleTo, jobAccessibleFromGroup } from '../visibility.js';
 import { relationOf } from '../relations.js';
 import { currentState } from '../engagement.js';
 import { startOpenmaiTask, getOpenmaiResult } from '../openmai-task.js';
@@ -128,7 +128,8 @@ function dailyBrief(db, args, principal) {
 
 function jobAssessment(db, args, principal) {
   const row = db.prepare('SELECT * FROM job_facts WHERE project_id=?').get(args.job_id);
-  if (!row || !jobVisibleTo(db, principal.consultantId, args.job_id)) fail('NOT_FOUND_OR_FORBIDDEN');
+  if (!row || (!jobVisibleTo(db, principal.consultantId, args.job_id)
+      && !jobAccessibleFromGroup(db, principal, args.job_id))) fail('NOT_FOUND_OR_FORBIDDEN');
   const rec = recommendationFor(db, principal.consultantId, args.job_id);
   const unknowns = [];
   if (!row.city) unknowns.push('工作地点待确认');
@@ -149,7 +150,8 @@ function jobAssessment(db, args, principal) {
 function gapQuestions(db, args, principal) {
   if (args.object_type !== 'job') fail('TOOL_DISABLED');
   const row = db.prepare('SELECT * FROM job_facts WHERE project_id=?').get(args.object_ref);
-  if (!row || !jobVisibleTo(db, principal.consultantId, args.object_ref)) fail('NOT_FOUND_OR_FORBIDDEN');
+  if (!row || (!jobVisibleTo(db, principal.consultantId, args.object_ref)
+      && !jobAccessibleFromGroup(db, principal, args.object_ref))) fail('NOT_FOUND_OR_FORBIDDEN');
   const candidates = [
     ['city', row.city, '这个职位的工作地点及到岗方式是什么？'],
     ['hc', Number.isInteger(row.hc) ? row.hc : null, '本轮明确开放多少个 HC，优先级如何？'],
@@ -295,10 +297,12 @@ function pollDiscipline(startedAt, entry, autoDeliver = false) {
  * 费用门控：done 读缓存、running 报状态、其他才触发新任务（防重复费用）。 */
 function openmaiSearch(db, args, principal) {
   const row = db.prepare('SELECT * FROM job_facts WHERE project_id=?').get(args.job_id);
-  if (!row || !jobVisibleTo(db, principal.consultantId, args.job_id)) fail('NOT_FOUND_OR_FORBIDDEN');
+  if (!row || (!jobVisibleTo(db, principal.consultantId, args.job_id)
+      && !jobAccessibleFromGroup(db, principal, args.job_id))) fail('NOT_FOUND_OR_FORBIDDEN');
   const st = currentState(db, principal.consultantId, args.job_id)?.state;
   // 职位本人可见但未接单：明确提醒接单入口（不泄露任何额外信息——可见性已校验）
-  if (!['ACCEPTED', 'COMPLETED'].includes(st)) fail('JOB_NOT_ACCEPTED');
+  if (!['ACCEPTED', 'COMPLETED'].includes(st)
+      && !jobAccessibleFromGroup(db, principal, args.job_id)) fail('JOB_NOT_ACCEPTED');
   const criteria = cleanSearchCriteria(args.criteria);
   const continuing = args.continue_search === true;
   const cur = getOpenmaiResult(db, principal.consultantId, args.job_id) || {};
@@ -357,10 +361,12 @@ function supermaiScout(db, args, principal) {
   if (continuing && !jobId) fail('INVALID_ARGUMENT');
   const extra = cleanSearchCriteria(args.criteria);
   const job = jobId ? db.prepare('SELECT * FROM job_facts WHERE project_id=?').get(jobId) : null;
-  if (jobId && (!job || !jobVisibleTo(db, principal.consultantId, jobId))) fail('NOT_FOUND_OR_FORBIDDEN');
+  if (jobId && (!job || (!jobVisibleTo(db, principal.consultantId, jobId)
+      && !jobAccessibleFromGroup(db, principal, jobId)))) fail('NOT_FOUND_OR_FORBIDDEN');
   if (jobId) {
     const st = currentState(db, principal.consultantId, jobId)?.state;
-    if (!['ACCEPTED', 'COMPLETED'].includes(st)) fail('JOB_NOT_ACCEPTED');
+    if (!['ACCEPTED', 'COMPLETED'].includes(st)
+        && !jobAccessibleFromGroup(db, principal, jobId)) fail('JOB_NOT_ACCEPTED');
   }
   const criteria = job ? projectCriteria(job, extra) : extra;
   if (criteria.length < 5) fail('INVALID_ARGUMENT');

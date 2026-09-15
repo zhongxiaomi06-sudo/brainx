@@ -56,21 +56,23 @@ function authorizeGroup(db, payload, binding, projectRef) {
     LIMIT 2`).all(binding.tenant_id, payload.account_id, payload.chat_id);
   if (scopes.length !== 1) fail();
   const purposes = parseStringArray(scopes[0].allowed_purposes_json);
-  const senders = parseStringArray(scopes[0].allowed_senders_json);
   const projects = parseStringArray(scopes[0].project_refs_json);
-  if (!purposes.includes(payload.purpose) || !senders.includes(payload.requester_sender_id)) fail();
+  // 2026-09-15 用户决策：不再按 allowed_senders 限制——已绑定群的 ACTIVE scope 即信任边界，
+  // 群里任何已登记顾问都能点找人/候选动作（发送人身份由 resolveBinding 兜底）。
+  if (!purposes.includes(payload.purpose)) fail();
   if (projectRef !== null && !projects.includes(projectRef)) fail();
 }
 
 /**
  * specs/015：旧群绑定工具的特例放行。群尚未登记 agent_group_scopes，靠 bot_chat_intake
- * 卡口（机器人主动接管过、状态为 CARD_SENT/SEEN 且未 BOUND）+ 已登记顾问身份放行。
- * 只此一个工具（brainx_bind_group_project）走这条路；绑定后群有了 ACTIVE scope 即转正常。
+ * 卡口 + 已登记顾问身份放行；只此一个工具（brainx_bind_group_project）走这条路。
+ * 2026-09-15：轮询未登记的群不再授权层硬拒（基线抑制/静默失败/10 分钟窗口都会让表为空），
+ * 放行到 handler 由 bindGroupToProject 实时核对机器人在群并补登记（自愈）。
  */
 function authorizeIntakeBinding(db, payload, binding) {
-  const intake = db.prepare(`SELECT status FROM bot_chat_intake WHERE chat_id=?`).get(payload.chat_id);
-  if (!intake) fail('GROUP_NOT_INTAKED');
   if (payload.purpose !== 'group_binding') fail();
+  const intake = db.prepare(`SELECT status FROM bot_chat_intake WHERE chat_id=?`).get(payload.chat_id);
+  if (!intake) return;
   if (intake.status === 'BOUND') fail('GROUP_ALREADY_BOUND');
   if (!['SEEN', 'CARD_SENT'].includes(intake.status)) fail('GROUP_NOT_INTAKED');
 }

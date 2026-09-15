@@ -83,7 +83,7 @@ test('工具与 purpose 必须采用服务端固定映射', () => {
   }), /NOT_FOUND_OR_FORBIDDEN/);
 });
 
-test('群聊同时校验白名单群、sender、purpose 与项目范围', () => {
+test('群聊校验白名单群、purpose 与项目范围；sender 只要是已登记顾问即放行', () => {
   const db = openDb(':memory:');
   seedBinding(db);
   seedGroup(db);
@@ -96,6 +96,7 @@ test('群聊同时校验白名单群、sender、purpose 与项目范围', () => 
   for (const changed of [
     { chat_id: 'oc_unknown' }, { requester_sender_id: 'ou_other' }, { purpose: 'interview_prep' },
   ]) {
+    // ou_other 无身份绑定，仍被 resolveBinding 拒（UNBOUND_IDENTITY）
     assert.throws(() => authorizePrincipal(db, { ...group, ...changed }, {
       feishuAppKeyHash: APP_HASH, projectRef: 'job-a',
     }), /NOT_FOUND_OR_FORBIDDEN|UNBOUND_IDENTITY/);
@@ -108,7 +109,19 @@ test('群聊同时校验白名单群、sender、purpose 与项目范围', () => 
   }, { feishuAppKeyHash: APP_HASH, requireProjectScope: true }), /NOT_FOUND_OR_FORBIDDEN/);
 });
 
-test('已登记项目群允许候选推进，但仍受 sender、项目与明确 purpose 限制', () => {
+test('2026-09-15 决策：绑定群里不在 allowed_senders 的已登记顾问也放行', () => {
+  const db = openDb(':memory:');
+  seedBinding(db); // mia（在 allowed_senders 里）
+  seedBinding(db, { binding_id: 'binding-linda', open_id: 'ou_linda', consultant_id: 'linda' });
+  seedGroup(db); // allowed_senders 仅 ou_mia
+  const asLinda = authorizePrincipal(db, payload({
+    requester_sender_id: 'ou_linda', chat_type: 'group', chat_id: 'oc_project_a',
+    purpose: 'candidate_review', tool_name: 'brainx_candidate_shortlist',
+  }), { feishuAppKeyHash: APP_HASH, projectRef: 'job-a' });
+  assert.equal(asLinda.consultantId, 'linda');
+});
+
+test('已登记项目群允许候选推进，受项目与明确 purpose 限制', () => {
   const db = openDb(':memory:');
   seedBinding(db);
   seedGroup(db, { allowed_purposes_json: JSON.stringify(['candidate_action']) });
@@ -133,7 +146,7 @@ test('已登记项目群允许候选推进，但仍受 sender、项目与明确 
 test('损坏的群 scope JSON 和缺失 App 配置不能降级放行', () => {
   const db = openDb(':memory:');
   seedBinding(db);
-  seedGroup(db, { allowed_senders_json: 'not-json' });
+  seedGroup(db, { allowed_purposes_json: 'not-json' });
   const group = payload({
     chat_type: 'group', chat_id: 'oc_project_a', purpose: 'candidate_review',
     tool_name: 'brainx_candidate_shortlist',

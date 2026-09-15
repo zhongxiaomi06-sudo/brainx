@@ -98,7 +98,7 @@ function intakeBindingPayload(overrides = {}) {
   };
 }
 
-test('授权：未绑定群只放行 bind 工具；未接管/已绑定的群拒绝', () => {
+test('授权：未绑定群只放行 bind 工具；已绑定的群拒绝；未登记群授权层放行（handler 自愈核对）', () => {
   const db = readyDb();
   db.prepare('SELECT open_id FROM consultants WHERE consultant_id=?').get('felix'); // warm
   const openId = db.prepare("SELECT open_id FROM consultants WHERE consultant_id='felix'").get().open_id;
@@ -109,9 +109,11 @@ test('授权：未绑定群只放行 bind 工具；未接管/已绑定的群拒�
   const ok = authorizePrincipal(db, intakeBindingPayload(), { feishuAppKeyHash: APP_HASH, allowIntakeBinding: true });
   assert.equal(ok.consultantId, 'felix');
 
-  // 未接管的群：明确报 GROUP_NOT_INTAKED（specs/017，此前是裸 NOT_FOUND_OR_FORBIDDEN）
-  assert.throws(() => authorizePrincipal(db, intakeBindingPayload({ chat_id: 'oc_unknown' }),
-    { feishuAppKeyHash: APP_HASH, allowIntakeBinding: true }), /GROUP_NOT_INTAKED/);
+  // 2026-09-15：轮询未登记的群授权层不再硬拒（基线抑制/静默失败会让表为空），
+  // 放行到 handler 由 bindGroupToProject 实时核对机器人在群并补登记。
+  const unknown = authorizePrincipal(db, intakeBindingPayload({ chat_id: 'oc_unknown' }),
+    { feishuAppKeyHash: APP_HASH, allowIntakeBinding: true });
+  assert.equal(unknown.chatId, 'oc_unknown');
   // 已绑定的群拒绝（不能再 bind）
   db.prepare('UPDATE bot_chat_intake SET status=? WHERE chat_id=?').run('BOUND', 'oc_new');
   assert.throws(() => authorizePrincipal(db, intakeBindingPayload(),
@@ -184,6 +186,40 @@ test('bind 工具：重复绑定已 BOUND 的群报 GROUP_ALREADY_BOUND', async 
   await assert.rejects(() => h.brainx_bind_group_project({ job_id: PID, confirm: true },
     { principal: { consultantId: 'felix', chatId: 'oc_new', chatType: 'group', purpose: 'group_binding' } }),
     /GROUP_ALREADY_BOUND/);
+  db.close();
+});
+
+test('bind 工具（自愈）：轮询未登记的群，实时核对机器人在群后补登记并完成绑定', async () => {
+  const db = readyDb();
+  const sent = [];
+  const h = createActionToolHandlers({
+    db,
+    sendCardFn: async (i) => { sent.push(i); return { message_id: 'om' }; },
+    listChatsFn: async () => [{ chat_id: 'oc_late', name: '晚登记群' }],
+  });
+  const out = await h.brainx_bind_group_project({ job_id: PID, confirm: true },
+    { principal: { consultantId: 'felix', chatId: 'oc_late', chatType: 'group', purpose: 'group_binding' } });
+  assert.equal(out.data.bound, true);
+  const row = db.prepare('SELECT status, project_id, chat_name FROM bot_chat_intake WHERE chat_id=?').get('oc_late');
+  assert.equal(row.status, 'BOUND');
+  assert.equal(row.project_id, PID);
+  assert.equal(row.chat_name, '晚登记群', '补登记时带回群名');
+  assert.equal(db.prepare('SELECT chat_id FROM job_facts WHERE project_id=?').get(PID).chat_id, 'oc_late');
+  db.close();
+});
+
+test('bind 工具（自愈）：机器人不在该群仍报 GROUP_NOT_INTAKED，不得越权绑定', async () => {
+  const db = readyDb();
+  const h = createActionToolHandlers({
+    db,
+    sendCardFn: async () => ({ message_id: 'om' }),
+    listChatsFn: async () => [{ chat_id: 'oc_other', name: '别的群' }],
+  });
+  await assert.rejects(() => h.brainx_bind_group_project({ job_id: PID, confirm: true },
+    { principal: { consultantId: 'felix', chatId: 'oc_stranger', chatType: 'group', purpose: 'group_binding' } }),
+    /GROUP_NOT_INTAKED/);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM bot_chat_intake WHERE chat_id=?').get('oc_stranger').n, 0,
+    '核对失败不得落登记');
   db.close();
 });
 

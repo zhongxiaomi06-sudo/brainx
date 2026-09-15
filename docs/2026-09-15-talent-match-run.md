@@ -23,6 +23,14 @@
 summary 岗位段 tokenize。CLI：`node bin/brainx-talent-tag-backfill.mjs [--write] [--talent <id>]`，
 同样 dry-run 默认、幂等可重跑。标准流程：先回填标签 → 再重跑 talent-match-run。
 
+## 定时跑批（systemd timer，独立部署单元）
+
+- `deploy/systemd/brainx-talent-match.service` + `.timer`：每天 06:17 依次执行标签回填与匹配重算
+  （`--write`，brainx 用户 + `/etc/brainx/worker.env`，与 brainx-worker 同一凭证纪律）。
+- 安装：`cp deploy/systemd/brainx-talent-match.{service,timer} /etc/systemd/system/ &&
+  systemctl daemon-reload && systemctl enable --now brainx-talent-match.timer`。
+- 手动触发：`systemctl start brainx-talent-match.service`；漏跑由 `Persistent=true` 补一次。
+
 ## 用法
 
 ```bash

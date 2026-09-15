@@ -1,0 +1,22 @@
+[Unit]
+Description=BrainX talent tag backfill + match run (daily batch, standalone module)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=brainx
+Group=brainx
+WorkingDirectory=/opt/brainx
+EnvironmentFile=/etc/brainx/worker.env
+# 先补标签再重算短名单；两脚本均幂等、单事务，失败整体非零退出
+ExecStart=/usr/bin/node /opt/brainx/bin/brainx-talent-tag-backfill.mjs --write
+ExecStart=/usr/bin/node /opt/brainx/bin/brainx-talent-match-run.mjs --write
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/brainx/data
+
+[Install]
+WantedBy=multi-user.target

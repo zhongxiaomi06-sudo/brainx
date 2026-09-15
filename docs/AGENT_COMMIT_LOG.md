@@ -1,5 +1,10 @@
 # Agent Commit 记录
 
+## 2026-09-15｜build(人才): 匹配跑批接入每日 systemd timer
+
+- deploy/systemd/brainx-talent-match.{service,timer}：每天 06:17 依次跑 talent-tag-backfill --write 与 talent-match-run --write，brainx 用户 + worker.env 凭证，Persistent 补漏跑；不动 worker 主流程。
+- 生产已安装启用（下次 2026-09-16 06:17 CST），手动 systemctl start 验证 Result=success（约 19s）。
+
 ## 2026-09-15｜feat(人才): 人才标签回填模块 talent-tag-backfill
 
 - 起因：talent-match-run 生产首跑发现 RDS 人才池 401 人全员零标签，supply-match-v1 只剩文本维、大量职位零召回（销售岗实证）。

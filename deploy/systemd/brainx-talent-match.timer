@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily BrainX talent match batch (tag backfill + match run)
+
+[Timer]
+# 每天 06:17（避开整点/半点聚集）；漏跑补一次
+OnCalendar=*-*-* 06:17:00
+Persistent=true
+Unit=brainx-talent-match.service
+
+[Install]
+WantedBy=timers.target

@@ -35,6 +35,10 @@ test('jobAccessibleFromGroup：仅绑定群（job_facts.chat_id 或 READY projec
   db.prepare(`INSERT INTO project_launches (launch_id, consultant_id, project_id, idempotency_key, status, current_step, chat_id, created_at, updated_at)
     VALUES ('l-g1', 'felix', ?, 'kg1', 'READY', 'READY', 'oc_launch', ?, ?)`).run(jobId, now(), now());
   assert.equal(jobAccessibleFromGroup(db, { chatType: 'group', chatId: 'oc_launch' }, jobId), true);
+  // intake 绑定群同样命中（一职位多群实证：chat_id 被后续 launch 覆盖后，intake 绑定事实仍在）
+  db.prepare(`INSERT INTO bot_chat_intake (chat_id, chat_name, status, project_id, first_seen_at, updated_at)
+    VALUES ('oc_intake', '旧群', 'BOUND', ?, ?, ?)`).run(jobId, now(), now());
+  assert.equal(jobAccessibleFromGroup(db, { chatType: 'group', chatId: 'oc_intake' }, jobId), true);
   db.close();
 });
 

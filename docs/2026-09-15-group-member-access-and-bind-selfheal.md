@@ -18,7 +18,7 @@
 
 | 层 | 文件 | 改动 |
 |---|---|---|
-| 可见性 | `src/visibility.js` | 新增 `jobAccessibleFromGroup`：调用上下文为群且该群是职位当前绑定群（`job_facts.chat_id` 或 READY `project_launches.chat_id`）时放行 |
+| 可见性 | `src/visibility.js` | 新增 `jobAccessibleFromGroup`：调用上下文为群且该群是职位当前绑定群（`job_facts.chat_id`、READY `project_launches.chat_id` 或 `bot_chat_intake` BOUND 记录，三者任一）时放行 |
 | 授权 | `src/agent-gateway/authorization.js` | `authorizeGroup` 不再校验 `allowed_senders`（列保留，写入逻辑不变）；`authorizeIntakeBinding` 对无 intake 登记的群放行到 handler 自愈，`BOUND`/`SKIPPED` 仍拒 |
 | 绑定 | `src/group-intake.js` | `bindGroupToProject` 对未登记群实时调 `listBotChats` 核对机器人在群：在群则补登记 SEEN 并继续绑定，不在群仍 `GROUP_NOT_INTAKED`（防越权绑定陌生 chat_id） |
 | 工具 | `src/agent-gateway/tools-actions.js`、`tools-jobs.js`、`tools-candidate-actions.js` | 所有 `jobVisibleTo` 检查追加 `jobAccessibleFromGroup` 群上下文放行；`start_candidate_search`/`openmai_search`/`supermai_scout` 的"本人须 ACCEPTED"检查在绑定群上下文同样放行（搜索本就是项目级共享） |
@@ -27,6 +27,8 @@
 
 - 绑定群里任何人可点"找人"按钮、初筛通过、加入 reloop、取简历、自助接单（接单落点击者本人
   MY_JOB 成员关系）。
+- 一职位多群时（intake 绑定群 + 后续 launch 新群），`job_facts.chat_id` 会被最新 launch 覆盖，
+  但 intake 绑定事实仍在 `bot_chat_intake`——三个来源任一命中即视为绑定群（9/15 荆华密算实证）。
 - 机器人被拉进旧群后，顾问在群里 @机器人 绑定职位即刻可用：授权层放行 → handler 实时核对
   机器人在群 → 补登记 → 激活 scope → 发找人卡。轮询的基线抑制、静默失败、10 分钟窗口都不再阻塞绑定。
 

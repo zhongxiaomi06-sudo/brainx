@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-15｜fix(群权限): intake 绑定群纳入群上下文放行
+
+- 起因（荆华密算实证）：一职位多群时 `job_facts.chat_id` 被后续 launch 覆盖，intake 绑定群（bot_chat_intake BOUND）里的成员点候选人动作仍 NOT_FOUND_OR_FORBIDDEN（生产 14 连拒）。
+- `jobAccessibleFromGroup` 增加第三个命中源：`bot_chat_intake` BOUND 记录。launch 群、intake 绑定群均为「绑定群」，群里的人依同一决策放行。
+- 验证：后端全量 724/724（group-member-access 增补 intake BOUND 用例）；生产数据副本复核候选写入路径。
+- 附带生产核查结论（不改代码）：reloop/RDS 人才库 401 人（含 37 名销售/公关/市场方向、信鹏飞在库），但 candidateShortlist 依赖 match_runs，现网仅 reloop-position 26/31 两轮旧数据，故普通职位查短名单为 NO_AUTHORIZED_SHORTLIST（设计行为，非故障）。
+
 ## 2026-09-15｜feat(群权限): 绑定群成员放开找人 + 旧群绑定自愈
 
 - 起因：共享职位群里非协作者点找人/候选工具被拒（9/14 恒星力量群实证）；旧群绑定依赖 10 分钟轮询登记，基线抑制/静默失败导致 `GROUP_NOT_INTAKED`。用户决策：绑定群里的人都可以点找人，绑定链路修好。

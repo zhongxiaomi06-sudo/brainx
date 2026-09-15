@@ -36,7 +36,12 @@ export function jobAccessibleFromGroup(db, principal, projectId) {
     .get(projectId, principal.chatId)
     || !!db.prepare(`SELECT 1 FROM project_launches
         WHERE project_id=? AND chat_id=? AND status='READY' LIMIT 1`)
-      .get(projectId, principal.chatId);
+      .get(projectId, principal.chatId)
+    // intake 绑定群同样是「绑定群」：job_facts.chat_id 可能被后续 launch 覆盖（一职位多群实证），
+    // 但绑定事实仍在——群里的人依 2026-09-15 决策都能操作。
+    || !!db.prepare(`SELECT 1 FROM bot_chat_intake
+        WHERE chat_id=? AND project_id=? AND status='BOUND' LIMIT 1`)
+      .get(principal.chatId, projectId);
 }
 
 /** 该顾问可见的消息 id 集合（他自己的令牌+群成员身份拉到的）。 */

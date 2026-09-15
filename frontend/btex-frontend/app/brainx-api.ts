@@ -1,7 +1,6 @@
 // brainx-api.ts — Brain X 后端（btex/brainx）HTTP 适配层。
 // 前端唯一数据通道：页面不得直接 fetch /api；全部请求与映射集中在这里。
 // 后端契约见 brainx/src/server.js 与 README「后端接入」章节。
-//
 // 纯函数映射器（map*/of*）不依赖浏览器环境，供 tests/brainx-adapter.test.mjs 直接单测。
 // 请求函数只在浏览器端调用；SSR（npm run build）期间不会触发任何网络请求。
 import type {
@@ -15,6 +14,7 @@ import type {
   SyncStatus,
 } from "./decision-demo";
 import { brainxFetch } from "./brainx-http.ts";
+import { plainDisplayText } from "./display-text.ts";
 import { getProjects, type ProjectSummary } from "./brainx-projects-api.ts";
 export { brainxFetch, BrainxApiError } from "./brainx-http.ts";
 export {
@@ -322,15 +322,15 @@ function breakdownDim(
 
 /** 后端推荐项（/recommendations 或 /workbench.today_top3 的元素）→ 前端 DecisionJob。 */
 export function mapRecommendation(rec: BackendRecommendation): BrainxJob {
-  const job = rec.job;
+  const job = rec.job, role = plainDisplayText(rec.job.role || "", "未知职位");
   const relation = job.relation || "UNKNOWN";
   const coveragePct = Math.round((rec.evidence_coverage ?? 0) * 100);
   return {
     id: job.project_id,
     rank: rec.rank,
     company: job.company || "未知客户",
-    role: job.role || "未知职位",
-    direction: directionOf(job.role || ""),
+    role,
+    direction: directionOf(role),
     sourceMode: rec.source_mode === "COCKPIT_CONTEXT" ? "COCKPIT_CONTEXT" : "MARKET_ONLY", // 后端逐 item 透出（缺省按职位市场，与隔离判定一致：无 cockpit_facts 行即市场）
     group: groupOf(rec.action, job.hc ?? null, job.active_state || ""),
     eligibility: eligibilityOf(rec.action, relation, job.hc ?? null, job.active_state || ""),

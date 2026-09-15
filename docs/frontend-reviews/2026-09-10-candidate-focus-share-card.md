@@ -42,3 +42,7 @@
 - [候选卡片与对话建群复核](2026-09-09-candidate-card-conversation-group.md)
 - [OpenClaw 招聘闭环](../2026-09-03-openclaw-recruiting-loop.md)
 - [上传前完整验证](../standards/PRE_PUSH_VERIFICATION.md)
+
+## 2026-09-15 后续变更
+
+本记录保留 9 月 10 日的历史结论。当前交互已由用户改为：姓名直接打开 TTC；“初筛通过”写入共享重点名单并单独发送 TTC 链接，由飞书展开标准卡片；“加入reloop”保持独立动作。最新状态与验收证据见[候选总览三入口与人才链接直发复核](2026-09-15-candidate-link-actions.md)。

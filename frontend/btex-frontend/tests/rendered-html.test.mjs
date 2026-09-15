@@ -208,7 +208,7 @@ test("searches the complete frozen recommendation queue instead of only the visi
   assert.match(today, /探索发现/);
 });
 
-test("removes attention from detail and exposes ignore only for pending projects", async () => {
+test("keeps ignore in job detail and removes it from project list cards", async () => {
   const [loop, loopCss, projects, workbench, api, ignore] = await Promise.all([
     source("app/engagement-loop.tsx"), source("app/engagement-loop.css"),
     source("app/projects-view.tsx"), workbenchSource(), source("app/brainx-projects-api.ts"),
@@ -218,7 +218,7 @@ test("removes attention from detail and exposes ignore only for pending projects
   assert.match(loop, /\.filter\(\(a\) => a === "DISMISS"\)/);
   assert.match(loopCss, /\.commitment-idle-actions button/);
   assert.match(projects, /project\.project_status === "PENDING_START"/);
-  assert.match(projects, /"忽略"/);
+  assert.doesNotMatch(projects, /"忽略"/);
   assert.match(workbench, /createProjectIgnore/);
   assert.match(ignore, /removeOpportunityMembership/);
   assert.match(ignore, /"DISMISSED"/);

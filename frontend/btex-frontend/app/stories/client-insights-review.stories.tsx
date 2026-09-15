@@ -4,8 +4,8 @@ import { ClientInsightsReview, type ClientFactRow } from "../client-insights-rev
 import { WorkspaceShell } from "../workspace-shell";
 
 const clients: ClientFactRow[] = [
-  { company: "脱敏客户 A", companyType: "企业服务", jobCount: 8, activeJobs: 5, knownHc: 11, lastActivity: "2026-08-27T03:20:00Z", relations: ["MY_JOB", "TEAM_SHARED"], states: ["OPEN", "COOLING"] },
-  { company: "脱敏客户 B", companyType: null, jobCount: 4, activeJobs: 2, knownHc: null, lastActivity: "2026-08-26T09:10:00Z", relations: ["TEAM_SHARED"], states: ["OPEN"] },
+  { company: "脱敏客户 A", companyType: "企业服务", jobCount: 8, activeJobs: 5, knownHc: 11, lastActivity: "2026-08-27T03:20:00Z", relations: ["MY_JOB", "TEAM_SHARED"], states: ["OPEN", "COOLING", "UNKNOWN"] },
+  { company: "脱敏客户 B", companyType: null, jobCount: 4, activeJobs: 2, knownHc: null, lastActivity: "2026-08-26T09:10:00Z", relations: ["TEAM_SHARED"], states: ["UNKNOWN"] },
   { company: "脱敏客户 C", companyType: "智能硬件", jobCount: 3, activeJobs: 0, knownHc: 0, lastActivity: null, relations: ["OTHER_CONSULTANT"], states: ["CLOSED"] },
 ];
 
@@ -24,6 +24,8 @@ export const VerifiedFacts: Story = {
     const canvas = within(canvasElement);
     await expect(canvas.getByRole("heading", { name: "客户洞察" })).toBeInTheDocument();
     await expect(canvas.queryByRole("columnheader", { name: /招聘意愿|转化率|优先级评分/ })).not.toBeInTheDocument();
+    await expect(canvas.queryByText("UNKNOWN")).not.toBeInTheDocument();
+    await expect(canvas.queryByText("类型未标注")).not.toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: "查看 脱敏客户 A 事实" }));
     await expect(canvas.getByLabelText("脱敏客户 A 客户事实")).toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: "查看该客户的全部职位" }));

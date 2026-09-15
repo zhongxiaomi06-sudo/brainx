@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Bot, CheckCircle2, ChevronRight, Clock3, Search } from "lucide-react";
 import type { ProjectStatus, ProjectSummary } from "./brainx-projects-api";
-import { canIgnoreProject } from "./project-ignore-action";
+import { plainDisplayText } from "./display-text";
 import { Heading } from "./workbench-controls";
 
 type ProjectFilter = "ALL" | ProjectStatus;
@@ -82,18 +82,16 @@ function matches(project: ProjectSummary, query: string) {
     .filter(Boolean).join(" ").toLocaleLowerCase().includes(keyword);
 }
 
-export function ProjectsView({ projects, query, setQuery, focusedProjectId, openDetails, openAction, onIgnore, onLaunch }: {
+export function ProjectsView({ projects, query, setQuery, focusedProjectId, openDetails, openAction, onLaunch }: {
   projects: ProjectSummary[];
   query: string;
   setQuery: (value: string) => void;
   focusedProjectId: string | null;
   openDetails: (project: ProjectSummary) => void;
   openAction: (project: ProjectSummary) => void;
-  onIgnore: (project: ProjectSummary) => Promise<void>;
   onLaunch: (project: ProjectSummary) => Promise<void>;
 }) {
   const [filter, setFilter] = useState<ProjectFilter>("ALL");
-  const [ignoringId, setIgnoringId] = useState<string | null>(null);
   const [launchingId, setLaunchingId] = useState<string | null>(null);
   const [launchErrors, setLaunchErrors] = useState<Record<string, string>>({});
   const counts = useMemo(() => Object.fromEntries(filters.map(({ id }) => [id,
@@ -128,16 +126,16 @@ export function ProjectsView({ projects, query, setQuery, focusedProjectId, open
     </div>
     <div className="project-action-list">
       {visible.length ? visible.map(project => {
+        const role = plainDisplayText(project.role, "职位待确认");
         const due = dueText(project);
         const urgent = project.project_status === "NEEDS_ACTION";
-        const canIgnore = canIgnoreProject(project);
         const canLaunch = project.project_status === "PENDING_START"
           || project.launch?.status === "FAILED" || project.launch?.search_status === "FAILED";
         const launching = launchingId === project.project_id;
-        return <article id={`project-${project.project_id}`} className={`project-action-card status-${project.project_status.toLocaleLowerCase()}${focusedProjectId === project.project_id ? " is-focused" : ""}`} key={project.project_id} aria-label={`${project.role} · ${project.company}`}>
+        return <article id={`project-${project.project_id}`} className={`project-action-card status-${project.project_status.toLocaleLowerCase()}${focusedProjectId === project.project_id ? " is-focused" : ""}`} key={project.project_id} aria-label={`${role} · ${project.company}`}>
           <div className="project-identity">
             <div><span className="project-status">{urgent ? <AlertTriangle /> : project.project_status === "COMPLETED" ? <CheckCircle2 /> : <Clock3 />}{statusLabels[project.project_status]}</span><small>{project.relation === "MY_JOB" ? "我的职位" : "团队共享"}</small></div>
-            <h2>{project.role}</h2><p>{project.company}{project.city ? ` · ${project.city}` : ""}</p>
+            <h2>{role}</h2><p>{project.company}{project.city ? ` · ${project.city}` : ""}</p>
           </div>
           <div className="project-action-copy">
             <span>{project.active_action ? "当前行动" : project.project_status === "PENDING_START" ? "下一步" : "项目状态"}</span>
@@ -150,11 +148,6 @@ export function ProjectsView({ projects, query, setQuery, focusedProjectId, open
           <div className="project-action-side">
             <span className={urgent ? "urgent" : ""}>{due || `更新于 ${dateText(project.state_since || project.joined_at)}`}</span>
             <div className="project-card-actions">
-              {canIgnore && <button
-                type="button" className="is-ignore" disabled={ignoringId === project.project_id}
-                onClick={() => { setIgnoringId(project.project_id); void onIgnore(project).finally(() => setIgnoringId(null)); }}>
-                {ignoringId === project.project_id ? "忽略中…" : "忽略"}
-              </button>}
               <button type="button" className="is-primary" disabled={launching || project.launch?.search_status === "RUNNING"}
                 onClick={() => {
                   if (!canLaunch) { openAction(project); return; }

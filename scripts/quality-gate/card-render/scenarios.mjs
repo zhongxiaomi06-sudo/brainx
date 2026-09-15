@@ -14,7 +14,6 @@ import { buildCandidateShortlistCard } from '../../../src/candidate-shortlist-ca
 import { buildStageReminderCard } from '../../../src/stage-reminder.js';
 import { buildBindCard, buildGuidanceCard } from '../../../src/group-intake.js';
 import { buildProjectReminderCard } from '../../../src/project-reminder.js';
-import { candidateShareCard } from '../../../src/agent-gateway/tools-candidate-actions.js';
 import { contextCard } from '../../../src/candidate-decision-group.js';
 import { readyCard } from '../../../src/candidate-report.js';
 
@@ -119,8 +118,6 @@ export function buildScenarios() {
         analysisMarkdown: `**内部人才库匹配 ${CANDIDATE.name}**\n\n`
           + '- 现岗：影像算法产品经理 · 7 年\n- 学历：硕士 · 哈工大\n- 匹配：端侧影像 pipeline 经验完整\n\n'
           + '**风险**：近两年换岗较频繁，稳定性需面谈确认。', publicBaseUrl: BASE })],
-    ['candidate-share', '候选人卡（初筛通过 · 三按钮）',
-      candidateShareCard(JOB.project_id, CANDIDATE.candidate_ref, CANDIDATE)],
     ['decision-group-context', 'Offer 决策群首卡',
       contextCard({ project_id: JOB.project_id, role: JOB.role, company: JOB.company }, CANDIDATE,
         // 结构与 src/candidate-decision-group.js#sourceContext 的真实输出一致：4 个小节 + 讨论条目。

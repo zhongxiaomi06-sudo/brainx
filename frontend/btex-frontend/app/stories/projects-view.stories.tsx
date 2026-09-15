@@ -5,7 +5,6 @@ import { ProjectsView } from "../projects-view";
 
 const openDetails = fn();
 const openAction = fn();
-const ignore = fn(async () => undefined);
 const launch = fn(async () => undefined);
 
 function project(projectId: string, status: ProjectStatus, overrides: Partial<ProjectSummary> = {}): ProjectSummary {
@@ -55,7 +54,7 @@ const meta = {
   title: "业务组件/我的项目行动工作台",
   component: ProjectsView,
   parameters: { bare: true },
-  args: { projects, query: "", setQuery: fn(), focusedProjectId: null, openDetails, openAction, onIgnore: ignore, onLaunch: launch },
+  args: { projects, query: "", setQuery: fn(), focusedProjectId: null, openDetails, openAction, onLaunch: launch },
 } satisfies Meta<typeof ProjectsView>;
 
 export default meta;
@@ -81,9 +80,21 @@ export const FocusedNewProject: Story = {
   args: { focusedProjectId: "P-PENDING" },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getAllByRole("button", { name: "忽略" })).toHaveLength(1);
-    await userEvent.click(canvas.getByRole("button", { name: "忽略" }));
-    await expect(ignore).toHaveBeenCalledWith(expect.objectContaining({ project_id: "P-PENDING" }));
+    const focused = within(canvas.getByRole("article", { name: "AI 产品负责人 · 深势科技" }));
+    await expect(canvas.queryByRole("button", { name: "忽略" })).not.toBeInTheDocument();
+    await expect(focused.getByRole("button", { name: /在飞书启动寻访/ })).toBeEnabled();
+    await expect(focused.getByRole("button", { name: "详情" })).toBeEnabled();
+  },
+};
+
+export const RawMarkdownTitle: Story = {
+  args: {
+    projects: [project("P-MARKDOWN", "PENDING_START", { role: "**嵌入式 Linux BSP 开发工程师**" })],
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("heading", { name: "嵌入式 Linux BSP 开发工程师" })).toBeInTheDocument();
+    await expect(canvas.queryByText(/\*\*/)).not.toBeInTheDocument();
   },
 };
 

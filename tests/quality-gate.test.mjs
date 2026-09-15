@@ -27,7 +27,6 @@ import {
   MIN_ACTION_BUTTONS,
 } from "../scripts/quality-gate/card-render/typography.mjs";
 import { buildScenarios } from "../scripts/quality-gate/card-render/scenarios.mjs";
-import { candidateShareCard } from "../src/agent-gateway/tools-candidate-actions.js";
 import { alignSoloAction } from "../src/card-layout.js";
 
 test("Node 22 测试入口显式启用 TypeScript 类型剥离", () => {
@@ -386,14 +385,6 @@ test("卡片渲染器遇到未覆盖元素类型必须抛错，不得静默跳�
     () => renderElements([{ tag: "chart", chart_spec: {} }]),
     /未覆盖的元素类型：chart/,
   );
-});
-
-test("卡片渲染器能把真实构建出的候选人卡转成可截图 DOM", () => {
-  const card = candidateShareCard("proj-1", "TTC-8842137", { name: "李燊", role: "影像算法产品经理" });
-  const html = renderCard(card, { cardId: "candidate-share" });
-  assert.match(html, /feishu-card/);
-  assert.match(html, /查看 TTC 链接/);
-  assert.match(html, /加入reloop/);
 });
 
 test("卡片渲染门禁只在已人工确认基线的平台把「缺基线」当阻断", () => {

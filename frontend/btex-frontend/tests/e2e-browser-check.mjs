@@ -202,9 +202,10 @@ try {
   const firstCard = await recommendationCards.first().getAttribute("aria-label");
   const firstCardText = await recommendationCards.first().innerText();
   assert.match(firstCardText, /今天推进|本周观察|待核验/, "正式卡片必须显示后端决策层级");
-  assert.match(firstCardText, /AI 匹配分/, "正式卡片必须显示 AI 匹配分");
-  assert.match(firstCardText, /证据覆盖/, "正式卡片必须显示证据覆盖");
-  assert.match(firstCardText, /探索价值/, "正式卡片必须显示探索价值");
+  assert.equal(await recommendationCards.first().getByLabel(/AI 匹配分/).count(), 1,
+    "正式卡片标题区必须以可访问标签呈现匹配分");
+  assert.doesNotMatch(firstCardText, /证据覆盖|探索价值/,
+    "正式列表不得恢复已移出卡面的内部评分维度");
   assert.doesNotMatch(firstCardText, /为什么值得看|需要注意|事实充分|部分事实待确认|事实不足/,
     "正式卡片不得重复显示已删除的判断摘要区");
   assert.match(firstCardText, /职位事实更新|业务群活动|人工核验/, "正式卡片必须显示真实最近活动");

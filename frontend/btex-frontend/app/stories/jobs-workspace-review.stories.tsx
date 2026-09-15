@@ -30,6 +30,8 @@ export const DesktopReview: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.queryByRole("dialog")).not.toBeInTheDocument();
+    await expect(canvas.getByRole("tab", { name: "待判断 2" })).toBeInTheDocument();
+    await expect(canvas.getAllByLabelText("负责人 顾问甲").length).toBeGreaterThanOrEqual(1);
     await userEvent.click(canvas.getByRole("button", { name: "同步职位" }));
     await expect(sync).toHaveBeenCalledOnce();
     await userEvent.click(canvas.getByRole("row", { name: /高级算法工程师/ }));

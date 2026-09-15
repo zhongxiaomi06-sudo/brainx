@@ -12,6 +12,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import "./recommendation-queue-v2-review.css";
+import { displayPipeline } from "./recommendation-display";
 
 export type RecommendationDecisionTier = "TODAY" | "WEEK" | "VERIFY";
 export type RecommendationConfidence = "SUFFICIENT" | "PARTIAL" | "INSUFFICIENT";
@@ -37,6 +38,7 @@ export type RecommendationQueueItem = {
   currentStage: string | null;
   recentActivity: { label: string; occurredAt: string | null } | null;
   pipeline: string | null;
+  summary: string | null;
   score: number | string;
   evidenceCoverage: number | null;
   explorationScore: number | string;
@@ -85,9 +87,8 @@ function displayDate(value: string | null) {
   return new Intl.DateTimeFormat("zh-CN", { month: "2-digit", day: "2-digit" }).format(date);
 }
 
-function displayCoverage(value: number | null) {
-  if (value === null) return "—";
-  return `${Math.round(value <= 1 ? value * 100 : value)}%`;
+function isKnown(value: string | number | null | undefined) {
+  return value !== null && value !== undefined && value !== "" && value !== "UNKNOWN";
 }
 
 // 后端阶段枚举（src/job-extract/schema.js PIPELINE_STAGES）本地化；未知值原样展示。
@@ -135,22 +136,21 @@ function RecommendationCard({ item, onOpen, onAction }: {
     <header>
       <span className="recommendation-v2-rank">{String(item.rank).padStart(2, "0")}</span>
       <div className="recommendation-v2-identity"><h3>{item.role || "职位待确认"}</h3><p><BriefcaseBusiness />{item.company || "公司待确认"}<span><MapPin />{item.cities.length ? item.cities.join("、") : "城市待确认"}</span></p></div>
-      <DecisionPriorityBadge tier={item.tier} />
+      <div className="recommendation-v2-head-meta">
+        <span className="recommendation-v2-match" aria-label={`AI 匹配分 ${display(item.score)}`}><small>匹配</small><b>{display(item.score)}</b></span>
+        <DecisionPriorityBadge tier={item.tier} />
+      </div>
     </header>
 
     <div className="recommendation-v2-body">
-      <dl className="recommendation-v2-scores" aria-label="评分参考">
-        <div><dt>AI 匹配分</dt><dd>{display(item.score)}</dd></div>
-        <div><dt>证据覆盖</dt><dd>{displayCoverage(item.evidenceCoverage)}</dd></div>
-        <div><dt>探索价值</dt><dd>{display(item.explorationScore)}</dd></div>
-      </dl>
+      {item.summary && <p className="recommendation-v2-summary-line"><span>推荐摘要</span>{item.summary}</p>}
       <dl className="recommendation-v2-facts">
         <div><dt>关系</dt><dd>{display(item.relation)}</dd></div>
-        <div><dt>状态</dt><dd>{display(item.activeState)}</dd></div>
         <div><dt>HC</dt><dd>{display(item.hc)}</dd></div>
-        <div><dt>阶段</dt><dd>{displayStage(item.currentStage)}</dd></div>
+        {isKnown(item.activeState) && <div><dt>状态</dt><dd>{display(item.activeState)}</dd></div>}
+        {isKnown(item.currentStage) && <div><dt>阶段</dt><dd>{displayStage(item.currentStage)}</dd></div>}
         <div><dt>最近活动</dt><dd>{item.recentActivity ? `${item.recentActivity.label}${item.recentActivity.occurredAt ? ` · ${displayDate(item.recentActivity.occurredAt)}` : ""}` : "待确认"}</dd></div>
-        <div><dt>进展</dt><dd>{display(item.pipeline)}</dd></div>
+        <div><dt>进展</dt><dd>{displayPipeline(item.pipeline)}</dd></div>
       </dl>
     </div>
 

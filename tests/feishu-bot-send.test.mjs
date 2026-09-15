@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { createProjectChat, sendInteractiveCard, sendPdfFile, replyInteractiveCard } from '../src/feishu-bot.js';
+import { createProjectChat, sendInteractiveCard, sendPdfFile, sendTextMessage,
+  replyInteractiveCard } from '../src/feishu-bot.js';
 
 const response = (body) => ({ ok: true, json: async () => body });
 
@@ -120,6 +121,28 @@ test('飞书机器人直连接口：缺凭证或非法目标时 fail-closed', as
     sendInteractiveCard({ target: 'someone@example.com', card: {}, appId: 'cli_test', appSecret: 'secret' }),
     /FEISHU_TARGET_INVALID/,
   );
+});
+
+test('飞书机器人把人才库链接作为幂等纯文本消息发送到项目群', async () => {
+  const calls = [];
+  const out = await sendTextMessage({
+    target: 'oc_project', text: 'https://app.ttcadvisory.com/app/talent/C-1',
+    idempotencyKey: 'candidate-link-1', appId: 'cli_test', appSecret: 'secret',
+    fetchImpl: async (url, options) => {
+      calls.push({ url: String(url), options });
+      return calls.length === 1
+        ? response({ code: 0, tenant_access_token: 'token' })
+        : response({ code: 0, data: { message_id: 'om_link' } });
+    },
+  });
+  assert.deepEqual(out, { message_id: 'om_link' });
+  assert.match(calls[1].url, /receive_id_type=chat_id&uuid=candidate-link-1$/);
+  const sent = JSON.parse(calls[1].options.body);
+  assert.equal(sent.receive_id, 'oc_project');
+  assert.equal(sent.msg_type, 'text');
+  assert.deepEqual(JSON.parse(sent.content), {
+    text: 'https://app.ttcadvisory.com/app/talent/C-1',
+  });
 });
 
 test('飞书机器人直连接口：用 open_id 成员和当前机器人创建幂等项目群', async () => {

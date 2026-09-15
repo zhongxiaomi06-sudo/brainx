@@ -10,6 +10,7 @@ import {
 } from "./recommendation-queue-v2-review";
 import type { ProjectSummary } from "./brainx-projects-api";
 import type { RecommendationSort } from "./brainx-recommendation-pages-api";
+import { recommendationSummary } from "./recommendation-display";
 import { PickTray } from "./workbench-pick-tray";
 import {
   verificationJobs, type DecisionAction, type DecisionJob, type PickFolder,
@@ -94,6 +95,7 @@ function toQueueItem(job: DecisionJob, engagement: EngagementState | undefined, 
       ? { label: job.facts["最近活动"], occurredAt: job.facts["最近活动时间"] || null }
       : null,
     pipeline: job.facts["历史 Pipeline"] || null,
+    summary: recommendationSummary(job.scoreNotes) || null,
     score: job.finalScore,
     evidenceCoverage: job.evidenceCoverage,
     explorationScore: job.explorationScore,

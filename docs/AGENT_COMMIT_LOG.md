@@ -1,5 +1,20 @@
 # Agent Commit 记录
 
+## 2026-09-16｜feat(prompt): 杨东旭 Offer 群端到端验证脚本 + 固定文案回复 hook
+
+- 起因（咪需求）：验证「拉群 → 生成报告 → @ 问顾虑 → braintex 回固定文案」端到端流程。braintex 的 LLM 对话在 docx scope 未开时 fail-open 降级答非所问，咪要 wendy @ braintex 问"总结顾虑"时直接输出她审定过的固定文案，不走 LLM。
+- 改动：
+  1. `plugins/brainx-openclaw/yang-offer-reply.js`（新）：before_agent_reply hook，针对杨东旭群（`oc_4d7d97cfc99fb5dbb1de518d84b68a2b`）+ 入站消息含"总结"+"顾虑"关键词 → 返回 `{ handled: true, reply: { text: FIXED_REPLY } }` 拦截 LLM，直接回咪审定的固定文案（3 个顾虑 + 解法 + TODO + 隐藏风险）。
+  2. `plugins/brainx-openclaw/index.js`：注册 yang-offer-reply hook（priority 90，在 mention-silence 100 之后但在 LLM 之前；mention-silence 不拦 @braintex 消息，两者不冲突）。
+  3. `bin/brainx-yang-offer-demo.mjs`（新）：端到端验证脚本——检查/创建飞书群「杨东旭-Ai infra-Offer决策」+ 拉成员（wendy/mia/york）+ 发 Offer 决策报告卡片（链接到 `TrFHdPfc3oXzyLxa2TRcVxQvn6b`）。
+  4. `plugins/brainx-openclaw/doc-reader.js`（新，重建）：自包含 tenant_access_token 的 readFeishuDocument，避免跨目录引用 src/ 导致 npm pack 丢文件（test 449）。
+  5. `plugins/brainx-openclaw/prompt.js`：import 改回本地 doc-reader.js。
+  6. `plugins/brainx-openclaw/package.json`：版本 1.4.16 → 1.4.18，files[] 加 doc-reader.js + yang-offer-reply.js。
+  7. `plugins/brainx-openclaw/runtime.js`：PLUGIN_VERSION 1.4.16 → 1.4.18。
+  8. 测试版本号同步：`tests/openclaw-plugin.test.mjs` plugin_version 1.4.18。
+- 测试：新增 `tests/yang-offer-reply.test.mjs`（6 例：拦截/非杨东旭群不拦截/无关键词不拦截/变体拦截/无 sessionKey fail-open/无 text fail-open），35 例全过。
+- 待部署：scp 插件副本到 ECS `/var/lib/brainx/.openclaw/extensions/brainx-openclaw/` + chown + 重启 openclaw-brainx + 跑 brainx-yang-offer-demo.mjs 验证拉群+发报告。
+
 ## 2026-09-16｜fix(门禁): supermai 轮次标题测试断言更新 + 跨包引用跳过 + 工具产物 gitignore
 
 - 起因：full 门禁 2 项失败：① openmai-delivery 测试断言正文含「第 N 轮」，但 specs/018 已改轮次标题为「首轮/续搜」② openclaw-production-config 测试把跨包引用 `../../src/feishu-document.js` 当包内模块检查（Offer 会话的 import）。

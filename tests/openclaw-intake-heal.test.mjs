@@ -118,3 +118,33 @@ test('launch PENDING 原有行为不回归：重放成功 OK 并重启，intake 
   worker.stop();
   db.close();
 });
+
+test('launch FAILED 兜底：重试耗尽不再永久死区，成功转 OK，失败保持 FAILED 不再 bump', async () => {
+  const db = openDb(':memory:');
+  db.prepare(`INSERT INTO sync_runs (sync_id, consultant_id, source, as_of, input_hash, started_at)
+    VALUES ('sync-y', 'felix', 'test', ?, 'h', ?)`).run(now(), now());
+  db.prepare(`INSERT INTO job_facts (project_id, company, role, active_state, captured_at, sync_id, raw_json, updated_at)
+    VALUES ('P-DEAD', '恒星', '战略研究', 'OPEN', ?, 'sync-y', '{}', ?)`).run(now(), now());
+  db.prepare(`INSERT INTO project_launches
+    (launch_id, consultant_id, project_id, idempotency_key, status, current_step, chat_id,
+     openclaw_status, openclaw_attempts, created_at, updated_at)
+    VALUES ('l-dead', 'felix', 'P-DEAD', 'k-dead', 'READY', 'READY', 'oc_dead', 'FAILED', 12, ?, ?)`)
+    .run(now(), now());
+  let healthy = false;
+  const { worker } = workerFor(db, {
+    ensureGroup: async () => (healthy ? { added: false, sender_added: 0 } : Promise.reject(new Error('EACCES'))),
+    runImmediately: false,
+  });
+  // 故障期：FAILED 行仍被重试（兜底），但保持 FAILED、attempts 不再增长
+  await worker.sweep();
+  const broken = db.prepare("SELECT openclaw_status, openclaw_attempts FROM project_launches WHERE launch_id='l-dead'").get();
+  assert.equal(broken.openclaw_status, 'FAILED');
+  assert.equal(broken.openclaw_attempts, 12, 'FAILED 行不再 bump，避免 PENDING↔FAILED 空转');
+  // 环境恢复后：同一行自愈转 OK
+  healthy = true;
+  await worker.sweep();
+  assert.equal(db.prepare("SELECT openclaw_status FROM project_launches WHERE launch_id='l-dead'")
+    .get().openclaw_status, 'OK', 'CLI 恢复后 FAILED 行自愈转 OK');
+  worker.stop();
+  db.close();
+});

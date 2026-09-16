@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-16｜fix(群准入): launch 群白名单 FAILED 不再永久死区 + 重复接单优雅化
+
+- 起因（york 实证）：JLPJBV9 群点击接单/找人均无响应。根因有二：① 9/15 06:10 起所有 launch 的 openclaw 加白 CLI 连续失败（环境类故障，疑似配置文件属主被误改），12 轮重试耗尽落 FAILED 后补偿不再覆盖，群长期不在白名单、消息被 allowlist 丢弃；② york 其实已于 launch 时 ACCEPTED，旧卡片「接单」按钮再点撞 409「已有当前行动」被误读为无法接单。
+- 处置：12 个 FAILED launch 群已手动补白并回写 OK；openclaw.json 属主误改 root 的问题已纠正（chown brainx）。
+- 修复：pendingOpenclawLaunches 纳入 FAILED（PENDING 优先，CLI 恢复后自愈转 OK；FAILED 失败不再 bump 防空转刷日志）；acceptCommitment 409 且当前已 ACCEPTED 时按 already 优雅返回并指引直接点找人。
+- 验证：新增 2 例（FAILED 兜底自愈、重复接单幂等），相关 16/16，全量回归见提交。
+
 ## 2026-09-16｜fix(建群): READY 项目群不再误挡其他协作者
 
 - 起因（linda 私聊实证）：JLPJBV9（恒星力量·战略研究）的 READY 项目群由 york 创建，linda 加入职位后调 brainx_launch_project_chat（force）被 `launch.consultant_id !== consultantId` 卡口反复 409「其他协作者创建中」，机器人无限重试。

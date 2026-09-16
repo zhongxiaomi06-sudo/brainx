@@ -92,14 +92,17 @@ export function startOpenclawGroupRetryWorker(db, options = {}) {
           }
           continue;
         }
-        const current = db.prepare('SELECT openclaw_attempts FROM project_launches WHERE launch_id=?')
+        const current = db.prepare('SELECT openclaw_attempts, openclaw_status FROM project_launches WHERE launch_id=?')
           .get(row.launch_id);
-        const next = Number(current?.openclaw_attempts || 0) + 1;
-        const exhausted = next >= maxAttempts;
-        markOpenclawStatus(db, row.launch_id, {
-          status: exhausted ? 'FAILED' : 'PENDING', error: result.error, bumpAttempts: true,
-        });
-        if (exhausted) console.warn(`[openclaw-retry] ${row.project_id} 准入重试耗尽：${result.error}`);
+        // 已 FAILED 的行继续兜底重试但不再 bump/重复告警（否则 PENDING↔FAILED 空转刷日志）
+        if (current?.openclaw_status !== 'FAILED') {
+          const next = Number(current?.openclaw_attempts || 0) + 1;
+          const exhausted = next >= maxAttempts;
+          markOpenclawStatus(db, row.launch_id, {
+            status: exhausted ? 'FAILED' : 'PENDING', error: result.error, bumpAttempts: true,
+          });
+          if (exhausted) console.warn(`[openclaw-retry] ${row.project_id} 准入重试耗尽：${result.error}`);
+        }
       }
       // intake 旧群白名单自愈：launch PENDING 重放之后全量扫一轮。
       const listIntake = options.listIntakeChats || (() => defaultListIntakeChats(db));

@@ -40,7 +40,23 @@ function acceptJob(db, args, principal, startSearch) {
     due_at: args.due_at || workflowDueAt(),
     idempotency_key: args.idempotency_key || `bot:accept:${principal.consultantId}:${args.job_id}`,
   });
-  if (!result.ok) fail(result.status === 404 ? 'NOT_FOUND_OR_FORBIDDEN' : 'INVALID_ARGUMENT');
+  if (!result.ok) {
+    // 已 ACCEPTED 时重复接单按幂等成功处理（2026-09-16 york/JLPJBV9 实证：launch 流程
+    // 已接单，旧卡片上的「接单」按钮再点撞 409「已有当前行动」，被误读为无法接单）。
+    if (result.status === 409
+        && currentState(db, principal.consultantId, args.job_id).state === 'ACCEPTED') {
+      return {
+        data: { job_ref: args.job_id, state: 'ACCEPTED', already: true,
+          active_action: safeAction(result.active_action), search: null },
+        facts: [{ job_ref: args.job_id, state: 'ACCEPTED', already_accepted: true }],
+        inferences: [], recommendations: [],
+        unknowns: ['这单你已经在接了，直接点卡片上的找人按钮即可，无需重复接单。'],
+        evidence_refs: [`engagement:${args.job_id}`],
+        next_allowed_actions: ['brainx_openmai_search', 'brainx_supermai_scout', 'brainx_candidate_shortlist'],
+      };
+    }
+    fail(result.status === 404 ? 'NOT_FOUND_OR_FORBIDDEN' : 'INVALID_ARGUMENT');
+  }
   // 2026-09-12 D5 灰测实证：agent 侧接单不落 MY_JOB 成员关系，随后 launchProjectChat
   // 必报 PROJECT_MEMBERSHIP_REQUIRED。与 web 一键接单对齐，接单即幂等写入成员关系。
   confirmMembership(db, principal.consultantId, args.job_id, {

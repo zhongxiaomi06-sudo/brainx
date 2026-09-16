@@ -198,3 +198,19 @@ test('建群工具（specs/017）：底层 blocker 错误码原样透出，不�
     { principal: { tenantId: 'tenant-a', consultantId: 'felix', chatType: 'p2p' } }), /PROJECT_MEMBERSHIP_REQUIRED/);
   db.close();
 });
+
+test('重复接单（不同幂等键）按已接单优雅返回，不再报 INVALID_ARGUMENT', () => {
+  // 2026-09-16 york/JLPJBV9 实证：launch 流程已接单后，旧卡片「接单」按钮再点撞 409。
+  const { db, jobId, handlers, searches, context } = fixture();
+  const due = new Date(Date.now() + 2 * 86400000).toISOString();
+  const first = handlers.brainx_accept_job({ job_id: jobId, due_at: due,
+    idempotency_key: 'agent:accept:dup-1', confirm: true }, context);
+  assert.equal(first.data.state, 'ACCEPTED');
+  const second = handlers.brainx_accept_job({ job_id: jobId, due_at: due,
+    idempotency_key: 'agent:accept:dup-2', confirm: true }, context);
+  assert.equal(second.data.state, 'ACCEPTED');
+  assert.equal(second.data.already, true, '重复接单按幂等成功返回');
+  assert.ok(second.unknowns.some((u) => u.includes('已经在接了')));
+  assert.equal(searches.length, 1, '重复接单不再重复触发搜索');
+  db.close();
+});

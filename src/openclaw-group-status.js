@@ -39,11 +39,14 @@ export function markOpenclawStatus(db, launchId, { status, error = null, bumpAtt
     .run(status, error, bumpAttempts ? 1 : 0, now(), launchId);
 }
 
-/** 待补偿的行：群已建、链路已 READY、准入未完成。 */
+/** 待补偿的行：群已建、链路已 READY、准入未完成。
+ *  含 FAILED（重试耗尽）——耗尽不再是永久死区：CLI 故障往往是环境问题
+ *  （2026-09-16 实证：openclaw.json 属主被误改 root，worker 连失败 12 轮全部耗尽），
+ *  环境恢复后补偿应能自愈。PENDING 优先，FAILED 兜底。 */
 export function pendingOpenclawLaunches(db, limit = 5) {
   return db.prepare(`SELECT launch_id, project_id, chat_id FROM project_launches
-    WHERE chat_id IS NOT NULL AND chat_id<>'' AND status='READY' AND openclaw_status='PENDING'
-    ORDER BY updated_at LIMIT ?`).all(limit);
+    WHERE chat_id IS NOT NULL AND chat_id<>'' AND status='READY' AND openclaw_status IN ('PENDING','FAILED')
+    ORDER BY CASE openclaw_status WHEN 'PENDING' THEN 0 ELSE 1 END, updated_at LIMIT ?`).all(limit);
 }
 
 /** 重放准入所需的成员 open_id：优先复用已登记的群范围，避免重新推导协作者。 */

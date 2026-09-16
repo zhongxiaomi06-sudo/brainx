@@ -26,7 +26,7 @@ const JOB = {
 };
 
 const CANDIDATE = {
-  candidate_ref: 'TTC-8842137', name: '李燊', role: '影像算法产品经理',
+  candidate_ref: 'PL1878965686105948137', name: '李燊', role: '影像算法产品经理',
   experience: '7 年', city: '深圳', education: '硕士 · 哈工大',
   score: '86', evaluation: '有端侧影像 pipeline 与算法团队管理经验，主导过两代旗舰机型影像需求落地，与岗位的算法—产品耦合要求高度一致。',
 };
@@ -54,17 +54,17 @@ function dailyItems() {
 
 function openmaiResultText() {
   const candidates = [
-    { candidate_ref: 'TTC-8842137', name: '李燊', role: '影像算法产品经理', experience: '7 年', city: '深圳',
+    { candidate_ref: 'PL1878965686105948137', name: '李燊', role: '影像算法产品经理', experience: '7 年', city: '深圳',
       education: '硕士 · 哈工大', score: '86', evaluation: '端侧影像 pipeline 与算法团队管理经验完整，主导两代旗舰机型影像需求落地。' },
-    { candidate_ref: 'TTC-7791042', name: '黄俊凯', role: 'AI 产品经理', experience: '6 年', city: '深圳',
+    { candidate_ref: 'PL1878965686105948142', name: '黄俊凯', role: 'AI 产品经理', experience: '6 年', city: '深圳',
       education: '本科 · 华南理工', score: '81', evaluation: '有 AI 产品从 0 到 1 经验，缺少影像硬件侧协同经历，需要面试确认。' },
-    { candidate_ref: 'TTC-6620871', name: '余学庆', role: '高级产品经理（视觉）', experience: '9 年', city: '东莞',
+    { candidate_ref: 'PL1878965686105948171', name: '余学庆', role: '高级产品经理（视觉）', experience: '9 年', city: '东莞',
       education: '硕士 · 中山大学', score: '78', evaluation: '视觉产品线经验丰富，跨城市通勤意愿待确认。' },
-    { candidate_ref: 'TTC-5512330', name: '陈可', role: '产品经理', experience: '5 年', city: '深圳',
+    { candidate_ref: 'PL1878965686105948130', name: '陈可', role: '产品经理', experience: '5 年', city: '深圳',
       education: '本科 · 深圳大学', score: '72', evaluation: '偏业务侧，算法协同深度不足。' },
-    { candidate_ref: 'TTC-4409128', name: '吴桐', role: '影像质量工程师转产品', experience: '8 年', city: '广州',
+    { candidate_ref: 'PL1878965686105948128', name: '吴桐', role: '影像质量工程师转产品', experience: '8 年', city: '广州',
       education: '硕士 · 暨南大学', score: '70', evaluation: '技术背景扎实，产品方法论需要补证。' },
-    { candidate_ref: 'TTC-3390017', name: '郑一鸣', role: '算法产品经理', experience: '6 年', city: '深圳',
+    { candidate_ref: 'PL1878965686105948117', name: '郑一鸣', role: '算法产品经理', experience: '6 年', city: '深圳',
       education: '硕士 · 电子科大', score: '68', evaluation: '有车载影像经验，与消费电子场景存在差异。' },
   ];
   return `本轮共找到 ${candidates.length} 位候选人。\n\n<!--BRAINX_CANDIDATES_V1\n`

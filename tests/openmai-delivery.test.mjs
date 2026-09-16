@@ -185,9 +185,9 @@ test('OpenMai 澄清语句不得伪装成候选人已就绪', () => {
 test('OpenMai 总览姓名直达 TTC，右侧保留初筛通过与加入 reloop', () => {
   const resultText = `不应把这段 Markdown 原文直接发群\n|姓名|详情|\n|---|---|\n<!-- BRAINX_CANDIDATES_V1
 ${JSON.stringify({ candidates: [
-    { candidate_ref: 'c-1', name: '张三', evaluation: '匹配 91%，驱动经验待核实',
-      talent_url: 'https://app.ttcadvisory.com/app/talent/c-1' },
-    { candidate_ref: 'c-2', name: '李四', evaluation: '匹配 86%，地点待核实',
+    { candidate_ref: 'PL1878965686105948161', name: '张三', evaluation: '匹配 91%，驱动经验待核实',
+      talent_url: 'https://app.ttcadvisory.com/app/talent/PL1878965686105948161' },
+    { candidate_ref: 'PT2075148927600762881', name: '李四', evaluation: '匹配 86%，地点待核实',
       resume_url: 'https://gateway.ttcadvisory.com/resume/c-2.pdf' },
   ] })}
 -->`;
@@ -205,13 +205,16 @@ ${JSON.stringify({ candidates: [
   assert.match(firstInfo.content, /91%/);
   assert.doesNotMatch(JSON.stringify(card), /\|姓名\|详情\||不应把这段/);
   const names = rows.slice(1).map((row) => row.columns[0].elements[0]);
-  assert.ok(names.every((name) => name.tag === 'button' && name.type === 'default'));
-  assert.deepEqual(names.map((name) => name.text.content), ['1. 张三', '2. 李四']);
-  assert.equal(names[0].multi_url.url, 'https://app.ttcadvisory.com/app/talent/c-1');
-  assert.equal(names[1].multi_url.url, 'https://app.ttcadvisory.com/app/talent/c-2');
+  // PL 编号（含自带 talent_url）→ 姓名按钮直达 TTC；PT 外部渠道编号 → 纯文本不拼假链接
+  assert.equal(names[0].tag, 'button');
+  assert.equal(names[0].type, 'default');
+  assert.equal(names[0].text.content, '1. 张三');
+  assert.equal(names[0].multi_url.url, 'https://app.ttcadvisory.com/app/talent/PL1878965686105948161');
+  assert.equal(names[1].tag, 'div', 'PT 外部渠道编号 TTC 查无此人，姓名降级纯文本');
+  assert.equal(names[1].text.content, '2. 李四');
   const actions = rows.slice(1).map((row) => row.columns[2].elements);
   assert.deepEqual(actions[0].map((button) => button.text.content), ['初筛通过', '加入reloop']);
-  assert.match(actions[0][0].value.text, /candidate_ref=c-1/);
+  assert.match(actions[0][0].value.text, /candidate_ref=PL1878965686105948161/);
   assert.match(actions[0][0].value.text, /action=KEEP_FOR_REVIEW/);
   assert.match(actions[0][0].value.text, /confirm=true/);
   assert.match(actions[0][0].value.text, /已发送 TTC 人才链接/);
@@ -228,7 +231,7 @@ ${JSON.stringify({ candidates: [
   assert.match(card.elements[0].content, /第 2 轮/);
   assert.equal(card.header.title.content, 'Reloop 候选人推荐 · 第 2 轮候选人不足');
   const completeCandidates = Array.from({ length: 6 }, (_, index) => ({
-    candidate_ref: `c-${index + 1}`, name: `候选人${index + 1}`, evaluation: '匹配',
+    candidate_ref: `PL187896568610594817${index}`, name: `候选人${index + 1}`, evaluation: '匹配',
   }));
   const completeCard = buildOpenmaiDeliveryCard({
     job: { project_id: 'P-DELIVERY', company: '甲公司', role: '研发负责人', search_round: 2 },

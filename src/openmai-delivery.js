@@ -178,6 +178,9 @@ function ttcTalentUrl(candidate) {
     } catch { /* 使用候选编号回退。 */ }
   }
   if (candidate.candidateRefValid === false) return null;
+  // 仅 PL 编号是有效 TTC 人才编号（2026-09-16 JWT 实证：PT 外部渠道编号 TTC 查无此人），
+  // 其余一律不拼链接，姓名列降级为纯文本。
+  if (!/^PL\d{10,}$/.test(String(candidate.candidateRef || ''))) return null;
   return `https://app.ttcadvisory.com/app/talent/${encodeURIComponent(candidate.candidateRef)}`;
 }
 

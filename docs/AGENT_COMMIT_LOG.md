@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-16｜fix(人才卡): TTC 链接守卫收窄为仅 PL 编号（PT 外部渠道实证查无此人）
+
+- 起因（再次实证）：结果卡姓名链接仍有个别打不开。用真实 JWT 调 TTC API 验证：PL1878965686105948160 附件数 8（有效），PT2075148927600762880 / PT2081638592187449344 均 record not found——PT 是 SuperMai 外部渠道（猎聘/脉脉）编号，TTC 无此人。
+- 修复：tools-candidate-actions.js 的 TTC_REF 与 openmai-delivery.js 的 ttcTalentUrl 回退统一收窄为 /^PL\d{10,}$/；非 PL（PT/内部引用）姓名列降级纯文本、链接动作返回 no_ttc_link。候选人自带 talentUrl 透传不变。
+- 测试/基线：合成编号全部改 PL 形态并新增 PT 降级断言；渲染门禁场景 ref 改 PL 后两张基线人眼复核重生成，17/17；openmai-delivery 17/17、candidate-actions 8/8，全量回归见提交。
+
 ## 2026-09-16｜feat(demo): Offer 谈判演示三人种子数据与排练手册
 
 - 目的：为曹国鸿（aha 后端 J69JWW1)、杨东旭（超衍 JSV8VOH)、从容地（UIUX JBZ1NSL）三个 Offer 项目做「AI Native offer 群」演示：机器人建决策群、发候选人上下文欢迎卡、生成/更新 Offer 决策报告。

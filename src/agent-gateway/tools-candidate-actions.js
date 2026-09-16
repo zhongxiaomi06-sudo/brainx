@@ -21,9 +21,10 @@ function safeCandidateText(value, max = 300) {
   return (text || '待核实').slice(0, max);
 }
 
-// TTC 人才编号形态（PL…/PT…）。内部受控引用（talent-db:*、reloop-profile:*）不是 TTC 编号，
-// 拼出的 app.ttcadvisory.com 链接必然打不开（2026-09-16 实证）——此类返回 null 由调用方降级。
-const TTC_REF = /^P[A-Z]\d{10,}$/;
+// 有效 TTC 人才编号形态（仅 PL… 数字段）。PT… 是 SuperMai 外部渠道（猎聘/脉脉）编号，
+// TTC 查无此人（2026-09-16 用真实 JWT 实证 record not found）；内部受控引用
+// （talent-db:*、reloop-profile:*）同理拼不出有效链接——此类返回 null 由调用方降级。
+const TTC_REF = /^PL\d{10,}$/;
 
 function talentUrl(candidateRef, candidate = {}) {
   try {

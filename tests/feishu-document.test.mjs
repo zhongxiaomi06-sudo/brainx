@@ -21,6 +21,10 @@ test('飞书报告先建文档再批量写入标题与正文块', async () => {
   assert.match(calls[2].url, /documents\/doc_1\/blocks\/doc_1\/children/);
   const body = JSON.parse(calls[2].options.body);
   assert.deepEqual(body.children.map((item) => item.block_type), [4, 2]);
+  // 建文档后必须放开「组织内链接可编辑」，否则群成员打不开报告。
+  assert.match(calls[3].url, /permissions\/doc_1\/public\?type=docx/);
+  assert.equal(calls[3].options.method, 'PATCH');
+  assert.deepEqual(JSON.parse(calls[3].options.body), { link_share_entity: 'tenant_editable' });
 });
 
 test('飞书报告地址只接受租户 HTTPS 域名', async () => {

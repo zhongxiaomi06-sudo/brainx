@@ -142,6 +142,7 @@
 - [BrainX → OpenClaw 接口包（模块化交付信息）](2026-09-02-openclaw-interface-pack.md)：用户指令「后端的结构我打包给对方模块化的信息」的**单一打包文档**。§1 三接缝一屏图 + 三条红线；§2 stdio MCP 接入配置模板 + 15 工具快照（含黑名单 `brainx_sync_now`/`brainx_talent`）+ 调用纪律；§3 consultant_id 身份映射规则（**后端不碰 open_id，映射权威在对方**；群消息通道与身份映射互不相干）；§4 Skill 素材交付与合规基线；§6 交付包清单。
 - [OpenClaw 招聘闭环（2026-09-03）](2026-09-03-openclaw-recruiting-loop.md)：记录用户从“只读首版”升级为可执行闭环后的权威范围：卡片化回复、自然语言推送设置、职位负责人、确认后接单/找人/进展、候选 Case 推进、联系方式独立授权，以及尚未接通的外发和建群。
 - [AI Native 猎头全链路轨迹图](design/ai-native-headhunter-workflow.html)：环节级轨迹、人工/自动分工与证据来源的蒸馏工作稿，阶段三回填进行中。
+- [BrainTex AI Native 猎头工作流展示页](design/braintex-ai-recruiting-os.html)：按职位决策、人才供给、流程推进、Offer 决策四个章节组织的高级滚动演示界面，汇总当前技术链、自动化边界、差异化优势与 2026-09-16 演示证据。
 - [双项目 14 天作战计划](design/week-plan-brainx-reloop.html)：BrainX × reloop 至 9/14 决赛的双泳道排期、底线条件与不做清单。
 - [BrainX 最终交付蓝图与施工总清单](brainx-final-delivery-blueprint.md)：基于当前代码审计定义最终产品形态、黄金路径、跨前后端施工顺序和端到端验收。
 - [前端审核台账](frontend-reviews/README.md)：前端审核、正式接入、发布与真实数据验证状态的唯一权威入口。

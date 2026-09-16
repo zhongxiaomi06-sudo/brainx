@@ -228,6 +228,15 @@ ${JSON.stringify({ candidates: [
   const actionIntro = card.elements.find((element) => element.tag === 'note'
     && (element.elements || []).some((note) => /点姓名直接查看 TTC/.test(note.content || '')));
   assert.ok(actionIntro, '候选人行上方必须说明姓名直达与两个动作');
+  const continueHint = card.elements.find((element) => element.tag === 'note'
+    && (element.elements || []).some((note) => /继续找人时/.test(note.content || '')));
+  assert.ok(continueHint, '继续找人按钮下方必须用弱化提示说明条件输入方式');
+  assert.match(continueHint.elements[0].content, /找人条件：……/);
+  assert.match(continueHint.elements[0].content, /自动排除已推荐人选/);
+  const continueActionIndex = card.elements.findIndex((element) => (element.actions || [])
+    .some((button) => /继续找人/.test(button.text?.content || '')));
+  assert.equal(card.elements.indexOf(continueHint), continueActionIndex + 1,
+    '提示必须紧跟在继续找人按钮下方');
   assert.doesNotMatch(card.elements[0].content, /第 \d+ 轮/, '正文不再带「第 N 轮」前缀（specs/018 修订）');
   assert.equal(card.header.title.content, 'Reloop 候选人推荐 · 续搜候选人不足');
   const completeCandidates = Array.from({ length: 6 }, (_, index) => ({

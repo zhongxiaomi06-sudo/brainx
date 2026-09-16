@@ -22,6 +22,8 @@ const ERRORS = Object.freeze({
   AGENT_IDENTITY_BINDING_REQUIRED: [409, '你的账号还没完成飞书身份绑定，暂时无法建群，请联系管理员为你的账号补上身份绑定。', false],
   BRAINX_BASE_URL_REQUIRED: [503, '服务端生产地址未配置，暂时无法建群，请联系管理员检查生产环境配置。', true],
   FEISHU_CHAT_CREATE_FAILED: [502, '飞书项目群创建失败，请稍后重试；持续失败请联系管理员。', true],
+  FEISHU_DOC_READ_FAILED: [502, '暂时无法读取当前飞书报告，请稍后重试。', true],
+  FEISHU_DOC_APPEND_FAILED: [502, '暂时无法更新当前飞书报告，请稍后重试。', true],
   PROJECT_LAUNCH_IN_PROGRESS: [409, '这个职位的项目群正在创建中，请稍后重试。', true],
   INTERNAL: [500, '服务暂时无法完成请求', false],
 });

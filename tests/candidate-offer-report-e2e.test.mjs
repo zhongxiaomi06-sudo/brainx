@@ -6,7 +6,7 @@ import { setProjectCandidateFocus } from '../src/candidate-focus.js';
 import { createCandidateDecisionGroup } from '../src/candidate-decision-group.js';
 import { createProductionToolRegistry } from '../src/agent-gateway/tool-registry.js';
 
-test('本地全链：建 Offer 群、生成 V1、追加讨论后生成 V2', async () => {
+test('本地全链：建 Offer 群、创建唯一报告、读取编辑稿并在原文档追加讨论', async () => {
   const db = openDb(':memory:');
   runSync(db, { source: 'fixture', consultant_id: 'felix' });
   const jobId = db.prepare("SELECT project_id FROM job_memberships WHERE consultant_id='felix' LIMIT 1")
@@ -44,22 +44,30 @@ test('本地全链：建 Offer 群、生成 V1、追加讨论后生成 V2', asyn
   // 迁移摘要已按小节拆成多个 markdown 元素，动作块不再是固定下标，改为按元素类型定位。
   const contextActions = sentCards[0].card.elements.find((element) => element.tag === 'action').actions;
   assert.deepEqual(contextActions.map((action) => action.text.content),
-    ['生成报告', '更新报告', '查看 TTC 人才']);
+    ['生成报告', '查看 TTC 人才']);
 
   const documents = [];
+  const appended = [];
+  let currentText = '人工编辑：候选人最看重成长路径';
   const registry = createProductionToolRegistry({ db, reportDependencies: {
     createDocumentFn: async (input) => {
       documents.push(input);
       return { document_id: `doc-e2e-${documents.length}`,
         document_url: `https://tenant.feishu.cn/docx/doc-e2e-${documents.length}` };
     },
+    readDocumentFn: async ({ documentId }) => ({ document_id: documentId, content: currentText }),
+    appendDocumentFn: async (input) => { appended.push(input); },
     sendInteractiveCardFn: async (input) => { sentCards.push(input); return { message_id: 'om_report' }; },
   } });
   const reportContext = { principal: { ...principal, chatId: 'oc_offer_e2e', purpose: 'candidate_review' } };
   const first = await registry.execute('brainx_candidate_report',
     { mode: 'GENERATE', confirm: true }, reportContext);
-  assert.equal(first.data.version, 1);
+  assert.equal(first.data.created, true);
   assert.doesNotMatch(JSON.stringify(documents[0]), /候选人明确接受 400k/);
+
+  const read = await registry.execute('brainx_candidate_report',
+    { mode: 'READ', confirm: false }, reportContext);
+  assert.match(read.data.report_content, /最看重成长路径/);
 
   const later = '2026-09-10T02:00:00.000Z';
   db.prepare(`INSERT INTO lark_messages
@@ -68,9 +76,10 @@ test('本地全链：建 Offer 群、生成 V1、追加讨论后生成 V2', asyn
     .run(later, later);
   const second = await registry.execute('brainx_candidate_report',
     { mode: 'REGENERATE', confirm: true }, reportContext);
-  assert.equal(second.data.version, 2);
-  assert.match(JSON.stringify(documents[1]), /候选人明确接受 400k/);
-  assert.equal(db.prepare("SELECT COUNT(*) n FROM candidate_reports WHERE status='READY'").get().n, 2);
-  assert.equal(sentCards.filter((item) => item.card.header.title.content.includes('Offer 决策报告')).length, 2);
+  assert.equal(second.data.updated, true);
+  assert.match(JSON.stringify(appended[0]), /候选人明确接受 400k/);
+  assert.equal(documents.length, 1);
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM candidate_reports WHERE status='READY'").get().n, 1);
+  assert.equal(sentCards.filter((item) => item.card.header.title.content.includes('Offer 决策报告')).length, 1);
   db.close();
 });

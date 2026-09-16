@@ -92,7 +92,7 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
       ...(candidates.length ? [focusIntroNote()] : []),
       ...rows,
       ...candidateQualityNotes(candidates),
-      ...(candidates.length ? [continueSearchActions(job)] : []),
+      ...(candidates.length ? [continueSearchActions(job), continueSearchHint()] : []),
       // 失败 / 空结果卡只有这一个动作 → 右对齐收口（F4）。
       // freeform 无真实职位 → target 为 null → 不渲染「打开工作台」按钮，避免伪造链接（2026-09-16）。
       ...(!success || !candidates.length ? (target ? [alignSoloAction({ tag: 'action', actions: [{ tag: 'button', type: 'primary',
@@ -182,6 +182,12 @@ function continueSearchActions(job) {
     { tag: 'button', type: 'default', text: { tag: 'plain_text', content: 'SuperMai 继续找人' },
       value: { text: command('SuperMai', 'brainx_supermai_scout') } },
   ] };
+}
+
+/** 飞书 note 使用弱化灰字展示，不与候选事实或操作按钮争夺视觉层级。 */
+function continueSearchHint() {
+  return { tag: 'note', elements: [{ tag: 'plain_text',
+    content: '继续找人时，先在群里发送“找人条件：……”，再点击上方继续找人；不发条件则按职位事实继续，并自动排除已推荐人选。' }] };
 }
 
 function tableCell(content, weight, elements) {

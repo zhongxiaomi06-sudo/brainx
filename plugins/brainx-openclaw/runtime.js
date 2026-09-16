@@ -1,7 +1,7 @@
 import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
 
 const GATEWAY_URL = 'http://127.0.0.1:3102/internal/v1/agent/tools';
-const PLUGIN_VERSION = '1.4.16';
+const PLUGIN_VERSION = '1.4.17';
 const OPENCLAW_VERSION = '2026.7.1-2';
 const string = (extra = {}) => ({ type: 'string', minLength: 1, maxLength: 512, ...extra });
 const integer = (minimum, maximum) => ({ type: 'integer', minimum, maximum });
@@ -57,8 +57,8 @@ export const BRAINX_OPENCLAW_TOOLS = Object.freeze([
   }, ['job_id', 'confirm']),
   description: '为某个已接单职位创建飞书项目群并投放职位卡（specs/017）。私聊里接单后如果还没有项目群，直接调用它补建，不要跟用户要群号、群名或任何参数；已有群时重复调用是幂等的，只返回已存在。card 内容变了要重发时传 force=true。' },
   { name: 'brainx_candidate_report', purpose: () => 'candidate_review', parameters: object({
-    mode: string({ enum: ['GENERATE', 'REGENERATE'] }), confirm: boolean(),
-  }, ['mode', 'confirm']), description: '在当前候选人 Offer 决策群生成或更新飞书云文档报告。' },
+    mode: string({ enum: ['GENERATE', 'REGENERATE', 'READ'] }), confirm: boolean(),
+  }, ['mode', 'confirm']), description: '在当前候选人 Offer 决策群创建唯一报告，或读取其当前飞书正文用于问答。' },
   { name: 'brainx_talent_pool_add', purpose: () => 'candidate_action', parameters: object({
     job_id: string(), candidate_ref: string(), confirm: boolean(),
   }, ['job_id', 'candidate_ref', 'confirm']), description: '把授权候选人一键加入团队人才库（RDS，幂等）。候选人卡上的「加入reloop」按钮点击后调用；重复调用只返回已存在。' },

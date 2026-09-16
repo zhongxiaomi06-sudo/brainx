@@ -19,7 +19,7 @@
 
 ## 2. 总体状态
 
-独立展示文档补充：招聘工作流已按用户确认方向收敛为四阶段轨迹图；仅本地展示，不属于正式应用接入。具体视觉待复看，状态见[轨迹图精简复核](frontend-reviews/2026-09-17-recruiting-workflow-map.md)与[中央台账](frontend-reviews/README.md)。
+独立展示文档补充：招聘工作流已按用户确认方向收敛为四阶段轨迹图，并完成白底浅灰圆角视觉精修；仅本地展示，不属于正式应用接入。具体视觉待复看，状态见[视觉精修复核](frontend-reviews/2026-09-17-recruiting-workflow-polish.md)与[中央台账](frontend-reviews/README.md)。
 
 | 阶段 | 施工内容 | 当前状态 | 进入下一阶段的条件 |
 |---|---|---|---|

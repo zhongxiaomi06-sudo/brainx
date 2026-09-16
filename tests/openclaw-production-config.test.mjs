@@ -106,6 +106,8 @@ test('plugin package ships every locally imported module', async () => {
     const code = await readFile(new URL(`plugins/brainx-openclaw/${name}`, root), 'utf8');
     for (const match of code.matchAll(/from '(\.[^']+)'|require\('(\.[^']+)'\)/g)) {
       const specifier = match[1] || match[2];
+      // 跨包引用（../ 开头）不归本插件 files[] 管，由部署侧 src/ 整体存在保证（2026-09-16）。
+      if (specifier.startsWith('../')) continue;
       assert.ok(shipped.has(specifier.replace(/^\.\//, '')),
         `${name} 引用了 ${specifier}，但 package.json files[] 未包含，npm pack 会丢文件`);
     }

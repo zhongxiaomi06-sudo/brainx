@@ -49,3 +49,8 @@ diag_*.mjs
 check_om.mjs
 fix_zombie.mjs
 test_rerun.mjs
+
+# 工具链缓存与本地产物（不入库，2026-09-16）
+.kimi-code/
+.specify/integrations/.cache/
+outputs/

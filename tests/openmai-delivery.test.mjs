@@ -228,8 +228,8 @@ ${JSON.stringify({ candidates: [
   const actionIntro = card.elements.find((element) => element.tag === 'note'
     && (element.elements || []).some((note) => /点姓名直接查看 TTC/.test(note.content || '')));
   assert.ok(actionIntro, '候选人行上方必须说明姓名直达与两个动作');
-  assert.match(card.elements[0].content, /第 2 轮/);
-  assert.equal(card.header.title.content, 'Reloop 候选人推荐 · 第 2 轮候选人不足');
+  assert.doesNotMatch(card.elements[0].content, /第 \d+ 轮/, '正文不再带「第 N 轮」前缀（specs/018 修订）');
+  assert.equal(card.header.title.content, 'Reloop 候选人推荐 · 续搜候选人不足');
   const completeCandidates = Array.from({ length: 6 }, (_, index) => ({
     candidate_ref: `PL187896568610594817${index}`, name: `候选人${index + 1}`, evaluation: '匹配',
   }));
@@ -238,7 +238,7 @@ ${JSON.stringify({ candidates: [
     status: 'done', resultText: `<!-- BRAINX_CANDIDATES_V1\n${JSON.stringify({ candidates: completeCandidates })}\n-->`,
     publicBaseUrl: 'https://base.yorkteam.cn/',
   });
-  assert.equal(completeCard.header.title.content, 'Reloop 候选人推荐 · 第 2 轮已就绪');
+  assert.equal(completeCard.header.title.content, 'Reloop 候选人推荐 · 续搜已就绪');
   // 6 人：每行一个姓名链接和两个动作。
   const completeRows = completeCard.elements.filter((element) => element.tag === 'column_set');
   assert.equal(completeRows.length, 7, '一行表头加六行候选人');

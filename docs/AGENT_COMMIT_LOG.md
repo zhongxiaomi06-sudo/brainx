@@ -10,7 +10,7 @@
 ## 2026-09-16｜chore(specify): speckit→kimi-code 工具链迁移落盘（代提交）
 
 - 背景：工作区既有改动（非本次 supermai 任务产生）：`.agents/skills/speckit-*` 与 `.codebuddy/commands/speckit.*` 共 20 个文件删除，`.specify/` 配置/脚本/模板更新，新增 `.specify/integrations/kimi.manifest.json`，指向 kimi-code 集成。
-- 处置：该批次挡住质量门禁（「Git / 完整检出」报 22 个被跟踪文件缺失），经零一代为单独 commit 记录既有事实；`.specify/integrations/.cache/` 为工具缓存不入库。如需回滚 revert 本提交即可。
+- 处置：该批次挡住质量门禁（「Git / 完整检出」报 22 个被跟踪文件缺失），经零一代为单独 commit 记录既有事实；`.specify/integrations/.cache/` 为工具缓存不入库。如需回滚 revert 本提交即可。首次提交漏掉 codebuddy/codex 两个 manifest 的删除，随后补提。
 - 验证：staged 清单核对无 supermai 文件混入；本提交不含代码改动。
 
 ## 2026-09-16｜fix(人才卡): TTC 链接守卫收窄为仅 PL 编号（PT 外部渠道实证查无此人）

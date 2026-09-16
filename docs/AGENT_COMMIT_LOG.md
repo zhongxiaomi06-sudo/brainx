@@ -1,5 +1,18 @@
 # Agent Commit 记录
 
+## 2026-09-16｜feat(demo): Offer 谈判演示三人种子数据与排练手册
+
+- 目的：为曹国鸿（aha 后端 J69JWW1)、杨东旭（超衍 JSV8VOH)、从容地（UIUX JBZ1NSL）三个 Offer 项目做「AI Native offer 群」演示：机器人建决策群、发候选人上下文欢迎卡、生成/更新 Offer 决策报告。
+- 内容：`fixtures/demo-offer-candidates.json` 三人虚构演示数据（快照/来源群讨论/电话纪要，戏眼分别为竞对倒计时、期权确定性、非现金诉求）;`scripts/demo-offer-seed.mjs` 幂等灌入 CLI(seed/seed-offer-msg/status，已存在真实 launch 只跳过不覆盖）;`tests/demo-offer-seed.test.mjs` 自包含回归；`docs/2026-09-16-offer-demo-seed-and-rehearsal.md` 排练手册并登记 docs/README。
+- 验证：本地库副本全链模拟通过（建群→V1→灌纪要→V2 含新增证据）;demo-offer-seed 与 candidate-offer-report-e2e 测试全过；ECS 彩排实录（含 openclaw.json 属主修复、三群三报告证据）见手册 §7。
+
+## 2026-09-16｜fix(report): Offer 决策报告默认放开组织内链接编辑
+
+- 起因（用户实证）：群成员点开报告遇权限墙。createFeishuDocument 只建文档不设权限，默认仅机器人可见。
+- 修复：建文档后统一 PATCH `link_share_entity=tenant_editable`（组织内获得链接可查看与编辑），放开失败直接报错（FEISHU_DOC_PERMISSION_FAILED)，不允许再生成只有机器人能看的报告。
+- 验证：feishu-document 测试新增权限断言 2/2;ECS 存量 10 份 READY 报告已全部 PATCH 并回读确认 tenant_editable。
+
+
 ## 2026-09-16｜fix(人才卡): 内部人才库引用不再发打不开的假 TTC 链接
 
 - 起因（用户实证）：人才卡/初筛通过后发出的 TTC 链接打不开。根因：talentUrl 对任意 candidate_ref 兜底拼接 app.ttcadvisory.com/app/talent/<ref>；内部人才库跑批上线后短名单候选是内部受控引用（talent-db:<id>，源记录仅指向 reloop-profile:*，非 TTC 编号），拼出的链接必然 404。

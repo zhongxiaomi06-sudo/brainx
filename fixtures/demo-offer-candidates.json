@@ -1,0 +1,143 @@
+{
+  "description": "Offer 谈判演示三位候选人种子数据。配合 scripts/demo-offer-seed.mjs 使用：seed 灌入绑定/launch/重点名单/来源群讨论；建群后 seed-offer-msg 把电话纪要灌进新 Offer 群，供报告 V2「新增证据」使用。全部为虚构演示数据，不得用于生产决策。",
+  "candidates": [
+    {
+      "candidate_ref": "TTC-260915-CGH",
+      "job_id": "J69JWW1",
+      "consultant_id": "wendy",
+      "member_consultants": [
+        "wendy",
+        "miya",
+        "frankie",
+        "mia"
+      ],
+      "snapshot": {
+        "name": "曹国鸿",
+        "role": "高级后端工程师 · 某头部电商交易中台",
+        "experience": "7年",
+        "city": "杭州",
+        "education": "浙江大学 · 计算机 · 本科",
+        "score": "91%",
+        "evaluation": "Go/分布式数据平台经验与岗位高度匹配，主导过亿级订单链路重构。求职动机真实：现司业务收缩、组织动荡，寻求稳定且有技术话语权的团队。薪酬：现 38K×14≈53W，期望 65W+；竞对（某独角兽）68W+签字费，9/20 前须答复。主要顾虑：新团队汇报线不清晰、杭州→上海搬迁成本。建议策略：不与竞对拼现金，主打后端重构主导权与技术影响力，搬迁补贴与过渡远程可作为破局点。"
+      },
+      "source_messages": [
+        {
+          "offset_min": 4300,
+          "text": "曹国鸿简历初筛通过，7 年后端，Go 和数据平台都对口，先约个电话"
+        },
+        {
+          "offset_min": 2900,
+          "text": "曹国鸿电话打完：现司在收缩，跳槽动机真实，期望 65W+，base 杭州"
+        },
+        {
+          "offset_min": 1500,
+          "text": "曹国鸿二面反馈很好，TL 说数据平台经验直接能用，可以推进 offer 了"
+        },
+        {
+          "offset_min": 200,
+          "text": "提醒：曹国鸿提到还有个竞对 offer 在路上，我们节奏要抓紧"
+        }
+      ],
+      "offer_messages": [
+        {
+          "offset_min": 45,
+          "text": "电话纪要：曹国鸿确认竞对 offer 68W+签字费，9/20 前要答复；现金上加空间不大，但他反复问新团队的汇报线和技术栈话语权"
+        },
+        {
+          "offset_min": 20,
+          "text": "曹国鸿爱人对搬迁去上海有顾虑，搬迁补贴和过渡期远程安排可能是破局点"
+        }
+      ]
+    },
+    {
+      "candidate_ref": "TTC-260915-YDX",
+      "job_id": "JSV8VOH",
+      "consultant_id": "wendy",
+      "member_consultants": [
+        "wendy",
+        "frankie",
+        "mia"
+      ],
+      "snapshot": {
+        "name": "杨东旭",
+        "role": "Infra 工程师 · 某自动驾驶公司基础架构组",
+        "experience": "6年",
+        "city": "北京",
+        "education": "北京邮电大学 · 计算机 · 硕士",
+        "score": "88%",
+        "evaluation": "K8s/训练平台方向与岗位匹配，两轮面试评价稳定。薪资已谈拢：总包 80W 双方达成共识。当前唯一卡点：现司期权明年 3 月归属，提前离开损失约 30W，因此希望 4 月到岗。诉求偏确定性：要求书面职级承诺与明确的入职里程碑，而非更多现金。建议策略：签字费覆盖期权损失（约 30W），接受 4/1 到岗并给出书面欢迎方案，不要试图压到岗时间。"
+      },
+      "source_messages": [
+        {
+          "offset_min": 5800,
+          "text": "杨东旭，6 年 infra，自动驾驶训练平台背景，和超衍的方向很合，推了"
+        },
+        {
+          "offset_min": 3600,
+          "text": "杨东旭一面通过，面试官评价基础扎实，推进二面"
+        },
+        {
+          "offset_min": 1300,
+          "text": "杨东旭薪资沟通顺利，80W 总包双方都能接受"
+        },
+        {
+          "offset_min": 160,
+          "text": "卡点更新：杨东旭期权明年 3 月归属，现在走亏 30W 左右，他在犹豫"
+        }
+      ],
+      "offer_messages": [
+        {
+          "offset_min": 50,
+          "text": "电话纪要：杨东旭要的不是更多现金，是确定性——书面职级、明确的入职 milestone，以及期权损失的补偿方案"
+        },
+        {
+          "offset_min": 25,
+          "text": "杨东旭因家庭安排 4 月到岗的诉求很坚决，建议直接接受，把谈判重心放在签字费结构上"
+        }
+      ]
+    },
+    {
+      "candidate_ref": "TTC-260915-CRD",
+      "job_id": "JBZ1NSL",
+      "consultant_id": "wendy",
+      "member_consultants": [
+        "wendy",
+        "miya",
+        "mia"
+      ],
+      "snapshot": {
+        "name": "从容地",
+        "role": "资深 UI/UX 设计师 · 某互联网医疗公司",
+        "experience": "8年",
+        "city": "上海",
+        "education": "江南大学 · 设计学 · 硕士",
+        "score": "89%",
+        "evaluation": "B 端医疗产品设计经验匹配，作品集为同批最强。现金略低于预期（我方 42W vs 期望 48W），但候选人核心诉求不是现金：上一家做了两年执行、没有自己的设计系统是最大痛点，同时希望每周 2 天远程。建议策略：非现金包组合——设计系统 Owner 角色写进 offer + 每周 2 天远程 + 现金微调 1-2W 表态即可，预计周三前可收口。"
+      },
+      "source_messages": [
+        {
+          "offset_min": 5000,
+          "text": "从容地的作品集在医疗 B 端里是这批最强的，推进"
+        },
+        {
+          "offset_min": 3100,
+          "text": "从容地面试反馈：设计思维成熟，和用人经理聊得来"
+        },
+        {
+          "offset_min": 900,
+          "text": "从容地期望 48W，我们预算 42W，差 6W，先别急着加钱，她对现金没那么敏感"
+        },
+        {
+          "offset_min": 120,
+          "text": "关键信息：从容地上一家做了两年执行没有自己的设计系统，这是我们能给的"
+        }
+      ],
+      "offer_messages": [
+        {
+          "offset_min": 40,
+          "text": "电话纪要：从容地确认现金差距可以接受，前提是设计系统 Owner 角色 + 每周 2 天远程写进 offer，她周三前给答复"
+        }
+      ]
+    }
+  ]
+}

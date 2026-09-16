@@ -62,11 +62,10 @@ test('重点候选人建群并迁移脱敏上下文，重复点击不重复建�
   assert.match(goal.content, /准备 Offer/);
   const actions = card.elements[card.elements.indexOf(goal) + 1].actions;
   // F1：primary 从「查看 TTC 人才」这个纯跳转移交给「生成报告」，主行动排到最前。
-  assert.deepEqual(actions.map((action) => action.text.content), ['生成报告', '更新报告', '查看 TTC 人才']);
+  assert.deepEqual(actions.map((action) => action.text.content), ['生成报告', '查看 TTC 人才']);
   assert.equal(actions[0].type, 'primary', '真实业务动作必须是主按钮');
-  assert.match(actions[0].value.text, /brainx_candidate_report.*GENERATE/);
-  assert.match(actions[1].value.text, /brainx_candidate_report.*REGENERATE/);
-  assert.match(card.elements.at(-1).elements[0].content, /\/report/);
+  assert.match(actions[0].value.text, /BRAINTEX_REPORT_CREATE.*brainx_candidate_report.*GENERATE/);
+  assert.match(card.elements.at(-1).elements[0].content, /只创建一次/);
   assert.equal(db.prepare("SELECT notes FROM chat_contexts WHERE chat_id='oc_candidate'").get().notes,
     `candidate-decision:${jobId}:TTC-100`);
   assert.equal(db.prepare("SELECT COUNT(*) n FROM agent_group_scopes WHERE chat_id='oc_candidate'").get().n, 1);

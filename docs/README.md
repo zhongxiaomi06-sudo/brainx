@@ -34,7 +34,7 @@
 | 参考代码镜像、开源仓库学习或外部设计对照 | [参考代码本地镜像清单](standards/REFERENCE_REPOS.md)、[全景架构与技术施工蓝图](architecture-2026-09-01-full-blueprint.md) |
 | 飞书群聊工作流、BrainTex 机器人、事件/卡片回调或信息鉴权分工 | [BrainTex 群聊工作流技术 PRD](prd-2026-09-01-braintex-group-workflow.md)、[Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) |
 | **拉群后卡片没弹出来、OpenClaw 群准入失败、要补发职位卡或排查"群建了但机器人不响应"** | **[拉群即见卡规格](../specs/013-launch-card-first/spec.md)**（卡片先发 + 准入降级 best-effort + 补偿重放 + 节流重启 gateway + launch-redeliver 补发）、[OpenClaw 多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md) |
-| **群内接单被拒、卡片没有找人按钮、要在项目群里直接接单或按条件找人** | **[项目群卡片动作规格](../specs/014-launch-card-actions/spec.md)**（群内接单放开、卡片按承接状态分岔、OpenMai/Reloop/SuperMai 三按钮 + 条件输入框、存量群 scope 补齐 job_action）、[拉群即见卡规格](../specs/013-launch-card-first/spec.md) |
+| **群内接单被拒、卡片没有找人按钮、要在项目群里直接接单或按条件找人** | **[项目群卡片动作规格](../specs/014-launch-card-actions/spec.md)**（群内接单放开、卡片按承接状态分岔、OpenMai/Reloop/SuperMai 三按钮 + 同群条件消息、存量群 scope 补齐 job_action）、[拉群即见卡规格](../specs/013-launch-card-first/spec.md) |
 | **机器人被拉进已有群后没反应、想让它自动发「绑定职位」卡、或在旧群里绑定职位开始找人** | **[机器人进群接管规格](../specs/015-group-intake/spec.md)**（轮询发现新群发绑定卡 + groupIntakeBinding 特例授权 + 绑定后发找人卡与拉群指引/防滥用提醒）、[群成员权限放开与绑定自愈](2026-09-15-group-member-access-and-bind-selfheal.md)（旧群绑定不再依赖轮询登记，@机器人 即绑） |
 | **共享职位群里非协作者点找人/候选工具被拒、想在项目群里放开给所有成员** | **[群成员找人权限放开与旧群绑定自愈](2026-09-15-group-member-access-and-bind-selfheal.md)**（绑定群即信任边界，群成员都能点找人/自助接单；私聊与非绑定群仍 fail-closed） |
 | **顾问点了「绑定我的职位」却绑不上（群绑定停在 CARD_SENT、project_id 一直为空）** | 先查 `agent_tool_calls.error_code`：`BRAINX_BASE_URL_REQUIRED` = `brainx-agent-gateway` 缺生产基址 —— 本服务以 `brainx` 用户运行读不到 `root:600` 的 `/opt/brainx/.env`，须单独挂 `/etc/brainx/base-url.env`（见 [提交日志 2026-09-11](AGENT_COMMIT_LOG.md)、[机器人进群接管规格](../specs/015-group-intake/spec.md)） |
@@ -110,11 +110,13 @@
 - [候选人保留与项目共享上下文复核](frontend-reviews/2026-09-09-candidate-focus-context.md)：飞书候选行“保留”、项目级重点名单、后续群问答读取与安全边界。
 - [重点关注并发送人才卡复核](frontend-reviews/2026-09-10-candidate-focus-share-card.md)：9 月 10 日历史交互与共享上下文边界。
 - [候选总览三入口与人才链接直发复核](frontend-reviews/2026-09-15-candidate-link-actions.md)：姓名直达 TTC、初筛通过与加入 reloop，并由飞书展开人才链接。
+- [候选结果卡继续找人提示复核](frontend-reviews/2026-09-15-candidate-continue-search-hint.md)：继续找人按钮下方用弱化提示说明条件消息格式、默认搜索和历史候选排除。
 - [每日推荐卡一键接单并建群复核](frontend-reviews/2026-09-10-daily-card-quick-launch.md)：推荐卡签名确认、自动加入项目、接单、幂等建群和不自动找人的边界。
 - [候选人 Offer 决策群复核](frontend-reviews/2026-09-09-candidate-decision-group.md)：重点候选人独立建群、原项目群摘要迁移、群准入与幂等边界。
 - [候选卡片与对话建群复核](frontend-reviews/2026-09-09-candidate-card-conversation-group.md)：逐行发送人才卡、移除建群按钮、自然语言建群与自动重点名单边界。
-- [候选人 Offer 决策报告](2026-09-10-candidate-offer-report.md)：决策群首卡、飞书云文档版式、`/report` 更新、安全与真实验收边界。
-- [Offer 决策群首卡与报告复核](frontend-reviews/2026-09-10-candidate-offer-report.md)：三个首卡动作、上下文迁移和发布/真机状态。
+- [候选人 Offer 决策报告](2026-09-10-candidate-offer-report.md)：决策群首卡、单一可编辑飞书报告、实时正文读取问答、安全与真实验收边界。
+- [Offer 决策群首卡与报告复核](frontend-reviews/2026-09-10-candidate-offer-report.md)：历史三个首卡动作、上下文迁移和发布/真机状态。
+- [Offer 决策群单报告与编辑稿问答复核](frontend-reviews/2026-09-16-candidate-offer-single-report.md)：单文档幂等、人工编辑稿只读问答和本轮真机状态。
 - [Offer 谈判演示：三人种子数据与排练手册](2026-09-16-offer-demo-seed-and-rehearsal.md)：曹国鸿/杨东旭/从容地演示数据灌入工具、排练纪律与 ECS 拉群执行方案。
 - [BrainX × OpenClaw AI 猎头工作流产品需求文档](prd-2026-09-02-openclaw-ai-recruiting-workflow.md)：当前阶段权威开发基线；基于代码审计和官方能力，定义 OpenClaw 主 Agent、飞书最小权限、BrainX 窄网关、人才授权、简历事实、匹配、施工阶段和发布门禁。
 - [历史：BrainX 飞书 AI 猎头副驾驶产品需求文档](prd-2026-09-01-feishu-ai-consultant-copilot.md)：主 Agent 调整前的 Codex 方案和用户研究，仅作历史参考。

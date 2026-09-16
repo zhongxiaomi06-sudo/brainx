@@ -3,7 +3,7 @@ import { definePluginEntry } from 'openclaw/plugin-sdk/plugin-entry';
 import { createBraintexHomeCommand, createCandidateReportCommand } from './onboarding.js';
 import { BRAINX_OPENCLAW_TOOLS, createBrainxToolFactory } from './runtime.js';
 import { formatBrainxReplyPayload } from './response-card.js';
-import { createBraintexPromptContext } from './prompt.js';
+import { createBraintexPromptContext, preloadSpecialGroupDoc } from './prompt.js';
 import { createSearchStartNoticeHandler } from './search-start-notice.js';
 import { createMentionSilenceHandler } from './mention-silence.js';
 
@@ -21,6 +21,14 @@ export default definePluginEntry({
     api.on('message_received', createSearchStartNoticeHandler(api));
     const mentionSilence = createMentionSilenceHandler();
     api.on('message_received', (event, context) => mentionSilence.onMessageReceived(event, context));
+    // 群级特殊背景文档预加载（fire-and-forget，不阻塞消息处理）：
+    // 消息入站时异步拉飞书文档到 prompt.js 的 docCache，before_prompt_build 同步读缓存。
+    api.on('message_received', (event, context) => {
+      const chatId = [context?.conversationId, event?.metadata?.chatId, event?.metadata?.to]
+        .map((value) => String(value || '').trim().replace(/^chat:/, ''))
+        .find((value) => /^oc_[A-Za-z0-9_-]+$/.test(value));
+      if (chatId) void preloadSpecialGroupDoc(chatId);
+    });
     // before_agent_reply 拦普通文本回复（reply_payload_sending 只覆盖富负载，2026-09-14 探针实证）。
     api.on('before_agent_reply', mentionSilence.onBeforeAgentReply, { priority: 100 });
     api.on('reply_payload_sending', (event, context) => {

@@ -1,5 +1,16 @@
 # Agent Commit 记录
 
+## 2026-09-16｜feat(prompt): Offer 决策群小机器人注入飞书文档为对话背景（限本群独有）
+
+- 起因（咪需求）：让 `杨东旭-Ai infra-Offer决策` 群里小机器人对话时把飞书文档 `TrFHdPfc3oXzyLxa2TRcVxQvn6b`（杨东旭 × AI4S Offer 决策报告）作为背景上下文；用户改文档后机器人能读到改后内容（5 分钟缓存自动刷新）；其他群无此能力。
+- 改动：
+  1. `src/feishu-document.js` 新增 `readFeishuDocument({docId, ...})`：调飞书 `docx/v1/documents/{docId}/raw_content` 拉文档纯文本（结构扁平化但内容完整，足够对话背景）。权限要求 `docx:document:readonly`（或 `docx:document`）。
+  2. `plugins/brainx-openclaw/prompt.js` 加 `SPECIAL_GROUP_CONTEXT_DOCS` 映射（`chat_id -> docx token`）+ 5 分钟 TTL 缓存 + `preloadSpecialGroupDoc`（async，message_received 钩子触发，fire-and-forget）+ `readSpecialGroupDocFromCache`（sync，before_prompt_build 钩子同步读）；缓存未命中降级返回无文档版本（fail-open，与 mention-silence 一致）。
+  3. `plugins/brainx-openclaw/index.js` 加 message_received 钩子调 `preloadSpecialGroupDoc`，从 `context.conversationId`/`event.metadata.chatId`/`event.metadata.to` 三处源提取 chat_id。
+- 边界：仅 `oc_4d7d97cfc99fb5dbb1de518d84b68a2b`（杨东旭群）登记在映射里；其他群一律不加载文档。新增群级映射须在 `SPECIAL_GROUP_CONTEXT_DOCS` 显式登记。
+- 验证：新增 `tests/feishu-document-read.test.mjs`（4 例：成功/缺 docId/非零 code/HTTP 非 200）+ `tests/brainx-prompt-special-group.test.mjs`（8 例：映射查询/非 feishu channel/缓存未命中 fail-open/非映射群不注入/preload+注入/凭据缺失/飞书失败降级/sessionKey 路径提取），共 12 例全过；`npm run verify:quick` 16 项检查全过、53 测试全 pass。
+- 待办：① 飞书机器人应用需在开放平台后台勾选 `docx:document:readonly` scope（否则 readFeishuDocument 会 403）；② 部署到生产 ECS：插件副本 cp 到 `/var/lib/brainx/.openclaw/extensions/brainx-openclaw/`（chown brainx:brainx）+ 重启 openclaw-brainx；③ 真实验证：在杨东旭群 @ 机器人问文档里的事实，看回复是否引用文档内容。
+
 ## 2026-09-16｜feat(找人): SuperMai 自由找人结果卡 + 轮次标题修正（specs/018）
 
 - 起因（linda 实证）：SuperMai 自由找人（无职位、纯判据）done 后 result_text 由模型自由排版，格式不固定、群内无结构化卡片；且项目模式非首轮标题误写「第 N 轮」。

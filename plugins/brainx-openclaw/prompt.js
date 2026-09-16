@@ -1,3 +1,5 @@
+import { readFeishuDocument } from '../../src/feishu-document.js';
+
 const BRAINTEX_SYSTEM_CONTEXT = `你是 BrainTex AI 猎头助手，不是通用职业规划助手。
 
 在飞书会话中，用户没有明确指定其他主题时，“推荐三个”“推荐职位”“今天先做什么”都指当前顾问有权限查看的真实 BrainX 职位：必须先调用 brainx_daily_brief，再根据工具返回的事实回答；不得凭常识编造职位方向。
@@ -48,8 +50,89 @@ brainx_supermai_scout / brainx_openmai_search 是触发/读取两段式异步任
 
 顾问在私聊里问「怎么还没给我拉群」「给我建个群」「我要拉群跟进这个职位」时，直接用 brainx_launch_project_chat（job_id + confirm=true）把项目群建出来，不要让他自己去飞书建群、也不要问他要群名。私聊里已经有项目群时该工具幂等返回 already=true。`;
 
+// 群级特殊背景信息文档映射（chat_id -> docx token）。
+// 咪 2026-09-16 指定：让本群小机器人对话时自动加载这份飞书文档作为背景知识；其他群无此能力。
+// 报告可由用户手动修改；机器人通过 raw_content API 实时拉取，DOC_CACHE_TTL_MS 缓存。
+// 新增群级映射须在此处显式登记；不在映射内的群一律不加载文档。
+const SPECIAL_GROUP_CONTEXT_DOCS = Object.freeze({
+  // 杨东旭-Ai infra-Offer决策 群（9/16 演示建群）→ 杨东旭 × AI4S Offer 决策报告
+  oc_4d7d97cfc99fb5dbb1de518d84b68a2b: 'TrFHdPfc3oXzyLxa2TRcVxQvn6b',
+});
+
+const DOC_CACHE_TTL_MS = 5 * 60 * 1000;
+const docCache = new Map(); // docId -> { content, fetchedAt }
+
+function extractChatIdFromContext(context = {}) {
+  // 多源提取，参考 mention-silence.js 的策略
+  const directCandidates = [
+    context?.conversationId, context?.chatId,
+    context?.deliveryContext?.to, context?.metadata?.chatId,
+    context?.metadata?.to, context?.to,
+  ];
+  for (const value of directCandidates) {
+    const s = String(value || '').trim().replace(/^chat:/, '');
+    if (/^oc_[A-Za-z0-9_-]+$/.test(s)) return s;
+  }
+  // sessionKey 路径：常见形如 feishu:group:oc_xxx 或 :group:oc_xxx
+  const sessionKey = String(context?.sessionKey || '');
+  const match = /:group:(oc_[A-Za-z0-9_-]+)/.exec(sessionKey);
+  if (match) return match[1];
+  return null;
+}
+
+export function getSpecialGroupDocId(chatId) {
+  if (!chatId) return null;
+  return SPECIAL_GROUP_CONTEXT_DOCS[chatId] || null;
+}
+
+/** 预加载群级特殊文档到缓存。fire-and-forget，失败静默跳过。
+ *  message_received 钩子调用——在消息入站时异步触发拉取，before_prompt_build
+ *  钩子同步读缓存，无缓存则降级为无文档版本（fail-open，与 mention-silence 一致）。 */
+export async function preloadSpecialGroupDoc(chatId, dependencies = {}) {
+  const docId = getSpecialGroupDocId(chatId);
+  if (!docId) return;
+  const cached = docCache.get(docId);
+  if (cached && Date.now() - cached.fetchedAt < DOC_CACHE_TTL_MS) return;
+  const fetchImpl = dependencies.fetchImpl || globalThis.fetch;
+  const appId = dependencies.appId ?? process.env.BRAINX_FEISHU_APP_ID;
+  const appSecret = dependencies.appSecret ?? process.env.BRAINX_FEISHU_APP_SECRET;
+  if (!appId || !appSecret) return; // 凭据缺失静默跳过，下次再试
+  try {
+    const { content } = await readFeishuDocument({ docId, appId, appSecret, fetchImpl });
+    if (!content) return;
+    docCache.set(docId, { content, fetchedAt: Date.now() });
+    if (docCache.size > 20) docCache.delete(docCache.keys().next().value);
+  } catch {
+    // 拉取失败静默跳过，prompt 降级为无文档版本；下一条消息会自动重试
+  }
+}
+
+function readSpecialGroupDocFromCache(chatId) {
+  const docId = getSpecialGroupDocId(chatId);
+  if (!docId) return null;
+  const cached = docCache.get(docId);
+  if (!cached || Date.now() - cached.fetchedAt > DOC_CACHE_TTL_MS) return null;
+  return cached.content;
+}
+
+/** 测试钩子：重置 docCache，避免测试间状态污染。仅测试代码调用。 */
+export function _resetDocCacheForTests() {
+  docCache.clear();
+}
+
+function buildSpecialGroupSuffix(chatId, content) {
+  return `\n\n# 本群专属背景信息（实时同步飞书文档，${Math.floor(DOC_CACHE_TTL_MS / 60000)} 分钟刷新一次缓存；用户在飞书侧的修改会在缓存过期后自动同步）\n\n回答本群问题时，优先依据以下文档内容；若用户提及文档里没有的事实，明确说明该信息未在背景文档中，请用户补充：\n\n${content}`;
+}
+
 export function createBraintexPromptContext(context = {}) {
   const channel = String(context.messageProvider || context.channel || '').toLowerCase();
   if (channel && channel !== 'feishu') return undefined;
-  return BRAINTEX_SYSTEM_CONTEXT;
+  const chatId = extractChatIdFromContext(context);
+  if (!chatId) return BRAINTEX_SYSTEM_CONTEXT;
+  const docContent = readSpecialGroupDocFromCache(chatId);
+  if (!docContent) {
+    // 缓存未命中：触发改群下一条消息生效的预加载由 message_received 钩子负责
+    return BRAINTEX_SYSTEM_CONTEXT;
+  }
+  return BRAINTEX_SYSTEM_CONTEXT + buildSpecialGroupSuffix(chatId, docContent);
 }

@@ -1,6 +1,10 @@
 /** 使用企业自建应用身份创建只含脱敏业务事实的飞书云文档。
  *  创建后统一放开「组织内获得链接的人可编辑」（link_share_entity=tenant_editable），
- *  保证决策群成员点开报告即可查看与协作编辑；放开失败必须报错，不允许生成只有机器人能看的报告。 */
+ *  保证决策群成员点开报告即可查看与协作编辑；放开失败必须报错，不允许生成只有机器人能看的报告。
+ *
+ *  readFeishuDocument（2026-09-16 新增）：用 tenant_access_token 拉文档纯文本，
+ *  供 Offer 决策群小机器人把用户改后的报告正文作为对话背景上下文。权限要求
+ *  docx:document:readonly（或 docx:document），缺 scope 会 403；调用方负责降级。 */
 import { getTenantAccessToken } from './feishu-bot.js';
 
 const BASE = 'https://open.feishu.cn';
@@ -60,4 +64,22 @@ export async function createFeishuDocument({ title, sections, fetchImpl = global
     throw new Error(`FEISHU_DOC_PERMISSION_FAILED: ${String(permission.msg || permission.code || 'unknown').slice(0, 160)}`);
   }
   return { document_id: documentId, document_url: `${baseUrl}/docx/${documentId}` };
+}
+
+/** 读取飞书 docx 文档纯文本。用 raw_content API（结构扁平化但内容完整），
+ *  足够作为对话背景；表格会被展平为换行文本。docId 必须是飞书 docx token
+ *  （/docx/<token> 路径里的 token）。失败抛错，调用方负责降级。 */
+export async function readFeishuDocument({ docId, fetchImpl = globalThis.fetch,
+  appId, appSecret, timeoutMs = 15_000 }) {
+  if (!docId) throw new Error('FEISHU_DOC_ID_REQUIRED');
+  const token = await getTenantAccessToken({ appId, appSecret, fetchImpl, timeoutMs });
+  const response = await fetchImpl(
+    `${BASE}/open-apis/docx/v1/documents/${encodeURIComponent(docId)}/raw_content`,
+    { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(timeoutMs) },
+  );
+  const body = await json(response, 'FEISHU_DOC_READ_RESPONSE_INVALID');
+  if (response.ok === false || body.code !== 0) {
+    throw new Error(`FEISHU_DOC_READ_FAILED: ${String(body.msg || body.code || 'unknown').slice(0, 160)}`);
+  }
+  return { content: String(body.data?.content || ''), document_id: docId };
 }

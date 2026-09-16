@@ -71,6 +71,32 @@ function openmaiResultText() {
     + `${JSON.stringify({ candidates }, null, 0)}\n-->\n`;
 }
 
+function supermaiFreeformResultText() {
+  // 自由找人：候选人均无 PL 编号（外部猎聘/脉脉渠道），验证链接放空 + 操作列「不可操作」。
+  const candidates = [
+    { name: '张嘉宜', role: '快手 / 战略分析师', experience: '2 年', city: '北京',
+      education: '硕士 · 欧洲高等商学院', score: '89',
+      evaluation: 'AI 应用和跨部门协作标签匹配，年限和地点合适。' },
+    { name: '李璿', role: '美团 / 商业分析师', experience: '2 年', city: '北京',
+      education: '硕士 · 宾夕法尼亚大学', score: '76',
+      evaluation: '战略研究经验，文字表达基础好，硬科技项目待核实。' },
+    { name: '何宇昕', role: '滴滴出行 / 高级战略分析师', experience: '3 年', city: '北京',
+      education: '硕士 · 哥伦比亚大学', score: '82',
+      evaluation: '战略分析 + 零到一项目经验，商业航天/先进制造需确认。' },
+    { name: '郑思彬', role: '特斯联 / AI 战略分析师', experience: '4 年', city: '北京',
+      education: '硕士 · 伦敦政治经济学院', score: '92',
+      evaluation: 'AI 战略岗位最匹配，商业航天深度待核实。' },
+    { name: '王思齐', role: '字节跳动 / AI 产品经理', experience: '3 年', city: '北京',
+      education: '硕士 · 清华大学', score: '85',
+      evaluation: 'AI 产品从零到一经验，战略深度待核实。' },
+    { name: '陈雨桐', role: '百度 / 高级战略分析师', experience: '5 年', city: '北京',
+      education: '硕士 · 北京大学', score: '80',
+      evaluation: '战略分析经验完整，AI 应用落地待确认。' },
+  ];
+  return `本轮共找到 ${candidates.length} 位候选人。\n\n<!--BRAINX_CANDIDATES_V1\n`
+    + `${JSON.stringify({ candidates }, null, 0)}\n-->\n`;
+}
+
 function launchJob() {
   return { ...JOB, consultant_name: 'Felix 黄鑫' };
 }
@@ -106,9 +132,15 @@ export function buildScenarios() {
       buildProjectLaunchCard(job, { publicBaseUrl: BASE, state: 'ACCEPTED' })],
     ['project-launch-pending', '项目群职位卡（未接单）',
       buildProjectLaunchCard(job, { publicBaseUrl: BASE, state: 'PENDING' })],
-    ['openmai-delivery-complete', '找人结果卡（第 2 轮 6 人）',
+    ['openmai-delivery-complete', '找人结果卡（续搜 6 人）',
       buildOpenmaiDeliveryCard({ job: deliveryJob, status: 'done', resultText: openmaiResultText(),
         publicBaseUrl: BASE })],
+    ['supermai-freeform', 'SuperMai 自由找人卡（首轮 6 人无 PL 编号，链接放空）',
+      buildOpenmaiDeliveryCard({
+        job: { project_id: 'supermai:freeform00', company: '自由找人',
+          role: '北京 AI 战略 1-5 年', search_round: 1, freeform: true,
+          criteria: '北京 AI 战略分析师 1-5 年经验' },
+        status: 'done', resultText: supermaiFreeformResultText(), publicBaseUrl: BASE })],
     ['openmai-delivery-failed', '找人失败卡',
       buildOpenmaiDeliveryCard({ job: JOB, status: 'failed',
         error: 'OpenMai 连接超时：TTC 登录状态可能已失效，请在工作台重新授权后重试。',

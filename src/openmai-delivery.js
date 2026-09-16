@@ -53,32 +53,39 @@ export function groupSafeOpenmaiText(value, max = 6500) {
 }
 
 export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publicBaseUrl }) {
+  // freeform = SuperMai 自由找人模式（无职位）：判据摘要替代 company/role，不放 deep link。
+  // 项目模式 job.freeform 不传，行为不变（AGENTS.md §2 最小实现：复用同一函数）。
+  const freeform = job?.freeform === true;
   const baseUrl = productionBaseUrl(publicBaseUrl).href;
-  const target = buildBrainxDeepLink({ baseUrl, objectType: 'opportunity', objectRef: job.project_id });
+  const target = freeform ? null
+    : buildBrainxDeepLink({ baseUrl, objectType: 'opportunity', objectRef: job.project_id });
   const success = status === 'done' || status === 'needs_input';
   const quality = success ? assessOpenmaiCandidateBatch(resultText) : null;
   const needsInput = status === 'needs_input' || quality?.needsInput;
   const complete = success && quality.complete;
   const candidates = success ? extractOpenmaiCandidates(resultText) : [];
   const searchRound = Math.max(1, Number(job.search_round || 1));
-  const roundLabel = searchRound > 1 ? `第 ${searchRound} 轮 · ` : '';
-  const readyTitle = searchRound > 1 ? `Reloop 候选人推荐 · 第 ${searchRound} 轮已就绪`
-    : 'Reloop 候选人推荐 · 首轮已就绪';
-  const partialTitle = searchRound > 1 ? `Reloop 候选人推荐 · 第 ${searchRound} 轮候选人不足`
-    : 'Reloop 候选人推荐 · 首轮候选人不足';
+  // 2026-09-16 用户拍板：首轮才写「首轮」，其他轮次用「续搜」，不写「第 N 轮」。
+  const roundWord = searchRound > 1 ? '续搜' : '首轮';
+  const brand = freeform ? 'SuperMai 自由找人' : 'Reloop 候选人推荐';
+  const readyTitle = `${brand} · ${roundWord}已就绪`;
+  const partialTitle = `${brand} · ${roundWord}候选人不足`;
+  const headline = freeform
+    ? `**自由找人 · ${groupSafeOpenmaiText(job.criteria, 60) || '未给判据'}**`
+    : `**${job.company} · ${job.role}**`;
   const content = success
     ? (candidates.length
-      ? `**${job.company} · ${job.role}**\n\n${roundLabel}本轮共找到 ${candidates.length} 位候选人。`
+      ? `${headline}\n\n本轮共找到 ${candidates.length} 位候选人。`
         + (quality.message ? `\n\n> ${quality.message}` : '')
-      : `**${job.company} · ${job.role}**\n\n${groupSafeOpenmaiText(resultText)}`)
-    : `**${job.company} · ${job.role}**\n\n本轮候选人搜索失败：${groupSafeOpenmaiText(error, 500)}\n\n请修复连接后在工作台重试。`;
+      : `${headline}\n\n${groupSafeOpenmaiText(resultText)}`)
+    : `${headline}\n\n本轮候选人搜索失败：${groupSafeOpenmaiText(error, 500)}\n\n请修复连接后在工作台重试。`;
   const rows = candidates.length ? candidateFocusRows(job, candidates) : [];
   return {
     config: { wide_screen_mode: true },
     header: { template: complete ? 'green' : success ? 'orange' : 'red', title: { tag: 'plain_text',
       content: complete ? readyTitle
-        : needsInput ? 'Reloop 候选人推荐 · 请补充职位信息'
-          : success ? partialTitle : 'Reloop 候选人推荐 · 搜索失败' } },
+        : needsInput ? `${brand} · 请补充职位信息`
+          : success ? partialTitle : `${brand} · 搜索失败` } },
     elements: [
       { tag: 'markdown', content },
       // 说明收成一行小灰字 note：按钮与候选人随行后不再需要长段教学。
@@ -87,9 +94,10 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
       ...candidateQualityNotes(candidates),
       ...(candidates.length ? [continueSearchActions(job)] : []),
       // 失败 / 空结果卡只有这一个动作 → 右对齐收口（F4）。
-      ...(!success || !candidates.length ? [alignSoloAction({ tag: 'action', actions: [{ tag: 'button', type: 'primary',
+      // freeform 无真实职位 → target 为 null → 不渲染「打开工作台」按钮，避免伪造链接（2026-09-16）。
+      ...(!success || !candidates.length ? (target ? [alignSoloAction({ tag: 'action', actions: [{ tag: 'button', type: 'primary',
         text: { tag: 'plain_text', content: success ? '打开工作台查看与评估' : '打开工作台处理' },
-        multi_url: { url: target, pc_url: target, android_url: target, ios_url: target } }] })] : []),
+        multi_url: { url: target, pc_url: target, android_url: target, ios_url: target } }] })] : []) : []),
     ],
   };
 }
@@ -151,6 +159,12 @@ function candidateQualityNotes(candidates) {
 }
 
 function continueSearchActions(job) {
+  // freeform（自由找人）模式不接受 continue_search（skill 约定），
+  // 不放「继续找人」按钮，改放引导语：换方向请新发「找人条件：」消息（2026-09-16）。
+  if (job?.freeform === true) {
+    return { tag: 'note', elements: [{ tag: 'plain_text',
+      content: '想换方向找人，请新发一条以「找人条件：」开头的消息。' }] };
+  }
   const projectRef = String(job.project_id || '').trim().slice(0, 64);
   const command = (entry, tool) => `[BRAINTEX_SEARCH_START] 为项目 ${projectRef} 使用 ${entry} 继续找人。读取本群最近一条由顾问明确发送的“找人条件：”作为可选补充条件；现在第一次调用 ${tool}，传入 job_id=${projectRef} 和 continue_search=true。任务返回 running/triggered 后立即回复“正在继续找人，完成后候选人会自动发到本群”并结束本轮，不要原地轮询。后续若顾问主动询问进度，查询时必须把 continue_search 改为 false 或省略，同一次按钮任务绝不能再次传 true。排除名单必须由 BrainX 根据历史 TTC 编号生成，不要自行编造，也不要再次询问找人方式。`;
   return { tag: 'action', actions: [

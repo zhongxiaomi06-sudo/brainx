@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-16｜feat(找人): SuperMai 自由找人结果卡 + 轮次标题修正（specs/018）
+
+- 起因（linda 实证）：SuperMai 自由找人（无职位、纯判据）done 后 result_text 由模型自由排版，格式不固定、群内无结构化卡片；且项目模式非首轮标题误写「第 N 轮」。
+- 修复：① buildOpenmaiDeliveryCard 新增 freeform 分支（job.freeform=true 时判据摘要替代 company/role、deep link 置空、失败/空结果不再渲染「打开工作台」按钮）② 轮次标题改「首轮/续搜」二值，不再出现「第 2/3 轮」③ continueSearchActions 自由找人模式改引导语「新发『找人条件：』消息」（continue_search 不支持）④ supermaiScout 去掉 jobId&&job 排除，自由找人拼合成 job（project_id=supermai 合成键）同样发卡，幂等键随合成键防重。
+- 链接待核实口径不变：无 PL 编号候选人姓名列纯文本、操作列「不可操作」，底部小字披露（specs/018 §2.2 确认现状满足「无链接放空」）。
+- 验证：卡片渲染门禁 18/18（新增 supermai-freeform 场景：首轮 6 人无 PL 编号，人眼复核截图标题/判据摘要/纯文本姓名/引导语全部符合）；verify:quick 除 speckit 稀疏检出问题外全过（该问题由前一提交独立解决）。
+
 ## 2026-09-16｜chore(specify): speckit→kimi-code 工具链迁移落盘（代提交）
 
 - 背景：工作区既有改动（非本次 supermai 任务产生）：`.agents/skills/speckit-*` 与 `.codebuddy/commands/speckit.*` 共 20 个文件删除，`.specify/` 配置/脚本/模板更新，新增 `.specify/integrations/kimi.manifest.json`，指向 kimi-code 集成。

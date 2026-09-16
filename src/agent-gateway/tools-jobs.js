@@ -383,7 +383,7 @@ function openmaiSearch(db, args, principal, sendCardFn, publicBaseUrl) {
  * SuperMai 找人 = 猎聘/脉脉渠道 → 与 openmai_search 共用 OpenMai 引擎，
  * 本入口是「无需职位、直接给判据」的自由找人（completions 无 job_id 模式）。
  * 触发/读取两段式：首次调用触发任务返回 running，完成后同参数再调读取结果。 */
-function supermaiScout(db, args, principal) {
+function supermaiScout(db, args, principal, sendCardFn, publicBaseUrl) {
   const jobId = String(args.job_id || '').trim();
   const continuing = args.continue_search === true;
   if (continuing && !jobId) fail('INVALID_ARGUMENT');
@@ -406,16 +406,28 @@ function supermaiScout(db, args, principal) {
     // NO_REPLY/空结果：OpenMai 对极窄判据可能零命中（返回占位符）——语义化为「未搜到」而非当成成功交付。
     const noReply = cur.status === 'done' && !candidates.length
       && ['NO_REPLY', ''].includes(String(cur.result_text || '').trim());
+    // 项目模式 + 群上下文 + 已完成：确定性发结果卡（与 openmai_search 同一纪律），
+    // envelope 不再带名单——模型只回引导语，多轮对话后不再自由排版（2026-09-16 linda 实证）。
+    // 自由找人模式（无 jobId）也发卡：拼合成 job 传给卡片函数（2026-09-16 specs/018）。
+    const synthJob = jobId ? job : {
+      project_id, company: '自由找人', role: (criteria || '').slice(0, 60),
+      search_round: cur.search_round || 1, freeform: true, criteria,
+    };
+    const cardSent = cur.status === 'done' && !noReply
+      && trySendOpenmaiResultCard(sendCardFn, publicBaseUrl, { job_id: project_id }, principal, synthJob, cur);
     return {
       data: { entry: 'supermai', job_ref: jobId || null, criteria, status: cur.status,
-              result_text: noReply ? null : cur.result_text || null, candidates,
+              result_text: cardSent ? null : (noReply ? null : cur.result_text || null),
+              candidates: cardSent ? [] : candidates,
+              ...(cardSent ? { card_delivered: true } : {}),
               empty_reason: noReply ? 'NO_MATCHES_FOUND' : null,
               started_at: cur.started_at || null, finished_at: cur.finished_at || null,
               ...(disc ? { elapsed_seconds: disc.elapsed_seconds, elapsed_minutes: disc.elapsed_minutes } : {}) },
       facts: [], inferences: [],
-      recommendations: cur.status === 'done' && !noReply ? [{ action: 'present_result',
+      recommendations: !cardSent && cur.status === 'done' && !noReply ? [{ action: 'present_result',
         note: '结果已就绪——请把 data.result_text 里的候选人列表完整、结构化地呈现给顾问，并询问下一步（约面/推荐）。' }] : [],
-      unknowns: disc ? [disc.discipline]
+      unknowns: cardSent ? ['结果卡已发到本群：只用一句话引导群友点卡片上的按钮（初筛通过/加入reloop/继续找人），不要在回复里罗列名单、评分或自制表格。']
+        : disc ? [disc.discipline]
         : noReply ? ['本轮未搜到匹配候选人——建议放宽判据（去掉具体公司名、缩短方向、拆成 2-3 个宽方向）后重新触发']
         : cur.status === 'done' ? [`这是第 ${cur.search_round || 1} 轮已完成结果的复用，不是新一轮找人；`
           + '不要声称启动了新一轮，也不要声称「已避开」任何候选人——排除名单只在显式新一轮（continue_search=true）时由 BrainX 生成。']

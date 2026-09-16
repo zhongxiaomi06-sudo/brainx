@@ -3,217 +3,379 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="BrainTex AI Native 猎头工作流：职位决策、智能找人、流程推进与 Offer 决策。">
-  <title>BrainTex · AI Native 猎头工作流</title>
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%2307090d'/%3E%3Cpath d='M18 17h17c9 0 14 4 14 11 0 4-2 7-6 9 5 2 7 5 7 10 0 8-6 12-16 12H18V17zm12 9v8h5c3 0 5-1 5-4s-2-4-5-4h-5zm0 16v8h6c3 0 5-1 5-4s-2-4-5-4h-6z' fill='%2358e6c2'/%3E%3C/svg%3E">
+  <meta name="description" content="BrainTex 招聘交付系统：职位决策、人才供给、流程推进与 Offer 决策。">
+  <title>BrainTex · 招聘交付系统</title>
   <style>
-    :root{--bg:#07090d;--panel:#0e1218;--paper:#f4f6f3;--ink:#f5f7f6;--muted:#9aa4ae;--line:rgba(255,255,255,.12);--green:#58e6c2;--blue:#7aa7ff;--amber:#ffc56e;--violet:#b99cff;--red:#ff827c;--radius:32px;--ease:cubic-bezier(.22,1,.36,1)}
-    *{box-sizing:border-box}html{scroll-behavior:smooth;background:var(--bg)}body{margin:0;color:var(--ink);background:var(--bg);font:16px/1.6 -apple-system,BlinkMacSystemFont,"SF Pro Display","PingFang SC","Microsoft YaHei",sans-serif;overflow-x:hidden}a{color:inherit;text-decoration:none}button{font:inherit}::selection{color:#07100e;background:var(--green)}
-    .progress{position:fixed;inset:0 auto auto 0;z-index:90;width:100%;height:2px;background:rgba(255,255,255,.06)}.progress i{display:block;width:0;height:100%;background:linear-gradient(90deg,var(--blue),var(--green));box-shadow:0 0 20px var(--green)}
-    .nav{position:fixed;top:18px;left:50%;z-index:80;width:min(1080px,calc(100% - 32px));height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 10px 0 18px;border:1px solid rgba(255,255,255,.12);border-radius:18px;background:rgba(9,12,17,.72);backdrop-filter:blur(22px);transform:translateX(-50%);box-shadow:0 16px 60px rgba(0,0,0,.2)}
-    .brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:-.02em}
-    .brand-mark{width:26px;height:26px;display:grid;place-items:center;color:#07100e;background:var(--green);border-radius:8px;font-size:13px;font-weight:900}
-    .nav-links{display:flex;gap:5px}.nav-links a{padding:9px 12px;color:#aeb6bf;border-radius:11px;font-size:13px;transition:.3s ease}
-    .nav-links a:hover,.nav-links a.active{color:white;background:rgba(255,255,255,.08)}
-    .nav-note{padding:8px 12px;color:var(--green);border:1px solid rgba(88,230,194,.25);border-radius:999px;font-size:12px}
-    .wrap{width:min(1200px,calc(100% - 48px));margin:auto}
-    .hero{position:relative;min-height:100svh;display:grid;place-items:center;padding:130px 0 70px;isolation:isolate}
-    .hero:before{content:"";position:absolute;z-index:-2;width:760px;height:760px;top:-180px;right:-220px;background:radial-gradient(circle,rgba(122,167,255,.25),transparent 66%);filter:blur(10px)}
-    .hero:after{content:"";position:absolute;z-index:-1;width:620px;height:620px;left:-260px;bottom:-240px;background:radial-gradient(circle,rgba(88,230,194,.18),transparent 67%)}
-    .hero-inner{text-align:center}.kicker{display:inline-flex;align-items:center;gap:9px;color:#b9c1ca;font-size:13px;letter-spacing:.1em;text-transform:uppercase}
-    .kicker:before{content:"";width:7px;height:7px;background:var(--green);border-radius:50%;box-shadow:0 0 18px var(--green)}
-    h1{max-width:1050px;margin:26px auto 24px;font-size:clamp(54px,9vw,118px);line-height:.93;letter-spacing:-.075em;font-weight:760}
-    .gradient-text{color:transparent;background:linear-gradient(110deg,#fff 20%,#aab7c7 52%,var(--green) 86%);-webkit-background-clip:text;background-clip:text}
-    .hero-copy{max-width:770px;margin:0 auto;color:#aab3bd;font-size:clamp(18px,2.2vw,24px);line-height:1.55}
-    .hero-actions{display:flex;justify-content:center;gap:12px;margin-top:36px}
-    .btn{padding:13px 19px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.06);font-weight:650;font-size:14px}.btn.primary{color:#07100e;background:var(--green);border-color:var(--green)}
-    .hero-foot{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:84px;text-align:left}.hero-stat{min-height:122px;padding:22px;border:1px solid var(--line);border-radius:22px;background:linear-gradient(145deg,rgba(255,255,255,.07),rgba(255,255,255,.025));backdrop-filter:blur(14px)}.hero-stat small{display:block;color:#8f99a4;font-size:12px}.hero-stat strong{display:block;margin-top:18px;font-size:18px;letter-spacing:-.025em}.hero-stat span{color:var(--green)}
-    .premise{padding:110px 0 150px}.premise-grid{display:grid;grid-template-columns:.85fr 1.15fr;gap:70px;align-items:start}
-    .section-label{color:var(--green);font-size:13px;font-weight:750;letter-spacing:.12em}
-    .premise h2,.proof h2,.architecture h2{margin:12px 0 20px;font-size:clamp(40px,6vw,76px);line-height:1.02;letter-spacing:-.06em}
-    .muted{color:var(--muted)}.conditions{display:grid;gap:12px}.condition{padding:25px 26px;border:1px solid var(--line);border-radius:24px;background:#0c1016}
-    .condition-top{display:flex;justify-content:space-between;align-items:center;gap:20px}.condition b{font-size:19px}
-    .condition em{color:var(--green);font-style:normal;font:700 12px/1 ui-monospace,SFMono-Regular,monospace}.condition p{margin:10px 0 0;color:#9ca6b0}
-    .equation{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:16px;padding:24px;border-radius:24px;background:linear-gradient(120deg,rgba(122,167,255,.13),rgba(88,230,194,.09));font-weight:700}
-    .equation i{color:#71808e;font-style:normal}.scene{position:relative;min-height:160vh;border-top:1px solid var(--line)}
-    .scene-sticky{position:sticky;top:0;min-height:100svh;display:grid;align-items:center;padding:112px 0 48px;overflow:hidden}
-    .scene-sticky:before{content:"";position:absolute;width:540px;height:540px;right:-220px;top:15%;border-radius:50%;background:radial-gradient(circle,var(--glow),transparent 68%);opacity:.16;filter:blur(16px);pointer-events:none}
-    .scene-grid{display:grid;grid-template-columns:.78fr 1.22fr;gap:70px;align-items:center}.chapter{color:var(--accent);font:750 13px/1 ui-monospace,SFMono-Regular,monospace;letter-spacing:.1em}
-    .scene h2{max-width:470px;margin:20px 0;font-size:clamp(46px,6.4vw,82px);line-height:.98;letter-spacing:-.062em}.scene .lead{max-width:480px;color:#aab3bd;font-size:18px}
-    .advantage{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:32px}.advantage div{padding:14px 12px;border-top:1px solid rgba(255,255,255,.15)}
-    .advantage b{display:block;color:var(--accent);font-size:13px}.advantage span{display:block;margin-top:6px;color:#8e99a4;font-size:12px;line-height:1.45}
-    .product{position:relative;min-height:610px;padding:12px;border:1px solid rgba(255,255,255,.16);border-radius:34px;background:rgba(255,255,255,.04);box-shadow:0 42px 110px rgba(0,0,0,.42);transform:perspective(1100px) rotateY(-3deg) rotateX(1deg);transition:1s var(--ease)}
-    .scene.visible .product{transform:perspective(1100px) rotateY(0) rotateX(0)}.screen{min-height:584px;padding:22px;border-radius:24px;background:linear-gradient(160deg,#111721,#090c11 60%);overflow:hidden}
-    .screen-bar{display:flex;align-items:center;justify-content:space-between;padding-bottom:18px;border-bottom:1px solid var(--line)}.dots{display:flex;gap:6px}
-    .dots i{width:7px;height:7px;border-radius:50%;background:#313a45}.screen-title{color:#a8b2bd;font-size:12px}.live{display:flex;align-items:center;gap:7px;color:var(--accent);font-size:11px}
-    .live:before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 12px currentColor}.tech-flow{display:grid;gap:10px;margin-top:20px}
-    .flow-row{display:grid;grid-template-columns:36px 1fr auto;gap:13px;align-items:center;padding:13px 14px;border:1px solid rgba(255,255,255,.1);border-radius:15px;background:rgba(255,255,255,.035);transition:.35s ease}
-    .flow-row:hover{border-color:color-mix(in srgb,var(--accent) 55%,transparent);background:rgba(255,255,255,.065);transform:translateX(4px)}
-    .flow-no{width:34px;height:34px;display:grid;place-items:center;color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent);border-radius:10px;font:700 11px/1 ui-monospace,SFMono-Regular,monospace}
-    .flow-row strong{display:block;font-size:14px}.flow-row p{margin:2px 0 0;color:#85909c;font-size:12px;line-height:1.45}
-    .code{padding:5px 8px;color:#8f9aa7;background:#080a0e;border:1px solid rgba(255,255,255,.08);border-radius:8px;font:600 10px/1 ui-monospace,SFMono-Regular,monospace;white-space:nowrap}
-    .screen-bottom{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:13px}.mini{padding:14px;border:1px solid rgba(255,255,255,.09);border-radius:15px;background:rgba(0,0,0,.18)}
-    .mini small{color:#76818e}.mini b{display:block;margin-top:5px;font-size:13px}.status{color:var(--green)}.boundary{color:var(--amber)}
-    .stage-1{--accent:var(--blue);--glow:var(--blue)}.stage-2{--accent:var(--green);--glow:var(--green)}.stage-3{--accent:var(--amber);--glow:var(--amber)}.stage-4{--accent:var(--violet);--glow:var(--violet)}
-    .proof{padding:150px 0;background:#f2f4f1;color:#10141a}.proof .section-label{color:#0d755f}.proof-head{display:grid;grid-template-columns:1fr .8fr;gap:80px;align-items:end}
-    .proof p{color:#68717a}.proof-grid{display:grid;grid-template-columns:1.3fr .7fr .7fr;gap:14px;margin-top:52px}
-    .proof-card{min-height:270px;padding:30px;border:1px solid #d8ddda;border-radius:28px;background:#fff;box-shadow:0 22px 70px rgba(22,31,28,.08)}
-    .proof-card:first-child{color:white;background:#10161d;border-color:#10161d}.proof-card .big{display:block;margin:18px 0 6px;font-size:clamp(48px,7vw,84px);line-height:1;letter-spacing:-.065em}
-    .proof-card small{color:#808a92}.proof-card:first-child small{color:#9eabb5}.proof-card ul{margin:22px 0 0;padding:0;list-style:none}
-    .proof-card li{padding:9px 0;border-top:1px solid rgba(120,130,135,.2);font-size:13px}.proof-note{margin-top:18px;padding:18px 22px;border:1px solid #d8ddda;border-radius:18px;color:#5d666e;background:rgba(255,255,255,.55);font-size:13px}
-    .architecture{padding:150px 0}.stack{display:grid;gap:10px;margin-top:50px}.stack-row{display:grid;grid-template-columns:150px 1fr 1fr 1fr;gap:10px}
-    .stack-row>div{padding:20px;border:1px solid var(--line);border-radius:18px;background:rgba(255,255,255,.035)}.stack-name{color:var(--green);font-weight:750}
-    .stack-row b{display:block;font-size:14px}.stack-row span{color:#85909c;font-size:12px}.architecture .footnote{margin-top:24px;color:#7f8994;font-size:13px}
-    .final{min-height:84svh;display:grid;place-items:center;padding:120px 0;text-align:center;border-top:1px solid var(--line);background:radial-gradient(circle at 50% 100%,rgba(88,230,194,.14),transparent 44%)}
-    .final h2{max-width:970px;margin:0 auto;font-size:clamp(52px,8vw,106px);line-height:.97;letter-spacing:-.072em}.final p{max-width:680px;margin:28px auto;color:#9ca6b0;font-size:18px}.final .source{margin-top:55px;color:#65717c;font-size:12px}
-    .reveal{opacity:0;transform:translateY(24px);transition:opacity .9s var(--ease),transform .9s var(--ease)}.visible .reveal,.reveal.visible{opacity:1;transform:none}.delay-1{transition-delay:.12s}.delay-2{transition-delay:.22s}
-    @media(max-width:900px){.nav-links{display:none}.premise-grid,.scene-grid,.proof-head{grid-template-columns:1fr}.scene{min-height:auto}.scene-sticky{position:relative;min-height:auto;padding:120px 0}.scene h2{max-width:700px}.product{min-height:auto;transform:none}.hero-foot{grid-template-columns:1fr 1fr}.proof-grid{grid-template-columns:1fr 1fr}.proof-card:first-child{grid-column:1/-1}.stack-row{grid-template-columns:1fr 1fr}.stack-name{grid-column:1/-1}.advantage{max-width:650px}}
-    @media(max-width:580px){.wrap{width:min(100% - 26px,1200px)}.nav{top:10px;height:52px}.nav-note{display:none}.hero{padding-top:112px}.hero-actions{flex-direction:column;align-items:stretch}
-      .hero-foot,.proof-grid,.screen-bottom,.advantage{grid-template-columns:1fr}.hero-stat{min-height:96px}.premise{padding:80px 0 100px}.product{padding:7px;border-radius:25px}.screen{min-height:auto;padding:15px;border-radius:19px}
-      .flow-row{grid-template-columns:32px 1fr}.code{grid-column:2}.proof,.architecture{padding:100px 0}.proof-card:first-child{grid-column:auto}.stack-row{grid-template-columns:1fr}.stack-name{grid-column:auto}}
-    @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.reveal{opacity:1;transform:none;transition:none}.product,.flow-row{transition:none}}
+    :root {
+      --paper: #f3f1ec;
+      --surface: #ffffff;
+      --ink: #151515;
+      --quiet: #686861;
+      --line: #d2d0c9;
+      --blue: #2848d8;
+      --orange: #e0522d;
+      --green: #236b50;
+      --ease: cubic-bezier(.2,.8,.2,1);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; background: var(--paper); }
+    body { margin: 0; color: var(--ink); background: var(--paper); font: 16px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif; }
+    a { color: inherit; text-decoration: none; }
+    button { font: inherit; }
+    ::selection { color: white; background: var(--blue); }
+    .scroll-rule { position: fixed; inset: 64px auto 0 0; z-index: 50; width: 3px; background: #dedcd6; }
+    .scroll-rule i { display: block; width: 100%; height: 0; background: var(--blue); }
+    .nav { position: fixed; inset: 0 0 auto; z-index: 40; height: 64px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 0 32px; border-bottom: 1px solid var(--line); background: rgba(243,241,236,.96); }
+    .wordmark { font-size: 17px; font-weight: 760; letter-spacing: -.03em; }
+    .wordmark span { color: var(--blue); }
+    .nav-links { display: flex; height: 100%; }
+    .nav-links a { position: relative; display: grid; place-items: center; padding: 0 16px; color: #72726d; font-size: 12px; }
+    .nav-links a:after { content: ""; position: absolute; inset: auto 16px -1px; height: 2px; background: var(--blue); transform: scaleX(0); transition: transform .25s ease; }
+    .nav-links a:hover, .nav-links a.active { color: var(--ink); }
+    .nav-links a.active:after { transform: scaleX(1); }
+    .nav-meta { justify-self: end; color: var(--quiet); font: 11px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .04em; }
+    .wrap { width: min(1240px, calc(100% - 64px)); margin: 0 auto; }
+    .eyebrow { display: flex; align-items: center; gap: 12px; color: var(--blue); font: 700 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .12em; text-transform: uppercase; }
+    .eyebrow:before { content: ""; width: 30px; height: 2px; background: currentColor; }
+    .hero { padding: 128px 0 72px; border-bottom: 1px solid var(--line); }
+    .hero-grid { display: grid; grid-template-columns: .9fr 1.1fr; gap: 80px; align-items: end; }
+    h1 { max-width: 720px; margin: 28px 0 24px; font: 650 clamp(44px, 6.2vw, 84px)/1.02 "Iowan Old Style", "Songti SC", "Noto Serif SC", serif; letter-spacing: -.055em; }
+    .hero-copy { max-width: 620px; margin: 0; color: #4c4c47; font-size: clamp(17px, 1.6vw, 21px); }
+    .hero-note { display: grid; grid-template-columns: 110px 1fr; gap: 18px; margin-top: 42px; padding-top: 16px; border-top: 1px solid var(--ink); color: var(--quiet); font-size: 12px; }
+    .hero-note b { color: var(--ink); }
+    .system-map { border-top: 4px solid var(--ink); background: var(--surface); box-shadow: 16px 16px 0 #dcd9d1; }
+    .map-head { display: flex; justify-content: space-between; gap: 24px; padding: 18px 20px; border-bottom: 1px solid var(--line); }
+    .map-head b { font-size: 13px; }
+    .map-head span { color: var(--quiet); font: 10px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .map-row { display: grid; grid-template-columns: 48px 1fr auto; gap: 16px; align-items: center; min-height: 86px; padding: 14px 20px; border-bottom: 1px solid var(--line); transition: color .25s, background .25s; }
+    .map-row:last-child { border-bottom: 0; }
+    .map-row:hover { color: white; background: var(--blue); }
+    .map-no { color: var(--blue); font: 700 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .map-row:hover .map-no, .map-row:hover p { color: #d9e0ff; }
+    .map-row strong { display: block; font-size: 18px; letter-spacing: -.02em; }
+    .map-row p { margin: 3px 0 0; color: var(--quiet); font-size: 12px; }
+    .mode { padding: 6px 9px; border: 1px solid currentColor; font-size: 10px; white-space: nowrap; }
+    .principles { padding: 86px 0; background: var(--ink); color: white; }
+    .principles-grid { display: grid; grid-template-columns: .75fr 1.25fr; gap: 80px; }
+    .principles h2 { max-width: 520px; margin: 18px 0; font: 500 clamp(34px, 4vw, 58px)/1.08 "Iowan Old Style", "Songti SC", serif; letter-spacing: -.04em; }
+    .principles .eyebrow { color: #8fa4ff; }
+    .principles-copy { color: #a9a9a3; }
+    .formula { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid #4b4b48; border-left: 1px solid #4b4b48; }
+    .formula article { min-height: 176px; padding: 22px; border-right: 1px solid #4b4b48; border-bottom: 1px solid #4b4b48; }
+    .formula small { color: #92928c; font: 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .formula b { display: block; margin: 48px 0 8px; font-size: 17px; }
+    .formula p { margin: 0; color: #a9a9a3; font-size: 12px; }
+    .formula .result { grid-column: span 3; min-height: auto; display: flex; justify-content: space-between; gap: 24px; color: var(--ink); background: #dce2ff; }
+    .formula .result b { margin: 0; }
+    .chapter { position: relative; min-height: 142vh; border-bottom: 1px solid var(--line); }
+    .chapter-inner { position: sticky; top: 64px; min-height: calc(100vh - 64px); display: grid; align-items: center; padding: 46px 0; }
+    .chapter-grid { display: grid; grid-template-columns: .68fr 1.32fr; gap: 70px; align-items: start; }
+    .chapter-index { color: var(--blue); font: 700 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .chapter h2 { margin: 26px 0 20px; font: 560 clamp(38px, 4.7vw, 66px)/1.02 "Iowan Old Style", "Songti SC", serif; letter-spacing: -.045em; }
+    .chapter-lead { max-width: 440px; margin: 0; color: #55554f; font-size: 17px; }
+    .advantage { margin-top: 44px; border-top: 1px solid var(--ink); }
+    .advantage div { display: grid; grid-template-columns: 32px 1fr; gap: 10px; padding: 13px 0; border-bottom: 1px solid var(--line); }
+    .advantage b { color: var(--blue); font: 700 10px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .advantage span { font-size: 12px; }
+    .workflow { border: 1px solid var(--ink); background: var(--surface); box-shadow: 12px 12px 0 #dcd9d1; }
+    .workflow-head { display: grid; grid-template-columns: 1fr auto; gap: 24px; padding: 16px 20px; color: white; background: var(--ink); }
+    .workflow-head strong { font-size: 13px; }
+    .workflow-head span { color: #b8b8b2; font: 10px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .step { display: grid; grid-template-columns: 42px 1fr 150px; gap: 14px; align-items: center; min-height: 84px; padding: 14px 20px; border-bottom: 1px solid var(--line); }
+    .step:last-of-type { border-bottom: 0; }
+    .step-no { width: 28px; height: 28px; display: grid; place-items: center; color: white; background: var(--blue); font: 700 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .step strong { display: block; font-size: 14px; }
+    .step p { margin: 3px 0 0; color: var(--quiet); font-size: 12px; }
+    .token { justify-self: end; color: #5f5f59; font: 10px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; text-align: right; overflow-wrap: anywhere; }
+    .workflow-foot { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--ink); }
+    .workflow-foot div { padding: 14px 20px; }
+    .workflow-foot div + div { border-left: 1px solid var(--line); }
+    .workflow-foot small { display: block; color: var(--quiet); font-size: 10px; }
+    .workflow-foot b { display: block; margin-top: 4px; font-size: 12px; }
+    .workflow-foot .boundary b { color: var(--orange); }
+    .stage-2 .chapter-index, .stage-2 .advantage b { color: var(--green); }
+    .stage-2 .step-no { background: var(--green); }
+    .stage-3 .chapter-index, .stage-3 .advantage b { color: var(--orange); }
+    .stage-3 .step-no { background: var(--orange); }
+    .stage-4 { background: #e7e6e1; }
+    .stage-4 .chapter-index, .stage-4 .advantage b { color: #5b3ba7; }
+    .stage-4 .step-no { background: #5b3ba7; }
+    .evidence { padding: 110px 0; color: white; background: #1d2540; }
+    .evidence .eyebrow { color: #9fb0ff; }
+    .evidence-head { display: grid; grid-template-columns: 1fr .7fr; gap: 80px; align-items: end; }
+    .evidence h2 { max-width: 720px; margin: 22px 0 0; font: 520 clamp(40px, 5.5vw, 74px)/1.04 "Iowan Old Style", "Songti SC", serif; letter-spacing: -.045em; }
+    .evidence-head p { color: #bfc5d6; }
+    .evidence-grid { display: grid; grid-template-columns: 1.2fr .8fr .8fr; margin-top: 58px; border-top: 1px solid #6c748c; border-left: 1px solid #6c748c; }
+    .metric { min-height: 290px; padding: 28px; border-right: 1px solid #6c748c; border-bottom: 1px solid #6c748c; }
+    .metric small { color: #aab2c8; }
+    .metric strong { display: block; margin: 46px 0 14px; font: 500 clamp(54px, 7vw, 92px)/1 "Iowan Old Style", serif; letter-spacing: -.05em; }
+    .metric p { color: #c3c9d7; font-size: 13px; }
+    .metric ul { margin: 24px 0 0; padding: 0; list-style: none; }
+    .metric li { padding: 9px 0; border-top: 1px solid #535b72; font-size: 12px; }
+    .evidence-note { margin-top: 24px; padding-left: 18px; border-left: 3px solid #9fb0ff; color: #bac1d3; font-size: 12px; }
+    .architecture { padding: 110px 0; }
+    .architecture-head { display: grid; grid-template-columns: .75fr 1.25fr; gap: 80px; }
+    .architecture h2 { max-width: 500px; margin: 22px 0; font: 520 clamp(38px, 4.5vw, 62px)/1.04 "Iowan Old Style", "Songti SC", serif; letter-spacing: -.045em; }
+    .stack { border-top: 3px solid var(--ink); }
+    .stack-row { display: grid; grid-template-columns: 140px repeat(3, 1fr); border-bottom: 1px solid var(--line); }
+    .stack-row > div { min-height: 96px; padding: 18px; border-right: 1px solid var(--line); }
+    .stack-row > div:last-child { border-right: 0; }
+    .stack-name { color: var(--blue); font: 700 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .stack-row b { display: block; font-size: 13px; }
+    .stack-row span { color: var(--quiet); font-size: 11px; }
+    .stack-note { margin-top: 18px; color: var(--quiet); font-size: 12px; }
+    .closing { padding: 86px 0 100px; border-top: 1px solid var(--ink); }
+    .closing-grid { display: grid; grid-template-columns: 1.15fr .85fr; gap: 100px; align-items: end; }
+    .closing h2 { max-width: 820px; margin: 0; font: 520 clamp(42px, 5.8vw, 80px)/1.03 "Iowan Old Style", "Songti SC", serif; letter-spacing: -.05em; }
+    .closing p { margin: 0 0 26px; color: var(--quiet); }
+    .back { display: inline-flex; align-items: center; gap: 24px; padding: 12px 0; border-bottom: 2px solid var(--blue); color: var(--blue); font-weight: 700; font-size: 13px; }
+    .source { margin-top: 70px; color: #85857e; font-size: 10px; }
+    .reveal { opacity: 0; transform: translateY(18px); transition: opacity .75s var(--ease), transform .75s var(--ease); }
+    .reveal.visible { opacity: 1; transform: none; }
+    @media (max-width: 980px) {
+      .nav { grid-template-columns: 1fr auto; padding: 0 22px; }
+      .nav-links { display: none; }
+      .hero-grid, .principles-grid, .chapter-grid, .evidence-head, .architecture-head, .closing-grid { grid-template-columns: 1fr; gap: 48px; }
+      .chapter { min-height: auto; }
+      .chapter-inner { position: relative; top: auto; min-height: auto; padding: 90px 0; }
+      .advantage { max-width: 700px; }
+      .evidence-grid { grid-template-columns: 1fr 1fr; }
+      .metric:first-child { grid-column: 1 / -1; }
+      .stack-row { grid-template-columns: 120px 1fr; }
+      .stack-row > div:nth-child(3), .stack-row > div:nth-child(4) { border-top: 1px solid var(--line); }
+    }
+    @media (max-width: 620px) {
+      .wrap { width: min(100% - 32px, 1240px); }
+      .nav { height: 56px; padding: 0 16px; }
+      .nav-meta { display: none; }
+      .scroll-rule { top: 56px; }
+      .hero { padding: 100px 0 58px; }
+      .hero-note { grid-template-columns: 1fr; }
+      .map-row { grid-template-columns: 34px 1fr; }
+      .mode { grid-column: 2; justify-self: start; }
+      .formula { grid-template-columns: 1fr; }
+      .formula .result { grid-column: auto; flex-direction: column; }
+      .chapter-inner { padding: 72px 0; }
+      .step { grid-template-columns: 34px 1fr; }
+      .token { grid-column: 2; justify-self: start; text-align: left; }
+      .workflow-foot, .evidence-grid { grid-template-columns: 1fr; }
+      .workflow-foot div + div { border-left: 0; border-top: 1px solid var(--line); }
+      .metric:first-child { grid-column: auto; }
+      .stack-row { grid-template-columns: 1fr; }
+      .stack-row > div { min-height: auto; border-right: 0; }
+      .stack-row > div:not(:first-child) { border-top: 1px solid var(--line); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .reveal { opacity: 1; transform: none; transition: none; }
+    }
   </style>
 </head>
 <body>
-  <div class="progress" aria-hidden="true"><i></i></div>
-  <header class="nav" aria-label="章节导航">
-    <a class="brand" href="#top"><span class="brand-mark">B</span>BrainTex</a>
-    <nav class="nav-links"><a href="#stage-1">决策</a><a href="#stage-2">人才</a><a href="#stage-3">推进</a><a href="#stage-4">Offer</a><a href="#proof">演示证据</a></nav>
-    <span class="nav-note">AI Recruiting OS</span>
+  <div class="scroll-rule" aria-hidden="true"><i></i></div>
+  <header class="nav">
+    <a class="wordmark" href="#top">Brain<span>Tex</span></a>
+    <nav class="nav-links" aria-label="章节导航">
+      <a href="#stage-1">01 决策</a><a href="#stage-2">02 人才</a><a href="#stage-3">03 推进</a><a href="#stage-4">04 Offer</a><a href="#evidence">演示证据</a>
+    </nav>
+    <div class="nav-meta">RECRUITING DELIVERY SYSTEM / 2026</div>
   </header>
 
   <main id="top">
     <section class="hero">
-      <div class="wrap hero-inner">
-        <div class="kicker reveal">BrainTex · AI Native 猎头工作流</div>
-        <h1 class="gradient-text reveal delay-1">从选项目，到拿 Offer。<br>一条会积累的工作流。</h1>
-        <p class="hero-copy reveal delay-2">把顾问每天分散在职位库、人才渠道、飞书群与电话里的工作，连接成四个连续决策界面。AI 负责看全局、找线索、接上下文；人保留关键判断。</p>
-        <div class="hero-actions reveal delay-2"><a class="btn primary" href="#stage-1">进入四阶段</a><a class="btn" href="#proof">查看今天演示证据</a></div>
-        <div class="hero-foot reveal delay-2">
-          <div class="hero-stat"><small>01 · 决策入口</small><strong>职位选择 <span>→</span> 派单</strong></div>
-          <div class="hero-stat"><small>02 · 人才供给</small><strong>AI 推人 <span>→</span> 人才池</strong></div>
-          <div class="hero-stat"><small>03 · 执行中枢</small><strong>触达 <span>→</span> 流程跟进</strong></div>
-          <div class="hero-stat"><small>04 · 决策资产</small><strong>Offer <span>→</span> 最佳实践</strong></div>
+      <div class="wrap hero-grid">
+        <div>
+          <div class="eyebrow reveal">BrainTex operating brief</div>
+          <h1 class="reveal">招聘交付，不该靠人脑搬运上下文。</h1>
+          <p class="hero-copy reveal">把职位选择、人才供给、沟通推进与 Offer 判断连接成一条连续工作流。系统处理信息密度和重复执行，顾问保留关键决策。</p>
+          <div class="hero-note reveal"><b>设计原则</b><span>不是给工作流加一层聊天框，而是让每个决定都有事实、责任人、下一步与可回放的结果。</span></div>
+        </div>
+        <div class="system-map reveal" aria-label="四阶段工作流总览">
+          <div class="map-head"><b>交付系统 / 四个连续界面</b><span>DECIDE → SUPPLY → ADVANCE → LEARN</span></div>
+          <a class="map-row" href="#stage-1"><span class="map-no">01</span><div><strong>职位选择 &amp; 派单</strong><p>从项目判断进入确定性执行</p></div><span class="mode">半自动 → 全自动</span></a>
+          <a class="map-row" href="#stage-2"><span class="map-no">02</span><div><strong>AI 推人 &amp; 人才池</strong><p>多渠道、多轮次、可沉淀</p></div><span class="mode">持续供给</span></a>
+          <a class="map-row" href="#stage-3"><span class="map-no">03</span><div><strong>触达 &amp; 推荐跟进</strong><p>把沟通变成下一步行动</p></div><span class="mode">人机协同</span></a>
+          <a class="map-row" href="#stage-4"><span class="map-no">04</span><div><strong>Offer &amp; 最佳实践</strong><p>把现场经验变成团队资产</p></div><span class="mode">单一事实源</span></a>
         </div>
       </div>
     </section>
 
-    <section class="premise">
-      <div class="wrap premise-grid">
-        <div class="reveal"><span class="section-label">成立条件</span><h2>智能不是一个模型。<br>是三种能力同时在线。</h2><p class="muted">算法决定“该看什么”，记忆保留“发生过什么”，上下文解释“为什么现在行动”。三者缺一，自动化只会放大噪音。</p></div>
-        <div class="conditions reveal delay-1">
-          <article class="condition"><div class="condition-top"><b>必要条件 · 决策质量</b><em>ALGORITHM × MEMORY × CONTEXT</em></div><p>冻结推荐与硬规则做底线；事件账本记录选择和结果；群、职位、候选人上下文在授权范围内连续传递。</p></article>
-          <article class="condition"><div class="condition-top"><b>0 → 1 条件 · 持续交付</b><em>ENGINEERING × SUBSCRIPTION</em></div><p>幂等、任务队列、重试、权限与审计把一次演示变成稳定服务；订阅触发让正确动作在正确时间主动出现。</p></article>
-          <div class="equation"><span>可信判断</span><i>+</i><span>稳定执行</span><i>=</i><span>可规模化猎头能力</span></div>
+    <section class="principles">
+      <div class="wrap principles-grid">
+        <div class="reveal">
+          <div class="eyebrow">成立条件</div>
+          <h2>智能的质量，取决于系统知道什么、记住什么、何时行动。</h2>
+          <p class="principles-copy">模型只是其中一环。真正可交付的能力，需要决策依据、连续记忆与可靠工程同时在线。</p>
+        </div>
+        <div class="formula reveal">
+          <article><small>01 / DECISION</small><b>算法</b><p>决定该看什么、按什么顺序看，并保留硬规则。</p></article>
+          <article><small>02 / CONTINUITY</small><b>记忆</b><p>保存选择、证据、结果与历史排除集。</p></article>
+          <article><small>03 / TIMING</small><b>上下文</b><p>解释为什么现在行动，以及谁有权行动。</p></article>
+          <article class="result"><div><small>0 → 1 条件</small><b>工程可靠性 × 订阅式触发</b></div><p>幂等、队列、重试、权限、审计和事件订阅，把一次演示变成稳定服务。</p></article>
         </div>
       </div>
     </section>
 
-    <section class="scene stage-1" id="stage-1">
-      <div class="scene-sticky"><div class="wrap scene-grid">
-        <div><div class="chapter reveal">01 / JOB DECISION</div><h2 class="reveal delay-1">先选对项目，<br>再自动起跑。</h2><p class="lead reveal delay-1">BrainTex 聚合职位事实、关系、活跃度与交付信号，给出可解释的投资优先级。顾问做承接决定；系统完成派单、建群与权限准备。</p>
-          <div class="advantage reveal delay-2"><div><b>优势 01</b><span>不是静态职位列表，而是冻结、可回放的完整决策队列</span></div><div><b>优势 02</b><span>选择与执行分离，顾问决定做什么，工程保证不重复做</span></div><div><b>优势 03</b><span>身份、项目、群权限逐层取交集，不靠模型猜测</span></div></div>
+    <section class="chapter stage-1" id="stage-1">
+      <div class="chapter-inner"><div class="wrap chapter-grid">
+        <div>
+          <div class="chapter-index reveal">01 / JOB DECISION</div>
+          <h2 class="reveal">先把项目选对，再让系统自动起跑。</h2>
+          <p class="chapter-lead reveal">BrainTex 聚合职位事实、关系、活跃度与交付信号，给出可解释的项目优先级。顾问决定是否承接，系统完成派单、建群与权限准备。</p>
+          <div class="advantage reveal">
+            <div><b>01</b><span>冻结、可回放的决策队列，不是随时漂移的静态列表</span></div>
+            <div><b>02</b><span>选择与执行分离：顾问决定做什么，工程保证不重复做</span></div>
+            <div><b>03</b><span>身份、项目、群权限逐层取交集，不让模型猜权限</span></div>
+          </div>
         </div>
-        <div class="product reveal"><div class="screen"><div class="screen-bar"><div class="dots"><i></i><i></i><i></i></div><span class="screen-title">职位选择与派单 · 技术链</span><span class="live">半自动决策 / 全自动执行</span></div>
-          <div class="tech-flow">
-            <div class="flow-row"><span class="flow-no">01</span><div><strong>聚合职位真值</strong><p>TTC / Radar → 完整快照，未完成同步不进入新判断</p></div><span class="code">snapshot_id</span></div>
-            <div class="flow-row"><span class="flow-no">02</span><div><strong>冻结推荐与硬门槛</strong><p>六维评分 + 容量 / 状态 / 关系硬规则，生成最多 200 条稳定队列</p></div><span class="code">baseline-1.1</span></div>
-            <div class="flow-row"><span class="flow-no">03</span><div><strong>BrainTex 辅助选项目</strong><p>展示原因、风险、下一步与待确认项；顾问点击即形成明确决定</p></div><span class="code">recommendation_run</span></div>
-            <div class="flow-row"><span class="flow-no">04</span><div><strong>幂等承接与唯一项目群</strong><p>写入 MY_JOB / ACCEPTED，建立唯一群、成员与机器人准入范围</p></div><span class="code">idempotency_key</span></div>
-            <div class="flow-row"><span class="flow-no">05</span><div><strong>按入口选择启动策略</strong><p>工作台接单可自动起 OpenMai；飞书建群后由顾问选择 OpenMai / Reloop / SuperMai</p></div><span class="code">READY</span></div>
-          </div><div class="screen-bottom"><div class="mini"><small>已经具备</small><b class="status">推荐 → 接单 → 建群 → 卡片</b></div><div class="mini"><small>诚实边界</small><b class="boundary">项目选择仍由顾问拍板</b></div></div>
-        </div></div>
+        <div class="workflow reveal">
+          <div class="workflow-head"><strong>职位选择与派单 / 技术链</strong><span>HUMAN DECISION · DETERMINISTIC EXECUTION</span></div>
+          <div class="step"><span class="step-no">01</span><div><strong>聚合职位真值</strong><p>TTC / Radar 生成完整快照；同步未完成，不进入新判断。</p></div><span class="token">snapshot_id</span></div>
+          <div class="step"><span class="step-no">02</span><div><strong>冻结推荐与硬门槛</strong><p>六维评分叠加容量、状态和关系规则，生成最多 200 条稳定队列。</p></div><span class="token">baseline-1.1</span></div>
+          <div class="step"><span class="step-no">03</span><div><strong>辅助顾问选项目</strong><p>展示推荐原因、风险、下一步和待确认项；点击后形成明确决定。</p></div><span class="token">recommendation_run</span></div>
+          <div class="step"><span class="step-no">04</span><div><strong>幂等承接与唯一项目群</strong><p>写入 MY_JOB / ACCEPTED，建立唯一群、成员和机器人准入范围。</p></div><span class="token">idempotency_key</span></div>
+          <div class="step"><span class="step-no">05</span><div><strong>按入口启动人才供给</strong><p>工作台可起 OpenMai；飞书建群后可选 OpenMai / Reloop / SuperMai。</p></div><span class="token">READY</span></div>
+          <div class="workflow-foot"><div><small>现有能力</small><b>推荐 → 接单 → 建群 → 卡片</b></div><div class="boundary"><small>人工边界</small><b>项目承接仍由顾问拍板</b></div></div>
+        </div>
       </div></div>
     </section>
 
-    <section class="scene stage-2" id="stage-2">
-      <div class="scene-sticky"><div class="wrap scene-grid">
-        <div><div class="chapter reveal">02 / TALENT INTELLIGENCE</div><h2 class="reveal delay-1">一次找人，<br>变成持续供给。</h2><p class="lead reveal delay-1">从职位事实出发，同时调用内部人才库与外部渠道。每一轮都继承条件、排除历史候选人，并把人选沉淀为可追溯的事实与标签。</p>
-          <div class="advantage reveal delay-2"><div><b>优势 01</b><span>三条供给通道围绕同一项目协同，不再分散在多个工具里</span></div><div><b>优势 02</b><span>多轮推荐自动累计排除名单，减少重复结果与重复费用</span></div><div><b>优势 03</b><span>候选卡由代码确定性渲染，格式、动作和权限不依赖模型发挥</span></div></div>
+    <section class="chapter stage-2" id="stage-2">
+      <div class="chapter-inner"><div class="wrap chapter-grid">
+        <div>
+          <div class="chapter-index reveal">02 / TALENT SUPPLY</div>
+          <h2 class="reveal">一次找人，变成持续的人才供给。</h2>
+          <p class="chapter-lead reveal">从职位事实出发，同时调度内部人才库与外部渠道。每一轮继承条件、排除历史候选人，并把结果沉淀为可追溯的事实与标签。</p>
+          <div class="advantage reveal">
+            <div><b>01</b><span>三条人才通道围绕同一项目协同，不再分散在多个工具</span></div>
+            <div><b>02</b><span>多轮推荐自动累计排除名单，减少重复结果与重复费用</span></div>
+            <div><b>03</b><span>候选卡确定性渲染，格式、动作和权限不依赖模型发挥</span></div>
+          </div>
         </div>
-        <div class="product reveal"><div class="screen"><div class="screen-bar"><div class="dots"><i></i><i></i><i></i></div><span class="screen-title">AI 推人及人才池 · 技术链</span><span class="live">多渠道 / 多轮 / 可沉淀</span></div>
-          <div class="tech-flow">
-            <div class="flow-row"><span class="flow-no">01</span><div><strong>职位事实生成找人判据</strong><p>角色、技能、城市、HC 与群内“找人条件”合并为本轮检索输入</p></div><span class="code">job_facts</span></div>
-            <div class="flow-row"><span class="flow-no">02</span><div><strong>三渠道并行覆盖</strong><p>OpenMai 按职位 · Reloop 私域人才库 · SuperMai 猎聘 / 脉脉判据搜索</p></div><span class="code">task ledger</span></div>
-            <div class="flow-row"><span class="flow-no">03</span><div><strong>异步执行与自动回群</strong><p>任务持久化、超时关闭、有限重试；成功后由 worker 投递原项目群</p></div><span class="code">outbox / worker</span></div>
-            <div class="flow-row"><span class="flow-no">04</span><div><strong>多轮推荐不撞人</strong><p>累计历史 TTC 编号，由 BrainX 生成排除集；新条件只影响下一轮</p></div><span class="code">search_round</span></div>
-            <div class="flow-row"><span class="flow-no">05</span><div><strong>分类、标注与人才池回流</strong><p>初筛通过写项目重点名单；加入 reloop 走独立动作与授权校验</p></div><span class="code">candidate_fact_v1</span></div>
-          </div><div class="screen-bottom"><div class="mini"><small>已经具备</small><b class="status">首轮 / 续搜 / 重点 / 入池</b></div><div class="mini"><small>诚实边界</small><b class="boundary">低于 6 人会告警，不偷偷加费</b></div></div>
-        </div></div>
+        <div class="workflow reveal">
+          <div class="workflow-head"><strong>AI 推人与人才池 / 技术链</strong><span>MULTI-SOURCE · MULTI-ROUND · TRACEABLE</span></div>
+          <div class="step"><span class="step-no">01</span><div><strong>职位事实生成找人判据</strong><p>角色、技能、城市、HC 与群内“找人条件”合并为本轮输入。</p></div><span class="token">job_facts</span></div>
+          <div class="step"><span class="step-no">02</span><div><strong>三渠道并行覆盖</strong><p>OpenMai 按职位、Reloop 私域人才库、SuperMai 判据搜索。</p></div><span class="token">task_ledger</span></div>
+          <div class="step"><span class="step-no">03</span><div><strong>异步执行并自动回群</strong><p>任务持久化、超时关闭、有限重试；worker 把结果投递原项目群。</p></div><span class="token">outbox / worker</span></div>
+          <div class="step"><span class="step-no">04</span><div><strong>多轮推荐不撞人</strong><p>累计历史 TTC 编号形成排除集；新条件只影响下一轮。</p></div><span class="token">search_round</span></div>
+          <div class="step"><span class="step-no">05</span><div><strong>分类、标注与人才池回流</strong><p>初筛通过写项目重点名单；加入 Reloop 走独立动作和授权校验。</p></div><span class="token">candidate_fact_v1</span></div>
+          <div class="workflow-foot"><div><small>现有能力</small><b>首轮 / 续搜 / 重点 / 入池</b></div><div class="boundary"><small>成本边界</small><b>少于 6 人会告警，不隐性加费</b></div></div>
+        </div>
       </div></div>
     </section>
 
-    <section class="scene stage-3" id="stage-3">
-      <div class="scene-sticky"><div class="wrap scene-grid">
-        <div><div class="chapter reveal">03 / ENGAGEMENT LOOP</div><h2 class="reveal delay-1">每一次沟通，<br>都推动下一步。</h2><p class="lead reveal delay-1">群内讨论、电话纪要、候选动作与新需求不再散落。它们进入同一个项目上下文，形成当前行动、截止时间与下一轮找人条件。</p>
-          <div class="advantage reveal delay-2"><div><b>优势 01</b><span>项目群就是执行中枢，信息与动作停留在业务发生的地方</span></div><div><b>优势 02</b><span>进展不是“聊天记忆”，而是带状态、期限和幂等键的事件</span></div><div><b>优势 03</b><span>新需求可直接驱动下一轮检索，不必从头解释整个职位</span></div></div>
+    <section class="chapter stage-3" id="stage-3">
+      <div class="chapter-inner"><div class="wrap chapter-grid">
+        <div>
+          <div class="chapter-index reveal">03 / ENGAGEMENT LOOP</div>
+          <h2 class="reveal">每一次沟通，都推动一个明确的下一步。</h2>
+          <p class="chapter-lead reveal">群内讨论、电话纪要、候选动作与新需求进入同一个项目上下文，形成当前行动、截止时间与下一轮找人条件。</p>
+          <div class="advantage reveal">
+            <div><b>01</b><span>项目群就是执行中枢，信息与动作停留在业务发生的地方</span></div>
+            <div><b>02</b><span>进展成为带状态、期限和幂等键的事件，不是聊天记忆</span></div>
+            <div><b>03</b><span>新需求直接驱动下一轮检索，不必重新解释整个职位</span></div>
+          </div>
         </div>
-        <div class="product reveal"><div class="screen"><div class="screen-bar"><div class="dots"><i></i><i></i><i></i></div><span class="screen-title">触达与推荐跟进 · 技术链</span><span class="live">上下文连续 / 人工守门</span></div>
-          <div class="tech-flow">
-            <div class="flow-row"><span class="flow-no">01</span><div><strong>群内交互保持项目绑定</strong><p>chat_id ↔ project_id 固定映射；群成员、用途与候选权限服务端校验</p></div><span class="code">group scope</span></div>
-            <div class="flow-row"><span class="flow-no">02</span><div><strong>电话与沟通结论进入证据</strong><p>人工联系后记录事实、顾虑、薪酬与时间点，不把模型推断当成事实</p></div><span class="code">evidence</span></div>
-            <div class="flow-row"><span class="flow-no">03</span><div><strong>流程状态与唯一行动</strong><p>开始跟进、记录进展、阻塞、释放与终局均写事件账本和当前行动</p></div><span class="code">ACCEPTED → COMPLETED</span></div>
-            <div class="flow-row"><span class="flow-no">04</span><div><strong>定时与事件双触发</strong><p>逾期、阻塞或缺行动进入提醒；材料变化触发更新，而非重复开任务</p></div><span class="code">scheduler</span></div>
-            <div class="flow-row"><span class="flow-no">05</span><div><strong>需求变化回流下一轮</strong><p>“找人条件：……”只保存为下一轮输入，并自动排除已推荐候选人</p></div><span class="code">search_brief</span></div>
-          </div><div class="screen-bottom"><div class="mini"><small>已经具备</small><b class="status">群互动 / 进展 / 提醒 / 续搜</b></div><div class="mini"><small>诚实边界</small><b class="boundary">外部联系由人完成，AI 先准备</b></div></div>
-        </div></div>
+        <div class="workflow reveal">
+          <div class="workflow-head"><strong>触达与推荐跟进 / 技术链</strong><span>CONTEXT CONTINUITY · HUMAN-GATED OUTREACH</span></div>
+          <div class="step"><span class="step-no">01</span><div><strong>群内交互保持项目绑定</strong><p>chat_id 与 project_id 固定映射；成员、用途和候选权限服务端校验。</p></div><span class="token">group_scope</span></div>
+          <div class="step"><span class="step-no">02</span><div><strong>电话与沟通结论进入证据</strong><p>记录事实、顾虑、薪酬和时间点，不把模型推断当成事实。</p></div><span class="token">evidence</span></div>
+          <div class="step"><span class="step-no">03</span><div><strong>流程状态与唯一行动</strong><p>跟进、阻塞、释放和终局写入事件账本及当前行动。</p></div><span class="token">ACCEPTED → COMPLETED</span></div>
+          <div class="step"><span class="step-no">04</span><div><strong>定时与事件双触发</strong><p>逾期、阻塞或缺行动进入提醒；材料变化触发更新，不重复开任务。</p></div><span class="token">scheduler</span></div>
+          <div class="step"><span class="step-no">05</span><div><strong>需求变化回流下一轮</strong><p>“找人条件：……”保存为下一轮输入，并排除已推荐候选人。</p></div><span class="token">search_brief</span></div>
+          <div class="workflow-foot"><div><small>现有能力</small><b>群互动 / 进展 / 提醒 / 续搜</b></div><div class="boundary"><small>人工边界</small><b>外部联系由人完成，AI 先准备</b></div></div>
+        </div>
       </div></div>
     </section>
 
-    <section class="scene stage-4" id="stage-4">
-      <div class="scene-sticky"><div class="wrap scene-grid">
-        <div><div class="chapter reveal">04 / OFFER INTELLIGENCE</div><h2 class="reveal delay-1">把谈判现场，<br>变成决策资产。</h2><p class="lead reveal delay-1">候选人进入 Offer 后，系统建立独立决策群，迁移必要上下文，并维护一份可编辑、可追问、可持续追加证据的报告。</p>
-          <div class="advantage reveal delay-2"><div><b>优势 01</b><span>从跨群碎片中还原一份候选人级上下文，避免信息失真</span></div><div><b>优势 02</b><span>每群只有一份报告；人可以改，机器人下一次按最新正文回答</span></div><div><b>优势 03</b><span>谈判策略可经脱敏与人工确认沉淀，形成团队最佳实践</span></div></div>
+    <section class="chapter stage-4" id="stage-4">
+      <div class="chapter-inner"><div class="wrap chapter-grid">
+        <div>
+          <div class="chapter-index reveal">04 / OFFER INTELLIGENCE</div>
+          <h2 class="reveal">把谈判现场，沉淀成可复用的决策资产。</h2>
+          <p class="chapter-lead reveal">候选人进入 Offer 后，系统建立独立决策群，迁移必要上下文，并维护一份可编辑、可追问、可持续追加证据的报告。</p>
+          <div class="advantage reveal">
+            <div><b>01</b><span>从跨群碎片还原候选人级上下文，减少信息失真</span></div>
+            <div><b>02</b><span>每群只有一份报告；人工修改后，机器人按最新正文回答</span></div>
+            <div><b>03</b><span>谈判策略经脱敏与人工确认后，进入团队最佳实践</span></div>
+          </div>
         </div>
-        <div class="product reveal"><div class="screen"><div class="screen-bar"><div class="dots"><i></i><i></i><i></i></div><span class="screen-title">Offer 管理与报告 · 技术链</span><span class="live">单一报告 / 实时问答</span></div>
-          <div class="tech-flow">
-            <div class="flow-row"><span class="flow-no">01</span><div><strong>建立候选人决策群</strong><p>从重点名单确认对象，迁移最近最多 8 条明确提及该人的脱敏讨论</p></div><span class="code">decision_group</span></div>
-            <div class="flow-row"><span class="flow-no">02</span><div><strong>汇总四类上下文</strong><p>候选事实、项目匹配、来源群讨论、本群新增证据；缺失项保持待确认</p></div><span class="code">context summary</span></div>
-            <div class="flow-row"><span class="flow-no">03</span><div><strong>生成唯一可编辑报告</strong><p>固定六段写入飞书文档，重复点击复用同一 document_id，不重复发卡</p></div><span class="code">idempotent doc</span></div>
-            <div class="flow-row"><span class="flow-no">04</span><div><strong>按人工编辑稿继续问答</strong><p>分页读取当前文档块、隐藏联系方式，再基于最新正文回答群内问题</p></div><span class="code">READ mode</span></div>
-            <div class="flow-row"><span class="flow-no">05</span><div><strong>新证据只追加，不覆盖</strong><p>电话纪要与新讨论追加到原报告；最佳实践需去标识并经人工确认</p></div><span class="code">append-only</span></div>
-          </div><div class="screen-bottom"><div class="mini"><small>已经具备</small><b class="status">决策群 / 单报告 / 编辑稿问答</b></div><div class="mini"><small>诚实边界</small><b class="boundary">真机编辑问答仍待部署后补证</b></div></div>
-        </div></div>
+        <div class="workflow reveal">
+          <div class="workflow-head"><strong>Offer 管理与报告 / 技术链</strong><span>SINGLE SOURCE · EDITABLE · QUERYABLE</span></div>
+          <div class="step"><span class="step-no">01</span><div><strong>建立候选人决策群</strong><p>从重点名单确认对象，迁移最近最多 8 条明确提及该人的脱敏讨论。</p></div><span class="token">decision_group</span></div>
+          <div class="step"><span class="step-no">02</span><div><strong>汇总四类上下文</strong><p>候选事实、项目匹配、来源群讨论、本群新增证据；缺失项待确认。</p></div><span class="token">context_summary</span></div>
+          <div class="step"><span class="step-no">03</span><div><strong>生成唯一可编辑报告</strong><p>固定六段写入飞书文档；重复点击复用 document_id，不重复发卡。</p></div><span class="token">idempotent_doc</span></div>
+          <div class="step"><span class="step-no">04</span><div><strong>按人工编辑稿继续问答</strong><p>分页读取当前文档块、隐藏联系方式，再基于最新正文回答。</p></div><span class="token">READ mode</span></div>
+          <div class="step"><span class="step-no">05</span><div><strong>新证据只追加，不覆盖</strong><p>电话纪要和新讨论追加到原报告；最佳实践需去标识并人工确认。</p></div><span class="token">append-only</span></div>
+          <div class="workflow-foot"><div><small>现有能力</small><b>决策群 / 单报告 / 编辑稿问答</b></div><div class="boundary"><small>验证边界</small><b>真机编辑问答待部署后补证</b></div></div>
+        </div>
       </div></div>
     </section>
 
-    <section class="proof" id="proof"><div class="wrap">
-      <div class="proof-head"><div><span class="section-label">2026.09.16 演示复盘</span><h2>不是未来想象。<br>是今天跑过的链路。</h2></div><p>今天的彩排把三个 Offer 项目从项目上下文带进独立决策群，并完成报告生成与电话纪要更新。随后产品进一步收敛为“每群一份可编辑报告”，消除 V1 / V2 多文档分叉。</p></div>
-      <div class="proof-grid">
-        <article class="proof-card"><small>真实飞书演示群</small><strong class="big">3</strong><p>曹国鸿 · 杨东旭 · 从容地</p><ul><li>项目绑定与群成员复用</li><li>候选概览 + 来源讨论 + 待核实项</li><li>电话纪要进入同一决策上下文</li></ul></article>
-        <article class="proof-card"><small>报告链路</small><strong class="big">3/3</strong><p>三份报告成功生成，链接格式和群内投递已彩排。</p></article>
-        <article class="proof-card"><small>更新证据</small><strong class="big">2/2/1</strong><p>三位候选的新证据条数，证明讨论可以进入报告。</p></article>
+    <section class="evidence" id="evidence">
+      <div class="wrap">
+        <div class="evidence-head reveal">
+          <div><div class="eyebrow">2026.09.16 演示纪要</div><h2>不是概念图。今天已经跑过关键链路。</h2></div>
+          <p>三位候选从项目上下文进入独立 Offer 决策群，完成报告生成和电话纪要更新；随后产品收敛为“每群一份可编辑报告”，消除多版本文档分叉。</p>
+        </div>
+        <div class="evidence-grid reveal">
+          <article class="metric"><small>真实飞书演示群</small><strong>3</strong><p>曹国鸿 · 杨东旭 · 从容地</p><ul><li>项目绑定与群成员复用</li><li>候选概览、来源讨论与待核实项</li><li>电话纪要进入同一决策上下文</li></ul></article>
+          <article class="metric"><small>报告链路</small><strong>3/3</strong><p>三份报告生成成功，链接格式与群内投递已完成彩排。</p></article>
+          <article class="metric"><small>新证据条数</small><strong>2·2·1</strong><p>三位候选的电话与讨论证据进入报告上下文。</p></article>
+        </div>
+        <p class="evidence-note reveal">状态说明：彩排中的 V1 → V2 是当时的演示节拍；当前实现已升级为单一文档生命周期。重复生成复用原文档，显式更新只追加证据。目标飞书群的人工编辑稿问答仍需部署后完成最后一轮真机验证。</p>
       </div>
-      <div class="proof-note">状态说明：彩排记录中的 V1 → V2 是当时的演示节拍；当前代码已升级为单一文档生命周期——重复生成复用同一文档，显式更新只追加证据。目标飞书群的人工编辑稿问答仍需部署后完成最后一轮真机验证。</div>
-    </div></section>
+    </section>
 
-    <section class="architecture"><div class="wrap"><span class="section-label">统一技术底座</span><h2>四个界面，<br>共享一条可信数据链。</h2>
-      <div class="stack">
-        <div class="stack-row"><div class="stack-name">交互层</div><div><b>飞书私聊与项目群</b><span>消息、卡片、按钮、文档</span></div><div><b>BrainX 工作台</b><span>队列、职位、项目、详情</span></div><div><b>OpenClaw</b><span>意图理解与窄工具编排</span></div></div>
-        <div class="stack-row"><div class="stack-name">可信执行层</div><div><b>Agent Gateway</b><span>身份、签名、限流、审计</span></div><div><b>Workflow Hub</b><span>事件、幂等、Case、Outbox</span></div><div><b>领域状态机</b><span>承接、行动、进展、终局</span></div></div>
-        <div class="stack-row"><div class="stack-name">数据与供给层</div><div><b>职位与决策事实</b><span>SQLite 冻结运行与事件账本</span></div><div><b>人才事实与授权</b><span>RDS、candidate_fact_v1</span></div><div><b>多渠道人才供给</b><span>OpenMai · Reloop · SuperMai</span></div></div>
-      </div><p class="footnote">核心原则：飞书不判断权限，OpenClaw 不直连数据库，模型文本不决定身份；所有写动作都经过服务端确认、幂等与审计。</p>
-    </div></section>
+    <section class="architecture">
+      <div class="wrap architecture-head">
+        <div class="reveal"><div class="eyebrow">统一技术底座</div><h2>四个界面，共用一条可信数据链。</h2></div>
+        <div class="reveal">
+          <div class="stack">
+            <div class="stack-row"><div class="stack-name">INTERACTION</div><div><b>飞书私聊与项目群</b><span>消息、卡片、按钮、文档</span></div><div><b>BrainX 工作台</b><span>队列、职位、项目、详情</span></div><div><b>OpenClaw</b><span>意图理解与窄工具编排</span></div></div>
+            <div class="stack-row"><div class="stack-name">EXECUTION</div><div><b>Agent Gateway</b><span>身份、签名、限流、审计</span></div><div><b>Workflow Hub</b><span>事件、幂等、Case、Outbox</span></div><div><b>领域状态机</b><span>承接、行动、进展、终局</span></div></div>
+            <div class="stack-row"><div class="stack-name">DATA &amp; SUPPLY</div><div><b>职位与决策事实</b><span>冻结运行与事件账本</span></div><div><b>人才事实与授权</b><span>RDS、candidate_fact_v1</span></div><div><b>多渠道人才供给</b><span>OpenMai · Reloop · SuperMai</span></div></div>
+          </div>
+          <p class="stack-note">核心边界：飞书不判断权限，OpenClaw 不直连数据库，模型文本不决定身份；所有写动作经过服务端确认、幂等与审计。</p>
+        </div>
+      </div>
+    </section>
 
-    <section class="final"><div class="wrap">
-      <h2 class="gradient-text">不是替顾问工作。<br>是让每一次工作，都成为下一次的优势。</h2>
-      <p>BrainTex 把职位选择、人才供给、流程推进和 Offer 判断连接起来，让团队从“靠人记住”走向“系统会积累”。</p>
-      <a class="btn primary" href="#top">回到开场</a>
-      <div class="source">依据：当前 BrainX / OpenClaw 生产工作流、2026-09-16 Offer 演示彩排与前端审核记录</div>
-    </div></section>
+    <section class="closing">
+      <div class="wrap">
+        <div class="closing-grid reveal">
+          <h2>让每一次交付，都成为下一次交付的优势。</h2>
+          <div><p>BrainTex 不替顾问做判断。它把职位、人才、过程和结果连接起来，让团队从“靠人记住”走向“系统会积累”。</p><a class="back" href="#top">回到工作流总览 <span>↑</span></a></div>
+        </div>
+        <div class="source">依据：BrainX / OpenClaw 当前生产工作流、2026-09-16 Offer 演示纪要与前端审核记录。</div>
+      </div>
+    </section>
   </main>
 
   <script>
-    const progress=document.querySelector('.progress i');
-    const navLinks=[...document.querySelectorAll('.nav-links a')];
-    const sections=[...document.querySelectorAll('.scene,.proof')];
-    const reveal=[...document.querySelectorAll('.reveal')];
-    const update=()=>{const max=document.documentElement.scrollHeight-innerHeight;progress.style.width=`${max?scrollY/max*100:0}%`};
-    addEventListener('scroll',update,{passive:true});update();
-    const appear=new IntersectionObserver(entries=>entries.forEach(entry=>{if(entry.isIntersecting)entry.target.classList.add('visible')}),{threshold:.14});
-    reveal.forEach(el=>appear.observe(el));sections.forEach(el=>appear.observe(el));
-    const active=new IntersectionObserver(entries=>entries.forEach(entry=>{if(!entry.isIntersecting)return;navLinks.forEach(link=>link.classList.toggle('active',link.getAttribute('href')===`#${entry.target.id}`))}),{rootMargin:'-35% 0px -55%'});
-    sections.forEach(el=>active.observe(el));
+    const progress = document.querySelector(".scroll-rule i");
+    const links = Array.from(document.querySelectorAll(".nav-links a"));
+    const sections = Array.from(document.querySelectorAll(".chapter, .evidence"));
+    const reveal = Array.from(document.querySelectorAll(".reveal"));
+    const updateProgress = () => {
+      const max = document.documentElement.scrollHeight - innerHeight;
+      progress.style.height = (max ? scrollY / max * 100 : 0) + "%";
+    };
+    addEventListener("scroll", updateProgress, { passive: true });
+    updateProgress();
+    const appear = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) entry.target.classList.add("visible");
+      });
+    }, { threshold: .12 });
+    reveal.forEach((item) => appear.observe(item));
+    const active = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        links.forEach((link) => link.classList.toggle("active", link.getAttribute("href") === "#" + entry.target.id));
+      });
+    }, { rootMargin: "-35% 0px -55%" });
+    sections.forEach((section) => active.observe(section));
   </script>
 </body>
 </html>

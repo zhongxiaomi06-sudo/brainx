@@ -21,12 +21,17 @@ function safeCandidateText(value, max = 300) {
   return (text || '待核实').slice(0, max);
 }
 
+// TTC 人才编号形态（PL…/PT…）。内部受控引用（talent-db:*、reloop-profile:*）不是 TTC 编号，
+// 拼出的 app.ttcadvisory.com 链接必然打不开（2026-09-16 实证）——此类返回 null 由调用方降级。
+const TTC_REF = /^P[A-Z]\d{10,}$/;
+
 function talentUrl(candidateRef, candidate = {}) {
   try {
     const target = new URL(candidate.talentUrl || '');
     if (target.origin === 'https://app.ttcadvisory.com'
         && target.pathname.startsWith('/app/talent/')) return target.toString();
   } catch { /* 使用受控候选编号回退。 */ }
+  if (!TTC_REF.test(String(candidateRef || ''))) return null;
   return `https://app.ttcadvisory.com/app/talent/${encodeURIComponent(candidateRef)}`;
 }
 
@@ -153,18 +158,26 @@ export function createCandidateActionToolHandlers({
           sourceTaskId: discovered?.sourceTaskId || null, candidateSnapshot: discovered,
         }, args.action === 'KEEP_FOR_REVIEW');
         let talentLinkStatus = 'not_requested';
+        const unknowns = [];
         if (args.action === 'KEEP_FOR_REVIEW' && isSourceProjectGroup(db, context.principal, args.job_id)) {
           const candidate = discovered || focusedCandidate || { candidateRef: args.candidate_ref };
-          const key = createHash('sha256')
-            .update(`${args.job_id}\0${args.candidate_ref}\0${context.principal.chatId}`)
-            .digest('hex').slice(0, 32);
-          await sendTextMessageFn({ target: context.principal.chatId,
-            text: talentUrl(args.candidate_ref, candidate),
-            idempotencyKey: `candidate-link-${key}` });
-          talentLinkStatus = 'sent';
+          const link = talentUrl(args.candidate_ref, candidate);
+          if (link) {
+            const key = createHash('sha256')
+              .update(`${args.job_id}\0${args.candidate_ref}\0${context.principal.chatId}`)
+              .digest('hex').slice(0, 32);
+            await sendTextMessageFn({ target: context.principal.chatId,
+              text: link,
+              idempotencyKey: `candidate-link-${key}` });
+            talentLinkStatus = 'sent';
+          } else {
+            // 内部人才库引用（talent-db:* / reloop-profile:*）拼不出有效 TTC 链接，不发假链接
+            talentLinkStatus = 'no_ttc_link';
+            unknowns.push('该候选人来自内部人才库（非 TTC 编号），暂无可发送的 TTC 链接；回复顾问时说明已初筛通过，不要承诺已发链接。');
+          }
         }
         return { data: { ...row, talent_link_status: talentLinkStatus }, facts: [{ candidate_ref: args.candidate_ref,
-          project_focus: row.focus_status === 'FOCUSED' }], inferences: [], recommendations: [], unknowns: [],
+          project_focus: row.focus_status === 'FOCUSED' }], inferences: [], recommendations: [], unknowns,
         evidence_refs: [`candidate_focus:${args.job_id}:${args.candidate_ref}`],
         next_allowed_actions: row.focus_status === 'FOCUSED'
           ? ['brainx_candidate_fit', 'brainx_candidate_workflow'] : ['brainx_candidate_workflow'] };
@@ -188,10 +201,18 @@ export function createCandidateActionToolHandlers({
       if (args.action === 'SEND_TALENT_CARD') {
         if (!isSourceProjectGroup(db, context.principal, args.job_id)) fail('NOT_FOUND_OR_FORBIDDEN');
         const candidate = discovered || focusedCandidate || { candidateRef: args.candidate_ref };
+        const link = talentUrl(args.candidate_ref, candidate);
+        if (!link) {
+          return { data: { candidate_ref: args.candidate_ref, talent_link_status: 'no_ttc_link' },
+            facts: [{ candidate_ref: args.candidate_ref, talent_link_available: false }],
+            inferences: [], recommendations: [],
+            unknowns: ['该候选人来自内部人才库（非 TTC 编号），没有可打开的 TTC 链接；回复顾问时如实说明，不要假装已发送。'],
+            evidence_refs: [`candidate_link:${args.job_id}:${args.candidate_ref}`], next_allowed_actions: [] };
+        }
         const key = createHash('sha256').update(`${args.job_id}\0${args.candidate_ref}\0${context.principal.chatId}`)
           .digest('hex').slice(0, 32);
         await sendTextMessageFn({ target: context.principal.chatId,
-          text: talentUrl(args.candidate_ref, candidate),
+          text: link,
           idempotencyKey: `candidate-link-${key}` });
         return { data: { candidate_ref: args.candidate_ref, talent_link_status: 'sent' },
           facts: [{ candidate_ref: args.candidate_ref, talent_link_sent_to_current_group: true }],

@@ -272,3 +272,32 @@ ${JSON.stringify({ candidates: [{ candidate_ref: 'openmai-talent-1', name: '王�
     job_id: jobId, candidate_ref: 'openmai-talent-1', confirm: false }, context), /INVALID_ARGUMENT/);
   db.close();
 });
+
+test('内部人才库引用（talent-db:*）不发假 TTC 链接，明确返回 no_ttc_link', async () => {
+  // 2026-09-16 实证：短名单候选是内部受控引用，兜底拼接的 ttcadvisory.com 链接必然打不开。
+  const { db, jobId } = fixture();
+  db.prepare(`INSERT INTO project_launches
+    (launch_id,consultant_id,project_id,idempotency_key,status,current_step,chat_id,created_at,updated_at)
+    VALUES ('launch-internal','felix',?,'launch-internal-key','READY','READY','oc_internal',
+      '2026-09-09T00:00:00.000Z','2026-09-09T00:00:00.000Z')`).run(jobId);
+  const sent = [];
+  const handlers = createCandidateActionToolHandlers({ db,
+    candidateShortlistFn: async () => ({ items: [{ candidate_ref: 'talent-db:73' }],
+      page: { next_page_token: null } }),
+    sendTextMessageFn: async (input) => { sent.push(input); return { message_id: 'om-x' }; },
+  });
+  const context = { principal: { tenantId: 'tenant-a', consultantId: 'felix',
+    chatType: 'group', chatId: 'oc_internal' } };
+
+  const kept = await handlers.brainx_candidate_workflow({ job_id: jobId,
+    candidate_ref: 'talent-db:73', action: 'KEEP_FOR_REVIEW', confirm: true }, context);
+  assert.equal(kept.data.focus_status, 'FOCUSED', '初筛通过本身照常生效');
+  assert.equal(kept.data.talent_link_status, 'no_ttc_link');
+  assert.ok(kept.unknowns.some((u) => u.includes('内部人才库')));
+
+  const card = await handlers.brainx_candidate_workflow({ job_id: jobId,
+    candidate_ref: 'talent-db:73', action: 'SEND_TALENT_CARD', confirm: true }, context);
+  assert.equal(card.data.talent_link_status, 'no_ttc_link');
+  assert.equal(sent.length, 0, '内部引用一律不发链接消息');
+  db.close();
+});

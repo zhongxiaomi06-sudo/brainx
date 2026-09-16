@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-16｜fix(人才卡): 内部人才库引用不再发打不开的假 TTC 链接
+
+- 起因（用户实证）：人才卡/初筛通过后发出的 TTC 链接打不开。根因：talentUrl 对任意 candidate_ref 兜底拼接 app.ttcadvisory.com/app/talent/<ref>；内部人才库跑批上线后短名单候选是内部受控引用（talent-db:<id>，源记录仅指向 reloop-profile:*，非 TTC 编号），拼出的链接必然 404。
+- 修复：talentUrl 增加 TTC 编号守卫（^P[A-Z]\d{10,}$，PL/PT 形态）——候选人自带 talentUrl 仍优先透传；内部引用返回 null。KEEP_FOR_REVIEW 与 SEND_TALENT_CARD 拿到 null 时不发消息、返回 talent_link_status=no_ttc_link 并给模型明确口径（如实说明，不要承诺已发链接）。
+- 验证：新增内部引用用例（初筛通过照常 FOCUSED、零发送、no_ttc_link），既有 talent_url 透传用例不受影响，agent-candidate-actions 8/8，全量回归见提交。
+
 ## 2026-09-16｜fix(群准入): launch 群白名单 FAILED 不再永久死区 + 重复接单优雅化
 
 - 起因（york 实证）：JLPJBV9 群点击接单/找人均无响应。根因有二：① 9/15 06:10 起所有 launch 的 openclaw 加白 CLI 连续失败（环境类故障，疑似配置文件属主被误改），12 轮重试耗尽落 FAILED 后补偿不再覆盖，群长期不在白名单、消息被 allowlist 丢弃；② york 其实已于 launch 时 ACCEPTED，旧卡片「接单」按钮再点撞 409「已有当前行动」被误读为无法接单。

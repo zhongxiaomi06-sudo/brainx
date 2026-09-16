@@ -3,379 +3,166 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="BrainTex 招聘交付系统：职位决策、人才供给、流程推进与 Offer 决策。">
-  <title>BrainTex · 招聘交付系统</title>
-  <style>
-    :root {
-      --paper: #f3f1ec;
-      --surface: #ffffff;
-      --ink: #151515;
-      --quiet: #686861;
-      --line: #d2d0c9;
-      --blue: #2848d8;
-      --orange: #e0522d;
-      --green: #236b50;
-      --ease: cubic-bezier(.2,.8,.2,1);
-    }
-    * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; background: var(--paper); }
-    body { margin: 0; color: var(--ink); background: var(--paper); font: 16px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif; }
-    a { color: inherit; text-decoration: none; }
-    button { font: inherit; }
-    ::selection { color: white; background: var(--blue); }
-    .scroll-rule { position: fixed; inset: 64px auto 0 0; z-index: 50; width: 3px; background: #dedcd6; }
-    .scroll-rule i { display: block; width: 100%; height: 0; background: var(--blue); }
-    .nav { position: fixed; inset: 0 0 auto; z-index: 40; height: 64px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 0 32px; border-bottom: 1px solid var(--line); background: rgba(243,241,236,.96); }
-    .wordmark { font-size: 17px; font-weight: 760; letter-spacing: -.03em; }
-    .wordmark span { color: var(--blue); }
-    .nav-links { display: flex; height: 100%; }
-    .nav-links a { position: relative; display: grid; place-items: center; padding: 0 16px; color: #72726d; font-size: 12px; }
-    .nav-links a:after { content: ""; position: absolute; inset: auto 16px -1px; height: 2px; background: var(--blue); transform: scaleX(0); transition: transform .25s ease; }
-    .nav-links a:hover, .nav-links a.active { color: var(--ink); }
-    .nav-links a.active:after { transform: scaleX(1); }
-    .nav-meta { justify-self: end; color: var(--quiet); font: 11px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .04em; }
-    .wrap { width: min(1240px, calc(100% - 64px)); margin: 0 auto; }
-    .eyebrow { display: flex; align-items: center; gap: 12px; color: var(--blue); font: 700 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .12em; text-transform: uppercase; }
-    .eyebrow:before { content: ""; width: 30px; height: 2px; background: currentColor; }
-    .hero { padding: 128px 0 72px; border-bottom: 1px solid var(--line); }
-    .hero-grid { display: grid; grid-template-columns: .9fr 1.1fr; gap: 80px; align-items: end; }
-    h1 { max-width: 720px; margin: 28px 0 24px; font: 650 clamp(44px, 6.2vw, 84px)/1.02 "Iowan Old Style", "Songti SC", "Noto Serif SC", serif; letter-spacing: -.055em; }
-    .hero-copy { max-width: 620px; margin: 0; color: #4c4c47; font-size: clamp(17px, 1.6vw, 21px); }
-    .hero-note { display: grid; grid-template-columns: 110px 1fr; gap: 18px; margin-top: 42px; padding-top: 16px; border-top: 1px solid var(--ink); color: var(--quiet); font-size: 12px; }
-    .hero-note b { color: var(--ink); }
-    .system-map { border-top: 4px solid var(--ink); background: var(--surface); box-shadow: 16px 16px 0 #dcd9d1; }
-    .map-head { display: flex; justify-content: space-between; gap: 24px; padding: 18px 20px; border-bottom: 1px solid var(--line); }
-    .map-head b { font-size: 13px; }
-    .map-head span { color: var(--quiet); font: 10px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
-    .map-row { display: grid; grid-template-columns: 48px 1fr auto; gap: 16px; align-items: center; min-height: 86px; padding: 14px 20px; border-bottom: 1px solid var(--line); transition: color .25s, background .25s; }
-    .map-row:last-child { border-bottom: 0; }
-    .map-row:hover { color: white; background: var(--blue); }
-    .map-no { color: var(--blue); font: 700 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
-    .map-row:hover .map-no, .map-row:hover p { color: #d9e0ff; }
-    .map-row strong { display: block; font-size: 18px; letter-spacing: -.02em; }
-    .map-row p { margin: 3px 0 0; color: var(--quiet); font-size: 12px; }
-    .mode { padding: 6px 9px; border: 1px solid currentColor; font-size: 10px; white-space: nowrap; }
-    .principles { padding: 86px 0; background: var(--ink); color: white; }
-    .principles-grid { display: grid; grid-template-columns: .75fr 1.25fr; gap: 80px; }
-    .principles h2 { max-width: 520px; margin: 18px 0; font: 500 clamp(34px, 4vw, 58px)/1.08 "Iowan Old Style", "Songti SC", serif; letter-spacing: -.04em; }
-    .principles .eyebrow { color: #8fa4ff; }
-    .principles-copy { color: #a9a9a3; }
-    .formula { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid #4b4b48; border-left: 1px solid #4b4b48; }
-    .formula article { min-height: 176px; padding: 22px; border-right: 1px solid #4b4b48; border-bottom: 1px solid #4b4b48; }
-    .formula small { color: #92928c; font: 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
-    .formula b { display: block; margin: 48px 0 8px; font-size: 17px; }
-    .formula p { margin: 0; color: #a9a9a3; font-size: 12px; }
-    .formula .result { grid-column: span 3; min-height: auto; display: flex; justify-content: space-between; gap: 24px; color: var(--ink); background: #dce2ff; }
-    .formula .result b { margin: 0; }
-    .chapter { position: relative; min-height: 142vh; border-bottom: 1px solid var(--line); }
-    .chapter-inner { position: sticky; top: 64px; min-height: calc(100vh - 64px); display: grid; align-items: center; padding: 46px 0; }
-    .chapter-grid { display: grid; grid-template-columns: .68fr 1.32fr; gap: 70px; align-items: start; }
-    .chapter-index { color: var(--blue); font: 700 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
-    .chapter h2 { margin: 26px 0 20px; font: 560 clamp(38px, 4.7vw, 66px)/1.02 "Iowan Old Style", "Songti SC", serif; letter-spacing: -.045em; }
-    .chapter-lead { max-width: 440px; margin: 0; color: #55554f; font-size: 17px; }
-    .advantage { margin-top: 44px; border-top: 1px solid var(--ink); }
-    .advantage div { display: grid; grid-template-columns: 32px 1fr; gap: 10px; padding: 13px 0; border-bottom: 1px solid var(--line); }
-    .advantage b { color: var(--blue); font: 700 10px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; }
-    .advantage span { font-size: 12px; }
-    .workflow { border: 1px solid var(--ink); background: var(--surface); box-shadow: 12px 12px 0 #dcd9d1; }
-    .workflow-head { display: grid; grid-template-columns: 1fr auto; gap: 24px; padding: 16px 20px; color: white; background: var(--ink); }
-    .workflow-head strong { font-size: 13px; }
-    .workflow-head span { color: #b8b8b2; font: 10px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
-    .step { display: grid; grid-template-columns: 42px 1fr 150px; gap: 14px; align-items: center; min-height: 84px; padding: 14px 20px; border-bottom: 1px solid var(--line); }
-    .step:last-of-type { border-bottom: 0; }
-    .step-no { width: 28px; height: 28px; display: grid; place-items: center; color: white; background: var(--blue); font: 700 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
-    .step strong { display: block; font-size: 14px; }
-    .step p { margin: 3px 0 0; color: var(--quiet); font-size: 12px; }
-    .token { justify-self: end; color: #5f5f59; font: 10px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; text-align: right; overflow-wrap: anywhere; }
-    .workflow-foot { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--ink); }
-    .workflow-foot div { padding: 14px 20px; }
-    .workflow-foot div + div { border-left: 1px solid var(--line); }
-    .workflow-foot small { display: block; color: var(--quiet); font-size: 10px; }
-    .workflow-foot b { display: block; margin-top: 4px; font-size: 12px; }
-    .workflow-foot .boundary b { color: var(--orange); }
-    .stage-2 .chapter-index, .stage-2 .advantage b { color: var(--green); }
-    .stage-2 .step-no { background: var(--green); }
-    .stage-3 .chapter-index, .stage-3 .advantage b { color: var(--orange); }
-    .stage-3 .step-no { background: var(--orange); }
-    .stage-4 { background: #e7e6e1; }
-    .stage-4 .chapter-index, .stage-4 .advantage b { color: #5b3ba7; }
-    .stage-4 .step-no { background: #5b3ba7; }
-    .evidence { padding: 110px 0; color: white; background: #1d2540; }
-    .evidence .eyebrow { color: #9fb0ff; }
-    .evidence-head { display: grid; grid-template-columns: 1fr .7fr; gap: 80px; align-items: end; }
-    .evidence h2 { max-width: 720px; margin: 22px 0 0; font: 520 clamp(40px, 5.5vw, 74px)/1.04 "Iowan Old Style", "Songti SC", serif; letter-spacing: -.045em; }
-    .evidence-head p { color: #bfc5d6; }
-    .evidence-grid { display: grid; grid-template-columns: 1.2fr .8fr .8fr; margin-top: 58px; border-top: 1px solid #6c748c; border-left: 1px solid #6c748c; }
-    .metric { min-height: 290px; padding: 28px; border-right: 1px solid #6c748c; border-bottom: 1px solid #6c748c; }
-    .metric small { color: #aab2c8; }
-    .metric strong { display: block; margin: 46px 0 14px; font: 500 clamp(54px, 7vw, 92px)/1 "Iowan Old Style", serif; letter-spacing: -.05em; }
-    .metric p { color: #c3c9d7; font-size: 13px; }
-    .metric ul { margin: 24px 0 0; padding: 0; list-style: none; }
-    .metric li { padding: 9px 0; border-top: 1px solid #535b72; font-size: 12px; }
-    .evidence-note { margin-top: 24px; padding-left: 18px; border-left: 3px solid #9fb0ff; color: #bac1d3; font-size: 12px; }
-    .architecture { padding: 110px 0; }
-    .architecture-head { display: grid; grid-template-columns: .75fr 1.25fr; gap: 80px; }
-    .architecture h2 { max-width: 500px; margin: 22px 0; font: 520 clamp(38px, 4.5vw, 62px)/1.04 "Iowan Old Style", "Songti SC", serif; letter-spacing: -.045em; }
-    .stack { border-top: 3px solid var(--ink); }
-    .stack-row { display: grid; grid-template-columns: 140px repeat(3, 1fr); border-bottom: 1px solid var(--line); }
-    .stack-row > div { min-height: 96px; padding: 18px; border-right: 1px solid var(--line); }
-    .stack-row > div:last-child { border-right: 0; }
-    .stack-name { color: var(--blue); font: 700 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
-    .stack-row b { display: block; font-size: 13px; }
-    .stack-row span { color: var(--quiet); font-size: 11px; }
-    .stack-note { margin-top: 18px; color: var(--quiet); font-size: 12px; }
-    .closing { padding: 86px 0 100px; border-top: 1px solid var(--ink); }
-    .closing-grid { display: grid; grid-template-columns: 1.15fr .85fr; gap: 100px; align-items: end; }
-    .closing h2 { max-width: 820px; margin: 0; font: 520 clamp(42px, 5.8vw, 80px)/1.03 "Iowan Old Style", "Songti SC", serif; letter-spacing: -.05em; }
-    .closing p { margin: 0 0 26px; color: var(--quiet); }
-    .back { display: inline-flex; align-items: center; gap: 24px; padding: 12px 0; border-bottom: 2px solid var(--blue); color: var(--blue); font-weight: 700; font-size: 13px; }
-    .source { margin-top: 70px; color: #85857e; font-size: 10px; }
-    .reveal { opacity: 0; transform: translateY(18px); transition: opacity .75s var(--ease), transform .75s var(--ease); }
-    .reveal.visible { opacity: 1; transform: none; }
-    @media (max-width: 980px) {
-      .nav { grid-template-columns: 1fr auto; padding: 0 22px; }
-      .nav-links { display: none; }
-      .hero-grid, .principles-grid, .chapter-grid, .evidence-head, .architecture-head, .closing-grid { grid-template-columns: 1fr; gap: 48px; }
-      .chapter { min-height: auto; }
-      .chapter-inner { position: relative; top: auto; min-height: auto; padding: 90px 0; }
-      .advantage { max-width: 700px; }
-      .evidence-grid { grid-template-columns: 1fr 1fr; }
-      .metric:first-child { grid-column: 1 / -1; }
-      .stack-row { grid-template-columns: 120px 1fr; }
-      .stack-row > div:nth-child(3), .stack-row > div:nth-child(4) { border-top: 1px solid var(--line); }
-    }
-    @media (max-width: 620px) {
-      .wrap { width: min(100% - 32px, 1240px); }
-      .nav { height: 56px; padding: 0 16px; }
-      .nav-meta { display: none; }
-      .scroll-rule { top: 56px; }
-      .hero { padding: 100px 0 58px; }
-      .hero-note { grid-template-columns: 1fr; }
-      .map-row { grid-template-columns: 34px 1fr; }
-      .mode { grid-column: 2; justify-self: start; }
-      .formula { grid-template-columns: 1fr; }
-      .formula .result { grid-column: auto; flex-direction: column; }
-      .chapter-inner { padding: 72px 0; }
-      .step { grid-template-columns: 34px 1fr; }
-      .token { grid-column: 2; justify-self: start; text-align: left; }
-      .workflow-foot, .evidence-grid { grid-template-columns: 1fr; }
-      .workflow-foot div + div { border-left: 0; border-top: 1px solid var(--line); }
-      .metric:first-child { grid-column: auto; }
-      .stack-row { grid-template-columns: 1fr; }
-      .stack-row > div { min-height: auto; border-right: 0; }
-      .stack-row > div:not(:first-child) { border-top: 1px solid var(--line); }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      html { scroll-behavior: auto; }
-      .reveal { opacity: 1; transform: none; transition: none; }
-    }
-  </style>
+  <meta name="description" content="BrainTex 四阶段工作流：职位选择与派单、AI 推人与人才池、触达跟进、Offer 与最佳实践。">
+  <title>BrainTex · 招聘工作流</title>
+  <link rel="stylesheet" href="braintex-ai-recruiting-os.css">
 </head>
 <body>
-  <div class="scroll-rule" aria-hidden="true"><i></i></div>
   <header class="nav">
-    <a class="wordmark" href="#top">Brain<span>Tex</span></a>
-    <nav class="nav-links" aria-label="章节导航">
-      <a href="#stage-1">01 决策</a><a href="#stage-2">02 人才</a><a href="#stage-3">03 推进</a><a href="#stage-4">04 Offer</a><a href="#evidence">演示证据</a>
+    <a class="brand" href="#top">BrainTex<span> / 工作流</span></a>
+    <nav aria-label="工作流阶段">
+      <a href="#stage-1">01 决策</a><a href="#stage-2">02 找人</a><a href="#stage-3">03 推进</a><a href="#stage-4">04 Offer</a>
     </nav>
-    <div class="nav-meta">RECRUITING DELIVERY SYSTEM / 2026</div>
+    <span class="edition">WORKFLOW / 2026</span>
   </header>
-
-  <main id="top">
-    <section class="hero">
-      <div class="wrap hero-grid">
-        <div>
-          <div class="eyebrow reveal">BrainTex operating brief</div>
-          <h1 class="reveal">招聘交付，不该靠人脑搬运上下文。</h1>
-          <p class="hero-copy reveal">把职位选择、人才供给、沟通推进与 Offer 判断连接成一条连续工作流。系统处理信息密度和重复执行，顾问保留关键决策。</p>
-          <div class="hero-note reveal"><b>设计原则</b><span>不是给工作流加一层聊天框，而是让每个决定都有事实、责任人、下一步与可回放的结果。</span></div>
-        </div>
-        <div class="system-map reveal" aria-label="四阶段工作流总览">
-          <div class="map-head"><b>交付系统 / 四个连续界面</b><span>DECIDE → SUPPLY → ADVANCE → LEARN</span></div>
-          <a class="map-row" href="#stage-1"><span class="map-no">01</span><div><strong>职位选择 &amp; 派单</strong><p>从项目判断进入确定性执行</p></div><span class="mode">半自动 → 全自动</span></a>
-          <a class="map-row" href="#stage-2"><span class="map-no">02</span><div><strong>AI 推人 &amp; 人才池</strong><p>多渠道、多轮次、可沉淀</p></div><span class="mode">持续供给</span></a>
-          <a class="map-row" href="#stage-3"><span class="map-no">03</span><div><strong>触达 &amp; 推荐跟进</strong><p>把沟通变成下一步行动</p></div><span class="mode">人机协同</span></a>
-          <a class="map-row" href="#stage-4"><span class="map-no">04</span><div><strong>Offer &amp; 最佳实践</strong><p>把现场经验变成团队资产</p></div><span class="mode">单一事实源</span></a>
-        </div>
-      </div>
-    </section>
-
-    <section class="principles">
-      <div class="wrap principles-grid">
-        <div class="reveal">
-          <div class="eyebrow">成立条件</div>
-          <h2>智能的质量，取决于系统知道什么、记住什么、何时行动。</h2>
-          <p class="principles-copy">模型只是其中一环。真正可交付的能力，需要决策依据、连续记忆与可靠工程同时在线。</p>
-        </div>
-        <div class="formula reveal">
-          <article><small>01 / DECISION</small><b>算法</b><p>决定该看什么、按什么顺序看，并保留硬规则。</p></article>
-          <article><small>02 / CONTINUITY</small><b>记忆</b><p>保存选择、证据、结果与历史排除集。</p></article>
-          <article><small>03 / TIMING</small><b>上下文</b><p>解释为什么现在行动，以及谁有权行动。</p></article>
-          <article class="result"><div><small>0 → 1 条件</small><b>工程可靠性 × 订阅式触发</b></div><p>幂等、队列、重试、权限、审计和事件订阅，把一次演示变成稳定服务。</p></article>
-        </div>
-      </div>
-    </section>
-
-    <section class="chapter stage-1" id="stage-1">
-      <div class="chapter-inner"><div class="wrap chapter-grid">
-        <div>
-          <div class="chapter-index reveal">01 / JOB DECISION</div>
-          <h2 class="reveal">先把项目选对，再让系统自动起跑。</h2>
-          <p class="chapter-lead reveal">BrainTex 聚合职位事实、关系、活跃度与交付信号，给出可解释的项目优先级。顾问决定是否承接，系统完成派单、建群与权限准备。</p>
-          <div class="advantage reveal">
-            <div><b>01</b><span>冻结、可回放的决策队列，不是随时漂移的静态列表</span></div>
-            <div><b>02</b><span>选择与执行分离：顾问决定做什么，工程保证不重复做</span></div>
-            <div><b>03</b><span>身份、项目、群权限逐层取交集，不让模型猜权限</span></div>
+  <main class="wrap" id="top">
+    <header class="intro">
+      <div><p class="eyebrow">THE RECRUITING LOOP</p><h1>从职位，到 Offer<span>。</span></h1></div>
+      <div class="intro-aside"><p>选项目 → 找人 → 推进 → 沉淀</p><div class="legend"><span><i></i>AI / 系统</span><span><i class="human-dot"></i>顾问参与</span></div></div>
+    </header>
+    <div class="reading"><span>顺着箭头阅读，点击节点查看技术逻辑。</span><span>4 个阶段 / 16 个节点</span></div>
+    <div class="journey">
+      <section class="stage" id="stage-1" aria-labelledby="heading-01">
+        <header class="stage-heading"><span class="stage-no">01</span><h2 id="heading-01">职位选择与派单</h2><p>顾问定方向，系统接着执行。</p></header>
+        <div class="stage-body">
+          <ol class="lane">
+            <li>
+              <details class="node">
+                <summary><span class="node-meta"><span>01.1</span><span class="role">系统</span></span><h3>职位汇总</h3><p>多源聚合 · 完整快照</p><span class="expand" aria-hidden="true">+</span></summary>
+                <div class="technical">TTC / Radar 汇成职位事实；快照完整后再进入推荐判断。</div>
+              </details>
+            </li>
+            <li>
+              <details class="node">
+                <summary><span class="node-meta"><span>01.2</span><span class="role">AI</span></span><h3>AI 分析</h3><p>六维评分 · 硬规则过滤</p><span class="expand" aria-hidden="true">+</span></summary>
+                <div class="technical">结合职位、关系与顾问偏好排序，冻结推荐原因，供后续回看。</div>
+              </details>
+            </li>
+            <li>
+              <details class="node human">
+                <summary><span class="node-meta"><span>01.3</span><span class="role">顾问</span></span><h3>顾问选项目</h3><p>偏好记忆 · 人工确认</p><span class="expand" aria-hidden="true">+</span></summary>
+                <div class="technical">顾问结合推荐依据决定承接，选择与结果进入事件记录。</div>
+              </details>
+            </li>
+            <li>
+              <details class="node">
+                <summary><span class="node-meta"><span>01.4</span><span class="role">系统</span></span><h3>自动派单</h3><p>订阅触发 · 幂等执行</p><span class="expand" aria-hidden="true">+</span></summary>
+                <div class="technical">按订阅主动推送；顾问确认承接后，幂等建群并绑定项目权限。</div>
+              </details>
+            </li>
+          </ol>
+          <div class="handoff" aria-label="下一阶段：确认承接 · 启动找人">
+            <svg viewBox="0 0 1000 48" preserveAspectRatio="none" aria-hidden="true"><path d="M 875 0 V 13 Q 875 24 864 24 H 136 Q 125 24 125 35 V 47"/><path class="arrow-tip" d="M 120 41 L 125 47 L 130 41"/></svg>
+            <span>确认承接 · 启动找人</span>
           </div>
         </div>
-        <div class="workflow reveal">
-          <div class="workflow-head"><strong>职位选择与派单 / 技术链</strong><span>HUMAN DECISION · DETERMINISTIC EXECUTION</span></div>
-          <div class="step"><span class="step-no">01</span><div><strong>聚合职位真值</strong><p>TTC / Radar 生成完整快照；同步未完成，不进入新判断。</p></div><span class="token">snapshot_id</span></div>
-          <div class="step"><span class="step-no">02</span><div><strong>冻结推荐与硬门槛</strong><p>六维评分叠加容量、状态和关系规则，生成最多 200 条稳定队列。</p></div><span class="token">baseline-1.1</span></div>
-          <div class="step"><span class="step-no">03</span><div><strong>辅助顾问选项目</strong><p>展示推荐原因、风险、下一步和待确认项；点击后形成明确决定。</p></div><span class="token">recommendation_run</span></div>
-          <div class="step"><span class="step-no">04</span><div><strong>幂等承接与唯一项目群</strong><p>写入 MY_JOB / ACCEPTED，建立唯一群、成员和机器人准入范围。</p></div><span class="token">idempotency_key</span></div>
-          <div class="step"><span class="step-no">05</span><div><strong>按入口启动人才供给</strong><p>工作台可起 OpenMai；飞书建群后可选 OpenMai / Reloop / SuperMai。</p></div><span class="token">READY</span></div>
-          <div class="workflow-foot"><div><small>现有能力</small><b>推荐 → 接单 → 建群 → 卡片</b></div><div class="boundary"><small>人工边界</small><b>项目承接仍由顾问拍板</b></div></div>
-        </div>
-      </div></div>
-    </section>
-
-    <section class="chapter stage-2" id="stage-2">
-      <div class="chapter-inner"><div class="wrap chapter-grid">
-        <div>
-          <div class="chapter-index reveal">02 / TALENT SUPPLY</div>
-          <h2 class="reveal">一次找人，变成持续的人才供给。</h2>
-          <p class="chapter-lead reveal">从职位事实出发，同时调度内部人才库与外部渠道。每一轮继承条件、排除历史候选人，并把结果沉淀为可追溯的事实与标签。</p>
-          <div class="advantage reveal">
-            <div><b>01</b><span>三条人才通道围绕同一项目协同，不再分散在多个工具</span></div>
-            <div><b>02</b><span>多轮推荐自动累计排除名单，减少重复结果与重复费用</span></div>
-            <div><b>03</b><span>候选卡确定性渲染，格式、动作和权限不依赖模型发挥</span></div>
+      </section>
+      <section class="stage" id="stage-2" aria-labelledby="heading-02">
+        <header class="stage-heading"><span class="stage-no">02</span><h2 id="heading-02">AI 推人与人才池</h2><p>同一份需求，多轮持续供给。</p></header>
+        <div class="stage-body">
+          <ol class="lane">
+            <li>
+              <details class="node">
+                <summary><span class="node-meta"><span>02.1</span><span class="role">AI</span></span><h3>职位画像</h3><p>职位事实 + 找人条件</p><span class="expand" aria-hidden="true">+</span></summary>
+                <div class="technical">合并职位要求与同群补充条件；新增条件供下一轮搜索使用。</div>
+              </details>
+            </li>
+            <li>
+              <details class="node">
+                <summary><span class="node-meta"><span>02.2</span><span class="role">AI</span></span><h3>多渠道推人</h3><p>OpenMai · Reloop · SuperMai</p><span class="expand" aria-hidden="true">+</span></summary>
+                <div class="technical">按职位找人、检索私域人才库或按判据寻访；异步任务完成后回到项目群。</div>
+              </details>
+            </li>
+            <li>
+              <details class="node human">
+                <summary><span class="node-meta"><span>02.3</span><span class="role">顾问</span></span><h3>筛选与打标</h3><p>匹配解释 · 反馈留痕</p><span class="expand" aria-hidden="true">+</span></summary>
+                <div class="technical">顾问核对匹配依据，确认初筛与分类；选择写入项目重点名单。</div>
+              </details>
+            </li>
+            <li>
+              <details class="node">
+                <summary><span class="node-meta"><span>02.4</span><span class="role">系统</span></span><h3>人才入池</h3><p>结构化事实 · 授权回流</p><span class="expand" aria-hidden="true">+</span></summary>
+                <div class="technical">通过独立授权动作加入 Reloop，保留候选来源与结构化事实。</div>
+              </details>
+            </li>
+          </ol>
+          <div class="feedback local-loop"><a href="#stage-2">← 调整条件 → 继续推荐<small>继承条件 · 排除已推荐人选</small></a></div>
+          <div class="handoff" aria-label="下一阶段：初筛通过 · 进入沟通">
+            <svg viewBox="0 0 1000 48" preserveAspectRatio="none" aria-hidden="true"><path d="M 875 0 V 13 Q 875 24 864 24 H 136 Q 125 24 125 35 V 47"/><path class="arrow-tip" d="M 120 41 L 125 47 L 130 41"/></svg>
+            <span>初筛通过 · 进入沟通</span>
           </div>
         </div>
-        <div class="workflow reveal">
-          <div class="workflow-head"><strong>AI 推人与人才池 / 技术链</strong><span>MULTI-SOURCE · MULTI-ROUND · TRACEABLE</span></div>
-          <div class="step"><span class="step-no">01</span><div><strong>职位事实生成找人判据</strong><p>角色、技能、城市、HC 与群内“找人条件”合并为本轮输入。</p></div><span class="token">job_facts</span></div>
-          <div class="step"><span class="step-no">02</span><div><strong>三渠道并行覆盖</strong><p>OpenMai 按职位、Reloop 私域人才库、SuperMai 判据搜索。</p></div><span class="token">task_ledger</span></div>
-          <div class="step"><span class="step-no">03</span><div><strong>异步执行并自动回群</strong><p>任务持久化、超时关闭、有限重试；worker 把结果投递原项目群。</p></div><span class="token">outbox / worker</span></div>
-          <div class="step"><span class="step-no">04</span><div><strong>多轮推荐不撞人</strong><p>累计历史 TTC 编号形成排除集；新条件只影响下一轮。</p></div><span class="token">search_round</span></div>
-          <div class="step"><span class="step-no">05</span><div><strong>分类、标注与人才池回流</strong><p>初筛通过写项目重点名单；加入 Reloop 走独立动作和授权校验。</p></div><span class="token">candidate_fact_v1</span></div>
-          <div class="workflow-foot"><div><small>现有能力</small><b>首轮 / 续搜 / 重点 / 入池</b></div><div class="boundary"><small>成本边界</small><b>少于 6 人会告警，不隐性加费</b></div></div>
-        </div>
-      </div></div>
-    </section>
-
-    <section class="chapter stage-3" id="stage-3">
-      <div class="chapter-inner"><div class="wrap chapter-grid">
-        <div>
-          <div class="chapter-index reveal">03 / ENGAGEMENT LOOP</div>
-          <h2 class="reveal">每一次沟通，都推动一个明确的下一步。</h2>
-          <p class="chapter-lead reveal">群内讨论、电话纪要、候选动作与新需求进入同一个项目上下文，形成当前行动、截止时间与下一轮找人条件。</p>
-          <div class="advantage reveal">
-            <div><b>01</b><span>项目群就是执行中枢，信息与动作停留在业务发生的地方</span></div>
-            <div><b>02</b><span>进展成为带状态、期限和幂等键的事件，不是聊天记忆</span></div>
-            <div><b>03</b><span>新需求直接驱动下一轮检索，不必重新解释整个职位</span></div>
+      </section>
+      <section class="stage" id="stage-3" aria-labelledby="heading-03">
+        <header class="stage-heading"><span class="stage-no">03</span><h2 id="heading-03">触达与推荐跟进</h2><p>每一次沟通，留下下一步。</p></header>
+        <div class="stage-body">
+          <ol class="lane">
+            <li>
+              <details class="node">
+                <summary><span class="node-meta"><span>03.1</span><span class="role">AI</span></span><h3>群内交互</h3><p>项目绑定 · 共享上下文</p><span class="expand" aria-hidden="true">+</span></summary>
+                <div class="technical">群与项目固定关联；机器人在授权范围内读取讨论和候选信息。</div>
+              </details>
+            </li>
+            <li>
+              <details class="node human">
+                <summary><span class="node-meta"><span>03.2</span><span class="role">顾问</span></span><h3>电话沟通</h3><p>人工联系 · 纪要作证</p><span class="expand" aria-hidden="true">+</span></summary>
+                <div class="technical">顾问完成外部联系，把动机、顾虑和时间点录为沟通证据。</div>
+              </details>
+            </li>
+            <li>
+              <details class="node human">
+                <summary><span class="node-meta"><span>03.3</span><span class="role">人机</span></span><h3>推荐跟进</h3><p>状态流转 · 到期提醒</p><span class="expand" aria-hidden="true">+</span></summary>
+                <div class="technical">记录当前行动、负责人和截止时间；阻塞与逾期进入提醒。</div>
+              </details>
+            </li>
+            <li>
+              <details class="node human">
+                <summary><span class="node-meta"><span>03.4</span><span class="role">人机</span></span><h3>需求更新</h3><p>新条件继承 · 历史排除</p><span class="expand" aria-hidden="true">+</span></summary>
+                <div class="technical">客户或候选反馈改变需求时，顾问更新条件，再发起下一轮找人。</div>
+              </details>
+            </li>
+          </ol>
+          <div class="feedback"><a href="#stage-2">↖ 新需求 / 未匹配 → 回到找人<small>顾问确认后发起下一轮</small></a></div>
+          <div class="handoff" aria-label="下一阶段：进入 Offer · 汇总决策上下文">
+            <svg viewBox="0 0 1000 48" preserveAspectRatio="none" aria-hidden="true"><path d="M 875 0 V 13 Q 875 24 864 24 H 136 Q 125 24 125 35 V 47"/><path class="arrow-tip" d="M 120 41 L 125 47 L 130 41"/></svg>
+            <span>进入 Offer · 汇总决策上下文</span>
           </div>
         </div>
-        <div class="workflow reveal">
-          <div class="workflow-head"><strong>触达与推荐跟进 / 技术链</strong><span>CONTEXT CONTINUITY · HUMAN-GATED OUTREACH</span></div>
-          <div class="step"><span class="step-no">01</span><div><strong>群内交互保持项目绑定</strong><p>chat_id 与 project_id 固定映射；成员、用途和候选权限服务端校验。</p></div><span class="token">group_scope</span></div>
-          <div class="step"><span class="step-no">02</span><div><strong>电话与沟通结论进入证据</strong><p>记录事实、顾虑、薪酬和时间点，不把模型推断当成事实。</p></div><span class="token">evidence</span></div>
-          <div class="step"><span class="step-no">03</span><div><strong>流程状态与唯一行动</strong><p>跟进、阻塞、释放和终局写入事件账本及当前行动。</p></div><span class="token">ACCEPTED → COMPLETED</span></div>
-          <div class="step"><span class="step-no">04</span><div><strong>定时与事件双触发</strong><p>逾期、阻塞或缺行动进入提醒；材料变化触发更新，不重复开任务。</p></div><span class="token">scheduler</span></div>
-          <div class="step"><span class="step-no">05</span><div><strong>需求变化回流下一轮</strong><p>“找人条件：……”保存为下一轮输入，并排除已推荐候选人。</p></div><span class="token">search_brief</span></div>
-          <div class="workflow-foot"><div><small>现有能力</small><b>群互动 / 进展 / 提醒 / 续搜</b></div><div class="boundary"><small>人工边界</small><b>外部联系由人完成，AI 先准备</b></div></div>
+      </section>
+      <section class="stage" id="stage-4" aria-labelledby="heading-04">
+        <header class="stage-heading"><span class="stage-no">04</span><h2 id="heading-04">Offer 与最佳实践</h2><p>一份报告，持续积累判断。</p></header>
+        <div class="stage-body">
+          <ol class="lane">
+            <li>
+              <details class="node">
+                <summary><span class="node-meta"><span>04.1</span><span class="role">AI</span></span><h3>上下文汇总</h3><p>候选事实 + 项目讨论</p><span class="expand" aria-hidden="true">+</span></summary>
+                <div class="technical">进入候选人决策群，汇总候选事实、项目匹配与相关讨论；缺失项待确认。</div>
+              </details>
+            </li>
+            <li>
+              <details class="node">
+                <summary><span class="node-meta"><span>04.2</span><span class="role">AI</span></span><h3>Offer 分析</h3><p>证据驱动 · 风险拆解</p><span class="expand" aria-hidden="true">+</span></summary>
+                <div class="technical">把已有证据整理为可编辑的决策报告，辅助顾问判断谈判重点。</div>
+              </details>
+            </li>
+            <li>
+              <details class="node human">
+                <summary><span class="node-meta"><span>04.3</span><span class="role">人机</span></span><h3>多轮完善</h3><p>单一文档 · 追加证据</p><span class="expand" aria-hidden="true">+</span></summary>
+                <div class="technical">复用同一份报告，新增证据只追加；编辑稿实时问答仍待目标环境验证。</div>
+              </details>
+            </li>
+            <li>
+              <details class="node human">
+                <summary><span class="node-meta"><span>04.4</span><span class="role">顾问</span></span><h3>最佳实践</h3><p>脱敏复盘 · 人工收录</p><span class="expand" aria-hidden="true">+</span></summary>
+                <div class="technical">顾问确认可复用经验后收录。经验回流是人工复用路径，尚非自动学习。</div>
+              </details>
+            </li>
+          </ol>
         </div>
-      </div></div>
-    </section>
-
-    <section class="chapter stage-4" id="stage-4">
-      <div class="chapter-inner"><div class="wrap chapter-grid">
-        <div>
-          <div class="chapter-index reveal">04 / OFFER INTELLIGENCE</div>
-          <h2 class="reveal">把谈判现场，沉淀成可复用的决策资产。</h2>
-          <p class="chapter-lead reveal">候选人进入 Offer 后，系统建立独立决策群，迁移必要上下文，并维护一份可编辑、可追问、可持续追加证据的报告。</p>
-          <div class="advantage reveal">
-            <div><b>01</b><span>从跨群碎片还原候选人级上下文，减少信息失真</span></div>
-            <div><b>02</b><span>每群只有一份报告；人工修改后，机器人按最新正文回答</span></div>
-            <div><b>03</b><span>谈判策略经脱敏与人工确认后，进入团队最佳实践</span></div>
-          </div>
-        </div>
-        <div class="workflow reveal">
-          <div class="workflow-head"><strong>Offer 管理与报告 / 技术链</strong><span>SINGLE SOURCE · EDITABLE · QUERYABLE</span></div>
-          <div class="step"><span class="step-no">01</span><div><strong>建立候选人决策群</strong><p>从重点名单确认对象，迁移最近最多 8 条明确提及该人的脱敏讨论。</p></div><span class="token">decision_group</span></div>
-          <div class="step"><span class="step-no">02</span><div><strong>汇总四类上下文</strong><p>候选事实、项目匹配、来源群讨论、本群新增证据；缺失项待确认。</p></div><span class="token">context_summary</span></div>
-          <div class="step"><span class="step-no">03</span><div><strong>生成唯一可编辑报告</strong><p>固定六段写入飞书文档；重复点击复用 document_id，不重复发卡。</p></div><span class="token">idempotent_doc</span></div>
-          <div class="step"><span class="step-no">04</span><div><strong>按人工编辑稿继续问答</strong><p>分页读取当前文档块、隐藏联系方式，再基于最新正文回答。</p></div><span class="token">READ mode</span></div>
-          <div class="step"><span class="step-no">05</span><div><strong>新证据只追加，不覆盖</strong><p>电话纪要和新讨论追加到原报告；最佳实践需去标识并人工确认。</p></div><span class="token">append-only</span></div>
-          <div class="workflow-foot"><div><small>现有能力</small><b>决策群 / 单报告 / 编辑稿问答</b></div><div class="boundary"><small>验证边界</small><b>真机编辑问答待部署后补证</b></div></div>
-        </div>
-      </div></div>
-    </section>
-
-    <section class="evidence" id="evidence">
-      <div class="wrap">
-        <div class="evidence-head reveal">
-          <div><div class="eyebrow">2026.09.16 演示纪要</div><h2>不是概念图。今天已经跑过关键链路。</h2></div>
-          <p>三位候选从项目上下文进入独立 Offer 决策群，完成报告生成和电话纪要更新；随后产品收敛为“每群一份可编辑报告”，消除多版本文档分叉。</p>
-        </div>
-        <div class="evidence-grid reveal">
-          <article class="metric"><small>真实飞书演示群</small><strong>3</strong><p>曹国鸿 · 杨东旭 · 从容地</p><ul><li>项目绑定与群成员复用</li><li>候选概览、来源讨论与待核实项</li><li>电话纪要进入同一决策上下文</li></ul></article>
-          <article class="metric"><small>报告链路</small><strong>3/3</strong><p>三份报告生成成功，链接格式与群内投递已完成彩排。</p></article>
-          <article class="metric"><small>新证据条数</small><strong>2·2·1</strong><p>三位候选的电话与讨论证据进入报告上下文。</p></article>
-        </div>
-        <p class="evidence-note reveal">状态说明：彩排中的 V1 → V2 是当时的演示节拍；当前实现已升级为单一文档生命周期。重复生成复用原文档，显式更新只追加证据。目标飞书群的人工编辑稿问答仍需部署后完成最后一轮真机验证。</p>
-      </div>
-    </section>
-
-    <section class="architecture">
-      <div class="wrap architecture-head">
-        <div class="reveal"><div class="eyebrow">统一技术底座</div><h2>四个界面，共用一条可信数据链。</h2></div>
-        <div class="reveal">
-          <div class="stack">
-            <div class="stack-row"><div class="stack-name">INTERACTION</div><div><b>飞书私聊与项目群</b><span>消息、卡片、按钮、文档</span></div><div><b>BrainX 工作台</b><span>队列、职位、项目、详情</span></div><div><b>OpenClaw</b><span>意图理解与窄工具编排</span></div></div>
-            <div class="stack-row"><div class="stack-name">EXECUTION</div><div><b>Agent Gateway</b><span>身份、签名、限流、审计</span></div><div><b>Workflow Hub</b><span>事件、幂等、Case、Outbox</span></div><div><b>领域状态机</b><span>承接、行动、进展、终局</span></div></div>
-            <div class="stack-row"><div class="stack-name">DATA &amp; SUPPLY</div><div><b>职位与决策事实</b><span>冻结运行与事件账本</span></div><div><b>人才事实与授权</b><span>RDS、candidate_fact_v1</span></div><div><b>多渠道人才供给</b><span>OpenMai · Reloop · SuperMai</span></div></div>
-          </div>
-          <p class="stack-note">核心边界：飞书不判断权限，OpenClaw 不直连数据库，模型文本不决定身份；所有写动作经过服务端确认、幂等与审计。</p>
-        </div>
-      </div>
-    </section>
-
-    <section class="closing">
-      <div class="wrap">
-        <div class="closing-grid reveal">
-          <h2>让每一次交付，都成为下一次交付的优势。</h2>
-          <div><p>BrainTex 不替顾问做判断。它把职位、人才、过程和结果连接起来，让团队从“靠人记住”走向“系统会积累”。</p><a class="back" href="#top">回到工作流总览 <span>↑</span></a></div>
-        </div>
-        <div class="source">依据：BrainX / OpenClaw 当前生产工作流、2026-09-16 Offer 演示纪要与前端审核记录。</div>
-      </div>
-    </section>
+      </section>
+    </div>
+    <a class="return-loop" href="#stage-1"><span aria-hidden="true">↶</span><strong>经验回流，进入下一次项目判断</strong><span>人工复用 · 持续积累</span><span aria-hidden="true">↑</span></a>
+    <footer><span>算法 × 记忆 × 上下文 <i> / </i> 工程 × 订阅</span><a href="ai-native-headhunter-workflow.html">原始轨迹图 ↗</a></footer>
   </main>
-
-  <script>
-    const progress = document.querySelector(".scroll-rule i");
-    const links = Array.from(document.querySelectorAll(".nav-links a"));
-    const sections = Array.from(document.querySelectorAll(".chapter, .evidence"));
-    const reveal = Array.from(document.querySelectorAll(".reveal"));
-    const updateProgress = () => {
-      const max = document.documentElement.scrollHeight - innerHeight;
-      progress.style.height = (max ? scrollY / max * 100 : 0) + "%";
-    };
-    addEventListener("scroll", updateProgress, { passive: true });
-    updateProgress();
-    const appear = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) entry.target.classList.add("visible");
-      });
-    }, { threshold: .12 });
-    reveal.forEach((item) => appear.observe(item));
-    const active = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (!entry.isIntersecting) return;
-        links.forEach((link) => link.classList.toggle("active", link.getAttribute("href") === "#" + entry.target.id));
-      });
-    }, { rootMargin: "-35% 0px -55%" });
-    sections.forEach((section) => active.observe(section));
-  </script>
 </body>
 </html>

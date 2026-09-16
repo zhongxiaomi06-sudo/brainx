@@ -106,3 +106,10 @@ const cardSent = cur.status === 'done' && !noReply
 - 不改 `ttcTalentUrl` 链接逻辑（已满足「无链接放空」）。
 - 不动 speckit/.specify/.codebuddy 批次（来源不明，留给用户自定）。
 - 不部署生产（本 spec 只到提交 + 门禁；部署需用户单独确认）。
+
+## 6. 修订（2026-09-16，咪拍板按钮对齐项目卡格式）
+
+- 起因：咪看了上一版截图，姓名纯文本 + 操作「不可操作」+ 底部引导语，与飞书现有项目找人卡格式不一致。
+- 修订：① `candidateLinkButton` 无 url 也做按钮（不放 multi_url，不跳转）② `candidateFocusRows` freeform 无链接做姓名按钮、无 PL 编号做初筛通过+加入reloop 占位按钮 ③ `continueSearchActions` freeform 放「SuperMai 重新找人」按钮（`alignSoloAction` 右对齐收口）。
+- `candidateQualityNotes` 不改（咪确认）。
+- 门禁：supermai-freeform 从 0 组按钮 → 19 组按钮，与项目卡 `openmai-delivery-complete` 同；18/18 全绿。

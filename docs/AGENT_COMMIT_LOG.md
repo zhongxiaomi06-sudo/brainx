@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-16｜feat(找人): SuperMai 自由找人卡按钮对齐项目卡格式（specs/018 修订）
+
+- 起因（咪实证）：上一版 supermai-freeform 卡姓名列纯文本、操作列「不可操作」、底部引导语——与飞书现有项目找人卡格式不一致。
+- 修复：① candidateLinkButton 无 TTC 链接时也做按钮（不放 multi_url，点击不跳转）② candidateFocusRows freeform 模式无链接做姓名按钮、无 PL 编号做初筛通过+加入reloop 占位按钮 ③ continueSearchActions freeform 放「SuperMai 重新找人」按钮（用 alignSoloAction 右对齐收口，单按钮行规范）。
+- 链接/功能占位口径：无 PL 编号按钮先做占位对齐格式，功能（candidate_workflow 接到 fallback candidate-N 会 NOT_FOUND）后续补；candidateQualityNotes 不改（咪确认）。
+- 验证：卡片门禁 18/18（supermai-freeform 从 0 组按钮 → 19 组按钮，与项目卡 openmai-delivery-complete 同）；verify:quick 通过。
+
 ## 2026-09-16｜feat(prompt): Offer 决策群小机器人注入飞书文档为对话背景（限本群独有）
 
 - 起因（咪需求）：让 `杨东旭-Ai infra-Offer决策` 群里小机器人对话时把飞书文档 `TrFHdPfc3oXzyLxa2TRcVxQvn6b`（杨东旭 × AI4S Offer 决策报告）作为背景上下文；用户改文档后机器人能读到改后内容（5 分钟缓存自动刷新）；其他群无此能力。

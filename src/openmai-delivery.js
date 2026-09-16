@@ -105,6 +105,7 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
 /** 候选人每人一行：姓名直接打开 TTC，右侧只保留初筛通过与加入 reloop。
  *  三列权重 3/5/3，动作按钮纵向排列，确保四字姓名和两个动作都不被截断。 */
 function candidateFocusRows(job, candidates) {
+  const freeform = job?.freeform === true;
   return [
     { tag: 'column_set', flex_mode: 'none', background_style: 'grey',
       columns: [tableCell('候选人', 3), tableCell('匹配与背景 · 核心匹配', 5), tableCell('操作', 3)] },
@@ -116,17 +117,18 @@ function candidateFocusRows(job, candidates) {
       ].filter(Boolean).join('\n');
       const url = ttcTalentUrl(candidate);
       const name = groupSafeOpenmaiText(candidate.name, 12);
-      const talentUrl = ttcTalentUrl(candidate);
       return { tag: 'column_set', flex_mode: 'none',
         background_style: index % 2 === 0 ? 'default' : 'grey', columns: [
+          // freeform：无 TTC 链接也做姓名按钮，对齐项目卡格式（链接放空不跳转，2026-09-16 specs/018 修订）
           { tag: 'column', width: 'weighted', weight: 3, vertical_align: 'center',
-            elements: [url
+            elements: [url || freeform
               ? candidateLinkButton(url, index + 1, name)
               : { tag: 'div', text: { tag: 'plain_text', content: `${index + 1}. ${name}` } }] },
           { tag: 'column', width: 'weighted', weight: 5, vertical_align: 'top',
             elements: [{ tag: 'markdown', content: info }] },
+          // freeform：无 PL 编号也做操作按钮占位（功能后续补，2026-09-16 specs/018 修订）
           { tag: 'column', width: 'weighted', weight: 3, vertical_align: 'center',
-            elements: candidate.candidateRefValid === false
+            elements: (candidate.candidateRefValid === false && !freeform)
               ? [{ tag: 'div', text: { tag: 'plain_text', content: '不可操作' } }]
               : [screenCandidateAction(job, candidate), addToReloopAction(job, candidate)] },
         ] };
@@ -135,8 +137,10 @@ function candidateFocusRows(job, candidates) {
 }
 
 function candidateLinkButton(url, no, name) {
-  return { tag: 'button', type: 'default', text: { tag: 'plain_text', content: `${no}. ${name}` },
-    multi_url: { url, pc_url: url, android_url: url, ios_url: url } };
+  const btn = { tag: 'button', type: 'default', text: { tag: 'plain_text', content: `${no}. ${name}` } };
+  // 有 TTC 链接才放 multi_url；无链接（freeform 外部找人）按钮存在但不跳转（2026-09-16 specs/018 修订）
+  if (url) btn.multi_url = { url, pc_url: url, android_url: url, ios_url: url };
+  return btn;
 }
 
 /** 一句话说明三个入口，避免用户先点开二次卡片才找到人才链接。 */
@@ -159,11 +163,16 @@ function candidateQualityNotes(candidates) {
 }
 
 function continueSearchActions(job) {
-  // freeform（自由找人）模式不接受 continue_search（skill 约定），
-  // 不放「继续找人」按钮，改放引导语：换方向请新发「找人条件：」消息（2026-09-16）。
+  // freeform：无 job_id，不放 OpenMai 继续找人（需 job_id）；放 SuperMai 重新找人按钮，
+  // 引导用同判据重新触发。按钮先做占位对齐项目卡格式（2026-09-16 specs/018 修订）。
   if (job?.freeform === true) {
-    return { tag: 'note', elements: [{ tag: 'plain_text',
-      content: '想换方向找人，请新发一条以「找人条件：」开头的消息。' }] };
+    const criteria = String(job.criteria || '').slice(0, 2000);
+    const command = `[BRAINTEX_SEARCH_START] 自由找人继续：用本轮判据重新触发 brainx_supermai_scout。现在调用 brainx_supermai_scout，传 criteria（见下）。任务返回 running/triggered 后立即回复"正在重新找人，完成后候选人会自动发到本群"并结束本轮，不要原地轮询；如返回 already_done，提示顾问换判据措辞后重试。\ncriteria=${criteria}`;
+    // 单按钮行用 alignSoloAction 右对齐收口（卡片排版规范，2026-09-16 specs/018 修订）
+    return alignSoloAction({ tag: 'action', actions: [
+      { tag: 'button', type: 'primary', text: { tag: 'plain_text', content: 'SuperMai 重新找人' },
+        value: { text: command } },
+    ] });
   }
   const projectRef = String(job.project_id || '').trim().slice(0, 64);
   const command = (entry, tool) => `[BRAINTEX_SEARCH_START] 为项目 ${projectRef} 使用 ${entry} 继续找人。读取本群最近一条由顾问明确发送的“找人条件：”作为可选补充条件；现在第一次调用 ${tool}，传入 job_id=${projectRef} 和 continue_search=true。任务返回 running/triggered 后立即回复“正在继续找人，完成后候选人会自动发到本群”并结束本轮，不要原地轮询。后续若顾问主动询问进度，查询时必须把 continue_search 改为 false 或省略，同一次按钮任务绝不能再次传 true。排除名单必须由 BrainX 根据历史 TTC 编号生成，不要自行编造，也不要再次询问找人方式。`;

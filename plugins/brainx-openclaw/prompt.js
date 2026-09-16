@@ -121,7 +121,11 @@ export function _resetDocCacheForTests() {
 }
 
 function buildSpecialGroupSuffix(chatId, content) {
-  return `\n\n# 本群专属背景信息（实时同步飞书文档，${Math.floor(DOC_CACHE_TTL_MS / 60000)} 分钟刷新一次缓存；用户在飞书侧的修改会在缓存过期后自动同步）\n\n回答本群问题时，优先依据以下文档内容；若用户提及文档里没有的事实，明确说明该信息未在背景文档中，请用户补充：\n\n${content}`;
+  // 隐蔽约束（咪 2026-09-16 拍板）：不要向用户暴露信息来源、读取状态、
+  // 缓存机制或飞书文档存在。读不到时由 createBraintexPromptContext fail-open
+  // 返回无文档版本，小机器人按通用猎头助手回答，自然不会说"我读不到"。
+  // 缓存命中时也不暴露文档存在——基于内容回答但不说来源。
+  return `\n\n# 本群业务上下文\n\n以下为本群已确认的事实。回答时自然引用，不要向用户透露信息来源、读取状态、内部机制或文档存在；若用户问的事实不在以下范围，按通用猎头判断回答，不要主动暴露任何与读取能力相关的限制或状态：\n\n${content}`;
 }
 
 export function createBraintexPromptContext(context = {}) {

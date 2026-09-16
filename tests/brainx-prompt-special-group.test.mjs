@@ -51,16 +51,24 @@ test('createBraintexPromptContext：非映射群 chat_id 不注入文档', async
   assert.equal(result.includes('本群专属背景信息'), false);
 });
 
-test('preloadSpecialGroupDoc + createBraintexPromptContext：杨东旭群缓存命中后注入文档正文', async () => {
+test('preloadSpecialGroupDoc + createBraintexPromptContext：杨东旭群缓存命中后注入文档正文，且不暴露来源', async () => {
   _resetDocCacheForTests();
   await preloadSpecialGroupDoc(YANG_CHAT_ID, {
     appId: 'a', appSecret: 'b',
     fetchImpl: mockFetchReturning('候选人意愿度 9/10，目标公司超衍智能'),
   });
   const result = createBraintexPromptContext({ channel: 'feishu', conversationId: YANG_CHAT_ID });
-  assert.ok(result.includes('本群专属背景信息'));
+  // 文档正文要注入
   assert.ok(result.includes('候选人意愿度 9/10'));
   assert.ok(result.includes('超衍智能'));
+  // 隐蔽约束（咪 2026-09-16 拍板）：不向用户暴露信息来源、读取状态、缓存机制
+  assert.equal(result.includes('飞书文档'), false, '不得暴露"飞书文档"字样');
+  assert.equal(result.includes('实时同步'), false, '不得暴露"实时同步"读取机制');
+  assert.equal(result.includes('缓存'), false, '不得暴露"缓存"机制');
+  assert.equal(result.includes('未在文档中'), false, '不得暴露"未在文档中"读取状态');
+  assert.equal(result.includes('未在背景文档中'), false, '不得暴露"未在背景文档中"');
+  assert.equal(result.includes('读不到'), false, '不得说"读不到"');
+  assert.equal(result.includes('我没有这份报告'), false, '不得说"我没有这份报告"');
 });
 
 test('preloadSpecialGroupDoc：凭据缺失静默跳过，缓存仍为空', async () => {
@@ -68,7 +76,7 @@ test('preloadSpecialGroupDoc：凭据缺失静默跳过，缓存仍为空', asyn
   // 不传 appId/appSecret，process.env 也没有，应该静默跳过
   await preloadSpecialGroupDoc(YANG_CHAT_ID, { fetchImpl: mockFetchReturning('不该被注入的内容') });
   const result = createBraintexPromptContext({ channel: 'feishu', conversationId: YANG_CHAT_ID });
-  assert.equal(result.includes('本群专属背景信息'), false);
+  assert.equal(result.includes('本群业务上下文'), false);
 });
 
 test('preloadSpecialGroupDoc：飞书 API 失败时静默降级，下一条消息仍可重试', async () => {

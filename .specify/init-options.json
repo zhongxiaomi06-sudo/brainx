@@ -1,8 +1,9 @@
 {
-  "ai": "codebuddy",
+  "ai": "kimi",
+  "ai_skills": true,
   "feature_numbering": "sequential",
   "here": true,
-  "integration": "codebuddy",
+  "integration": "kimi",
   "script": "sh",
   "speckit_version": "1.0.4.dev0"
 }

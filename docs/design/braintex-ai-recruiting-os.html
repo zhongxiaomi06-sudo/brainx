@@ -20,7 +20,7 @@
       <h1>从职位，到 Offer。</h1>
       <p class="intro-copy">四个阶段，让每一步自然衔接。</p>
     </header>
-    <div class="reading">点按节点，了解背后的技术逻辑。</div>
+    <div class="reading">点按 ＋ 查看技术栈与答疑 · 基于代码核对，不代表生产验收</div>
     <div class="journey">
       <section class="stage" id="stage-1" aria-labelledby="heading-01">
         <header class="stage-heading"><span class="stage-no">01</span><h2 id="heading-01">职位选择与派单</h2><p>顾问定方向，系统接着执行。</p></header>
@@ -29,25 +29,61 @@
             <li>
               <details class="node">
                 <summary><span class="node-meta"><span class="role">系统</span></span><h3>职位汇总</h3><p>多源聚合 · 完整快照</p><span class="expand" aria-hidden="true">+</span></summary>
-                <div class="technical">TTC / Radar 汇成职位事实；快照完整后再进入推荐判断。</div>
+                <div class="technical">
+                  <p class="tech-status">代码已实现</p>
+                  <ul class="tech-stack" aria-label="技术栈">
+                    <li>TTC API</li>
+                    <li>Feishu Bitable</li>
+                    <li>SQLite</li>
+                  </ul>
+                  <p class="tech-mechanism">通过分页与增量游标同步职位，统一写入 job_facts；sync_runs 记录完整性，完整快照才进入推荐。</p>
+                  <p class="tech-boundary"><span>Q&amp;A</span>Radar 是内部职位视图，不是另一个数据源。</p>
+                </div>
               </details>
             </li>
             <li>
               <details class="node">
                 <summary><span class="node-meta"><span class="role">AI</span></span><h3>AI 分析</h3><p>六维评分 · 硬规则过滤</p><span class="expand" aria-hidden="true">+</span></summary>
-                <div class="technical">结合职位、关系与顾问偏好排序，冻结推荐原因，供后续回看。</div>
+                <div class="technical">
+                  <p class="tech-status">确定性算法</p>
+                  <ul class="tech-stack" aria-label="技术栈">
+                    <li>Rule-based Ranking</li>
+                    <li>baseline-1.1</li>
+                    <li>Frozen Snapshot</li>
+                  </ul>
+                  <p class="tech-mechanism">六维加权：方向 25%、活跃 20%、相似 15%、容量 15%、结果 15%、探索 10%；硬规则先过滤，结果与依据冻结保存。</p>
+                  <p class="tech-boundary"><span>Q&amp;A</span>不是 LLM 直接打分；BGE-M3 / FAISS / LambdaMART 是规划，不是当前正式排序。</p>
+                </div>
               </details>
             </li>
             <li>
               <details class="node human">
                 <summary><span class="node-meta"><span class="role">顾问</span></span><h3>顾问选项目</h3><p>偏好记忆 · 人工确认</p><span class="expand" aria-hidden="true">+</span></summary>
-                <div class="technical">顾问结合推荐依据决定承接，选择与结果进入事件记录。</div>
+                <div class="technical">
+                  <p class="tech-status">人工确认</p>
+                  <ul class="tech-stack" aria-label="技术栈">
+                    <li>Human-in-the-loop</li>
+                    <li>Preference Memory</li>
+                    <li>SQLite Event Log</li>
+                  </ul>
+                  <p class="tech-mechanism">读取顾问关键词、历史项目与公司级反馈；顾问确认承接后，记录决策事件、首个行动和截止时间。</p>
+                  <p class="tech-boundary"><span>Q&amp;A</span>记忆是结构化偏好与行为记录，不是自动训练或 Fine-tuning。</p>
+                </div>
               </details>
             </li>
             <li>
               <details class="node">
                 <summary><span class="node-meta"><span class="role">系统</span></span><h3>自动派单</h3><p>订阅触发 · 幂等执行</p><span class="expand" aria-hidden="true">+</span></summary>
-                <div class="technical">按订阅主动推送；顾问确认承接后，幂等建群并绑定项目权限。</div>
+                <div class="technical">
+                  <p class="tech-status">代码已实现</p>
+                  <ul class="tech-stack" aria-label="技术栈">
+                    <li>Node.js Worker</li>
+                    <li>Scheduler</li>
+                    <li>Feishu Cards</li>
+                  </ul>
+                  <p class="tech-mechanism">定时器读取每人订阅时间与数量，push_log 防重复推送；接单后调用飞书 API 建群并绑定项目。</p>
+                  <p class="tech-boundary"><span>Q&amp;A</span>自动的是推荐推送；承接仍需确认，建群不等于自动启动收费找人。</p>
+                </div>
               </details>
             </li>
           </ol>
@@ -64,25 +100,61 @@
             <li>
               <details class="node">
                 <summary><span class="node-meta"><span class="role">AI</span></span><h3>职位画像</h3><p>职位事实 + 找人条件</p><span class="expand" aria-hidden="true">+</span></summary>
-                <div class="technical">合并职位要求与同群补充条件；新增条件供下一轮搜索使用。</div>
+                <div class="technical">
+                  <p class="tech-status">代码已实现</p>
+                  <ul class="tech-stack" aria-label="技术栈">
+                    <li>Context Assembly</li>
+                    <li>LLM JSON Extraction</li>
+                    <li>Zod</li>
+                  </ul>
+                  <p class="tech-mechanism">搜索上下文 = 职位事实 + 顾问找人条件。JD 建岗入口另用兼容 OpenAI 协议的 LLM 抽取 JSON，经 Zod 校验，失败走规则回退。</p>
+                  <p class="tech-boundary"><span>Q&amp;A</span>JD 抽取与找人是两条路径；草稿确认后才入职位事实，模型随配置选择。</p>
+                </div>
               </details>
             </li>
             <li>
               <details class="node">
                 <summary><span class="node-meta"><span class="role">AI</span></span><h3>多渠道推人</h3><p>OpenMai · Reloop · SuperMai</p><span class="expand" aria-hidden="true">+</span></summary>
-                <div class="technical">按职位找人、检索私域人才库或按判据寻访；异步任务完成后回到项目群。</div>
+                <div class="technical">
+                  <p class="tech-status">外部接口 + 本地匹配</p>
+                  <ul class="tech-stack" aria-label="技术栈">
+                    <li>OpenMai API</li>
+                    <li>SSE / Polling</li>
+                    <li>MySQL Shortlist</li>
+                  </ul>
+                  <p class="tech-mechanism">OpenMai 按职位搜人，SuperMai 按判据寻访；两者共用上游 completions 接口。Reloop 入口读取授权的预计算短名单。</p>
+                  <p class="tech-boundary"><span>Q&amp;A</span>本地匹配基线 supply-match-v1：技能 50% + 意向 30% + 文本 20%；不把上游算法称为自研。</p>
+                </div>
               </details>
             </li>
             <li>
               <details class="node human">
                 <summary><span class="node-meta"><span class="role">顾问</span></span><h3>筛选与打标</h3><p>匹配解释 · 反馈留痕</p><span class="expand" aria-hidden="true">+</span></summary>
-                <div class="technical">顾问核对匹配依据，确认初筛与分类；选择写入项目重点名单。</div>
+                <div class="technical">
+                  <p class="tech-status">人工筛选 + 规则标签</p>
+                  <ul class="tech-stack" aria-label="技术栈">
+                    <li>Human Review</li>
+                    <li>Fact-based Tags</li>
+                    <li>MySQL</li>
+                  </ul>
+                  <p class="tech-mechanism">初筛通过写入 SQLite 项目重点名单；独立标签回填模块从结构化技能与岗位摘要提取 skill / intention，写入 MySQL 标签关系。</p>
+                  <p class="tech-boundary"><span>Q&amp;A</span>重点名单与标签是两套记录；标签回填不是每次初筛自动执行，也不是模型自动终审。</p>
+                </div>
               </details>
             </li>
             <li>
               <details class="node">
                 <summary><span class="node-meta"><span class="role">系统</span></span><h3>人才入池</h3><p>结构化事实 · 授权回流</p><span class="expand" aria-hidden="true">+</span></summary>
-                <div class="technical">通过独立授权动作加入 Reloop，保留候选来源与结构化事实。</div>
+                <div class="technical">
+                  <p class="tech-status">RDS 写入已实现</p>
+                  <ul class="tech-stack" aria-label="技术栈">
+                    <li>mysql2</li>
+                    <li>RDS MySQL</li>
+                    <li>Source Reference</li>
+                  </ul>
+                  <p class="tech-mechanism">经确认调用 brainx_talent_pool_add，把候选姓名、脱敏摘要和来源编号写入 talent；按姓名与来源标记检查已有记录。</p>
+                  <p class="tech-boundary"><span>Q&amp;A</span>“加入 Reloop”当前落到 BrainX RDS 人才库；不能据此承诺已同步至 ReLoop 应用。</p>
+                </div>
               </details>
             </li>
           </ol>
@@ -100,25 +172,61 @@
             <li>
               <details class="node">
                 <summary><span class="node-meta"><span class="role">AI</span></span><h3>群内交互</h3><p>项目绑定 · 共享上下文</p><span class="expand" aria-hidden="true">+</span></summary>
-                <div class="technical">群与项目固定关联；机器人在授权范围内读取讨论和候选信息。</div>
+                <div class="technical">
+                  <p class="tech-status">代码已实现</p>
+                  <ul class="tech-stack" aria-label="技术栈">
+                    <li>OpenClaw</li>
+                    <li>Tool Calling</li>
+                    <li>HMAC-SHA256</li>
+                  </ul>
+                  <p class="tech-mechanism">飞书承载会话，OpenClaw 调窄工具；原生插件经 HTTP 连接 Agent Gateway，校验签名身份、群项目范围并记录审计。</p>
+                  <p class="tech-boundary"><span>Q&amp;A</span>模型负责理解与编排，后端负责权限；当前飞书主链是原生插件，不是直接连数据库。</p>
+                </div>
               </details>
             </li>
             <li>
               <details class="node human">
                 <summary><span class="node-meta"><span class="role">顾问</span></span><h3>电话沟通</h3><p>人工联系 · 纪要作证</p><span class="expand" aria-hidden="true">+</span></summary>
-                <div class="technical">顾问完成外部联系，把动机、顾虑和时间点录为沟通证据。</div>
+                <div class="technical">
+                  <p class="tech-status">人工环节</p>
+                  <ul class="tech-stack" aria-label="技术栈">
+                    <li>Human-in-the-loop</li>
+                    <li>PII Redaction</li>
+                    <li>Evidence Capture</li>
+                  </ul>
+                  <p class="tech-mechanism">顾问完成电话沟通，再把纪要录入群消息或进展记录；报告从已记录文本汇总证据，并遮蔽电话与邮箱。</p>
+                  <p class="tech-boundary"><span>Q&amp;A</span>本链路未接自动拨号、ASR 或 TTS；录音转写不是当前已实现能力。</p>
+                </div>
               </details>
             </li>
             <li>
               <details class="node human">
                 <summary><span class="node-meta"><span class="role">人机</span></span><h3>推荐跟进</h3><p>状态流转 · 到期提醒</p><span class="expand" aria-hidden="true">+</span></summary>
-                <div class="technical">记录当前行动、负责人和截止时间；阻塞与逾期进入提醒。</div>
+                <div class="technical">
+                  <p class="tech-status">代码已实现</p>
+                  <ul class="tech-stack" aria-label="技术栈">
+                    <li>State Machine</li>
+                    <li>SQLite Transaction</li>
+                    <li>Reminder Worker</li>
+                  </ul>
+                  <p class="tech-mechanism">顾问确认后更新阶段，关闭当前行动并建立下一步；事务与幂等键保护写入，Worker 按阶段、静默窗口和偏好推送提醒。</p>
+                  <p class="tech-boundary"><span>Q&amp;A</span>记录已触达、已推荐，不等于系统替顾问拨号或向客户发出推荐。</p>
+                </div>
               </details>
             </li>
             <li>
               <details class="node human">
                 <summary><span class="node-meta"><span class="role">人机</span></span><h3>需求更新</h3><p>新条件继承 · 历史排除</p><span class="expand" aria-hidden="true">+</span></summary>
-                <div class="technical">客户或候选反馈改变需求时，顾问更新条件，再发起下一轮找人。</div>
+                <div class="technical">
+                  <p class="tech-status">代码已实现</p>
+                  <ul class="tech-stack" aria-label="技术栈">
+                    <li>Context Injection</li>
+                    <li>Search Rounds</li>
+                    <li>Exclusion Set</li>
+                  </ul>
+                  <p class="tech-mechanism">群内“找人条件：…”暂存于插件，点继续找人时注入 criteria；后端累积可识别的 TTC 编号作为排除集，并记录搜索轮次。</p>
+                  <p class="tech-boundary"><span>Q&amp;A</span>条件缓存为进程内存，重启后需重发；排除依赖稳定编号，不是全渠道身份去重。</p>
+                </div>
               </details>
             </li>
           </ol>
@@ -136,25 +244,61 @@
             <li>
               <details class="node">
                 <summary><span class="node-meta"><span class="role">AI</span></span><h3>上下文汇总</h3><p>候选事实 + 项目讨论</p><span class="expand" aria-hidden="true">+</span></summary>
-                <div class="technical">进入候选人决策群，汇总候选事实、项目匹配与相关讨论；缺失项待确认。</div>
+                <div class="technical">
+                  <p class="tech-status">代码已实现</p>
+                  <ul class="tech-stack" aria-label="技术栈">
+                    <li>Context Assembly</li>
+                    <li>SQLite</li>
+                    <li>PII Redaction</li>
+                  </ul>
+                  <p class="tech-mechanism">按项目与候选编号组装重点名单快照、来源群摘要及决策群最近消息；迁入候选人决策群，供报告和问答使用。</p>
+                  <p class="tech-boundary"><span>Q&amp;A</span>读取的是已授权、已采集的证据；不是全量历史记忆，也没有自动补齐未知事实。</p>
+                </div>
               </details>
             </li>
             <li>
               <details class="node">
                 <summary><span class="node-meta"><span class="role">AI</span></span><h3>Offer 分析</h3><p>证据驱动 · 风险拆解</p><span class="expand" aria-hidden="true">+</span></summary>
-                <div class="technical">把已有证据整理为可编辑的决策报告，辅助顾问判断谈判重点。</div>
+                <div class="technical">
+                  <p class="tech-status">模板汇总已实现</p>
+                  <ul class="tech-stack" aria-label="技术栈">
+                    <li>Template Rendering</li>
+                    <li>Feishu Docx API</li>
+                    <li>Evidence Checklist</li>
+                  </ul>
+                  <p class="tech-mechanism">用固定六节模板汇总候选事实、匹配与群聊证据，调用飞书 Docx API 创建可编辑报告，列出动机、薪酬、到岗等待核实项。</p>
+                  <p class="tech-boundary"><span>Q&amp;A</span>当前生成器没有调用 LLM 做独立 Offer 评分；深度研判由顾问与机器人对话完成。</p>
+                </div>
               </details>
             </li>
             <li>
               <details class="node human">
                 <summary><span class="node-meta"><span class="role">人机</span></span><h3>多轮完善</h3><p>单一文档 · 追加证据</p><span class="expand" aria-hidden="true">+</span></summary>
-                <div class="technical">复用同一份报告，新增证据只追加；编辑稿实时问答仍待目标环境验证。</div>
+                <div class="technical">
+                  <p class="tech-status">待目标环境验证</p>
+                  <ul class="tech-stack" aria-label="技术栈">
+                    <li>Single Document</li>
+                    <li>Docx Block API</li>
+                    <li>Tool-grounded Q&A</li>
+                  </ul>
+                  <p class="tech-mechanism">GENERATE 复用已有报告，REGENERATE 向原文档追加新证据；READ 分页读取当前正文，再交给机器人作为问答上下文。</p>
+                  <p class="tech-boundary"><span>Q&amp;A</span>代码与本地模拟已具备；编辑稿问答、权限和回调仍需目标环境实测，不承诺实时自动同步。</p>
+                </div>
               </details>
             </li>
             <li>
               <details class="node human">
                 <summary><span class="node-meta"><span class="role">顾问</span></span><h3>最佳实践</h3><p>脱敏复盘 · 人工收录</p><span class="expand" aria-hidden="true">+</span></summary>
-                <div class="technical">顾问确认可复用经验后收录。经验回流是人工复用路径，尚非自动学习。</div>
+                <div class="technical">
+                  <p class="tech-status">人工收录路径</p>
+                  <ul class="tech-stack" aria-label="技术栈">
+                    <li>Markdown Playbook</li>
+                    <li>Skill Loading</li>
+                    <li>Human Curation</li>
+                  </ul>
+                  <p class="tech-mechanism">将资深猎头访谈与复盘整理为脱敏方法文档，人工确认后按需加载 Skill；业务经验由此成为工作流设计和回答参考。</p>
+                  <p class="tech-boundary"><span>Q&amp;A</span>Skill 文件是方法上下文，不是模型权重；Offer 结果尚未自动回写知识库或触发训练。</p>
+                </div>
               </details>
             </li>
           </ol>

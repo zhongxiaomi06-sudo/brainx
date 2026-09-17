@@ -51,6 +51,7 @@
 | **后端架构全貌、现状核实结论或"什么算做完"** | **[BrainX 后端架构 PRD（代码核实版）](prd-2026-09-02-backend-architecture.md)**（六层现状逐项核实 + 差距盘点含 3 个清单外新发现 + 工期关键路径 + 7 条验收标准）、[后端侧模块结构](2026-09-02-backend-module-structure.md) |
 | **飞书后台要勾选哪些权限/scope、事件订阅、敏感权限审批** | **[飞书权限清单（9/2 研发对齐会定论版）](2026-09-02-feishu-permission-scopes.md)**、`src/oauth.js` 用户身份 scope 实证注释 |
 | **这个架构承担哪些业务工作、每段业务走哪个工具** | **[业务工作全景](2026-09-02-business-work-breakdown.md)**（全链路六段 + MVP 每日循环 + 权限对照）、**[AI leader 工作流 + 日历助手](2026-09-02-ai-leader-workflow.md)**（一面前后两种形态）、[Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) |
+| 展示会技术栈、工作流节点技术与 Q&A | [招聘工作流技术栈与代码证据](audits/2026-09-17-workflow-tech-stack.md)、[技术展开区复核](frontend-reviews/2026-09-17-workflow-tech-stack.md) |
 | **一面之前怎么串联 AI leader 工作流 / 一面之后的待办提醒** | **[AI leader 工作流 + 日历助手](2026-09-02-ai-leader-workflow.md)**、`src/scheduler.js` `src/engagement.js` `src/push.js` |
 | **某个工具能不能外露给 OpenClaw / 生成 Skill** | **[工具外露白名单（全量）](2026-09-02-tool-exposure-whitelist.md)**、[OpenClaw 壳子架构 §5.2](2026-09-02-openclaw-shell-architecture.md) |
 | 任何代码、测试或配置改动 | [上传前完整验证](standards/PRE_PUSH_VERIFICATION.md)、[质量门禁操作手册](standards/QUALITY_GATE_OPERATIONS.md) |
@@ -142,7 +143,8 @@
 - [BrainX → OpenClaw 接口包（模块化交付信息）](2026-09-02-openclaw-interface-pack.md)：用户指令「后端的结构我打包给对方模块化的信息」的**单一打包文档**。§1 三接缝一屏图 + 三条红线；§2 stdio MCP 接入配置模板 + 15 工具快照（含黑名单 `brainx_sync_now`/`brainx_talent`）+ 调用纪律；§3 consultant_id 身份映射规则（**后端不碰 open_id，映射权威在对方**；群消息通道与身份映射互不相干）；§4 Skill 素材交付与合规基线；§6 交付包清单。
 - [OpenClaw 招聘闭环（2026-09-03）](2026-09-03-openclaw-recruiting-loop.md)：记录用户从“只读首版”升级为可执行闭环后的权威范围：卡片化回复、自然语言推送设置、职位负责人、确认后接单/找人/进展、候选 Case 推进、联系方式独立授权，以及尚未接通的外发和建群。
 - [AI Native 猎头全链路轨迹图](design/ai-native-headhunter-workflow.html)：环节级轨迹、人工/自动分工与证据来源的蒸馏工作稿，阶段三回填进行中。
-- [BrainTex 招聘工作流](design/braintex-ai-recruiting-os.html)：四阶段、16 个节点的连续箭头轨迹图；白底浅灰圆角界面，节点展示一句技术逻辑，点击展开机制与边界；含多轮找人、需求反馈与经验复用回路。[本轮审核](frontend-reviews/2026-09-17-recruiting-workflow-polish.md)。
+- [BrainTex 招聘工作流](design/braintex-ai-recruiting-os.html)：四阶段、16 个节点的连续箭头轨迹图；点击加号展开英文技术栈、中文机制与 Q&A 边界，默认仍保持简洁。[本轮审核](frontend-reviews/2026-09-17-workflow-tech-stack.md)。
+- [招聘工作流技术栈与代码证据](audits/2026-09-17-workflow-tech-stack.md)：16 个节点的实际实现来源、现场追问口径与未实现/未验收边界，不把架构规划当作生产事实。
 - [双项目 14 天作战计划](design/week-plan-brainx-reloop.html)：BrainX × reloop 至 9/14 决赛的双泳道排期、底线条件与不做清单。
 - [BrainX 最终交付蓝图与施工总清单](brainx-final-delivery-blueprint.md)：基于当前代码审计定义最终产品形态、黄金路径、跨前后端施工顺序和端到端验收。
 - [前端审核台账](frontend-reviews/README.md)：前端审核、正式接入、发布与真实数据验证状态的唯一权威入口。

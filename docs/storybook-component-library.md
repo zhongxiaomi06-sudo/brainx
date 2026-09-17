@@ -8,7 +8,7 @@
 
 ## 当前收录范围
 
-[招聘工作流轨迹图](design/braintex-ai-recruiting-os.html)为独立静态说明文档，不作为生产组件新增 Storybook 场景；结构方向已确认、白底浅灰圆角精修稿待复看，见[审核记录](frontend-reviews/2026-09-17-recruiting-workflow-polish.md)。
+[招聘工作流轨迹图](design/braintex-ai-recruiting-os.html)为独立静态说明文档，不作为生产组件新增 Storybook 场景；沿用四阶段结构与白底浅灰视觉，16 节点加号展开区补实际技术栈、机制和 Q&A，本轮技术稿待复看，见[审核记录](frontend-reviews/2026-09-17-workflow-tech-stack.md)。
 
 | 分组 | 生产组件与状态 |
 |---|---|

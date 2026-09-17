@@ -46,6 +46,12 @@ h1 { margin: 0; font-size: clamp(36px, 4.7vw, 64px); font-weight: 650; line-heig
 .expand { position: absolute; right: 14px; bottom: 13px; width: 23px; height: 23px; display: grid; place-items: center; border-radius: 50%; background: #e7e7eb; color: #6e6e73; font-size: 18px; font-weight: 400; line-height: 1; transition: transform .2s, background .2s; }
 .node[open] .expand { transform: rotate(45deg); color: white; background: #1d1d1f; }
 .technical { padding: 15px 20px 20px; margin: 0 4px; border-top: 1px solid #dde3eb; color: #515154; font-size: 12px; line-height: 1.8; }
+.technical p { margin: 0; overflow-wrap: anywhere; }
+.tech-status { color: #626267; font-size: 10px; letter-spacing: .01em; }
+.tech-stack { display: flex; flex-wrap: wrap; gap: 5px; list-style: none; padding: 0; margin: 10px 0 14px; }
+.tech-stack li { max-width: 100%; padding: 4px 7px; border: 1px solid #d9e2ee; border-radius: 6px; background: #ffffffb3; color: #29394c; font: 10px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; overflow-wrap: anywhere; }
+.technical .tech-boundary { margin-top: 14px; padding-top: 12px; border-top: 1px solid #dce4ee; color: #626267; font-size: 11px; }
+.tech-boundary > span { display: block; margin-bottom: 5px; color: #0066cc; font-size: 10px; font-weight: 600; letter-spacing: .06em; }
 .handoff { height: 76px; position: relative; }
 .handoff svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
 .handoff path { fill: none; stroke: #c2c2c8; stroke-width: 1; vector-effect: non-scaling-stroke; }
@@ -75,6 +81,7 @@ footer a:hover { color: var(--accent); }
   .lane > li:not(:last-child)::after { left: 100%; }
   .node summary { padding-left: 15px; padding-right: 15px; min-height: 175px; }
   .node h3 { font-size: 17px; }
+  .technical { padding-left: 11px; padding-right: 11px; }
   .return-loop { margin-left: 174px; }
 }
 @media (max-width: 800px) {
@@ -102,6 +109,7 @@ footer a:hover { color: var(--accent); }
   .node summary { min-height: 128px; padding: 20px 23px 24px; }
   .node h3 { margin: 10px 0 7px; font-size: 20px; }
   .node summary p { padding-right: 28px; font-size: 12px; }
+  .technical { padding: 16px 20px 22px; }
   .lane > li:not(:last-child)::after { content: "↓"; top: calc(100% + 3px); left: calc(50% - 10px); }
   .feedback { justify-content: center; height: auto; }
   .feedback small { display: block; margin: 3px 0 0; text-align: center; }

@@ -1,6 +1,6 @@
 {
   "name": "@brainx/openclaw-plugin",
-  "version": "1.4.18",
+  "version": "1.4.21",
   "private": true,
   "type": "module",
   "description": "Least-privilege OpenClaw tools for the BrainX recruiting workflow",
@@ -15,6 +15,8 @@
     "search-start-notice.js",
     "mention-silence.js",
     "yang-offer-reply.js",
+    "wendy-private-group.js",
+    "linda-private-launch.js",
     "runtime.js",
     "openclaw.plugin.json",
     "README.md"

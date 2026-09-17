@@ -1,5 +1,15 @@
 # Agent Commit 记录
 
+## 2026-09-17｜feat(hook): linda 私聊接单 hook——直调 brainx_accept_job 接单+自动找人，省略接单卡
+
+- 起因（咪需求）：帮 linda 演练「私聊 @bot 说接单 → 接单 → 建群 → 找人 → 出第一批人」链路。JC3V82F（北京脑利科技 CEO助理）的 project_launches 已 READY+linda+message_id=NULL，launchProject 返回 already → 不发接单卡（"省略接单卡"由 READY 态自动达成）。hook 必须用 mention-silence 模式（lastDirectInbound 缓存 + onMessageReceived 存 + onBeforeAgentReply 读缓存），避免 before_agent_reply 的 event 不含入站文本的 bug。
+- 改动：
+  1. `plugins/brainx-openclaw/linda-private-launch.js`（新，118 行）：before_agent_reply hook，私聊 + linda open_id（`ou_4c810c0729050de5877347697aee2c29`）+ 含"接单"关键词 → 拦截 LLM，直调 `callBrainxGatewayTool('brainx_accept_job', {job_id:'JC3V82F', confirm:true, idempotency_key:'linda-private-launch-JC3V82F'}, principal)`。principal 构造参考 search-start-notice.js（account_id 默认 'mia'，chat_type='p2p'，chat_id=sender）。acceptJob line 67 `!already || state===ACCEPTED` 对 dup 路径永真 → 重复接单仍触发 startSearch。响应解析参考 envelopes.js：`result.error` 存在=失败，`result.data` 存在=成功。
+  2. `plugins/brainx-openclaw/index.js`：import + 注册 linda-private-launch hook（priority 96，在 wendy-private 95 之前；两者互斥于 senderId，不竞争）。同注册 message_received 缓存入站文本。
+  3. `tests/linda-private-launch.test.mjs`（新，116 行）：8 例——正常接单+找人触发/dup 路径仍找人/409 冲突 already=true/网关错误/群聊不触发/无关键词不触发/非 linda 不触发/丢缓存 fail-open。
+- 验证：`npm run verify:quick` 16/16 通过，53 测试全绿。新增 8 例 + 已有 21 例 openclaw 测试全过。
+- 待部署：scp 插件副本到 ECS `/var/lib/brainx/.openclaw/extensions/brainx-openclaw/` + chown brainx:brainx + 重启 openclaw-brainx。部署后让 linda 私聊 braintex 说"接单"验证端到端。
+
 ## 2026-09-16｜feat(prompt): 杨东旭 Offer 群端到端验证脚本 + 固定文案回复 hook
 
 - 起因（咪需求）：验证「拉群 → 生成报告 → @ 问顾虑 → braintex 回固定文案」端到端流程。braintex 的 LLM 对话在 docx scope 未开时 fail-open 降级答非所问，咪要 wendy @ braintex 问"总结顾虑"时直接输出她审定过的固定文案，不走 LLM。

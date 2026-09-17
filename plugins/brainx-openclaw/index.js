@@ -7,6 +7,8 @@ import { createBraintexPromptContext, preloadSpecialGroupDoc } from './prompt.js
 import { createSearchStartNoticeHandler } from './search-start-notice.js';
 import { createMentionSilenceHandler } from './mention-silence.js';
 import { createYangOfferReplyHandler } from './yang-offer-reply.js';
+import { createWendyPrivateGroupHandler } from './wendy-private-group.js';
+import { createLindaPrivateLaunchHandler } from './linda-private-launch.js';
 
 export default definePluginEntry({
   id: 'brainx-openclaw',
@@ -34,7 +36,21 @@ export default definePluginEntry({
     api.on('before_agent_reply', mentionSilence.onBeforeAgentReply, { priority: 100 });
     // 杨东旭 Offer 群固定文案回复（priority 90，在 mention-silence 之后但在 LLM 之前；
     // mention-silence 不会拦 @braintex 的消息，所以两者不冲突）。
-    api.on('before_agent_reply', createYangOfferReplyHandler(), { priority: 90 });
+    // 需注册 message_received 缓存入站文本（before_agent_reply 的 event 不含原文）。
+    const yangOffer = createYangOfferReplyHandler();
+    api.on('message_received', yangOffer.onMessageReceived);
+    api.on('before_agent_reply', yangOffer, { priority: 90 });
+    // wendy 私聊拉群 hook（priority 95，在 yang-offer 之前；私聊 + "拉群/建群" + 候选人名 → 自动建群+发报告）。
+    // 同样需注册 message_received 缓存入站文本。
+    const wendyPrivate = createWendyPrivateGroupHandler();
+    api.on('message_received', wendyPrivate.onMessageReceived);
+    api.on('before_agent_reply', wendyPrivate, { priority: 95 });
+    // linda 私聊接单 hook（priority 96，在 wendy 之前；私聊 + linda open_id + "接单"关键词
+    // → 直调 brainx_accept_job 接单+自动找人。JC3V82F group 已 READY → 省略接单卡）。
+    // 同样需注册 message_received 缓存入站文本（before_agent_reply 的 event 不含原文）。
+    const lindaLaunch = createLindaPrivateLaunchHandler();
+    api.on('message_received', lindaLaunch.onMessageReceived);
+    api.on('before_agent_reply', lindaLaunch, { priority: 96 });
     api.on('reply_payload_sending', (event, context) => {
       const result = formatBrainxReplyPayload(event, context);
       api.logger?.info?.(`[brainx-rich-replies] kind=${event?.kind || 'unknown'} channel=${event?.channel || context?.channelId || 'unknown'} applied=${Boolean(result)}`);

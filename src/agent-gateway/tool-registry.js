@@ -110,7 +110,7 @@ export const AGENT_TOOL_ROWS = Object.freeze([
     job_id: string(), candidate_ref: string(), confirm: boolean(),
   }, ['job_id', 'candidate_ref', 'confirm']), projectKey: 'job_id' },
   { name: 'brainx_candidate_report', purpose: ['candidate_review'], parameters: object({
-    mode: string({ enum: ['GENERATE', 'REGENERATE'] }), confirm: boolean(),
+    mode: string({ enum: ['GENERATE', 'REGENERATE', 'READ'] }), confirm: boolean(),
   }, ['mode', 'confirm']) },
 ]);
 

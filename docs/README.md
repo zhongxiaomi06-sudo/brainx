@@ -34,7 +34,7 @@
 | 参考代码镜像、开源仓库学习或外部设计对照 | [参考代码本地镜像清单](standards/REFERENCE_REPOS.md)、[全景架构与技术施工蓝图](architecture-2026-09-01-full-blueprint.md) |
 | 飞书群聊工作流、BrainTex 机器人、事件/卡片回调或信息鉴权分工 | [BrainTex 群聊工作流技术 PRD](prd-2026-09-01-braintex-group-workflow.md)、[Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) |
 | **拉群后卡片没弹出来、OpenClaw 群准入失败、要补发职位卡或排查"群建了但机器人不响应"** | **[拉群即见卡规格](../specs/013-launch-card-first/spec.md)**（卡片先发 + 准入降级 best-effort + 补偿重放 + 节流重启 gateway + launch-redeliver 补发）、[OpenClaw 多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md) |
-| **群内接单被拒、卡片没有找人按钮、要在项目群里直接接单或按条件找人** | **[项目群卡片动作规格](../specs/014-launch-card-actions/spec.md)**（群内接单放开、卡片按承接状态分岔、OpenMai/Reloop/SuperMai 三按钮 + 条件输入框、存量群 scope 补齐 job_action）、[拉群即见卡规格](../specs/013-launch-card-first/spec.md) |
+| **群内接单被拒、卡片没有找人按钮、要在项目群里直接接单或按条件找人** | **[项目群卡片动作规格](../specs/014-launch-card-actions/spec.md)**（群内接单放开、卡片按承接状态分岔、OpenMai/Reloop/SuperMai 三按钮 + 同群条件消息、存量群 scope 补齐 job_action）、[拉群即见卡规格](../specs/013-launch-card-first/spec.md) |
 | **机器人被拉进已有群后没反应、想让它自动发「绑定职位」卡、或在旧群里绑定职位开始找人** | **[机器人进群接管规格](../specs/015-group-intake/spec.md)**（轮询发现新群发绑定卡 + groupIntakeBinding 特例授权 + 绑定后发找人卡与拉群指引/防滥用提醒）、[群成员权限放开与绑定自愈](2026-09-15-group-member-access-and-bind-selfheal.md)（旧群绑定不再依赖轮询登记，@机器人 即绑） |
 | **共享职位群里非协作者点找人/候选工具被拒、想在项目群里放开给所有成员** | **[群成员找人权限放开与旧群绑定自愈](2026-09-15-group-member-access-and-bind-selfheal.md)**（绑定群即信任边界，群成员都能点找人/自助接单；私聊与非绑定群仍 fail-closed） |
 | **顾问点了「绑定我的职位」却绑不上（群绑定停在 CARD_SENT、project_id 一直为空）** | 先查 `agent_tool_calls.error_code`：`BRAINX_BASE_URL_REQUIRED` = `brainx-agent-gateway` 缺生产基址 —— 本服务以 `brainx` 用户运行读不到 `root:600` 的 `/opt/brainx/.env`，须单独挂 `/etc/brainx/base-url.env`（见 [提交日志 2026-09-11](AGENT_COMMIT_LOG.md)、[机器人进群接管规格](../specs/015-group-intake/spec.md)） |
@@ -51,6 +51,7 @@
 | **后端架构全貌、现状核实结论或"什么算做完"** | **[BrainX 后端架构 PRD（代码核实版）](prd-2026-09-02-backend-architecture.md)**（六层现状逐项核实 + 差距盘点含 3 个清单外新发现 + 工期关键路径 + 7 条验收标准）、[后端侧模块结构](2026-09-02-backend-module-structure.md) |
 | **飞书后台要勾选哪些权限/scope、事件订阅、敏感权限审批** | **[飞书权限清单（9/2 研发对齐会定论版）](2026-09-02-feishu-permission-scopes.md)**、`src/oauth.js` 用户身份 scope 实证注释 |
 | **这个架构承担哪些业务工作、每段业务走哪个工具** | **[业务工作全景](2026-09-02-business-work-breakdown.md)**（全链路六段 + MVP 每日循环 + 权限对照）、**[AI leader 工作流 + 日历助手](2026-09-02-ai-leader-workflow.md)**（一面前后两种形态）、[Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) |
+| 展示会技术栈、工作流节点技术与 Q&A | [招聘工作流技术栈与代码证据](audits/2026-09-17-workflow-tech-stack.md)、[技术展开区复核](frontend-reviews/2026-09-17-workflow-tech-stack.md) |
 | **一面之前怎么串联 AI leader 工作流 / 一面之后的待办提醒** | **[AI leader 工作流 + 日历助手](2026-09-02-ai-leader-workflow.md)**、`src/scheduler.js` `src/engagement.js` `src/push.js` |
 | **某个工具能不能外露给 OpenClaw / 生成 Skill** | **[工具外露白名单（全量）](2026-09-02-tool-exposure-whitelist.md)**、[OpenClaw 壳子架构 §5.2](2026-09-02-openclaw-shell-architecture.md) |
 | 任何代码、测试或配置改动 | [上传前完整验证](standards/PRE_PUSH_VERIFICATION.md)、[质量门禁操作手册](standards/QUALITY_GATE_OPERATIONS.md) |
@@ -110,11 +111,13 @@
 - [候选人保留与项目共享上下文复核](frontend-reviews/2026-09-09-candidate-focus-context.md)：飞书候选行“保留”、项目级重点名单、后续群问答读取与安全边界。
 - [重点关注并发送人才卡复核](frontend-reviews/2026-09-10-candidate-focus-share-card.md)：9 月 10 日历史交互与共享上下文边界。
 - [候选总览三入口与人才链接直发复核](frontend-reviews/2026-09-15-candidate-link-actions.md)：姓名直达 TTC、初筛通过与加入 reloop，并由飞书展开人才链接。
+- [候选结果卡继续找人提示复核](frontend-reviews/2026-09-15-candidate-continue-search-hint.md)：继续找人按钮下方用弱化提示说明条件消息格式、默认搜索和历史候选排除。
 - [每日推荐卡一键接单并建群复核](frontend-reviews/2026-09-10-daily-card-quick-launch.md)：推荐卡签名确认、自动加入项目、接单、幂等建群和不自动找人的边界。
 - [候选人 Offer 决策群复核](frontend-reviews/2026-09-09-candidate-decision-group.md)：重点候选人独立建群、原项目群摘要迁移、群准入与幂等边界。
 - [候选卡片与对话建群复核](frontend-reviews/2026-09-09-candidate-card-conversation-group.md)：逐行发送人才卡、移除建群按钮、自然语言建群与自动重点名单边界。
-- [候选人 Offer 决策报告](2026-09-10-candidate-offer-report.md)：决策群首卡、飞书云文档版式、`/report` 更新、安全与真实验收边界。
-- [Offer 决策群首卡与报告复核](frontend-reviews/2026-09-10-candidate-offer-report.md)：三个首卡动作、上下文迁移和发布/真机状态。
+- [候选人 Offer 决策报告](2026-09-10-candidate-offer-report.md)：决策群首卡、单一可编辑飞书报告、实时正文读取问答、安全与真实验收边界。
+- [Offer 决策群首卡与报告复核](frontend-reviews/2026-09-10-candidate-offer-report.md)：历史三个首卡动作、上下文迁移和发布/真机状态。
+- [Offer 决策群单报告与编辑稿问答复核](frontend-reviews/2026-09-16-candidate-offer-single-report.md)：单文档幂等、人工编辑稿只读问答和本轮真机状态。
 - [Offer 谈判演示：三人种子数据与排练手册](2026-09-16-offer-demo-seed-and-rehearsal.md)：曹国鸿/杨东旭/从容地演示数据灌入工具、排练纪律与 ECS 拉群执行方案。
 - [BrainX × OpenClaw AI 猎头工作流产品需求文档](prd-2026-09-02-openclaw-ai-recruiting-workflow.md)：当前阶段权威开发基线；基于代码审计和官方能力，定义 OpenClaw 主 Agent、飞书最小权限、BrainX 窄网关、人才授权、简历事实、匹配、施工阶段和发布门禁。
 - [历史：BrainX 飞书 AI 猎头副驾驶产品需求文档](prd-2026-09-01-feishu-ai-consultant-copilot.md)：主 Agent 调整前的 Codex 方案和用户研究，仅作历史参考。
@@ -140,6 +143,8 @@
 - [BrainX → OpenClaw 接口包（模块化交付信息）](2026-09-02-openclaw-interface-pack.md)：用户指令「后端的结构我打包给对方模块化的信息」的**单一打包文档**。§1 三接缝一屏图 + 三条红线；§2 stdio MCP 接入配置模板 + 15 工具快照（含黑名单 `brainx_sync_now`/`brainx_talent`）+ 调用纪律；§3 consultant_id 身份映射规则（**后端不碰 open_id，映射权威在对方**；群消息通道与身份映射互不相干）；§4 Skill 素材交付与合规基线；§6 交付包清单。
 - [OpenClaw 招聘闭环（2026-09-03）](2026-09-03-openclaw-recruiting-loop.md)：记录用户从“只读首版”升级为可执行闭环后的权威范围：卡片化回复、自然语言推送设置、职位负责人、确认后接单/找人/进展、候选 Case 推进、联系方式独立授权，以及尚未接通的外发和建群。
 - [AI Native 猎头全链路轨迹图](design/ai-native-headhunter-workflow.html)：环节级轨迹、人工/自动分工与证据来源的蒸馏工作稿，阶段三回填进行中。
+- [BrainTex 招聘工作流](design/braintex-ai-recruiting-os.html)：四阶段、16 个节点的连续箭头轨迹图；点击加号展开英文技术栈、中文机制与 Q&A 边界，默认仍保持简洁。[本轮审核](frontend-reviews/2026-09-17-workflow-tech-stack.md)。
+- [招聘工作流技术栈与代码证据](audits/2026-09-17-workflow-tech-stack.md)：16 个节点的实际实现来源、现场追问口径与未实现/未验收边界，不把架构规划当作生产事实。
 - [双项目 14 天作战计划](design/week-plan-brainx-reloop.html)：BrainX × reloop 至 9/14 决赛的双泳道排期、底线条件与不做清单。
 - [BrainX 最终交付蓝图与施工总清单](brainx-final-delivery-blueprint.md)：基于当前代码审计定义最终产品形态、黄金路径、跨前后端施工顺序和端到端验收。
 - [前端审核台账](frontend-reviews/README.md)：前端审核、正式接入、发布与真实数据验证状态的唯一权威入口。

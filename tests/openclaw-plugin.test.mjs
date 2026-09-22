@@ -73,7 +73,10 @@ test('BrainTex prompt routes natural-language job recommendations to authorized 
   assert.match(prompt, /按钮本身就是.*明确选择/);
   assert.match(prompt, /KEEP_FOR_REVIEW/);
   assert.match(prompt, /focused_candidates/);
-  assert.match(prompt, /\/report.*brainx_candidate_report/s);
+  assert.match(prompt, /mode=READ.*report_content/s);
+  assert.match(prompt, /不得调用 GENERATE\/REGENERATE/);
+  assert.match(prompt, /\/report.*读取当前报告/s);
+  assert.match(prompt, /绝不创建 V2\/V3/);
   assert.match(prompt, /为这个人建群.*CREATE_DECISION_GROUP/s);
   assert.match(prompt, /消息本身就是.*明确确认/);
   // 项目搜索由 worker 自动投递；自由搜索仍保留轮询纪律。

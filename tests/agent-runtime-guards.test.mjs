@@ -66,6 +66,17 @@ test('SUPERMAI_UNAVAILABLE 独立映射：明示只挂 SuperMai，不波及 Open
   assert.match(generic.body.error.message, /数据源暂时不可用/);
 });
 
+test('飞书报告读取和更新失败返回可重试的明确错误', () => {
+  const read = errorEnvelope(Object.assign(new Error('upstream detail'), { code: 'FEISHU_DOC_READ_FAILED' }));
+  assert.equal(read.status, 502);
+  assert.equal(read.body.error.retryable, true);
+  assert.match(read.body.error.message, /读取当前飞书报告/);
+  const append = errorEnvelope(Object.assign(new Error('upstream detail'), { code: 'FEISHU_DOC_APPEND_FAILED' }));
+  assert.equal(append.status, 502);
+  assert.match(append.body.error.message, /更新当前飞书报告/);
+  assert.doesNotMatch(JSON.stringify({ read, append }), /upstream detail/);
+});
+
 test('审计只保存主体哈希、参数哈希和最小键摘要', () => {
   const db = openDb(':memory:');
   const payload = {

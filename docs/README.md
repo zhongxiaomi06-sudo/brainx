@@ -45,6 +45,7 @@
 | **BrainX 下游交付、MCP server 工具契约、接口打包或部署** | **[BrainX 下游交付文档](2026-09-02-brainx-mcp-deliverable.md)**（用户职责边界内）、[OpenClaw 壳子架构 §6 接口挂载](2026-09-02-openclaw-shell-architecture.md) |
 | **后端侧有哪些模块、各自什么状态、下一步做什么（不负责 OpenClaw 接口）** | **[后端侧模块结构与下一步安排](2026-09-02-backend-module-structure.md)**（六层结构 + 已建成/待补对照 + 9/3 排期）、[下游交付文档](2026-09-02-brainx-mcp-deliverable.md) |
 | **群消息怎么提炼成 job_facts、信息抽取开源组件选型或抽取层排期** | **[群消息 → job_facts 提炼层研发路径](2026-09-02-job-facts-extraction-roadmap.md)**（开源调研综合 + 挂账本消费者的架构 + E0-E4 时间线）、[后端侧模块结构 §3 待补第 5 项](2026-09-02-backend-module-structure.md) |
+| **顾问群聊中的业务判断（客户偏好/硬性要求/否决原因）怎么抽取、确认或进权威表** | **[顾问判断抽取回路](2026-09-22-judgment-extraction.md)**（第二抽取域 + 四层模式复刻 + judgment_facts 契约）、[规格 016](../specs/016-judgment-extract-loop/spec.md) |
 | **顾问私聊直接发 JD 建岗草稿、JD 提交幂等或 p2p 草稿可见性** | **[私聊 JD 直接提交建岗草稿规格](../specs/005-private-jd-job-draft/spec.md)**（brainx_submit_job_jd 工具 + sha256 幂等 + LLM/规则双层提炼 + 仅提交人可见）、[群消息 → job_facts 提炼层研发路径](2026-09-02-job-facts-extraction-roadmap.md) |
 | **给 OpenClaw 侧打包对接信息、MCP 接入配置、consultant_id 映射规则或 Skill 交付** | **[BrainX → OpenClaw 接口包](2026-09-02-openclaw-interface-pack.md)**（三接缝一屏 + 15 工具快照 + 交付包清单）、[下游交付文档](2026-09-02-brainx-mcp-deliverable.md) |
 | **群消息读取归谁（OpenClaw 还是后端）** | **[后端侧模块结构 §1 边界裁定](2026-09-02-backend-module-structure.md)**（**关键纠正：通道层 `src/gateway/ws-client.js` 已在后端仓库建成，不依赖 OpenClaw**）、[飞书权限清单 §6.1](2026-09-02-feishu-permission-scopes.md) |

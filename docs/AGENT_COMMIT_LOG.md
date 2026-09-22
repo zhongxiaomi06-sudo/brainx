@@ -1,5 +1,20 @@
 # Agent Commit 记录
 
+## 2026-09-22｜feat(judgment-extract): 顾问判断抽取回路——第二个信息域复刻四层模式，判断草稿经确认进 judgment_facts
+
+- 起因（用户指令）：「系统内部的飞书对话当前没办法处理非标准字段，想用『原文留档+LLM 结构化投影』这个方法把信息打通」。确认第一个域 = 顾问对话中的判断（客户偏好/硬性要求/例外规则/否决原因/评价），落地 = staging + 人工确认进权威表。job-extract 已是该模式的完整骨架，本任务复刻之，原文层（lark_messages）与账本层（workflow_event_log）零改动。
+- 改动：
+  1. `migrations/0051_judgment_facts.sql`（新）：`judgment_drafts`（staging，subject/kind/statement 各带 evidence 锚点 + confidence + raw_json 存档）+ `judgment_facts`（权威表，draft_id+sync_id 双血缘，V1 只追加无 supersede）。
+  2. `src/judgment-extract/`（新，四文件镜像 job-extract）：schema.js（zod 契约：subject_type=CLIENT_COMPANY|PROJECT|CANDIDATE|GENERAL，kind=PREFERENCE|CONSTRAINT|EXCEPTION|REJECTION|EVALUATION，statement≤120字）；classify.js（isJudgmentRelevant 关键词砍成本 + 规则层只抓「客户说…不接受/只要…」显式句型 + extractJudgmentLlm + mapJudgmentLlmFields 带 evidence 原文重合校验，不在原文出现的字段一律丢弃）；index.js（consumeJudgmentExtract，consumeOnce('judgment-extract') 与 job-extract 同事件各自幂等；statement=null 时 skip 不落空草稿）；confirm.js（confirmJudgment/rejectJudgment，血缘 sync_runs source='lark_judgment_extract'，关联职位 jobVisibleTo fail-closed）。
+  3. `src/job-extract/bridge-producer.js`：produceOne 在 consumeJobExtract 后追加 consumeJudgmentExtract；LLM 预抽取独立开关 `AI_JUDGMENT_EXTRACT_ENABLED`（默认关），schema 违规回退规则层（同现有纪律）。
+  4. `src/agent-gateway/tools-judgments.js`（新）：brainx_pending_judgments / brainx_review_judgment，可见性与 evidence 脱敏镜像 tools-job-facts.js，复用 job_fact_review 授权域；tool-registry.js 注册两行工具定义。
+  5. OpenClaw 外露：runtime.js BRAINX_OPENCLAW_TOOLS +2、openclaw.plugin.json、deploy/openclaw/openclaw.production.json tools.allow、tests/fixtures/openclaw-production/plugin-contract.json 同步（白名单 27→29 项）。
+  6. 测试（新三文件 18 例）：judgment-extract-rules（规则句型/schema/LLM 映射防幻觉锚定）、judgment-extract-consumer（幂等/irrelevant/no_judgment skip/与 job-extract 互不干扰/bridge 全链双草稿）、judgment-extract-confirm（转正+血缘/重复确认 409/可见职位关联/不可见 404 fail-closed/reject 终态）。
+  7. 文档：`docs/2026-09-22-judgment-extraction.md`（schema 契约+纪律+已知边界）+ `specs/016-judgment-extract-loop/spec.md` + docs/README.md 路由登记。
+- 验证：新增 18 例 + 受影响契约测试共 38/38 通过；`npm run verify:quick` 16/16 门禁通过。修复过两处：EXPLICIT_RE 内容组补逗号终止符（原贪婪吞后半句）、测试夹具 sync_runs.consultant_id NOT NULL。
+- 已知边界：WS 网关链路未接任何抽取消费者（job-extract 同此现状，单独任务）；judgment_facts 下游消费（回流排序/画像）是后续任务；不外露旧 MCP 白名单文档管辖范围（该文档只管 src/agent/registry.js 工具集）。
+- 未 push（本地领先 origin/main 2 个提交，push 需单独获准）。
+
 ## 2026-09-22｜refactor(hook): 硬编码 per-user hook 收编为配置——开通新顾问=写 user-hooks.json 不写代码
 
 - 起因（用户指令）：「先消灭硬编码 hook：把 linda/wendy/yang-* 这类 hook 表达为 per-user 配置（触发条件+动作模板），开通新顾问 = 写配置而不是写代码——这是复制的前提」。此前每个顾问级 hook 都是一个按人名硬编码的 JS 文件，加人要写代码改 index.js 发版。

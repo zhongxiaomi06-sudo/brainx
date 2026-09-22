@@ -45,7 +45,7 @@ test('plugin package and manifest declare exactly the approved tools', () => {
   assert.deepEqual(manifest.contracts.commands, ['brainx', 'report']);
   assert.deepEqual(manifest.contracts.tools, fixture.allowed_tools);
   assert.deepEqual(BRAINX_OPENCLAW_TOOLS.map(({ name }) => name), fixture.allowed_tools);
-  assert.equal(new Set(manifest.contracts.tools).size, 27);
+  assert.equal(new Set(manifest.contracts.tools).size, 29);
   assert.ok(!manifest.contracts.tools.includes('brainx_send_candidate_resume'));
   for (const tool of BRAINX_OPENCLAW_TOOLS) {
     assert.equal(tool.parameters.additionalProperties, false);

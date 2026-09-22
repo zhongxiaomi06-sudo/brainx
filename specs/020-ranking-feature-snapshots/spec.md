@@ -1,6 +1,6 @@
 # 020 — 排序特征冻结快照
 
-状态：Implemented，待完整门禁收口（2026-09-22）
+状态：Converged（2026-09-22；完整门禁基线 `2f35528`）
 
 上游：[仓库重构施工总手册](../../docs/2026-09-22-refactor-agentic-ranking-manual.md)阶段 01、
 [Algorithm A 决策契约](../../docs/2026-09-22-algorithm-a-contract.md)第 6 节、

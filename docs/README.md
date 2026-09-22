@@ -15,7 +15,7 @@
 
 | 任务类型 | 必读文档 |
 |---|---|
-| 仓库重构、来源解耦、Algorithm A 或本轮跨域施工 | [2026-09-22 仓库重构与 Algorithm A 施工总手册](2026-09-22-refactor-agentic-ranking-manual.md)、[Agent 最终决策契约](2026-09-22-algorithm-a-contract.md)、[数据契约与迁移手册](2026-09-22-ranking-data-migration.md) |
+| 仓库重构、来源解耦、Algorithm A 或本轮跨域施工 | [2026-09-22 仓库重构与 Algorithm A 施工总手册](2026-09-22-refactor-agentic-ranking-manual.md)、[阶段 00 冻结基线](2026-09-22-refactor-phase-00-baseline.md)、[Agent 最终决策契约](2026-09-22-algorithm-a-contract.md)、[数据契约与迁移手册](2026-09-22-ranking-data-migration.md) |
 | 产品范围、功能规划或验收标准 | [当前产品 PRD](prd-2026-09-02-brainx-workflow.md)；历史范围见 [BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md) |
 | OpenClaw、飞书机器人、AI 猎头工作流、人才权限或简历解析 | [BrainX × OpenClaw AI 猎头工作流产品需求文档](prd-2026-09-02-openclaw-ai-recruiting-workflow.md)、[安全操作手册](SECURITY.md) |
 | BrainTex 飞书欢迎页、功能菜单、按钮卡片或新用户指引 | [BrainTex 飞书功能首页与新用户指引](2026-09-03-braintex-feishu-home.md)、[BrainTex 群聊工作流技术 PRD](prd-2026-09-01-braintex-group-workflow.md) |
@@ -108,6 +108,7 @@
 ### 设计与数据
 
 - [仓库重构与 Algorithm A 施工总手册（2026-09-22）](2026-09-22-refactor-agentic-ranking-manual.md)：本轮重构的唯一施工总入口；审计复核、八领域边界、00–12 任务卡、依赖、验收与回滚。当前为设计交付，工程任务待实施。
+- [仓库重构阶段 00：冻结基线与首个施工单元](2026-09-22-refactor-phase-00-baseline.md)：记录开工 commit、协作状态、迁移编号、真实入口、兼容表、NDCG 口径和改造前完整门禁；数据恢复点与责任角色仍待补齐。
 - [Algorithm A：Agentic Adaptive Ranking 决策契约](2026-09-22-algorithm-a-contract.md)：Agent 获取授权证据并决定最终推荐顺序；规则校验、补查、弃权、缓存、失败语义与评估，不采用后置固定加权排序。
 - [推荐重构：数据契约与迁移手册](2026-09-22-ranking-data-migration.md)：Canonical Job、字段证据、画像/事件/结果/用量、旧表复用、单写迁移、对账、恢复与生命周期。
 - [BrainTex 飞书功能首页与新用户指引](2026-09-03-braintex-feishu-home.md)：定义 `/brainx` 确定性卡片、六个顾问任务入口、权限边界、首次出现时机和真实验收流程。

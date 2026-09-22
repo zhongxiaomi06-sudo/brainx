@@ -1,5 +1,18 @@
 # Agent Commit 记录
 
+## 2026-09-22｜docs(spec): 立项 specs/019 Hub 事件骨干重整——业务事件进账本 + dispatcher + 反馈环
+
+- 起因（用户指令）：对架构不满意（演示规模撞 300 顾问生产规模），要求立项重整。前置：2026-09-22 架构核实报告确认骨架（账本/幂等消费/Case 状态机/多租户鉴权）真实可留，三处形态待改。
+- 改动：
+  1. `specs/019-hub-event-backbone/spec.md`（新）：五个用户故事按核实报告修正顺序排优先级——P1 业务事件进账本（接单/找人/确认/终局补发标准信封事件）、P1 dispatcher 调度层（消费移出 bridge 调用栈、注册表、异步、DLQ）、P2 反馈环（决策↔结果对齐出指标）、P2 session 隔离下沉 gateway principal（破 maxAgents=20）、P3 接口面收敛（registry 唯一契约 + 发布验收门禁）。FR-001~012，SC-001~008。
+  2. 四个重难点专项（职位判断与匹配 / SuperMai+OpenMai 调度 / reloop 搜索 / 上下文总结）只在本规格钉死数据来源契约（全部从账本+权威表+原文锚点出），各立子规格施工。
+  3. `specs/019-hub-event-backbone/checklists/requirements.md`（新）：质量校验全过，无 NEEDS CLARIFICATION。
+  4. `docs/README.md`：路由表加 019 条目。
+  5. `.specify/feature.json`：指向 specs/019-hub-event-backbone。
+- 过程记录：开工前发现另一 Agent（kimi-code-main，judgment-extract-loop）已完成工作但未提交未释放锁；经用户确认其已完成，复核其 35/35 测试 + verify:quick 16/16 后按工作内容单独提交（9482b2a），再释放陈旧锁开始本任务。
+- 验证：docs/spec 改动，verify:quick 16/16 通过。后续走 speckit plan → tasks → implement。
+- 未 push。
+
 ## 2026-09-22｜feat(judgment-extract): 顾问判断抽取回路——第二个信息域复刻四层模式，判断草稿经确认进 judgment_facts
 
 - 起因（用户指令）：「系统内部的飞书对话当前没办法处理非标准字段，想用『原文留档+LLM 结构化投影』这个方法把信息打通」。确认第一个域 = 顾问对话中的判断（客户偏好/硬性要求/例外规则/否决原因/评价），落地 = staging + 人工确认进权威表。job-extract 已是该模式的完整骨架，本任务复刻之，原文层（lark_messages）与账本层（workflow_event_log）零改动。

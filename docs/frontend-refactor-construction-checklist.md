@@ -3,7 +3,7 @@
 > 上级入口：[BrainX 文档书](README.md)
 > 相关依据：[前端审核台账](frontend-reviews/README.md) · [前端交互架构](frontend-interaction-architecture.md) · [推荐队列与职位决策产品架构](recommendation-queue-product-architecture.md) · [TTC 职位字段库](ttc-field-catalog.md) · [内部 Storybook 组件库](storybook-component-library.md) · [BrainX v2.0 产品需求](prd-2026-08-24-brainx-v2.md)
 >
-> 跨前后端最终产品形态与后续总施工顺序，以[BrainX 最终交付蓝图与施工总清单](brainx-final-delivery-blueprint.md)为准；本文保留前期前端重构历史和细项。
+> 本文保留前期前端重构历史和细项；本轮跨域重构顺序以[2026-09-22 新施工总手册](2026-09-22-refactor-agentic-ranking-manual.md)为准，前期交付记录见[旧蓝图](brainx-final-delivery-blueprint.md)。Algorithm A 的展示、设置和异常接入按新手册任务 09 执行；下文 D/E 自定义权重不作为 A 的待实施方案。本次只新增设计文档，不改变中央台账中的任何审核或发布状态。
 
 ## 1. 目标与施工边界
 

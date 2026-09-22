@@ -80,6 +80,12 @@ BrainX 是以飞书群聊为主要工作入口、以 BrainX / Workflow Hub 为�
 | 工作台 | 查看、核验和操作统一业务事实 |
 | OpenMai / reloop | 受限后台找人与候选人域能力 |
 
+### 4.3 2026-09-22：个性化职位推荐目标
+
+Algorithm A 定义为 Agentic Adaptive Ranking：Agent 在授权和硬业务约束内补查证据、比较岗位，决定最终推荐列表、顺序、理由与行动建议；系统校验后按原序发布，不用固定权重覆盖合法 Agent 决策。职位来源先转换为 BrainX Canonical Job，下游不依赖 TTC 字段。
+
+这里的“Agent 最终决策”仅指推荐建议，接单、对外发送和业务状态变更仍遵守 §4.1 人的确认。数据不足可补查或弃权；结果、上下文版本、用量和真实业务反馈必须留痕。目标契约见 [Algorithm A](2026-09-22-algorithm-a-contract.md)，工程顺序见[新施工总手册](2026-09-22-refactor-agentic-ranking-manual.md)。本段是目标变更，尚未替换现有推荐代码，不代表生产验收。
+
 ## 5. 当前 MVP 范围
 
 ### P0：先让主链路真实可运行

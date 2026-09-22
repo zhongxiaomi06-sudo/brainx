@@ -15,7 +15,8 @@
 
 | 任务类型 | 必读文档 |
 |---|---|
-| 产品范围、功能规划或验收标准 | [BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md) |
+| 仓库重构、来源解耦、Algorithm A 或本轮跨域施工 | [2026-09-22 仓库重构与 Algorithm A 施工总手册](2026-09-22-refactor-agentic-ranking-manual.md)、[Agent 最终决策契约](2026-09-22-algorithm-a-contract.md)、[数据契约与迁移手册](2026-09-22-ranking-data-migration.md) |
+| 产品范围、功能规划或验收标准 | [当前产品 PRD](prd-2026-09-02-brainx-workflow.md)；历史范围见 [BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md) |
 | OpenClaw、飞书机器人、AI 猎头工作流、人才权限或简历解析 | [BrainX × OpenClaw AI 猎头工作流产品需求文档](prd-2026-09-02-openclaw-ai-recruiting-workflow.md)、[安全操作手册](SECURITY.md) |
 | BrainTex 飞书欢迎页、功能菜单、按钮卡片或新用户指引 | [BrainTex 飞书功能首页与新用户指引](2026-09-03-braintex-feishu-home.md)、[BrainTex 群聊工作流技术 PRD](prd-2026-09-01-braintex-group-workflow.md) |
 | OpenClaw 多顾问安装、上线、运维、故障或回滚 | [BrainTex 服务器部署与飞书接入 Agent 完整施工手册](2026-09-03-braintex-server-deployment-agent-manual.md)、[OpenClaw 多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md)、[部署编排](DEPLOYMENT.md) |
@@ -26,9 +27,9 @@
 | **候选短名单查任何职位都返回 NO_AUTHORIZED_SHORTLIST、要给活跃职位补预计算匹配** | **[人才匹配跑批模块](2026-09-15-talent-match-run.md)**（独立可插拔，dry-run 默认 + --write 幂等落 RDS 预计算链路与授权账本） |
 | **群里机器人发的候选人名单排版不规范、要统一成标准卡片** | **[群内候选人呈现标准化](2026-09-15-group-candidate-cards.md)**（handler 确定性发卡 + 模型只回引导语 + 幂等防刷屏） |
 | 历史 Codex 插件、旧版飞书副驾驶方案 | [历史：BrainX 飞书 AI 猎头副驾驶产品需求文档](prd-2026-09-01-feishu-ai-consultant-copilot.md)、[历史：BrainX Codex Agent 职责与权限规范](codex-agent-responsibilities-and-permissions.md) |
-| 最终产品形态、跨前后端施工顺序或总体验收 | [BrainX 最终交付蓝图与施工总清单](brainx-final-delivery-blueprint.md) |
+| 最终产品形态、跨前后端施工顺序或总体验收 | [当前产品 PRD](prd-2026-09-02-brainx-workflow.md)、[本轮重构施工总手册](2026-09-22-refactor-agentic-ranking-manual.md)；历史交付细项见[旧交付蓝图](brainx-final-delivery-blueprint.md) |
 | BrainX×reloop 工作流总线、身份、Case 或跨系统桥接 | [Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) |
-| 全景架构、技术施工安排、分步代码逻辑或组件选型 | [全景架构与技术施工蓝图](architecture-2026-09-01-full-blueprint.md)、[Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) |
+| 全景架构、技术施工安排、分步代码逻辑或组件选型 | [本轮重构施工总手册](2026-09-22-refactor-agentic-ranking-manual.md)、[Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md)；旧选型背景见[全景架构蓝图](architecture-2026-09-01-full-blueprint.md) |
 | 开源组件复用、自建边界或权限最小集 | [复用与自建边界及权限需求 PRD](prd-2026-09-01-reuse-selfbuild-boundary.md)、[全景架构与技术施工蓝图](architecture-2026-09-01-full-blueprint.md) |
 | spec-kit、规格驱动开发或 constitution 修订 | [规范驱动研发流程](standards/SPEC_DRIVEN_WORKFLOW.md)、[多 Agent 协作准则](../AGENTS.md) |
 | 参考代码镜像、开源仓库学习或外部设计对照 | [参考代码本地镜像清单](standards/REFERENCE_REPOS.md)、[全景架构与技术施工蓝图](architecture-2026-09-01-full-blueprint.md) |
@@ -60,7 +61,7 @@
 | 前端信息架构、页面流程或交互重构 | [前端交互架构](frontend-interaction-architecture.md)、[推荐队列与职位决策产品架构](recommendation-queue-product-architecture.md)、[BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md) |
 | 精选盘、推荐队列、推荐卡片或加入项目闭环 | [推荐队列与职位决策产品架构](recommendation-queue-product-architecture.md)、[前端审核台账](frontend-reviews/README.md) |
 | **改飞书群机器人卡片的文案、按钮或排版** | **[飞书群卡片文字排版规范](standards/CARD_TYPOGRAPHY.md)**（五级层级 + 7 条硬规则 + 卡片内不用 emoji）、[卡片渲染回归门禁](2026-09-12-feishu-card-render-gate.md)、[前端审核台账](frontend-reviews/README.md) |
-| 推荐算法、评分口径或学习排序规划 | [BrainX 岗位推荐算法与评分标准](BrainX岗位推荐算法与评分标准.md)、[推荐队列与职位决策产品架构](recommendation-queue-product-architecture.md) |
+| 推荐算法、评分口径或学习排序规划 | [Algorithm A 决策契约](2026-09-22-algorithm-a-contract.md)、[本轮施工总手册](2026-09-22-refactor-agentic-ranking-manual.md)；现有规则实现参考[历史评分基线](BrainX岗位推荐算法与评分标准.md)，队列交互参考[产品架构](recommendation-queue-product-architecture.md) |
 | 前端重构排期、施工范围或阶段验收 | [前端真实数据重构施工清单](frontend-refactor-construction-checklist.md)、[前端交互架构](frontend-interaction-architecture.md) |
 | TTC 职位字段、筛选能力或字段变化 | [TTC 职位字段库](ttc-field-catalog.md)、[BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md) |
 | Commit、协作记录 | [Agent Commit 记录](AGENT_COMMIT_LOG.md) |
@@ -106,6 +107,9 @@
 
 ### 设计与数据
 
+- [仓库重构与 Algorithm A 施工总手册（2026-09-22）](2026-09-22-refactor-agentic-ranking-manual.md)：本轮重构的唯一施工总入口；审计复核、八领域边界、00–12 任务卡、依赖、验收与回滚。当前为设计交付，工程任务待实施。
+- [Algorithm A：Agentic Adaptive Ranking 决策契约](2026-09-22-algorithm-a-contract.md)：Agent 获取授权证据并决定最终推荐顺序；规则校验、补查、弃权、缓存、失败语义与评估，不采用后置固定加权排序。
+- [推荐重构：数据契约与迁移手册](2026-09-22-ranking-data-migration.md)：Canonical Job、字段证据、画像/事件/结果/用量、旧表复用、单写迁移、对账、恢复与生命周期。
 - [BrainTex 飞书功能首页与新用户指引](2026-09-03-braintex-feishu-home.md)：定义 `/brainx` 确定性卡片、六个顾问任务入口、权限边界、首次出现时机和真实验收流程。
 - [候选人事实与 shortlist 数据契约](2026-09-03-candidate-data-contracts.md)：`candidate_fact_v1`、`candidate_match_bundle_v1`、reloop 真实数据转换、人才/职位双授权、固定飞书文案、MCP PoC 暴露条件及当前未完成项的唯一施工说明。
 - [候选人保留与项目共享上下文复核](frontend-reviews/2026-09-09-candidate-focus-context.md)：飞书候选行“保留”、项目级重点名单、后续群问答读取与安全边界。
@@ -146,11 +150,11 @@
 - [BrainTex 招聘工作流](design/braintex-ai-recruiting-os.html)：四阶段、16 个节点的连续箭头轨迹图；点击加号展开英文技术栈、中文机制与 Q&A 边界，默认仍保持简洁。[本轮审核](frontend-reviews/2026-09-17-workflow-tech-stack.md)。
 - [招聘工作流技术栈与代码证据](audits/2026-09-17-workflow-tech-stack.md)：16 个节点的实际实现来源、现场追问口径与未实现/未验收边界，不把架构规划当作生产事实。
 - [双项目 14 天作战计划](design/week-plan-brainx-reloop.html)：BrainX × reloop 至 9/14 决赛的双泳道排期、底线条件与不做清单。
-- [BrainX 最终交付蓝图与施工总清单](brainx-final-delivery-blueprint.md)：基于当前代码审计定义最终产品形态、黄金路径、跨前后端施工顺序和端到端验收。
+- [BrainX 最终交付蓝图与施工总清单](brainx-final-delivery-blueprint.md)：保留 8 月交付基线、黄金路径和历史验收；本轮跨域重构顺序以 9 月 22 日施工总手册为准。
 - [前端审核台账](frontend-reviews/README.md)：前端审核、正式接入、发布与真实数据验证状态的唯一权威入口。
 - [前端交互架构](frontend-interaction-architecture.md)：BrainX 页面分层、状态诚实性和核心用户动作链。
 - [推荐队列与职位决策产品架构](recommendation-queue-product-architecture.md)：完整200条推荐队列、20条分页、决策分层、卡片字段、动作闭环与全部职位进入详情规则。
-- [BrainX 岗位推荐算法与评分标准](BrainX岗位推荐算法与评分标准.md)：当前 `baseline-1.1` 六维确定性评分、前端口径、验收标准与未来学习排序路线。
+- [BrainX 岗位推荐算法与评分标准（历史基线）](BrainX岗位推荐算法与评分标准.md)：`baseline-1.1` 六维确定性评分与旧学习排序方案；新 Algorithm A 以专门契约为准，尚未替换现有代码。
 - [完整推荐队列排序复核](frontend-reviews/2026-08-30-recommendation-sort.md)：推荐优先级、最近活动、事实可信度三种服务端排序及游标稳定性证据。
 - [精选盘评分与队列视图整改](frontend-reviews/2026-08-30-pick-board-score-views.md)：评分参考恢复、五种完整队列视图、数据来源筛选删除及命名收口证据。
 - [精选盘卡片删除判断摘要区复审](frontend-reviews/2026-08-30-pick-card-remove-assessment.md)：列表卡片删除理由、风险、事实可信度与更新时间区，并保留详情数据边界。

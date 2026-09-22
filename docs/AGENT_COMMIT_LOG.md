@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-22｜test(judgment-extract): 跟进修正工具数与迁移记账断言（gateway 28→30、0051 入账）
+
+- 起因：9482b2a 提交后首次跑完整门禁 `npm run verify`，后端 4 个既有断言因新增 2 个 gateway 工具与 1 个迁移文件而失败（verify:quick 不覆盖这几项）。
+- 改动：`tests/agent-gateway-http.test.mjs` 健康检查工具数 28→30；`tests/agent-golden-workflow.test.mjs` 生产工具接入数 28→30；`tests/framework.test.mjs` schema_migrations 记账清单补 `0051_judgment_facts.sql`、旧库兼容断言 53→54。纯断言跟随接口变化，无逻辑改动。
+- 验证：`node --test` 三个受影响文件 27/27 通过；完整门禁重跑结果见 push 前记录。
+- 另查明：首次 full 门禁的另 3 项失败中，前后端依赖 audit 为网络瞬断（重跑 0 漏洞通过），工作区不干净系他人未跟踪文件 `bin/project-launch-no-jobcard.mjs`（非本任务，不处理）。
+
 ## 2026-09-22｜docs(spec): 立项 specs/019 Hub 事件骨干重整——业务事件进账本 + dispatcher + 反馈环
 
 - 起因（用户指令）：对架构不满意（演示规模撞 300 顾问生产规模），要求立项重整。前置：2026-09-22 架构核实报告确认骨架（账本/幂等消费/Case 状态机/多租户鉴权）真实可留，三处形态待改。

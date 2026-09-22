@@ -1,6 +1,6 @@
 # 022 — 排序负反馈事件回放与撤销
 
-状态：Implemented（2026-09-22；等待最新提交完整门禁收口）
+状态：Converged（2026-09-22；实现提交 `d75d9b7` 完整门禁 25/25 通过）
 
 上游：[仓库重构施工总手册](../../docs/2026-09-22-refactor-agentic-ranking-manual.md)阶段 01、
 [排序标签观察窗口](../021-ranking-label-windows/spec.md)、

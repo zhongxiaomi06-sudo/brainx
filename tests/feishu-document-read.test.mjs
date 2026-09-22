@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { readFeishuDocument, createFeishuDocument } from '../src/feishu-document.js';
+import { readFeishuDocument } from '../plugins/brainx-openclaw/doc-reader.js';
 
 const response = (body, status = 200) => new Response(JSON.stringify(body), {
   status, headers: { 'content-type': 'application/json' },

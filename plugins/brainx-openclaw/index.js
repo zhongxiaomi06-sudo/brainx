@@ -6,6 +6,7 @@ import { formatBrainxReplyPayload } from './response-card.js';
 import { createBraintexPromptContext, preloadSpecialGroupDoc } from './prompt.js';
 import { createSearchStartNoticeHandler } from './search-start-notice.js';
 import { createMentionSilenceHandler } from './mention-silence.js';
+import { createYangOfferReplyHandler } from './yang-offer-reply.js';
 
 export default definePluginEntry({
   id: 'brainx-openclaw',
@@ -31,6 +32,9 @@ export default definePluginEntry({
     });
     // before_agent_reply 拦普通文本回复（reply_payload_sending 只覆盖富负载，2026-09-14 探针实证）。
     api.on('before_agent_reply', mentionSilence.onBeforeAgentReply, { priority: 100 });
+    // 杨东旭 Offer 群固定文案回复（priority 90，在 mention-silence 之后但在 LLM 之前；
+    // mention-silence 不会拦 @braintex 的消息，所以两者不冲突）。
+    api.on('before_agent_reply', createYangOfferReplyHandler(), { priority: 90 });
     api.on('reply_payload_sending', (event, context) => {
       const result = formatBrainxReplyPayload(event, context);
       api.logger?.info?.(`[brainx-rich-replies] kind=${event?.kind || 'unknown'} channel=${event?.channel || context?.channelId || 'unknown'} applied=${Boolean(result)}`);

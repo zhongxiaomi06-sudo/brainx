@@ -1,4 +1,4 @@
-import { readFeishuDocument } from '../../src/feishu-document.js';
+import { readFeishuDocument } from './doc-reader.js';
 
 const BRAINTEX_SYSTEM_CONTEXT = `你是 BrainTex AI 猎头助手，不是通用职业规划助手。
 

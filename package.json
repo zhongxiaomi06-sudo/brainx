@@ -44,6 +44,7 @@
     "data:pull": "node scripts/pull-cloud-data.mjs",
     "data:audit": "node scripts/pull-cloud-data.mjs --audit-only",
     "retention:audit": "node bin/brainx-retention-inventory.mjs",
+    "retention:plan": "node bin/brainx-retention-dry-run.mjs",
     "diagnose": "node scripts/diagnose-policy.mjs",
     "label:export": "node scripts/export-labeling-sheet.mjs",
     "label:import": "node bin/brainx-label-import.mjs",

@@ -2,8 +2,9 @@
 
 > 上级入口：[仓库重构施工总手册](2026-09-22-refactor-agentic-ranking-manual.md)阶段 02 ·
 > [文档书](README.md)
-> 规格：[024 数据增长与保留责任只读盘点](../specs/024-retention-inventory/spec.md)
-> 日期：2026-09-22；状态：本地只读盘点完成，生产盘点、TTL 审批、责任人分配与恢复演练未完成。
+> 规格：[024 数据增长与保留责任只读盘点](../specs/024-retention-inventory/spec.md) ·
+> [025 清理路径隔离与显式策略 dry-run](../specs/025-retention-dry-run-safety/spec.md)
+> 日期：2026-09-23；状态：本地只读盘点与安全 dry-run 已实现，生产盘点、TTL 审批、责任人分配与恢复演练未完成。
 
 ## 1. 范围与证据边界
 
@@ -42,20 +43,43 @@
 所有类别的恢复点状态仍为 `UNVERIFIED`，所以 CLI 固定输出 `deletion_ready=false`，不生成候选
 主键、删除 SQL 或截止日期。
 
-## 4. 现有清理路径审计
+## 4. 清理路径隔离结果
 
-1. `src/recommend.js#pruneRecommendationHistory` 在每轮推荐事务内执行，只保护有
-   `job_outcomes` 引用的旧推荐；没有证明它保护真实下发曝光、决策事件、负反馈事件、冻结实验
-   集或事故保留。新保留执行器收口前，不应把这条运行时裁剪视为完整生命周期策略。
-2. `bin/brainx-retention.mjs --apply` 仍按旧口径把 `rank <= 20` 等同于真实曝光，但当前真实下发
-   由 `recommendation_impressions.served_at` 区分；它也清理旧状态名
-   `SKIPPED_UNCHANGED`，而现行自动节流写入 `SKIPPED_THROTTLED`。
-3. 旧脚本没有覆盖冻结特征、追加负反馈、恢复点、责任审批和删除审计，且包含真实 DELETE 与
-   checkpoint。因此当前明确标记为 `DO_NOT_RUN_WITHOUT_APPROVAL`；本轮没有执行它。
-4. 本地副本未具备最新特征快照列与负反馈事件表。没有恢复点时不得借盘点之名执行迁移；应先
-   由阶段 00 补齐脱敏副本恢复验证，再重新运行相同只读报告。
+1. 推荐事务已移除 `pruneRecommendationHistory()` 及其环境变量。单轮仍最多持久化既定数量，
+   但生成推荐不再顺带删除旧轮次；历史生命周期只允许由独立流程管理。
+2. `bin/brainx-retention.mjs --apply` 现在先返回 `RETENTION_APPLY_DISABLED`，再决定是否触库；
+   不带 `--apply` 的旧调用转到 `retention-inventory-v1` 只读盘点，不建临时表、不迁移、不播种。
+3. 测试以不存在的数据库路径证明 apply 在打开文件前失败，并以文件摘要证明新旧只读入口均不
+   修改数据库。旧 Top 20 曝光推断、DELETE、checkpoint 和 VACUUM 路径均已移除。
+4. 本地副本仍未具备最新特征快照列与负反馈事件表。没有恢复点时不得借盘点之名执行迁移；应
+   先由阶段 00 补齐脱敏副本恢复验证，再重新运行相同只读报告。
 
-## 5. 下一单元准入条件
+## 5. 显式策略 dry-run
+
+`npm run retention:plan -- --policy <策略文件> [--db <只读副本>]` 输出固定
+`retention-plan-v1`。策略必须提供规范 ISO `as_of`、推荐 TTL、每顾问最近保留轮次和节流审计
+TTL，例如：
+
+```json
+{
+  "contract_version": "retention-policy-v1",
+  "as_of": "2026-09-23T00:00:00.000Z",
+  "categories": {
+    "recommendation_snapshots": { "ttl_days": 30, "keep_latest_runs_per_consultant": 3 },
+    "throttled_runs": { "ttl_days": 7 }
+  }
+}
+```
+
+报告只含聚合总数、年龄命中数、保护原因和候选数。推荐候选须同时满足：早于 TTL、超出最近
+保留轮次、无展示记录、无真实下发、无业务结果、无决策事件、无追加负反馈事件。缺冻结特征
+列或任一引用表时返回 `BLOCKED_SCHEMA_CAPABILITY`，不猜测候选。字段报告、同步运行和原始
+上下文固定为 `BLOCKED_POLICY_NOT_IMPLEMENTED`。
+
+候选计数不是执行授权。报告始终返回 `execution_supported=false` 和
+`execution_ready=false`，不含主键、内容、SQL 或执行命令；本单元没有归档和删除实现。
+
+## 6. 下一单元准入条件
 
 后续 dry-run/执行器至少要先满足：责任人具名、TTL 与例外获批；一致性备份可恢复；引用集合覆盖
 曝光、结果、事件、反馈、实验和事故冻结；按稳定主键分批；默认 dry-run；执行需单独确认令牌与

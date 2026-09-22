@@ -211,8 +211,8 @@ export function buildRetentionInventory(db, { generatedAt = new Date().toISOStri
       raw_contexts: rawContexts(db),
     },
     existing_cleanup_paths: [
-      { path: 'src/recommend.js#pruneRecommendationHistory', status: 'REQUIRES_REDESIGN' },
-      { path: 'bin/brainx-retention.mjs --apply', status: 'DO_NOT_RUN_WITHOUT_APPROVAL' },
+      { path: 'src/recommend.js business transaction', status: 'IMPLICIT_DELETE_REMOVED' },
+      { path: 'bin/brainx-retention.mjs --apply', status: 'DISABLED' },
     ],
   };
 }

@@ -77,23 +77,6 @@ export function buildCtx(db, consultant_id, snapshot) {
 const THROTTLE_MS = Number(process.env.BRAINX_RECOMMEND_THROTTLE_MS || 2 * 3600 * 1000);
 const SKIP_AUDIT_MS = Number(process.env.BRAINX_SKIP_AUDIT_MS || 60 * 60 * 1000);
 const PERSIST_LIMIT = Number(process.env.BRAINX_RECOMMEND_PERSIST_LIMIT || 200);
-const RETAIN_RUNS = Number(process.env.BRAINX_RECOMMEND_RETAIN_RUNS || 3);
-
-/**
- * 推荐属于可再生成快照，不得无限累积。保留最近若干正式轮次；被结果记录引用的
- * 推荐继续保留，避免破坏人工结果的证据链。decision_runs 本身很小，作为审计行保留。
- */
-export function pruneRecommendationHistory(db, consultant_id, retainRuns = RETAIN_RUNS) {
-  const keep = Math.max(1, Number(retainRuns) || RETAIN_RUNS);
-  const stale = db.prepare(`SELECT run_id FROM decision_runs
-    WHERE consultant_id=? AND status='COMPLETED'
-    ORDER BY created_at DESC, rowid DESC LIMIT -1 OFFSET ?`).all(consultant_id, keep);
-  const remove = db.prepare(`DELETE FROM recommendations WHERE run_id=?
-    AND decision_id NOT IN (SELECT decision_id FROM job_outcomes WHERE decision_id IS NOT NULL)`);
-  let removed = 0;
-  for (const row of stale) removed += remove.run(row.run_id).changes;
-  return { stale_runs: stale.length, removed };
-}
 
 /**
  * 生成一轮推荐。硬约束：最近同步 complete=0 → blocked，不落推荐。
@@ -205,7 +188,6 @@ export function recommend(db, consultant_id, {
       }
       // 曝光埋点（算法文档 §2.4）：展示位置与展示概率随冻结同事务落库
       writeImpressions(db, { run_id, consultant_id, items: evaluated, top, policy_version: POLICY_VERSION });
-      pruneRecommendationHistory(db, consultant_id);
       db.exec('COMMIT');
     } catch (e) { db.exec('ROLLBACK'); throw e; }
   }

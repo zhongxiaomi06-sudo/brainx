@@ -67,6 +67,7 @@
 | 排序负反馈、忽略撤销、原因更正或按截点回放 | [排序负反馈事件回放规格](../specs/022-ranking-feedback-replay/spec.md)、[忽略状态后端收口复审](frontend-reviews/2026-08-31-ignore-state-backend.md) |
 | 人才库自动内存回退、运行期建表、RDS 失败关闭或持久层选择 | [人才库持久层失败关闭规格](../specs/023-talent-persistence-fail-closed/spec.md)、[候选人事实与 shortlist 数据契约](2026-09-03-candidate-data-contracts.md)、[安全操作手册](SECURITY.md) |
 | 数据增长、保留责任、TTL、清理 dry-run 或推荐快照引用 | [数据增长与保留责任只读盘点规格](../specs/024-retention-inventory/spec.md)、[推荐数据契约与迁移手册](2026-09-22-ranking-data-migration.md) |
+| 旧 retention apply、推荐隐式裁剪或清理 dry-run 安全 | [清理路径隔离与显式策略 dry-run 规格](../specs/025-retention-dry-run-safety/spec.md)、[数据增长与保留责任只读盘点](2026-09-22-retention-inventory.md) |
 | 前端重构排期、施工范围或阶段验收 | [前端真实数据重构施工清单](frontend-refactor-construction-checklist.md)、[前端交互架构](frontend-interaction-architecture.md) |
 | TTC 职位字段、筛选能力或字段变化 | [TTC 职位字段库](ttc-field-catalog.md)、[BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md) |
 | Commit、协作记录 | [Agent Commit 记录](AGENT_COMMIT_LOG.md) |
@@ -122,6 +123,7 @@
 - [人才库持久层失败关闭规格](../specs/023-talent-persistence-fail-closed/spec.md)：显式选择 MySQL 或易失内存后端；生产缺配置、断连或 schema 未就绪时不再伪装写入成功。
 - [数据增长与保留责任只读盘点规格](../specs/024-retention-inventory/spec.md)：只读、脱敏地统计增长、引用和责任阻断；未批准 TTL 与恢复点前不产生可执行删除集合。
 - [数据增长、引用与保留责任只读盘点](2026-09-22-retention-inventory.md)：本地聚合规模、跨表引用、责任矩阵、旧清理路径差距和下一单元准入条件。
+- [清理路径隔离与显式策略 dry-run 规格](../specs/025-retention-dry-run-safety/spec.md)：停止推荐事务隐式删除，禁用旧 apply，并以只读聚合验证引用保护；不提供执行器。
 - [BrainTex 飞书功能首页与新用户指引](2026-09-03-braintex-feishu-home.md)：定义 `/brainx` 确定性卡片、六个顾问任务入口、权限边界、首次出现时机和真实验收流程。
 - [候选人事实与 shortlist 数据契约](2026-09-03-candidate-data-contracts.md)：`candidate_fact_v1`、`candidate_match_bundle_v1`、reloop 真实数据转换、人才/职位双授权、固定飞书文案、MCP PoC 暴露条件及当前未完成项的唯一施工说明。
 - [候选人保留与项目共享上下文复核](frontend-reviews/2026-09-09-candidate-focus-context.md)：飞书候选行“保留”、项目级重点名单、后续群问答读取与安全边界。

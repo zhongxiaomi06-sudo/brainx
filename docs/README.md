@@ -63,6 +63,7 @@
 | **改飞书群机器人卡片的文案、按钮或排版** | **[飞书群卡片文字排版规范](standards/CARD_TYPOGRAPHY.md)**（五级层级 + 7 条硬规则 + 卡片内不用 emoji）、[卡片渲染回归门禁](2026-09-12-feishu-card-render-gate.md)、[前端审核台账](frontend-reviews/README.md) |
 | 推荐算法、评分口径或学习排序规划 | [Algorithm A 决策契约](2026-09-22-algorithm-a-contract.md)、[本轮施工总手册](2026-09-22-refactor-agentic-ranking-manual.md)；现有规则实现参考[历史评分基线](BrainX岗位推荐算法与评分标准.md)，队列交互参考[产品架构](recommendation-queue-product-architecture.md) |
 | 排序历史特征变化、LTR 未来泄漏或影子评估不可回放 | [排序特征冻结快照规格](../specs/020-ranking-feature-snapshots/spec.md)、[阶段 00 冻结基线](2026-09-22-refactor-phase-00-baseline.md) |
+| 排序标签时间切分、未来结果泄漏、样本成熟度或迟到结果 | [排序标签观察窗口规格](../specs/021-ranking-label-windows/spec.md)、[Algorithm A 决策契约](2026-09-22-algorithm-a-contract.md) |
 | 前端重构排期、施工范围或阶段验收 | [前端真实数据重构施工清单](frontend-refactor-construction-checklist.md)、[前端交互架构](frontend-interaction-architecture.md) |
 | TTC 职位字段、筛选能力或字段变化 | [TTC 职位字段库](ttc-field-catalog.md)、[BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md) |
 | Commit、协作记录 | [Agent Commit 记录](AGENT_COMMIT_LOG.md) |
@@ -113,6 +114,7 @@
 - [Algorithm A：Agentic Adaptive Ranking 决策契约](2026-09-22-algorithm-a-contract.md)：Agent 获取授权证据并决定最终推荐顺序；规则校验、补查、弃权、缓存、失败语义与评估，不采用后置固定加权排序。
 - [推荐重构：数据契约与迁移手册](2026-09-22-ranking-data-migration.md)：Canonical Job、字段证据、画像/事件/结果/用量、旧表复用、单写迁移、对账、恢复与生命周期。
 - [排序特征冻结快照规格](../specs/020-ranking-feature-snapshots/spec.md)：冻结新推荐的 LTR 输入；旧记录缺快照时明确排除，不读取当前职位事实伪造历史。
+- [排序标签观察窗口规格](../specs/021-ranking-label-windows/spec.md)：为离线标签增加显式观察窗口、数据截点、发生/收到双时间、成熟度和推荐项关联。
 - [BrainTex 飞书功能首页与新用户指引](2026-09-03-braintex-feishu-home.md)：定义 `/brainx` 确定性卡片、六个顾问任务入口、权限边界、首次出现时机和真实验收流程。
 - [候选人事实与 shortlist 数据契约](2026-09-03-candidate-data-contracts.md)：`candidate_fact_v1`、`candidate_match_bundle_v1`、reloop 真实数据转换、人才/职位双授权、固定飞书文案、MCP PoC 暴露条件及当前未完成项的唯一施工说明。
 - [候选人保留与项目共享上下文复核](frontend-reviews/2026-09-09-candidate-focus-context.md)：飞书候选行“保留”、项目级重点名单、后续群问答读取与安全边界。

@@ -5,7 +5,8 @@
  *   ② 分歧 TopN：每顾问最新一轮中，影子分排序与规则 rank 位移最大的职位
  *     （位移 = |shadow_rank - rule_rank|，附双向分数与当前标签，供人工复核）
  * 只读。写 data/shadow-daily-latest.json 供巡检/前端调用；--json 直出。
- * 用法：node bin/brainx-shadow-daily.mjs [--runs 5] [--model data/ltr-model.json] [--top 5]
+ * 用法：node bin/brainx-shadow-daily.mjs --cutoff-at <ISO> --window-days <1-365>
+ *      [--runs 5] [--model data/ltr-model.json] [--top 5]
  */
 import '../src/env.js';
 import { writeFileSync } from 'node:fs';
@@ -14,16 +15,17 @@ import { evaluate } from '../scripts/eval-ranking.mjs';
 import { loadShadowModel } from '../src/shadow-rank.js';
 import { readFeatureSnapshot } from '../src/ltr-features.js';
 import { loadConsultants } from '../src/recommend.js';
-import { labelFor } from '../src/labels.js';
+import { evaluationLabelFor, validateLabelWindow } from '../src/ranking-labels.js';
 
 const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i > -1 ? process.argv[i + 1] : d; };
 
 /** 单顾问最新一轮的分歧 TopN。 */
-export function divergenceTopN(db, model, consultant_id, { top = 5 } = {}) {
+export function divergenceTopN(db, model, consultant_id, { top = 5, labelWindow } = {}) {
+  const temporal = validateLabelWindow(labelWindow || {});
   const run = db.prepare(`SELECT run_id, created_at FROM decision_runs
     WHERE consultant_id=? AND status='COMPLETED' ORDER BY created_at DESC LIMIT 1`).get(consultant_id);
   if (!run) return null;
-  const recs = db.prepare(`SELECT project_id, rank, action, score, feature_snapshot_json
+  const recs = db.prepare(`SELECT decision_id, project_id, rank, action, score, feature_snapshot_json
     FROM recommendations WHERE run_id=? AND consultant_id=? ORDER BY rank LIMIT 50`)
     .all(run.run_id, consultant_id);
   const scored = [];
@@ -50,22 +52,30 @@ export function divergenceTopN(db, model, consultant_id, { top = 5 } = {}) {
       .sort((a, b) => b.delta - a.delta).slice(0, top)
       .map((r) => ({ project_id: r.project_id, rule_rank: r.rank, shadow_rank: r.shadow_rank,
                      delta: r.delta, rule_score: r.score, shadow_score: Number(r.shadow.toFixed(3)),
-                     action: r.action, label: labelFor(db, consultant_id, r.project_id) })),
+                     action: r.action, label: evaluationLabelFor(db, r.decision_id, temporal).label })),
   };
 }
 
 if (process.argv[1] && new URL(import.meta.url).pathname === process.argv[1]) {
+  let labelWindow = { cutoffAt: arg('cutoff-at', null),
+    windowDays: Number(arg('window-days', '')) };
+  try { labelWindow = validateLabelWindow(labelWindow); } catch (error) {
+    console.error(`必须提供合法 --cutoff-at <ISO> 和 --window-days <1-365>：${error.message}`);
+    process.exit(2);
+  }
   const db = openDb(arg('db', undefined));
   const modelPath = arg('model', 'data/ltr-model.json');
   const model = loadShadowModel(modelPath);
   if (!model) { console.error(`影子模型不可用：${modelPath}（先跑 bin/brainx-ltr-export.mjs + scripts/train_ltr.py）`); process.exit(2); }
   const runs = Math.max(1, Number(arg('runs', '5')) || 5);
   const top = Math.max(1, Number(arg('top', '5')) || 5);
-  const ev = evaluate(db, { runs, shadowModel: model });
+  const ev = evaluate(db, { runs, shadowModel: model, ...labelWindow });
   const divergence = loadConsultants(db)
-    .map((c) => divergenceTopN(db, model, c.consultant_id, { top }))
+    .map((c) => divergenceTopN(db, model, c.consultant_id, { top, labelWindow }))
     .filter(Boolean);
   const report = { generated_at: now(), model: { trained_at: model.trained_at, rows: model.rows },
+                   label_version: ev.label_version, label_window_days: ev.label_window_days,
+                   label_cutoff_at: ev.label_cutoff_at, sample_status: ev.sample_status,
                    metrics: ev.metrics, divergence, note: ev.note };
   writeFileSync('data/shadow-daily-latest.json', JSON.stringify(report, null, 2));
   if (process.argv.includes('--json')) { console.log(JSON.stringify(report, null, 2)); process.exit(0); }

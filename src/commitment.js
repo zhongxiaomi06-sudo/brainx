@@ -5,6 +5,7 @@ import { now, uuid } from './db.js';
 import { engage, currentState, legalActions } from './engagement.js';
 import { effectiveJob } from './facts.js';
 import { clearOpportunityIgnore } from './opportunity-ignore.js';
+import { decisionReferenceIsValid } from './event-time.js';
 
 export const RELEASE_REASONS = ['资源不足', '优先级调整', '转交其他顾问', '客户/职位变化', '当前无法投入', '其他'];
 export const CLOSE_REASONS = ['职位关闭', 'HC 已满', '客户暂停', '需求取消', '其他'];
@@ -145,6 +146,7 @@ export function acceptCommitment(db, consultant_id, project_id, input = {}) {
     clearOpportunityIgnore(db, consultant_id, project_id);
     const event = engage(db, consultant_id, project_id, 'ACCEPT', {
       confirm: true, idempotency_key: input.idempotency_key, payload: { goal },
+      decision_id: input.decision_id || null,
     });
     if (!event.ok) return event;
     const action = insertAction(db, consultant_id, project_id, {
@@ -159,12 +161,13 @@ function insertOutcome(db, consultant_id, project_id, {
 }) {
   const value = { summary, note: summary, rating: Number.isFinite(Number(rating)) ? Number(rating) : null };
   if (close_reason) value.close_reason = close_reason;
+  const at = now();
   db.prepare(`INSERT INTO job_outcomes
     (project_id, consultant_id, stage, value_json, decision_id, idempotency_key,
-     observed_at, action_id, kind)
-    VALUES (?,?,?,?,?,?,?,?,?)`)
+     observed_at, action_id, kind, occurred_at, received_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
     .run(project_id, consultant_id, stage || '进展', JSON.stringify(value), decision_id,
-      idempotency_key, now(), action_id, kind);
+      idempotency_key, at, action_id, kind, at, at);
 }
 
 export function recordProgress(db, consultant_id, project_id, input = {}) {
@@ -176,6 +179,9 @@ export function recordProgress(db, consultant_id, project_id, input = {}) {
   if (!input.idempotency_key) return fail(400, '缺 idempotency_key');
   if (db.prepare('SELECT 1 FROM job_outcomes WHERE idempotency_key=?').get(input.idempotency_key)) {
     return { ok: true, already: true, active_action: activeAction(db, consultant_id, project_id) };
+  }
+  if (!decisionReferenceIsValid(db, consultant_id, project_id, input.decision_id)) {
+    return fail(422, 'decision_id 与当前顾问或职位不匹配');
   }
   if (currentState(db, consultant_id, project_id).state !== 'ACCEPTED') return fail(409, '只有已接单职位可以回写进展');
   if (!PROGRESS_KINDS.includes(kind)) return fail(422, '进展类型无效');
@@ -211,6 +217,9 @@ export function recordTerminalResult(db, consultant_id, project_id, input = {}) 
   if (db.prepare('SELECT 1 FROM job_outcomes WHERE idempotency_key=?').get(input.idempotency_key)) {
     return { ok: true, already: true, state: currentState(db, consultant_id, project_id).state };
   }
+  if (!decisionReferenceIsValid(db, consultant_id, project_id, input.decision_id)) {
+    return fail(422, 'decision_id 与当前顾问或职位不匹配');
+  }
   const state = currentState(db, consultant_id, project_id).state;
   const backfill = state === 'COMPLETED' && !terminalOutcome(db, consultant_id, project_id);
   if (state !== 'ACCEPTED' && !backfill) return fail(409, '当前承接不能写入终局结果');
@@ -228,6 +237,7 @@ export function recordTerminalResult(db, consultant_id, project_id, input = {}) 
     const completed = engage(db, consultant_id, project_id, 'COMPLETE', {
       idempotency_key: `${input.idempotency_key}:state`, reason: stage,
       payload: { stage, summary, close_reason: closeReason || null },
+      decision_id: input.decision_id || null,
     });
     return completed.ok ? { ...completed, backfilled: false } : completed;
   });

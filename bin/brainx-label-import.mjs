@@ -57,8 +57,9 @@ for (const c of ['consultant', 'project_id', 'label', 'reason']) {
 const db = openDb();
 const results = { total: 0, inserted: 0, skipped_blank: 0, already: 0, conflicts: [], failed: [] };
 const ins = db.prepare(`INSERT INTO job_outcomes
-  (project_id, consultant_id, stage, value_json, decision_id, idempotency_key, observed_at)
-  VALUES (?,?,?,?,?,?,?)`);
+  (project_id, consultant_id, stage, value_json, decision_id, idempotency_key,
+   observed_at, occurred_at, received_at)
+  VALUES (?,?,?,?,?,?,?,?,?)`);
 const findExisting = db.prepare(`SELECT value_json FROM job_outcomes
   WHERE consultant_id=? AND project_id=? AND stage='人工标注'
   AND json_extract(value_json,'$.scheme')='v1' LIMIT 1`);
@@ -79,9 +80,10 @@ for (const cells of lines) {
   }
   if (dryRun) { results.inserted++; continue; }
   try {
+    const at = now();
     ins.run(r.project_id, r.consultant, '人工标注',
       JSON.stringify({ label: r.label, reason: r.reason, scheme: 'v1', labeled_by: r.consultant }),
-      null, `label-v1:${r.consultant}:${r.project_id}`, now());
+      null, `label-v1:${r.consultant}:${r.project_id}`, at, at, at);
     results.inserted++;
   } catch (e) {
     results.failed.push({ project_id: r.project_id, error: String(e.message).slice(0, 120) });

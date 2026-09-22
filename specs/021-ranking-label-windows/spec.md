@@ -1,6 +1,6 @@
 # 021 — 排序标签观察窗口与样本成熟度
 
-状态：Specified（2026-09-22）
+状态：Implemented，待完整门禁收口（2026-09-22）
 
 上游：[仓库重构施工总手册](../../docs/2026-09-22-refactor-agentic-ranking-manual.md)阶段 01、
 [Algorithm A 决策契约](../../docs/2026-09-22-algorithm-a-contract.md)第 6 节、

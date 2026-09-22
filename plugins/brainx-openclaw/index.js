@@ -6,9 +6,7 @@ import { formatBrainxReplyPayload } from './response-card.js';
 import { createBraintexPromptContext, preloadSpecialGroupDoc } from './prompt.js';
 import { createSearchStartNoticeHandler } from './search-start-notice.js';
 import { createMentionSilenceHandler } from './mention-silence.js';
-import { createYangOfferReplyHandler } from './yang-offer-reply.js';
-import { createWendyPrivateGroupHandler } from './wendy-private-group.js';
-import { createLindaPrivateLaunchHandler } from './linda-private-launch.js';
+import { loadUserHooksConfig, createUserHookHandler } from './user-hooks.js';
 
 export default definePluginEntry({
   id: 'brainx-openclaw',
@@ -34,23 +32,18 @@ export default definePluginEntry({
     });
     // before_agent_reply 拦普通文本回复（reply_payload_sending 只覆盖富负载，2026-09-14 探针实证）。
     api.on('before_agent_reply', mentionSilence.onBeforeAgentReply, { priority: 100 });
-    // 杨东旭 Offer 群固定文案回复（priority 90，在 mention-silence 之后但在 LLM 之前；
-    // mention-silence 不会拦 @braintex 的消息，所以两者不冲突）。
-    // 需注册 message_received 缓存入站文本（before_agent_reply 的 event 不含原文）。
-    const yangOffer = createYangOfferReplyHandler();
-    api.on('message_received', yangOffer.onMessageReceived);
-    api.on('before_agent_reply', yangOffer, { priority: 90 });
-    // wendy 私聊拉群 hook（priority 95，在 yang-offer 之前；私聊 + "拉群/建群" + 候选人名 → 自动建群+发报告）。
-    // 同样需注册 message_received 缓存入站文本。
-    const wendyPrivate = createWendyPrivateGroupHandler();
-    api.on('message_received', wendyPrivate.onMessageReceived);
-    api.on('before_agent_reply', wendyPrivate, { priority: 95 });
-    // linda 私聊接单 hook（priority 96，在 wendy 之前；私聊 + linda open_id + "接单"关键词
-    // → 直调 brainx_accept_job 接单+自动找人。JC3V82F group 已 READY → 省略接单卡）。
-    // 同样需注册 message_received 缓存入站文本（before_agent_reply 的 event 不含原文）。
-    const lindaLaunch = createLindaPrivateLaunchHandler();
-    api.on('message_received', lindaLaunch.onMessageReceived);
-    api.on('before_agent_reply', lindaLaunch, { priority: 96 });
+    // Per-user hook（私聊接单、私聊拉群、群固定文案等）全部来自配置而非代码：
+    // 开通新顾问 = 在 user-hooks.json（或 BRAINX_USER_HOOKS_FILE 指向的文件）加一条
+    // { trigger, action } 配置。priority 由每条配置自带，均低于 mention-silence(100)、
+    // 高于 LLM；mention-silence 不拦 @braintex 的消息，与群固定文案类 hook 不冲突。
+    // 每条 hook 都注册 message_received 缓存入站文本（before_agent_reply 的 event 不含原文）。
+    const userHooks = loadUserHooksConfig();
+    for (const error of userHooks.errors) api.logger?.warn?.(`[brainx-user-hooks] ${error}`);
+    for (const hook of userHooks.hooks) {
+      const handler = createUserHookHandler(hook);
+      api.on('message_received', handler.onMessageReceived);
+      api.on('before_agent_reply', handler, { priority: hook.priority ?? 95 });
+    }
     api.on('reply_payload_sending', (event, context) => {
       const result = formatBrainxReplyPayload(event, context);
       api.logger?.info?.(`[brainx-rich-replies] kind=${event?.kind || 'unknown'} channel=${event?.channel || context?.channelId || 'unknown'} applied=${Boolean(result)}`);

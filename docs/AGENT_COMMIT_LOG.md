@@ -1,5 +1,20 @@
 # Agent Commit 记录
 
+## 2026-09-22｜refactor(hook): 硬编码 per-user hook 收编为配置——开通新顾问=写 user-hooks.json 不写代码
+
+- 起因（用户指令）：「先消灭硬编码 hook：把 linda/wendy/yang-* 这类 hook 表达为 per-user 配置（触发条件+动作模板），开通新顾问 = 写配置而不是写代码——这是复制的前提」。此前每个顾问级 hook 都是一个按人名硬编码的 JS 文件，加人要写代码改 index.js 发版。
+- 改动：
+  1. `plugins/brainx-openclaw/user-hooks.js`（新，约 340 行）：通用 per-user hook 引擎。`loadUserHooksConfig()` 读 `BRAINX_USER_HOOKS_FILE`（缺省插件自带 `user-hooks.json`），逐条校验、非法条目记 warn 跳过、文件缺失/损坏 fail-open；`createUserHookHandler(hook)` 按配置生成 handler，保持 mention-silence 模式（message_received 缓存入站文本，before_agent_reply 取，丢缓存 fail-open 交 LLM）。三种动作模板：`fixed_reply`（固定文案，text 支持按行数组避免超长行）、`accept_job`（直调 brainx_accept_job，replies 可覆盖默认文案）、`offer_group`（候选人映射建/找 Offer 群+幂等发报告卡，success_template 占位符）。
+  2. `plugins/brainx-openclaw/user-hooks.json`（新）：三条历史 hook 原样迁为配置——yang-offer-fixed-reply（priority 90）、wendy-private-group（95）、linda-private-launch（96），open_id/chat_id/幂等键/文案不变。
+  3. `plugins/brainx-openclaw/index.js`：删掉三个硬编码工厂 import，改为加载配置循环注册（priority 取配置值）。
+  4. 删除 `linda-private-launch.js`、`wendy-private-group.js`、`yang-offer-reply.js`（含 wendy 里从未被调用的 disbandGroup 死代码）。
+  5. `plugins/brainx-openclaw/package.json`：files[] 换 user-hooks.js/json，版本 1.4.21 → 1.5.0；`runtime.js` PLUGIN_VERSION 同步；`tests/openclaw-plugin.test.mjs` 版本断言同步。
+  6. 测试：删 `tests/{linda-private-launch,wendy-private-group,yang-offer-reply}.test.mjs`（21 例），新增 `tests/user-hooks.test.mjs`（18 例）——覆盖三种动作模板全部原有用例 + 配置加载/env 覆盖/损坏 fail-open + 「纯配置开通新顾问」验收例。
+  7. `bin/brainx-yang-offer-demo.mjs`：3 处注释更新为指向 user-hooks.json（该脚本本身是演示种子脚本，未动逻辑）。
+  8. 文档：新增 `docs/2026-09-22-user-hooks-config.md`（配置格式、安全边界、验证方法），登记 docs/README.md 路由+目录；插件 README 加 Per-user hook 章节。
+- 验证：`node --test tests/user-hooks.test.mjs tests/openclaw-plugin.test.mjs tests/openclaw-production-config.test.mjs` 35/35 通过；`npm run verify:quick` 首次 2 项失败（删除文件未入索引导致"完整检出"失败 + user-hooks.json 超长行 896 字符），修复（fixed_reply text 改按行数组，引擎 join）并暂存后复检通过。
+- 待部署：scp 插件副本（index.js + user-hooks.js + user-hooks.json + package.json + runtime.js）到 ECS `/var/lib/brainx/.openclaw/extensions/brainx-openclaw/` + chown brainx:brainx + 重启 openclaw-brainx；或走 install.sh 重装。重启后三个 hook 行为应与线上一致（配置逐值迁移）。
+
 ## 2026-09-17｜feat(hook): linda 私聊接单 hook——直调 brainx_accept_job 接单+自动找人，省略接单卡
 
 - 起因（咪需求）：帮 linda 演练「私聊 @bot 说接单 → 接单 → 建群 → 找人 → 出第一批人」链路。JC3V82F（北京脑利科技 CEO助理）的 project_launches 已 READY+linda+message_id=NULL，launchProject 返回 already → 不发接单卡（"省略接单卡"由 READY 态自动达成）。hook 必须用 mention-silence 模式（lastDirectInbound 缓存 + onMessageReceived 存 + onBeforeAgentReply 读缓存），避免 before_agent_reply 的 event 不含入站文本的 bug。

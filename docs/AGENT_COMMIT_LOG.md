@@ -1,5 +1,14 @@
 # Agent Commit 记录
 
+## 2026-09-22｜feat(hub): specs/019 Phase 2 基座——账本测试基座 + 业务事件发射辅助
+
+- 起因：specs/019-hub-event-backbone tasks.md T002/T003，US1/US2/US3 共用的 Phase 2 基座。
+- 改动：
+  1. `tests/helpers/event-ledger.js`（新）：内存库测试基座。复用既有测试建库模式（`openDb(':memory:')` 跑全量迁移），workflow_event_log/processed_events/event_dlq 即为 0023/0024+0028/0027 生产真实结构，不手抄 DDL；另导出 `emitTestEvent`（快捷 appendEvent，缺省补 event_id/actor/occurred_at）与 `eventsByType`（payload/evidence_refs 已解析）。
+  2. `src/hub/emit.js`（新）：`emitEvent` 包装 appendEvent，统一 actor（缺省 `system:worker`）/occurred_at/schema_version=1 约定，返回 `{ok, deduplicated, event}`；`mustEmitEvent` 在信封无效时抛错（程序错误，让调用方事务回滚）。不开事务——业务写入点在自有 BEGIN/COMMIT 内调用，单条 INSERT 随调用方事务同生死。
+- 验证：`npm run verify:quick` 16/16 通过（基线 T001 同）；node 冒烟：emitTestEvent 落行、同 idem_key 重放 deduplicated=true。
+- 未 push。
+
 ## 2026-09-22｜docs(spec): specs/019 任务拆解——30 个任务按五用户故事分阶段，测试先行
 
 - 起因：speckit-tasks 阶段，把 plan/research/contracts 落成可执行任务清单。

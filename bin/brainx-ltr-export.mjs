@@ -8,15 +8,16 @@ import '../src/env.js';
 import { writeFileSync } from 'node:fs';
 import { openDb, now } from '../src/db.js';
 import { labelFor } from '../src/labels.js';
-import { featuresOf, LTR_FEATURE_VERSION, LTR_FEATURES } from '../src/ltr-features.js';
+import { readFeatureSnapshot, LTR_FEATURE_VERSION, LTR_FEATURES } from '../src/ltr-features.js';
 import { loadConsultants } from '../src/recommend.js';
 import { RANKING_METRIC_VERSION } from '../src/ranking-metrics.js';
 
 const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i > -1 ? process.argv[i + 1] : d; };
 const OUT = arg('out', 'data/ltr-export.jsonl');
 
-export function exportRows(db) {
+export function exportDataset(db) {
   const rows = [];
+  const excluded = {};
   for (const c of loadConsultants(db)) {
     // 曝光优先取 impressions（0021 起）；旧轮次无 impressions 行时以 recommendations 行
     // 本身作曝光记录（rank 已冻结可考），标签存在即证明发生过互动（§4 纪律：
@@ -35,30 +36,38 @@ export function exportRows(db) {
     for (const imp of imps) {
       const label = labelFor(db, c.consultant_id, imp.project_id);
       if (label === null) continue; // 未互动=未知，不打标（§4 纪律）
-      const rec = db.prepare(`SELECT decision_id, action, score, evidence_coverage, breakdown_json
+      const rec = db.prepare(`SELECT feature_snapshot_json
         FROM recommendations WHERE run_id=? AND project_id=?`)
         .get(imp.run_id, imp.project_id);
       if (!rec) continue;
-      const job = db.prepare('SELECT * FROM job_facts WHERE project_id=?').get(imp.project_id);
-      const feat = featuresOf({ ...rec, breakdown: JSON.parse(rec.breakdown_json || '{}'), job },
-        { nowIso: imp.created_at });
+      const snapshot = readFeatureSnapshot(rec.feature_snapshot_json);
+      if (!snapshot.ok) {
+        excluded[snapshot.reason] = (excluded[snapshot.reason] || 0) + 1;
+        continue;
+      }
       rows.push({ group: imp.run_id, consultant_id: c.consultant_id, project_id: imp.project_id,
         rank: imp.rank, label, slot_kind: imp.slot_kind, propensity: imp.propensity,
-        features: feat, feature_version: LTR_FEATURE_VERSION, created_at: imp.created_at });
+        features: snapshot.features, feature_version: snapshot.schema_version,
+        feature_captured_at: snapshot.captured_at, created_at: imp.created_at });
     }
   }
-  return rows;
+  return { rows, excluded };
+}
+
+export function exportRows(db) {
+  return exportDataset(db).rows;
 }
 
 if (process.argv[1] && new URL(import.meta.url).pathname === process.argv[1]) {
   const db = openDb(arg('db', undefined));
-  const rows = exportRows(db);
+  const dataset = exportDataset(db);
+  const { rows, excluded } = dataset;
   const header = { feature_version: LTR_FEATURE_VERSION, metric_version: RANKING_METRIC_VERSION,
                    feature_order: LTR_FEATURES,
-                   rows: rows.length, exported_at: now() };
+                   rows: rows.length, excluded, exported_at: now() };
   writeFileSync(OUT, JSON.stringify(header) + '\n'
     + rows.map((r) => JSON.stringify(r)).join('\n') + '\n');
   const byLabel = {};
   for (const r of rows) byLabel[r.label] = (byLabel[r.label] || 0) + 1;
-  console.log(JSON.stringify({ out: OUT, rows: rows.length, by_label: byLabel }, null, 2));
+  console.log(JSON.stringify({ out: OUT, rows: rows.length, excluded, by_label: byLabel }, null, 2));
 }

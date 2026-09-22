@@ -18,6 +18,7 @@ import { effectiveJobs } from './facts.js';
 import { dataConfidenceOf, presentationEvidence, recommendationPresentationOf } from './recommendation-presentation.js';
 import { writeImpressions } from './tier.js';
 import { ignoredProjectIds } from './opportunity-ignore.js';
+import { createFeatureSnapshot } from './ltr-features.js';
 
 /** 花名册从 DB 读（0003 起 consultants 表为权威，fixtures 只是种子）。 */
 export function loadConsultants(db) {
@@ -163,13 +164,18 @@ export function recommend(db, consultant_id, {
     const action = dataConfidence.band === 'INSUFFICIENT' ? 'OBSERVE' : actionOf(scored.score, scored.coverage);
     const presentation = recommendationPresentationOf(job, relation, action, ctx.now, dataConfidence);
     const { reasons, risks, evidence_refs } = explain(job, relation, scored, ctx);
-    evaluated.push({
+    const recommendation = {
       decision_id: uuid(), project_id: job.project_id, job, relation,
       action,
       score: scored.score, evidence_coverage: scored.coverage,
       confidence_band: { SUFFICIENT: 'HIGH', PARTIAL: 'MEDIUM', INSUFFICIENT: 'LOW' }[dataConfidence.band],
       reasons, risks, evidence_refs: [...evidence_refs, presentationEvidence(presentation)], breakdown: scored.breakdown,
-    });
+      outcomes_avg: ctx.outcomes_avg,
+    };
+    recommendation.feature_snapshot_json = JSON.stringify(
+      createFeatureSnapshot(recommendation, { nowIso: ctx.now }),
+    );
+    evaluated.push(recommendation);
   }
   evaluated.sort(sortRecs);
   evaluated.forEach((r, i) => { r.rank = i + 1; });
@@ -182,8 +188,8 @@ export function recommend(db, consultant_id, {
     const insRec = db.prepare(`INSERT INTO recommendations
       (decision_id, run_id, project_id, consultant_id, action, score, confidence_band,
        evidence_coverage, reasons_json, risks_json, evidence_refs_json, breakdown_json,
-       policy_version, rank, created_at)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+       policy_version, rank, created_at, feature_snapshot_json)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
     db.exec('BEGIN');
     try {
       insRun.run(run_id, consultant_id, snapshot.sync_id, POLICY_VERSION, evaluated.length, 'COMPLETED', now());
@@ -194,7 +200,8 @@ export function recommend(db, consultant_id, {
         insRec.run(r.decision_id, run_id, r.project_id, consultant_id, r.action, r.score,
                    r.confidence_band, r.evidence_coverage, JSON.stringify(r.reasons),
                    JSON.stringify(r.risks), JSON.stringify(r.evidence_refs),
-                   JSON.stringify(r.breakdown), POLICY_VERSION, r.rank, now());
+                   JSON.stringify(r.breakdown), POLICY_VERSION, r.rank, now(),
+                   r.feature_snapshot_json);
       }
       // 曝光埋点（算法文档 §2.4）：展示位置与展示概率随冻结同事务落库
       writeImpressions(db, { run_id, consultant_id, items: evaluated, top, policy_version: POLICY_VERSION });

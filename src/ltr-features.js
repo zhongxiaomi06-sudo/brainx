@@ -1,6 +1,6 @@
 /** ltr-features.js — LambdaMART 特征层（算法文档 §3.3 六类特征）。
- * 特征全部来自已冻结的 recommendations 行 + job_facts 权威事实，可重放、可审计；
- * 与线上六维评分共用同一事实源（训练/线上无特征泄漏：只用冻结时点可得字段）。
+ * 新推荐生成时从当时可见的 recommendation + job_facts 提取并冻结；历史训练和
+ * 影子评估只读该快照，不重新读取后来变化的职位事实。
  *
  * 六类（文档口径 → 实现字段）：
  *   需求真实性：active_state(OPEN=1)、hc、事实新鲜度(距 captured_at 天数)
@@ -25,7 +25,7 @@ export const LTR_FEATURES = [
 const STAGE_RANK = { OFFER: 5, INTERVIEW: 4, SCREENING: 3, SOURCING: 2, OPEN: 1 };
 const URGENT_RE = /紧急|急招|补位|立即|urgent|asap/i;
 
-/** 由一条冻结推荐（含 breakdown 与 job）+ ctx 提取特征向量（按 LTR_FEATURES 序）。 */
+/** 由一条待冻结推荐（含 breakdown 与 job）+ ctx 提取特征向量（按 LTR_FEATURES 序）。 */
 export function featuresOf(rec, { nowIso }) {
   const job = rec.job || {};
   const bd = rec.breakdown || {};
@@ -55,6 +55,43 @@ export function featuresOf(rec, { nowIso }) {
     evidence_coverage: rec.evidence_coverage ?? 0,
     dim_exploration: dim('exploration') ?? 0,
   };
+}
+
+/** 新推荐写入时冻结；与 recommendation 行在同一事务持久化。 */
+export function createFeatureSnapshot(rec, { nowIso }) {
+  if (!Number.isFinite(Date.parse(nowIso))) throw new TypeError('nowIso 必须是有效时间');
+  return {
+    schema_version: LTR_FEATURE_VERSION,
+    captured_at: nowIso,
+    features: featuresOf(rec, { nowIso }),
+  };
+}
+
+/** 历史读取严格失败关闭，不用当前职位事实填补缺失或损坏的快照。 */
+export function readFeatureSnapshot(raw) {
+  if (raw === null || raw === undefined || raw === '') {
+    return { ok: false, reason: 'MISSING_FEATURE_SNAPSHOT' };
+  }
+  let snapshot;
+  try {
+    snapshot = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  } catch {
+    return { ok: false, reason: 'INVALID_FEATURE_SNAPSHOT' };
+  }
+  if (snapshot?.schema_version !== LTR_FEATURE_VERSION) {
+    return { ok: false, reason: 'FEATURE_SNAPSHOT_VERSION_MISMATCH' };
+  }
+  if (!Number.isFinite(Date.parse(snapshot.captured_at)) || !snapshot.features) {
+    return { ok: false, reason: 'INVALID_FEATURE_SNAPSHOT' };
+  }
+  const features = {};
+  for (const name of LTR_FEATURES) {
+    const value = snapshot.features[name];
+    if (!Number.isFinite(value)) return { ok: false, reason: 'INVALID_FEATURE_SNAPSHOT' };
+    features[name] = value;
+  }
+  return { ok: true, schema_version: snapshot.schema_version,
+    captured_at: snapshot.captured_at, features };
 }
 
 export function featureVector(rec, ctx) {

@@ -14,7 +14,7 @@ import { openDb } from '../src/db.js';
 import { labelsForRun } from '../src/labels.js';
 import { loadConsultants } from '../src/recommend.js';
 import { loadShadowModel } from '../src/shadow-rank.js';
-import { featuresOf } from '../src/ltr-features.js';
+import { readFeatureSnapshot } from '../src/ltr-features.js';
 import { ndcgAtK, RANKING_METRIC_VERSION } from '../src/ranking-metrics.js';
 
 const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i > -1 ? process.argv[i + 1] : d; };
@@ -36,15 +36,22 @@ export function evaluate(db, { runs = RUNS, consultant_ids = null, shadowModel =
   for (const g of groups) {
     // 影子对照（§7 阶段二）：模型分重排同批候选算 NDCG@10，与规则 rank 对照
     if (shadowModel) {
-      const scored = g.items.map((it) => {
-        const rec = db.prepare(`SELECT decision_id, action, score, evidence_coverage, breakdown_json
+      const candidates = g.items.map((it) => {
+        const rec = db.prepare(`SELECT feature_snapshot_json
           FROM recommendations WHERE run_id=? AND project_id=?`).get(g.run_id, it.project_id);
-        const job = db.prepare('SELECT * FROM job_facts WHERE project_id=?').get(it.project_id);
-        const feat = rec ? featuresOf({ ...rec, breakdown: JSON.parse(rec.breakdown_json || '{}'), job },
-          { nowIso: g.created_at }) : null;
-        return { ...it, shadow: feat ? shadowModel.score(feat) : -1e9 };
-      }).sort((a, b) => b.shadow - a.shadow);
-      g.shadow_ndcg_at_10 = ndcgAtK(scored, 10);
+        const snapshot = readFeatureSnapshot(rec?.feature_snapshot_json);
+        return { item: it, snapshot };
+      });
+      const invalid = candidates.filter((row) => !row.snapshot.ok);
+      if (invalid.length) {
+        g.shadow_excluded_reason = invalid[0].snapshot.reason;
+        g.shadow_excluded_count = invalid.length;
+      } else {
+        const scored = candidates.map(({ item, snapshot }) => ({
+          ...item, shadow: shadowModel.score(snapshot.features),
+        })).sort((a, b) => b.shadow - a.shadow);
+        g.shadow_ndcg_at_10 = ndcgAtK(scored, 10);
+      }
     }
     const labeled = g.items.filter((i) => i.label !== null);
     const valuable = labeled.filter((i) => i.label >= 2);
@@ -54,6 +61,8 @@ export function evaluate(db, { runs = RUNS, consultant_ids = null, shadowModel =
     per.push({
       consultant_id: g.consultant_id, run_id: g.run_id, created_at: g.created_at,
       shadow_ndcg_at_10: g.shadow_ndcg_at_10 ?? null,
+      shadow_excluded_reason: g.shadow_excluded_reason ?? null,
+      shadow_excluded_count: g.shadow_excluded_count ?? 0,
       candidates: g.items.length, labeled: labeled.length, valuable: valuable.length,
       label_coverage: g.items.length ? labeled.length / g.items.length : null,
       recall_at_50: recall50,

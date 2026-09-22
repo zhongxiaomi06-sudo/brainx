@@ -12,7 +12,7 @@ import { writeFileSync } from 'node:fs';
 import { openDb, now } from '../src/db.js';
 import { evaluate } from '../scripts/eval-ranking.mjs';
 import { loadShadowModel } from '../src/shadow-rank.js';
-import { featuresOf } from '../src/ltr-features.js';
+import { readFeatureSnapshot } from '../src/ltr-features.js';
 import { loadConsultants } from '../src/recommend.js';
 import { labelFor } from '../src/labels.js';
 
@@ -23,21 +23,28 @@ export function divergenceTopN(db, model, consultant_id, { top = 5 } = {}) {
   const run = db.prepare(`SELECT run_id, created_at FROM decision_runs
     WHERE consultant_id=? AND status='COMPLETED' ORDER BY created_at DESC LIMIT 1`).get(consultant_id);
   if (!run) return null;
-  const recs = db.prepare(`SELECT project_id, rank, action, score, evidence_coverage, breakdown_json
+  const recs = db.prepare(`SELECT project_id, rank, action, score, feature_snapshot_json
     FROM recommendations WHERE run_id=? AND consultant_id=? ORDER BY rank LIMIT 50`)
     .all(run.run_id, consultant_id);
   const scored = [];
+  const excluded = {};
   for (const r of recs) {
-    const job = db.prepare('SELECT * FROM job_facts WHERE project_id=?').get(r.project_id);
-    const feat = featuresOf({ ...r, breakdown: JSON.parse(r.breakdown_json || '{}'), job },
-      { nowIso: run.created_at });
-    scored.push({ ...r, shadow: model.score(feat) });
+    const snapshot = readFeatureSnapshot(r.feature_snapshot_json);
+    if (!snapshot.ok) {
+      excluded[snapshot.reason] = (excluded[snapshot.reason] || 0) + 1;
+      continue;
+    }
+    scored.push({ ...r, shadow: model.score(snapshot.features) });
+  }
+  if (Object.keys(excluded).length) {
+    return { consultant_id, run_id: run.run_id, created_at: run.created_at,
+      status: 'EXCLUDED', excluded, top: [] };
   }
   const shadowOrder = [...scored].sort((a, b) => b.shadow - a.shadow)
     .map((r, i) => [r.project_id, i + 1]);
   const shadowRank = Object.fromEntries(shadowOrder);
   return {
-    consultant_id, run_id: run.run_id, created_at: run.created_at,
+    consultant_id, run_id: run.run_id, created_at: run.created_at, status: 'COMPARABLE',
     top: scored.map((r) => ({ ...r, shadow_rank: shadowRank[r.project_id],
                               delta: Math.abs(shadowRank[r.project_id] - r.rank) }))
       .sort((a, b) => b.delta - a.delta).slice(0, top)

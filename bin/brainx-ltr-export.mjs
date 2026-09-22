@@ -10,6 +10,7 @@ import { openDb, now } from '../src/db.js';
 import { labelFor } from '../src/labels.js';
 import { featuresOf, LTR_FEATURE_VERSION, LTR_FEATURES } from '../src/ltr-features.js';
 import { loadConsultants } from '../src/recommend.js';
+import { RANKING_METRIC_VERSION } from '../src/ranking-metrics.js';
 
 const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i > -1 ? process.argv[i + 1] : d; };
 const OUT = arg('out', 'data/ltr-export.jsonl');
@@ -52,7 +53,8 @@ export function exportRows(db) {
 if (process.argv[1] && new URL(import.meta.url).pathname === process.argv[1]) {
   const db = openDb(arg('db', undefined));
   const rows = exportRows(db);
-  const header = { feature_version: LTR_FEATURE_VERSION, feature_order: LTR_FEATURES,
+  const header = { feature_version: LTR_FEATURE_VERSION, metric_version: RANKING_METRIC_VERSION,
+                   feature_order: LTR_FEATURES,
                    rows: rows.length, exported_at: now() };
   writeFileSync(OUT, JSON.stringify(header) + '\n'
     + rows.map((r) => JSON.stringify(r)).join('\n') + '\n');

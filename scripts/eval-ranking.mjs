@@ -15,28 +15,18 @@ import { labelsForRun } from '../src/labels.js';
 import { loadConsultants } from '../src/recommend.js';
 import { loadShadowModel } from '../src/shadow-rank.js';
 import { featuresOf } from '../src/ltr-features.js';
+import { ndcgAtK, RANKING_METRIC_VERSION } from '../src/ranking-metrics.js';
 
 const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i > -1 ? process.argv[i + 1] : d; };
 const RUNS = Math.max(1, Number(arg('runs', '5')) || 5);
 
-function dcg(labels) {
-  return labels.reduce((s, l, i) => s + ((Math.pow(2, l) - 1) / Math.log2(i + 2)), 0);
-}
-
-function ndcg(items, k) {
-  const top = items.filter((i) => i.label !== null).slice(0, k);
-  if (!top.length) return null;
-  const ideal = [...top.map((i) => i.label)].sort((a, b) => b - a);
-  const denom = dcg(ideal);
-  return denom > 0 ? dcg(top.map((i) => i.label)) / denom : null;
-}
-
 export function evaluate(db, { runs = RUNS, consultant_ids = null, shadowModel = null } = {}) {
+  const runLimit = Math.max(1, Number(runs) || RUNS);
   const cids = consultant_ids || loadConsultants(db).map((c) => c.consultant_id);
   const groups = [];
   for (const cid of cids) {
     const runRows = db.prepare(`SELECT run_id, created_at FROM decision_runs
-      WHERE consultant_id=? AND status='COMPLETED' ORDER BY created_at DESC LIMIT ?`).all(cid, RUNS);
+      WHERE consultant_id=? AND status='COMPLETED' ORDER BY created_at DESC LIMIT ?`).all(cid, runLimit);
     for (const r of runRows) {
       const items = labelsForRun(db, cid, r.run_id);
       if (items.length) groups.push({ consultant_id: cid, run_id: r.run_id, created_at: r.created_at, items });
@@ -54,7 +44,7 @@ export function evaluate(db, { runs = RUNS, consultant_ids = null, shadowModel =
           { nowIso: g.created_at }) : null;
         return { ...it, shadow: feat ? shadowModel.score(feat) : -1e9 };
       }).sort((a, b) => b.shadow - a.shadow);
-      g.shadow_ndcg_at_10 = ndcg(scored, 10);
+      g.shadow_ndcg_at_10 = ndcgAtK(scored, 10);
     }
     const labeled = g.items.filter((i) => i.label !== null);
     const valuable = labeled.filter((i) => i.label >= 2);
@@ -65,8 +55,9 @@ export function evaluate(db, { runs = RUNS, consultant_ids = null, shadowModel =
       consultant_id: g.consultant_id, run_id: g.run_id, created_at: g.created_at,
       shadow_ndcg_at_10: g.shadow_ndcg_at_10 ?? null,
       candidates: g.items.length, labeled: labeled.length, valuable: valuable.length,
+      label_coverage: g.items.length ? labeled.length / g.items.length : null,
       recall_at_50: recall50,
-      ndcg_at_10: ndcg(g.items, 10),
+      ndcg_at_10: ndcgAtK(g.items, 10),
       precision_at_10: top10.length ? top10.filter((i) => i.label >= 2).length / top10.length : null,
     });
   }
@@ -75,13 +66,15 @@ export function evaluate(db, { runs = RUNS, consultant_ids = null, shadowModel =
     return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null;
   };
   return {
-    generated_at: new Date().toISOString(), groups: per.length,
+    generated_at: new Date().toISOString(), metric_version: RANKING_METRIC_VERSION,
+    groups: per.length,
     metrics: {
       recall_at_50: avg('recall_at_50'), ndcg_at_10: avg('ndcg_at_10'),
-      precision_at_10: avg('precision_at_10'),
+      precision_at_10: avg('precision_at_10'), label_coverage: avg('label_coverage'),
       ...(shadowModel ? { shadow_ndcg_at_10: avg('shadow_ndcg_at_10') } : {}),
     },
-    note: '快照口径：标签取当前可见结果（未来演化未按时间切分隔离，仅作基线对照，不作上线判据）',
+    note: '快照口径：未知标签保留预测位置且不当作 0，IDCG 取同组全部已知标签；'
+      + '标签仍取当前可见结果，未按决策时点和成熟窗口冻结，部分标注仅作基线诊断。',
     groups_detail: per,
   };
 }

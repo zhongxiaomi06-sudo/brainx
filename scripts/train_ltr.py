@@ -12,6 +12,7 @@ NDCG@10 只作影子对照，不作上线判据。
 """
 import json
 import sys
+from math import log2
 from pathlib import Path
 
 def load_rows(path):
@@ -23,6 +24,30 @@ def load_rows(path):
             if line:
                 rows.append(json.loads(line))
     return header, rows
+
+def ndcg(scores, labels, groups, k=10):
+    """Mean NDCG where predicted scores select order and full groups define IDCG."""
+    if len(scores) != len(labels):
+        raise ValueError('scores and labels must have the same length')
+    vals, off = [], 0
+    for raw_size in groups:
+        size = int(raw_size)
+        if size < 0 or off + size > len(labels):
+            raise ValueError('invalid ranking group size')
+        seg_s = scores[off:off + size]
+        seg_l = labels[off:off + size]
+        ranked = sorted(range(size), key=lambda i: (-float(seg_s[i]), i))[:k]
+        dcg = sum((2 ** float(seg_l[row_idx]) - 1) / log2(position + 2)
+                  for position, row_idx in enumerate(ranked))
+        ideal = sorted((float(label) for label in seg_l), reverse=True)[:k]
+        idcg = sum((2 ** label - 1) / log2(position + 2)
+                   for position, label in enumerate(ideal))
+        if idcg > 0:
+            vals.append(dcg / idcg)
+        off += size
+    if off != len(labels):
+        raise ValueError('ranking groups do not cover every row')
+    return float(sum(vals) / len(vals)) if vals else None
 
 def main():
     import lightgbm as lgb
@@ -77,6 +102,7 @@ def main():
     payload = {
         'format': 'lightgbm-lambdarank-json',
         'feature_version': header['feature_version'],
+        'metric_version': header.get('metric_version', 'legacy-ranking-metrics'),
         'feature_order': order,
         'trained_at': __import__('datetime').datetime.utcnow().isoformat() + 'Z',
         'rows': len(rows), 'train_groups': len(train_keys),
@@ -85,18 +111,6 @@ def main():
     Path(out).write_text(json.dumps(payload, ensure_ascii=False), encoding='utf-8')
 
     # 快速对照：验证集 NDCG@10（规则 rank vs 模型分）
-    def ndcg(scores, labels, groups, k=10):
-        vals, off = [], 0
-        for g in groups:
-            seg_s, seg_l = scores[off:off+g], labels[off:off+g]
-            idx = np.argsort(-seg_s)[:k]
-            dcg = sum((2**seg_l[i]-1)/np.log2(i+2) for i, _ in enumerate(idx))
-            ideal = np.sort(-seg_l)[:k]*-1
-            idcg = sum((2**l-1)/np.log2(i+2) for i, l in enumerate(ideal))
-            if idcg > 0: vals.append(dcg/idcg)
-            off += g
-        return float(np.mean(vals)) if vals else None
-
     report = {'ok': True, 'out': out, 'rows': len(rows)}
     if has_valid:
         report['ndcg10_model'] = ndcg(model.predict(Xva), yva, group_valid)

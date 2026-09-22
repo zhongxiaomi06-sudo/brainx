@@ -1,6 +1,6 @@
 # 024 — 数据增长、引用与保留责任只读盘点
 
-状态：Specified（2026-09-22）
+状态：Implemented，等待最新提交完整门禁（2026-09-22）
 
 上游：[仓库重构施工总手册](../../docs/2026-09-22-refactor-agentic-ranking-manual.md)阶段 02、
 [推荐数据契约与迁移手册](../../docs/2026-09-22-ranking-data-migration.md)第 7 节、

@@ -121,6 +121,7 @@
 - [排序负反馈事件回放规格](../specs/022-ranking-feedback-replay/spec.md)：追加记录忽略、撤销和原因更正，按双时间及明确推荐关联回放负反馈标签。
 - [人才库持久层失败关闭规格](../specs/023-talent-persistence-fail-closed/spec.md)：显式选择 MySQL 或易失内存后端；生产缺配置、断连或 schema 未就绪时不再伪装写入成功。
 - [数据增长与保留责任只读盘点规格](../specs/024-retention-inventory/spec.md)：只读、脱敏地统计增长、引用和责任阻断；未批准 TTL 与恢复点前不产生可执行删除集合。
+- [数据增长、引用与保留责任只读盘点](2026-09-22-retention-inventory.md)：本地聚合规模、跨表引用、责任矩阵、旧清理路径差距和下一单元准入条件。
 - [BrainTex 飞书功能首页与新用户指引](2026-09-03-braintex-feishu-home.md)：定义 `/brainx` 确定性卡片、六个顾问任务入口、权限边界、首次出现时机和真实验收流程。
 - [候选人事实与 shortlist 数据契约](2026-09-03-candidate-data-contracts.md)：`candidate_fact_v1`、`candidate_match_bundle_v1`、reloop 真实数据转换、人才/职位双授权、固定飞书文案、MCP PoC 暴露条件及当前未完成项的唯一施工说明。
 - [候选人保留与项目共享上下文复核](frontend-reviews/2026-09-09-candidate-focus-context.md)：飞书候选行“保留”、项目级重点名单、后续群问答读取与安全边界。

@@ -1,6 +1,6 @@
 # 025 — 清理路径隔离与显式策略 dry-run
 
-状态：Implemented，待最新提交完整门禁（2026-09-23）
+状态：Verified（2026-09-23）
 
 上游：[数据增长、引用与保留责任只读盘点](../../docs/2026-09-22-retention-inventory.md)、
 [推荐数据契约与迁移手册](../../docs/2026-09-22-ranking-data-migration.md)第 7 节、

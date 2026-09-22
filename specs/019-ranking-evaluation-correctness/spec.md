@@ -1,6 +1,6 @@
 # 019 — 排序评估正确性
 
-状态：Implemented，待提交后完整门禁（2026-09-22）
+状态：Converged（2026-09-22）
 
 上游：[仓库重构施工总手册](../../docs/2026-09-22-refactor-agentic-ranking-manual.md)阶段 01、
 [Algorithm A 决策契约](../../docs/2026-09-22-algorithm-a-contract.md)第 6 节、

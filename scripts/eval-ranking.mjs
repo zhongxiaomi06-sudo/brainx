@@ -79,16 +79,21 @@ export function evaluate(db, {
     return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null;
   };
   const sampleStatus = {};
+  const negativeReasons = {};
   for (const group of groups) {
     for (const item of group.items) {
       const key = `${item.status}:${item.reason}`;
       sampleStatus[key] = (sampleStatus[key] || 0) + 1;
+      for (const reason of item.negative_reason_codes || []) {
+        negativeReasons[reason] = (negativeReasons[reason] || 0) + 1;
+      }
     }
   }
   return {
     generated_at: new Date().toISOString(), metric_version: RANKING_METRIC_VERSION,
     label_version: RANKING_LABEL_VERSION, label_window_days: labelWindow.windowDays,
     label_cutoff_at: labelWindow.cutoffAt, sample_status: sampleStatus,
+    negative_reason_counts: negativeReasons,
     groups: per.length,
     metrics: {
       recall_at_50: avg('recall_at_50'), ndcg_at_10: avg('ndcg_at_10'),

@@ -143,7 +143,11 @@ export function acceptCommitment(db, consultant_id, project_id, input = {}) {
         due_at: new Date(due_at).toISOString(), source: 'MANUAL', idempotency_key: `${input.idempotency_key}:action` }) }));
   }
   return transact(db, () => {
-    clearOpportunityIgnore(db, consultant_id, project_id);
+    clearOpportunityIgnore(db, consultant_id, project_id, {
+      decision_id: input.decision_id || null, occurred_at: input.occurred_at || null,
+      source: 'COMMITMENT_ACCEPTED',
+      idempotency_key: `${input.idempotency_key}:ignore-revoked`,
+    });
     const event = engage(db, consultant_id, project_id, 'ACCEPT', {
       confirm: true, idempotency_key: input.idempotency_key, payload: { goal },
       decision_id: input.decision_id || null,

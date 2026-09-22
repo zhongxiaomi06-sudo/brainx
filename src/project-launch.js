@@ -231,6 +231,7 @@ export async function launchRecruitingWorkflow(db, bus, consultantId, projectId,
       action_title: '在项目群选择 OpenMai 或 SuperMai，并确认是否补充找人条件',
       due_at: workflowDueAt(),
       idempotency_key: `project-launch:${launchId}:accept`,
+      decision_id: input.decision_id || null,
     });
     if (!accepted.ok) fail(accepted.status || 409, 'PROJECT_ACCEPT_FAILED', accepted.error);
   }

@@ -45,7 +45,8 @@ export function buildDailyCard({ consultant_name, consultant_id, run, items, ite
     // 高优降级为文字标签 —— 语义保留，装饰去掉。
     const hot = j.priority === 'HIGH' ? '（高优）' : ''; // 重点高优（还做吗结构化，0007 起）
     const opportunityUrl = buildBrainxDeepLink({ baseUrl, objectType: 'opportunity', objectRef: j.project_id });
-    const launchUrl = consultant_id && quickLink(baseUrl, consultant_id, j.project_id, 'launch', now());
+    const launchUrl = consultant_id && quickLink(baseUrl, consultant_id, j.project_id,
+      'launch', now(), r.decision_id);
     // 排版纪律（docs/standards/CARD_TYPOGRAPHY.md）：标题行 → 元信息行 → 结论行 → 指标行，
     // 空行分组后接最多 3 行标签行。（高优）放在标题的加粗之外，只作强调、不参与标题层级。
     els.push({ tag: 'markdown', content:
@@ -69,7 +70,8 @@ export function buildDailyCard({ consultant_name, consultant_id, run, items, ite
     const secondaryActions = [btn('查看评估详情',
       buildBrainxDeepLink({ baseUrl, objectType: 'replay', objectRef: r.decision_id }))];
     // 一键反馈（F2）：签名当日有效；未配置密钥时 quickLink 返 null，按钮不渲染
-    const ignoreUrl = consultant_id && quickLink(baseUrl, consultant_id, j.project_id, 'ignore', now());
+    const ignoreUrl = consultant_id && quickLink(baseUrl, consultant_id, j.project_id,
+      'ignore', now(), r.decision_id);
     if (ignoreUrl) secondaryActions.push(btn('忽略', ignoreUrl, 'danger'));
     // 辅助组只剩「查看评估详情」时，两行各一个按钮会显得松散，合并回第一行（合计 2 个，不触截断）。
     if (primaryActions.length === 1 && secondaryActions.length === 1) {

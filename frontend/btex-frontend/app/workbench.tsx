@@ -102,7 +102,7 @@ export default function DecisionWorkbench({demo=false}:{demo?:boolean}={}){
    const pageSnapshot={pages:recommendationQueue.pages,pageIndex:recommendationQueue.pageIndex};
    try{
     if(brainxMode==="connected"){
-     await sendRecommendationFeedback(job.id,clean,brainxRun.snapshotId,
+     await sendRecommendationFeedback(job.id,job.brainxDecisionId||null,clean,brainxRun.snapshotId,
       makeIdempotencyKey(`recommendation-feedback:${job.id}`));
     }
     setBrainxJobs(current=>current?current.filter(item=>item.id!==job.id):current);
@@ -111,7 +111,8 @@ export default function DecisionWorkbench({demo=false}:{demo?:boolean}={}){
      actions:[{label:"撤销",onClick:()=>{
       setBrainxJobs(snapshot);
       recommendationQueue.restore(pageSnapshot);
-      if(brainxMode==="connected")void undoRecommendationFeedback(job.id)
+      if(brainxMode==="connected")void undoRecommendationFeedback(job.id,job.brainxDecisionId||null,
+       makeIdempotencyKey(`recommendation-feedback-undo:${job.id}`))
        .then(()=>notify("已撤销不感兴趣"))
        .catch(error=>notify(`撤销已恢复本地显示，但后端删除失败：${error instanceof Error?error.message:"后端未响应"}`,undefined,4000));
       if(brainxMode!=="connected")notify("已撤销不感兴趣");

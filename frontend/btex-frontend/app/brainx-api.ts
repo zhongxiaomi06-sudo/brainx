@@ -445,16 +445,16 @@ export async function nextRecommendationBatch(batchId: string, cursor: string, i
   });
 }
 
-export async function sendRecommendationFeedback(projectId: string, reason: string, batchId: string | null, idempotencyKey: string): Promise<BackendFeedbackResponse> {
+export async function sendRecommendationFeedback(projectId: string, decisionId: string | null, reason: string, batchId: string | null, idempotencyKey: string): Promise<BackendFeedbackResponse> {
   return brainxFetch<BackendFeedbackResponse>("/api/v1/recommendations/feedback", {
-    method: "POST", body: { project_id: projectId, feedback: "NOT_INTERESTED", reason, batch_id: batchId, idempotency_key: idempotencyKey },
+    method: "POST", body: { project_id: projectId, decision_id: decisionId, feedback: "NOT_INTERESTED", reason, batch_id: batchId, idempotency_key: idempotencyKey },
   });
 }
 
 // 撤销"不感兴趣"反馈（小红书/B站式 toast 撤销按钮的后端对应）
-export async function undoRecommendationFeedback(projectId: string): Promise<{ ok: boolean; removed?: boolean }> {
+export async function undoRecommendationFeedback(projectId: string, decisionId: string | null, idempotencyKey: string): Promise<{ ok: boolean; removed?: boolean }> {
   return brainxFetch<{ ok: boolean; removed?: boolean }>("/api/v1/recommendations/feedback/undo", {
-    method: "POST", body: { project_id: projectId },
+    method: "POST", body: { project_id: projectId, decision_id: decisionId, idempotency_key: idempotencyKey },
   });
 }
 

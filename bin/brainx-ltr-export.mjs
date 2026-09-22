@@ -56,6 +56,7 @@ export function exportDataset(db, { cutoffAt, windowDays } = {}) {
         features: snapshot.features, feature_version: snapshot.schema_version,
         feature_captured_at: snapshot.captured_at, label_version: labelResult.version,
         label_window_days: labelResult.window_days, label_cutoff_at: labelResult.cutoff_at,
+        negative_reason_codes: labelResult.negative_reason_codes,
         created_at: imp.created_at });
     }
   }

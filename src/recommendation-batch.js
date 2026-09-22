@@ -2,9 +2,24 @@ import { now, uuid } from './db.js';
 import { latestRun } from './recommend.js';
 import { effectiveJob } from './facts.js';
 import { currentState } from './engagement.js';
-import { isOpportunityIgnored } from './opportunity-ignore.js';
+import { isOpportunityIgnored, recordOpportunityIgnore,
+  revokeOpportunityIgnore } from './opportunity-ignore.js';
+import { appendFeedbackEvent } from './ranking-feedback.js';
 
 const LIMIT = 20;
+
+function transact(db, operation) {
+  db.exec('BEGIN');
+  try {
+    const result = operation();
+    if (result?.ok === false) db.exec('ROLLBACK');
+    else db.exec('COMMIT');
+    return result;
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
+  }
+}
 
 function batchFor(db, consultantId, snapshotId, size = LIMIT) {
   let batch = db.prepare('SELECT * FROM recommendation_batches WHERE consultant_id=? AND snapshot_id=?').get(consultantId, snapshotId);
@@ -86,15 +101,37 @@ export function feedback(db, consultantId, body) {
   const existingForProject = db.prepare(`SELECT * FROM recommendation_feedback
     WHERE consultant_id=? AND project_id=? AND snapshot_id=?`).get(consultantId, body.project_id, run.run.snapshot_id);
   if (existingForProject) {
-    db.prepare('UPDATE recommendation_feedback SET reason=?, created_at=? WHERE feedback_id=?')
-      .run(String(body.reason).slice(0, 200), now(), existingForProject.feedback_id);
+    const corrected = transact(db, () => {
+      const event = appendFeedbackEvent(db, consultantId, body.project_id, {
+        decision_id: body.decision_id || null, event_type: 'REASON_CORRECTED',
+        reason: body.reason, source: 'RECOMMENDATION_FEEDBACK',
+        occurred_at: body.occurred_at || null, idempotency_key: body.idempotency_key,
+      });
+      if (!event.ok || event.already) return event;
+      db.prepare('UPDATE recommendation_feedback SET reason=?, created_at=? WHERE feedback_id=?')
+        .run(String(body.reason).slice(0, 200), now(), existingForProject.feedback_id);
+      return { ...event, updated: true };
+    });
+    if (!corrected.ok || corrected.already) return { ...corrected,
+      replacement: pickTray(db, consultantId, { limit: LIMIT }) };
     return { ok: true, updated: true, feedback_id: existingForProject.feedback_id, replacement: pickTray(db, consultantId, { limit: LIMIT }) };
   }
   const feedbackId = `feedback_${uuid()}`;
-  db.prepare(`INSERT INTO recommendation_feedback
-    (feedback_id, consultant_id, project_id, snapshot_id, batch_id, feedback, reason, idempotency_key, created_at)
-    VALUES (?,?,?,?,?,?,?,?,?)`).run(feedbackId, consultantId, body.project_id, run.run.snapshot_id, body.batch_id || batch.batch_id,
-      body.feedback, String(body.reason).slice(0, 200), body.idempotency_key, now());
+  const recorded = transact(db, () => {
+    const ignored = recordOpportunityIgnore(db, consultantId, body.project_id, body.idempotency_key, {
+      decision_id: body.decision_id || null, reason: body.reason,
+      source: 'RECOMMENDATION_FEEDBACK', occurred_at: body.occurred_at || null,
+      force_event: true,
+    });
+    if (!ignored.ok || ignored.already) return ignored;
+    db.prepare(`INSERT INTO recommendation_feedback
+      (feedback_id, consultant_id, project_id, snapshot_id, batch_id, feedback, reason, idempotency_key, created_at)
+      VALUES (?,?,?,?,?,?,?,?,?)`).run(feedbackId, consultantId, body.project_id, run.run.snapshot_id, body.batch_id || batch.batch_id,
+        body.feedback, String(body.reason).slice(0, 200), body.idempotency_key, now());
+    return { ...ignored, feedback_id: feedbackId };
+  });
+  if (!recorded.ok || recorded.already) return { ...recorded,
+    replacement: pickTray(db, consultantId, { limit: LIMIT }) };
   return { ok: true, feedback_id: feedbackId, replacement: pickTray(db, consultantId, { limit: LIMIT }) };
 }
 
@@ -107,8 +144,17 @@ export function undoFeedback(db, consultantId, body) {
   }
   const run = latestRun(db, consultantId);
   if (!run) return { ok: false, status: 409, code: 'NO_RECOMMENDATION', message: '暂无完整推荐快照' };
-  // 不分快照全删：isHidden 判定本就不看 snapshot_id，只删当前快照行会让旧行继续隐藏 → 撤销假成功
-  const removed = db.prepare(`DELETE FROM recommendation_feedback
-    WHERE consultant_id=? AND project_id=?`).run(consultantId, body.project_id);
-  return { ok: true, removed: removed.changes > 0, replacement: pickTray(db, consultantId, { limit: LIMIT }) };
+  const current = db.prepare(`SELECT feedback_id, idempotency_key FROM recommendation_feedback
+    WHERE consultant_id=? AND project_id=? ORDER BY created_at DESC LIMIT 1`)
+    .get(consultantId, body.project_id);
+  const ignored = db.prepare(`SELECT idempotency_key FROM opportunity_ignores
+    WHERE consultant_id=? AND project_id=?`).get(consultantId, body.project_id);
+  const idempotencyKey = body.idempotency_key
+    || (current ? `feedback-undo:${current.feedback_id}`
+      : ignored ? `feedback-undo:${ignored.idempotency_key}` : '');
+  const revoked = revokeOpportunityIgnore(db, consultantId, body.project_id, {
+    decision_id: body.decision_id || null, source: 'RECOMMENDATION_FEEDBACK_UNDO',
+    occurred_at: body.occurred_at || null, idempotency_key: idempotencyKey,
+  });
+  return { ...revoked, replacement: pickTray(db, consultantId, { limit: LIMIT }) };
 }

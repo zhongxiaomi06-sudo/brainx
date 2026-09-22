@@ -118,19 +118,25 @@ test('F2: 签名往返；篡改/过期被拒', () => {
   assert.equal(verifyQuick(p, '2026-08-26T02:00:00Z').status, 403, '第三天过期');
   assert.equal(verifyQuick({ ...p, project: 'P2' }, '2026-08-24T02:00:00Z').status, 403, '篡改 project');
   assert.equal(verifyQuick({ ...p, sig: 'deadbeef' }, '2026-08-24T02:00:00Z').status, 403, '伪造签名');
+  const bound = Object.fromEntries(new URL(quickLink('http://x', 'mia', 'P1', 'ignore',
+    '2026-08-24T01:00:00Z', 'decision-1')).searchParams);
+  assert.equal(bound.decision, 'decision-1');
+  assert.equal(verifyQuick(bound, '2026-08-24T02:00:00Z').ok, true);
+  assert.equal(verifyQuick({ ...bound, decision: 'decision-2' }, '2026-08-24T02:00:00Z').status, 403);
 });
 
 test('F2: HTTP 端点端到端（无 session，忽略写统一排除事实且幂等）', async () => {
   process.env.BRAINX_FEEDBACK_SECRET = 'test-secret-64';
   runSync(db, { source: 'fixture', consultant_id: 'felix' });
   recommend(db, 'felix', { top: 20 });
-  const pid = db.prepare(`SELECT project_id FROM recommendations
-    WHERE consultant_id='felix' AND rank=1 ORDER BY rowid DESC LIMIT 1`).get().project_id;
+  const recommendation = db.prepare(`SELECT project_id, decision_id FROM recommendations
+    WHERE consultant_id='felix' AND rank=1 ORDER BY rowid DESC LIMIT 1`).get();
+  const pid = recommendation.project_id;
   const server = createServer(db);
   await new Promise((r) => server.listen(0, r));
   const base = `http://127.0.0.1:${server.address().port}`;
   try {
-    const link = quickLink(base, 'felix', pid, 'ignore', now());
+    const link = quickLink(base, 'felix', pid, 'ignore', now(), recommendation.decision_id);
     const r1 = await fetch(link);
     assert.equal(r1.status, 200);
     assert.match(await r1.text(), /已记录：忽略/);
@@ -139,6 +145,10 @@ test('F2: HTTP 端点端到端（无 session，忽略写统一排除事实且幂
     const ignored = db.prepare(`SELECT 1 FROM opportunity_ignores
       WHERE consultant_id='felix' AND project_id=?`).get(pid);
     assert.ok(ignored);
+    const event = db.prepare(`SELECT decision_id, event_type FROM recommendation_feedback_events
+      WHERE consultant_id='felix' AND project_id=?`).get(pid);
+    assert.equal(event.decision_id, recommendation.decision_id);
+    assert.equal(event.event_type, 'NEGATIVE');
     // 未签名请求被拒（B12 后按语义返回 403 签名无效，而非笼统 400）
     const r3 = await fetch(`${base}/api/v1/feedback/quick?consultant=felix&project=${pid}&action=ignore&day=2026-08-24&sig=bad`);
     assert.equal(r3.status, 403);

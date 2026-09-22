@@ -12,6 +12,13 @@ export function replay(db, decision_id) {
     ORDER BY occurred_at, id`).all(r.project_id);
   const outcomes = db.prepare(`SELECT stage, value_json, observed_at, occurred_at, received_at FROM job_outcomes
     WHERE project_id=? ORDER BY observed_at`).all(r.project_id);
+  const feedbackEvents = db.prepare(`SELECT event_type, reason_code, reason_text, source,
+      decision_id, occurred_at, received_at
+    FROM recommendation_feedback_events
+    WHERE consultant_id=? AND project_id=?
+      AND (decision_id=? OR (decision_id IS NULL AND event_type='REVOKED'))
+    ORDER BY occurred_at, received_at, rowid`)
+    .all(r.consultant_id, r.project_id, decision_id);
   return {
     decision_id,
     run: run && { run_id: run.run_id, snapshot_id: run.snapshot_id,
@@ -27,7 +34,8 @@ export function replay(db, decision_id) {
     },
     job_now: job && { company: job.company, role: job.role, active_state: job.active_state,
                       note: '回放以 recommendation 冻结行为准；此为当前职位现状，仅对照' },
-    events, outcomes: outcomes.map((o) => ({ ...o, value: JSON.parse(o.value_json) })),
+    events, feedback_events: feedbackEvents,
+    outcomes: outcomes.map((o) => ({ ...o, value: JSON.parse(o.value_json) })),
   };
 }
 

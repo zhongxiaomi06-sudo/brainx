@@ -76,6 +76,7 @@ if (process.argv[1] && new URL(import.meta.url).pathname === process.argv[1]) {
   const report = { generated_at: now(), model: { trained_at: model.trained_at, rows: model.rows },
                    label_version: ev.label_version, label_window_days: ev.label_window_days,
                    label_cutoff_at: ev.label_cutoff_at, sample_status: ev.sample_status,
+                   negative_reason_counts: ev.negative_reason_counts,
                    metrics: ev.metrics, divergence, note: ev.note };
   writeFileSync('data/shadow-daily-latest.json', JSON.stringify(report, null, 2));
   if (process.argv.includes('--json')) { console.log(JSON.stringify(report, null, 2)); process.exit(0); }

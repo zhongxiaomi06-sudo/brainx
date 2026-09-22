@@ -1,4 +1,5 @@
 /** ranking-labels.js — 离线排序标签的时间切分契约。 */
+import { negativeFeedbackAt } from './ranking-feedback.js';
 
 export const RANKING_LABEL_VERSION = 'ranking-label-v2';
 
@@ -31,7 +32,8 @@ export function evaluationLabelFor(db, decisionId, options) {
   const { windowDays, cutoffAt, cutoffMs } = validateLabelWindow(options || {});
   const rec = db.prepare(`SELECT decision_id, consultant_id, project_id, run_id
     FROM recommendations WHERE decision_id=?`).get(decisionId);
-  const base = { decision_id: decisionId, window_days: windowDays, cutoff_at: cutoffAt };
+  const base = { decision_id: decisionId, window_days: windowDays, cutoff_at: cutoffAt,
+    negative_reason_codes: [] };
   if (!rec) return result('EXCLUDED', null, 'MISSING_RECOMMENDATION', base);
 
   const impression = db.prepare(`SELECT served_at FROM recommendation_impressions
@@ -61,13 +63,17 @@ export function evaluationLabelFor(db, decisionId, options) {
       return result('EXCLUDED', null, 'MISSING_EVENT_TIME', context);
     }
   }
+  const negative = negativeFeedbackAt(db, rec, { servedMs, maturesMs, cutoffMs });
+  if (negative.invalid) return result('EXCLUDED', null, 'MISSING_EVENT_TIME', context);
+  const labeledContext = { ...context, negative_reason_codes: negative.reason_codes };
   const labels = facts.filter((fact) => {
     const occurredMs = Date.parse(fact.occurred_at);
     const receivedMs = Date.parse(fact.received_at);
     return occurredMs >= servedMs && occurredMs <= maturesMs && receivedMs <= cutoffMs;
   }).map((fact) => fact.label);
-  if (!labels.length) return result('MATURE', null, 'UNKNOWN_NO_OUTCOME', context);
-  return result('MATURE', Math.max(...labels), 'LABELED', context);
+  if (negative.label !== null) labels.push(negative.label);
+  if (!labels.length) return result('MATURE', null, 'UNKNOWN_NO_OUTCOME', labeledContext);
+  return result('MATURE', Math.max(...labels), 'LABELED', labeledContext);
 }
 
 export function labelsForRunAt(db, consultantId, runId, options) {

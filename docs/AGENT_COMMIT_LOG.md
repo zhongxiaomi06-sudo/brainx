@@ -1,5 +1,13 @@
 # Agent Commit 记录
 
+## 2026-09-22｜docs(spec): specs/019 任务拆解——30 个任务按五用户故事分阶段，测试先行
+
+- 起因：speckit-tasks 阶段，把 plan/research/contracts 落成可执行任务清单。
+- 改动：`specs/019-hub-event-backbone/tasks.md`（新，T001-T030）——Phase 1 基线确认；Phase 2 基座（tests/helpers/event-ledger.js 测试工具 + src/hub/emit.js 发射辅助）；US1 五路补事件（T005-T009 改不同文件可并行）；US2 dispatcher（consumeOnceAsync 两段式 + 注册表 + DLQ + T016 bridge 瘦身，标注为本期最高风险任务）；US3 反馈环（0052 迁移 + rollup 消费者）；US4/US5 只落地基（隔离原则测试 + 子规格占位、三方漂移门禁测试）；Phase 8 文档收口与 quickstart 全场景验收。
+- 关键约定写入清单：宪法 IV 测试先行（T004/T012/T020 先红后绿）；每个 Phase 末尾原子 commit 并同步本日志；US3 依赖 US1 事件原料，US2 未完成时 rollup 可由既有 worker 定时触发过渡。
+- 验证：纯文档改动，verify:quick 16/16 通过。下一步 speckit-implement 从 Phase 2 开工。
+- 未 push。
+
 ## 2026-09-22｜docs(spec): specs/019 实施计划——两段式异步消费者 + 五类业务事件契约 + 反馈快照表
 
 - 起因：specs/019 立项后的 speckit-plan 阶段，把架构重整落到技术方案。

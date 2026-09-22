@@ -25,6 +25,7 @@ append_kv() {
   grep -q "^${key}=" "$file" 2>/dev/null && sed -i "s|^${key}=.*|${key}=${value}|" "$file" || echo "${key}=${value}" >> "$file"
 }
 for ENV_FILE in /etc/brainx/agent.env /opt/brainx/.env; do
+  append_kv "$ENV_FILE" BRAINX_TALENT_BACKEND mysql
   append_kv "$ENV_FILE" BRAINX_MYSQL_HOST "$HOST"
   append_kv "$ENV_FILE" BRAINX_MYSQL_PORT 3306
   append_kv "$ENV_FILE" BRAINX_MYSQL_USER "$USER_NAME"

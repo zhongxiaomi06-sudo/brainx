@@ -1,6 +1,6 @@
 # 023 — 人才库持久层显式选择与失败关闭
 
-状态：Specified（2026-09-22）
+状态：Implemented，等待最新提交完整门禁（2026-09-22）
 
 上游：[仓库重构施工总手册](../../docs/2026-09-22-refactor-agentic-ranking-manual.md)阶段 02、
 [候选人事实与 shortlist 数据契约](../../docs/2026-09-03-candidate-data-contracts.md)、

@@ -226,6 +226,7 @@ cd /opt/brainx
 export BRAINX_MYSQL_HOST=<RDS_HOST>
 export BRAINX_MYSQL_PORT=3306
 export BRAINX_MYSQL_DATABASE=brainx_talent
+export BRAINX_TALENT_BACKEND=mysql
 export BRAINX_MYSQL_USER=<TEMP_MIGRATION_USER>
 read -rsp "Migration password: " BRAINX_MYSQL_PASSWORD
 export BRAINX_MYSQL_PASSWORD
@@ -235,7 +236,7 @@ npm run talent:health
 exit
 ```
 
-迁移必须 additive；禁止删除表、清库或回滚数据。健康检查失败时先查 RDS 白名单、SSL、库名与账号，不要扩大到超管常驻。
+迁移必须 additive；禁止删除表、清库或回滚数据。`talent:health` 只读校验基础表与迁移历史；失败时先查 RDS 白名单、SSL、库名与账号，不要扩大到超管常驻。
 
 ## 9. 显式绑定顾问与群
 

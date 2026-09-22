@@ -138,22 +138,27 @@ test('CSV 同步骨架：从岗位盘点表 UPSERT 候选画像并打意向标�
   assert.ok(list.length > 0);
 });
 
-test('后端状态：无凭据默认内存后端', async () => {
+test('后端状态：测试显式内存后端标记为易失', async () => {
   const st = await talentBackendStatus();
   assert.equal(st.backend, 'memory');
+  assert.equal(st.ready, true);
+  assert.equal(st.degraded, 'VOLATILE_MEMORY');
 });
 
-test('健康自检：无凭据时报 memory + 未连通 + 提示填凭据', async () => {
-  const savedUser = process.env.BRAINX_MYSQL_USER, savedDb = process.env.BRAINX_MYSQL_DATABASE;
-  delete process.env.BRAINX_MYSQL_USER; delete process.env.BRAINX_MYSQL_DATABASE;
+test('健康自检：未显式配置时失败关闭且不泄露凭据字段', async () => {
+  const keys = ['BRAINX_TALENT_BACKEND', 'BRAINX_MYSQL_USER',
+    'BRAINX_MYSQL_PASSWORD', 'BRAINX_MYSQL_DATABASE'];
+  const saved = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
+  for (const key of keys) delete process.env[key];
   const h = await talentHealth();
-  assert.equal(h.backend, 'memory');
+  assert.equal(h.backend, 'unconfigured');
+  assert.equal(h.ready, false);
   assert.equal(h.connected, false);
+  assert.equal(h.error_code, 'TALENT_BACKEND_NOT_CONFIGURED');
   assert.equal(h.config.credentials_present, false);
   assert.equal(JSON.stringify(h).includes('password_hash'), false); // 结构里不含密码字段
   assert.equal('password' in h.config, false); // config 只出 host/port/db，无密码键
   assert.ok(typeof h.hint === 'string' && h.hint.length > 0);
-  if (savedUser !== undefined) process.env.BRAINX_MYSQL_USER = savedUser;
-  if (savedDb !== undefined) process.env.BRAINX_MYSQL_DATABASE = savedDb;
+  for (const key of keys) if (saved[key] !== undefined) process.env[key] = saved[key];
   resetBackend(); useMemoryBackend();
 });

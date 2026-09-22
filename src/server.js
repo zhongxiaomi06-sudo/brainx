@@ -83,7 +83,7 @@ export function createServer(db = openDb(), deps = {}) {
         .map((c) => ({ consultant_id: c.consultant_id, display_name: c.display_name })) });
     },
 
-    // —— 人才库（MySQL 异步，连不通自动内存回退；读写独立于决策库，绝不进基础评分）——
+    // —— 人才库（显式持久层，故障失败关闭；读写独立于决策库，绝不进基础评分）——
     'GET /api/v1/talent/status': async (req, res, cid) => {
       try { json(res, 200, { ...(await talentBackendStatus()), supply_enabled: talentSupplyEnabled() }); }
       catch (e) { err(res, 502, 'TALENT_BACKEND_ERROR', String(e.message).slice(0, 200)); }

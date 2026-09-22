@@ -151,6 +151,8 @@ OpenClaw 只读取 BrainX 已经处理完成并授权的数据，不直接读取
 
 人才不存在、职位不存在、无授权和没有可用 shortlist 对外统一为空或 `NOT_FOUND_OR_FORBIDDEN`，不能靠响应差异枚举对象。RDS 不可用返回 `SOURCE_UNAVAILABLE`，不退到 `src/talent.js` 的进程内内存库，也不输出 SQL、主机名或凭据提示。
 
+运行期人才后端必须显式设置为 `mysql`，只做连通性、基础表和迁移历史的只读校验；应用与 Agent 账号不得执行建表。离线内存演示需要双重显式开关，并始终标记为重启即失，不能作为持久化验收证据。
+
 ### 6.1 项目共享重点名单
 
 `brainx_candidate_shortlist` 的 Agent Gateway 响应可额外包含 `data.focused_candidates`。它不是新的匹配运行，也不改变 `candidate_match_bundle_v1` 的排序；它表示项目成员经飞书候选卡明确“保留”的共享上下文。

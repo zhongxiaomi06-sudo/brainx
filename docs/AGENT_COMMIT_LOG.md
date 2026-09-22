@@ -1,5 +1,18 @@
 # Agent Commit 记录
 
+## 2026-09-22｜docs(spec): specs/019 实施计划——两段式异步消费者 + 五类业务事件契约 + 反馈快照表
+
+- 起因：specs/019 立项后的 speckit-plan 阶段，把架构重整落到技术方案。
+- 改动（全部在 `specs/019-hub-event-backbone/`，不改代码）：
+  1. `plan.md`：技术上下文（Node 内置 + 既有 4 依赖，零新增）、宪法门禁全过、源码结构（新增 `src/hub/dispatcher.js`、`src/feedback/rollup.js`、`bin/brainx-dispatcher.mjs`、`migrations/0052_feedback_metrics.sql`；改造点列到文件级）。
+  2. `research.md` 六项决策：①dispatcher 自建拒框架（BullMQ/Temporal 论证）；②**prepare/apply 两段式**解决 consumeOnce 同步事务 vs 异步 LLM 的形状错配（presetFields hack 的正确替代）；③五类事件类型与幂等键（全部复用业务写入点既有键）；④反馈环=消费者+快照表；⑤session 隔离与接口收敛本期只落地基（原则契约 + 漂移门禁）；⑥LLM 降级可见化。
+  3. `data-model.md`：feedback_metrics 快照表（append-only、可重算、superseded_by）；五类事件载荷形状。
+  4. `contracts/event-types.md`：五类业务事件信封契约 + 消费者注册契约 + 四项指标口径——事件类型的唯一事实源。
+  5. `quickstart.md`：五个端到端验证场景（产事件幂等/派发与 DLQ/bridge 瘦身 grep 判据/指标可重算/漂移门禁）。
+- 事实核实：event_dlq 存在于 migrations/0027（dispatcher DLQ 直接复用）；下一个迁移号 0052；bridge.js:329/361 为待瘦身调用点。
+- 验证：纯文档改动，verify:quick 16/16 通过。下一步 speckit-tasks 拆任务。
+- 未 push。
+
 ## 2026-09-22｜test(judgment-extract): 跟进修正工具数与迁移记账断言（gateway 28→30、0051 入账）
 
 - 起因：9482b2a 提交后首次跑完整门禁 `npm run verify`，后端 4 个既有断言因新增 2 个 gateway 工具与 1 个迁移文件而失败（verify:quick 不覆盖这几项）。

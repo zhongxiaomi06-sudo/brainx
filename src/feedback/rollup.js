@@ -140,18 +140,20 @@ export function runRollup(db, { windowStart, windowEnd }) {
   return { inserted, computed_at: computedAt };
 }
 
-/** 每 metric_key+dimension 取 computed_at 最新的一行（可带窗口过滤）。 */
+/** 每 metric_key+dimension 取最新一行（computed_at 相同毫秒时按 snapshot_id 决胜，消除并列抖动）。 */
 export function latestMetrics(db, { metricKey = null, dimension = null } = {}) {
   const where = ['1=1'];
   const params = [];
-  if (metricKey) { where.push('f.metric_key=?'); params.push(metricKey); }
-  if (dimension !== null) { where.push('f.dimension=?'); params.push(dimension); }
+  if (metricKey) { where.push('metric_key=?'); params.push(metricKey); }
+  if (dimension !== null) { where.push('dimension=?'); params.push(dimension); }
   return db.prepare(`
-    SELECT f.* FROM feedback_metrics f
-    JOIN (SELECT metric_key, dimension, MAX(computed_at) latest FROM feedback_metrics
-          GROUP BY metric_key, dimension) x
-      ON x.metric_key=f.metric_key AND x.dimension=f.dimension AND x.latest=f.computed_at
-    WHERE ${where.join(' AND ')}
-    ORDER BY f.metric_key, f.dimension`).all(...params)
+    SELECT * FROM (
+      SELECT *, ROW_NUMBER() OVER (
+        PARTITION BY metric_key, dimension
+        ORDER BY computed_at DESC, snapshot_id DESC
+      ) rn
+      FROM feedback_metrics
+    ) WHERE rn = 1 AND ${where.join(' AND ')}
+    ORDER BY metric_key, dimension`).all(...params)
     .map((row) => ({ ...row, inputs: JSON.parse(row.inputs_json) }));
 }

@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-23｜fix(feedback): latestMetrics 同毫秒并列抖动根治——ROW_NUMBER 决胜取唯一
+
+- 起因：收口完整门禁抓到 `feedback-rollup` append-only 用例偶发失败——两次 runRollup 的 computed_at 落在同一毫秒时，旧实现（MAX(computed_at) JOIN）在该 key+dimension 上返回 2 行，`latestMetrics` 唯一性断言抖动。单测两次通过、全量套件高负载下复现。
+- 改动：`src/feedback/rollup.js` latestMetrics 改用 `ROW_NUMBER() OVER (PARTITION BY metric_key, dimension ORDER BY computed_at DESC, snapshot_id DESC)`——同毫秒按 snapshot_id 决胜，任何时序下严格唯一。
+- 验证：强制同毫秒（UPDATE 刷平 computed_at）下 latest 仍唯一；全量 `npm test` 841/841；verify:quick 16/16。
+
 ## 2026-09-23｜test(hub): specs/019 US4/US5 地基——多租户边界用例 + 接口漂移门禁 + 发布后验收
 
 - 起因：specs/019 tasks.md T024-T027（US4/US5 只落地基，完整形态立子规格）。

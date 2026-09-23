@@ -163,7 +163,11 @@ async function phaseClassify(kind) {
     const resultPath = join(dir, kind === 'a' ? A_RESULT : B_RESULT);
     const items = await readJsonl(listPath);
     const done = readJsonlIds(resultPath);
-    const todo = items.filter((it) => !done.has(it.draft_id));
+    let todo = items.filter((it) => !done.has(it.draft_id));
+    const limitIx = process.argv.indexOf('--limit');
+    if (limitIx !== -1 && Number(process.argv[limitIx + 1]) > 0) {
+      todo = todo.slice(0, Number(process.argv[limitIx + 1])); // 冒烟用：只跑前 N 条
+    }
     const conc = Math.max(1, Math.min(16, Number(process.env.GLM_CONCURRENCY) || 4));
     let ok = 0, failed = 0, idx = 0;
     const worker = async () => {
@@ -308,11 +312,13 @@ try {
     console.error('用法：brainx-draft-cleanup.mjs <extract|classify [--b]|apply [--apply]|report>');
     process.exit(1);
   }
-} catch (e) {
-  if (e instanceof LockHeld) {
-    console.error(`[cleanup] ${e.message}（退出码 ${LOCK_EXIT_CODE}）`);
-    process.exit(LOCK_EXIT_CODE);
+  } catch (e) {
+    if (e instanceof LockHeld) {
+      console.error(`[cleanup] ${e.message}（退出码 ${LOCK_EXIT_CODE}）`);
+      process.exit(LOCK_EXIT_CODE);
+    }
+    console.error(`[cleanup] 失败：${e?.message || e}`);
+    process.exit(1);
+  } finally {
+    release?.(); // extract 等同步阶段也要释放锁（2026-09-23 实测：漏调导致残留锁阻塞后续阶段）
   }
-  console.error(`[cleanup] 失败：${e?.message || e}`);
-  process.exit(1);
-}

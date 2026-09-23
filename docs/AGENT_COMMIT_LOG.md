@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-23｜fix(specs/003 延伸): 清洗管线冒烟修复——classify --limit 开关 + extract 锁残留
+
+- 起因：咪指示直接开跑第一批清洗。无 GLM key，借财办项目 DeepSeek key 冒烟（stdin 临时传服务器、不落盘）。
+- 修复：① classify 加 `--limit N` 冒烟开关；② 入口 finally 释放锁（extract 同步阶段漏调 release()，实测残留锁阻塞后续阶段，退出码 75）。
+- 冒烟结果：DeepSeek key 本地直连 + 服务器调用均 401（尾号 b63b 已被服务端作废）——**无有效 LLM 凭据，classify 阻塞待咪提供 key**（GLM/DeepSeek 均可，管线 OpenAI 兼容，env 换 GLM_BASE_URL/GLM_MODEL 即切）。临时 key 文件已从服务器删除。
+- 验证：node --check 过；冒烟确认 401 为凭据问题非管线问题（请求已正确到达 API 并返回认证错误）。
+
 ## 2026-09-23｜docs(data): 数据结构与磁盘用途规范——数据域总表 + 磁盘铁律 + 历史遗留归置
 
 - 起因（用户指令）：「先规范当前的数据的结构，正确的规范，不要磁盘误用」。

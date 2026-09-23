@@ -156,3 +156,45 @@ test('损坏的群 scope JSON 和缺失 App 配置不能降级放行', () => {
   }), /NOT_FOUND_OR_FORBIDDEN/);
   assert.throws(() => authorizePrincipal(db, payload(), {}), /UNBOUND_IDENTITY/);
 });
+
+test('specs/019 US4：多租户并发会话——各自解析到本人，跨租户绑定与群 scope 隔离 fail-closed', () => {
+  const db = openDb(':memory:');
+  // 租户 A：mia；租户 B：wendy（同一 App 不同 channel_account / tenant）
+  seedBinding(db);
+  seedBinding(db, {
+    binding_id: 'binding-wendy', tenant_id: 'tenant-b', channel_account_id: 'brainx-prod-b',
+    open_id: 'ou_wendy', consultant_id: 'wendy',
+  });
+  seedGroup(db); // 租户 A 的群 oc_project_a（allowed_senders 仅 ou_mia）
+  seedGroup(db, {
+    group_scope_id: 'scope-b', tenant_id: 'tenant-b', channel_account_id: 'brainx-prod-b',
+    chat_id: 'oc_project_b', allowed_senders_json: JSON.stringify(['ou_wendy']),
+  });
+  const groupPayload = (sender, account, chat) => payload({
+    account_id: account, requester_sender_id: sender, chat_type: 'group', chat_id: chat,
+    purpose: 'candidate_review', tool_name: 'brainx_candidate_shortlist',
+  });
+
+  // 并发语义：同一库上两人同时会话，各自解析到本人身份
+  const asMia = authorizePrincipal(db, groupPayload('ou_mia', 'brainx-prod', 'oc_project_a'),
+    { feishuAppKeyHash: APP_HASH, projectRef: 'job-a' });
+  const asWendy = authorizePrincipal(db, groupPayload('ou_wendy', 'brainx-prod-b', 'oc_project_b'),
+    { feishuAppKeyHash: APP_HASH, projectRef: 'job-a' });
+  assert.equal(asMia.consultantId, 'mia');
+  assert.equal(asMia.tenantId, 'tenant-a');
+  assert.equal(asWendy.consultantId, 'wendy');
+  assert.equal(asWendy.tenantId, 'tenant-b');
+
+  // 跨租户越权：wendy 用租户 A 的 channel_account 访问租户 A 的群 → 拒绝
+  assert.throws(() => authorizePrincipal(db, groupPayload('ou_wendy', 'brainx-prod', 'oc_project_a'), {
+    feishuAppKeyHash: APP_HASH, projectRef: 'job-a',
+  }), /NOT_FOUND_OR_FORBIDDEN|UNBOUND_IDENTITY/);
+  // 跨租户群 scope：mia 访问租户 B 的群 → 拒绝
+  assert.throws(() => authorizePrincipal(db, groupPayload('ou_mia', 'brainx-prod-b', 'oc_project_b'), {
+    feishuAppKeyHash: APP_HASH, projectRef: 'job-a',
+  }), /NOT_FOUND_OR_FORBIDDEN|UNBOUND_IDENTITY/);
+  // 身份伪造：wendy 冒用 mia 的 sender 与 channel_account → 解析不到绑定，拒绝
+  assert.throws(() => authorizePrincipal(db, groupPayload('ou_mia', 'brainx-prod-b', 'oc_project_a'), {
+    feishuAppKeyHash: APP_HASH, projectRef: 'job-a',
+  }), /NOT_FOUND_OR_FORBIDDEN|UNBOUND_IDENTITY/);
+});

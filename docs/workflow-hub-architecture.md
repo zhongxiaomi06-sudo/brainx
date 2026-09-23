@@ -316,6 +316,10 @@ knowledge_bundle_version, prompt_template_version, model_id, built_at
 
 阈值可以后调，但事件采集、来源标签和时间质量必须从第一天存在。
 
+## 14. 落地回填（2026-09-23）
+
+本蓝图的事件骨干已由 [specs/019 Hub 事件骨干重整](../specs/019-hub-event-backbone/spec.md) 建成前三段：业务事件进账本（五类事件契约）、dispatcher 调度层（注册表派发 + 重试/死信/重放）、反馈环指标快照（`feedback_metrics` 每日汇总）。Step 0 骨架（账本/幂等消费/Case 状态机/entity_links）保持不动；session 隔离下沉见 [specs/020](../specs/020-session-isolation-principal/spec.md)（占位）。首日指标中 DLQ depth 已由 `consumer_failures` 表直接可读，lag 分布与 case SLA 待 specs/019 后续专项。
+
 ## 相关文档
 
 - [BrainX 最终交付蓝图与施工总清单](brainx-final-delivery-blueprint.md)

@@ -109,8 +109,8 @@
 
 **Independent Test**: 多租户并发用例全绿；风险与路径写入文档
 
-- [ ] T024 [US4] `tests/agent-authorization.test.mjs` 补多租户边界用例：不同 consultant 并发会话互不可见、越权访问 fail-closed（基于现有 authorization.js decide() 五态）
-- [ ] T025 [US4] 新建子规格目录 `specs/020-session-isolation-principal/spec.md` 占位：session 隔离从 OpenClaw Agent（maxAgents=20）下沉 gateway principal 的完整形态，引用本规格 US4 验收标准
+- [x] T024 [US4] `tests/agent-authorization.test.mjs` 补多租户边界用例：不同 consultant 并发会话互不可见、越权访问 fail-closed（基于现有 authorization.js decide() 五态）
+- [x] T025 [US4] 新建子规格目录 `specs/020-session-isolation-principal/spec.md` 占位：session 隔离从 OpenClaw Agent（maxAgents=20）下沉 gateway principal 的完整形态，引用本规格 US4 验收标准
 
 **Checkpoint**: 隔离原则有测试守护，完整形态有立项入口
 
@@ -122,8 +122,8 @@
 
 **Independent Test**: 人为制造漂移（registry 加工具不同步），verify:quick 失败并指名漂移工具
 
-- [ ] T026 [US5] 新建 `tests/tool-contract-drift.test.mjs`：`src/agent-gateway/tool-registry.js` ↔ `plugins/brainx-openclaw/openclaw.plugin.json` ↔ `tests/fixtures/openclaw-production/plugin-contract.json` 三方工具名与参数 schema 一致性断言
-- [ ] T027 [US5] `deploy/openclaw/install.sh` 或部署文档补「发布后验收」步骤：插件文件清单核对 + 工具数核对，缺失即失败（对接 docs/standards/PRE_PUSH_VERIFICATION.md）
+- [x] T026 [US5] 新建 `tests/tool-contract-drift.test.mjs`：`src/agent-gateway/tool-registry.js` ↔ `plugins/brainx-openclaw/openclaw.plugin.json` ↔ `tests/fixtures/openclaw-production/plugin-contract.json` 三方工具名与参数 schema 一致性断言
+- [x] T027 [US5] `deploy/openclaw/install.sh` 或部署文档补「发布后验收」步骤：插件文件清单核对 + 工具数核对，缺失即失败（对接 docs/standards/PRE_PUSH_VERIFICATION.md）
 
 **Checkpoint**: SC-007 成立——接口漂移 100% 被门禁拦截
 
@@ -131,9 +131,9 @@
 
 ## Phase 8: Polish & Cross-Cutting
 
-- [ ] T028 文档收口：`docs/README.md` 任务路由更新（dispatcher/反馈环/事件目录条目）；`docs/workflow-hub-architecture.md` 加一行指向本规格的回填说明
-- [ ] T029 按 `specs/019-hub-event-backbone/quickstart.md` 场景 1-5 全部跑通并记录证据；`npm test` 全量 + `npm run verify` 完整门禁通过
-- [ ] T030 每个原子任务 commit 均已同步 docs/AGENT_COMMIT_LOG.md（逐条核对）
+- [x] T028 文档收口：`docs/README.md` 任务路由更新（dispatcher/反馈环/事件目录条目）；`docs/workflow-hub-architecture.md` 加一行指向本规格的回填说明
+- [x] T029 按 `specs/019-hub-event-backbone/quickstart.md` 场景 1-5 全部跑通并记录证据；`npm test` 全量 + `npm run verify` 完整门禁通过
+- [x] T030 每个原子任务 commit 均已同步 docs/AGENT_COMMIT_LOG.md（逐条核对）
 
 ---
 

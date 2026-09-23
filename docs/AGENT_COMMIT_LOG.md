@@ -1,5 +1,21 @@
 # Agent Commit 记录
 
+## 2026-09-23｜test(hub): specs/019 US4/US5 地基——多租户边界用例 + 接口漂移门禁 + 发布后验收
+
+- 起因：specs/019 tasks.md T024-T027（US4/US5 只落地基，完整形态立子规格）。
+- 改动：
+  1. `tests/agent-authorization.test.mjs`：补 US4 多租户并发用例——租户 A/B 各自解析到本人、跨租户 channel_account/群 scope/身份伪造全部 fail-closed（8/8 通过）。
+  2. `specs/020-session-isolation-principal/spec.md`（新，占位）：session 隔离从 OpenClaw Agent（maxAgents=20）下沉 gateway principal 的完整形态立项入口。
+  3. `tests/tool-contract-drift.test.mjs`（新，2 例）：五个接口面一致性门禁——对外四面（插件 runtime/manifest/生产配置/契约 fixture）精确相等 + 外露集是 registry 权威集子集 + 逐工具参数 schema 比对。首跑即抓到设计内超集 `brainx_send_candidate_resume`（registry 注册但刻意不外露，openclaw-plugin 测试有对应断言）——修正门禁口径为「超集合法但外延变化必须显式可见」，并锁定当前内部工具清单。
+  4. `deploy/openclaw/install.sh`：尾部加发布后验收——插件文件清单（package.json files）与 live 配置工具数（manifest contracts）缺失即非零退出，兜底历史 npm pack 丢文件/白名单漂移事故形态。本地冒烟通过（13 文件 29 工具）。
+- 验证：相关测试 8+2 例全过；install.sh `bash -n` 语法通过。
+
+## 2026-09-23｜docs(spec): specs/019 Phase 8 收口——路由/蓝图回填/quickstart 全场景验证
+
+- 改动：`docs/README.md` 019 路由行补「US1-US3 已建成」指引（事件契约/dispatcher/反馈环落点）；`docs/workflow-hub-architecture.md` 新增 §14 落地回填（事件骨干三段建成、DLQ depth 已可读、剩余项指向 specs/020）；`specs/019-hub-event-backbone/tasks.md` T024-T030 全勾选。
+- quickstart.md 五场景验证记录：①业务事件 8 例 ✔ ②dispatcher 10 例 ✔ ③bridge 瘦身 grep 判据 ✔（无 consume 残留）④反馈环 3 例 ✔ ⑤漂移门禁首跑即触发（抓到 brainx_send_candidate_resume 超集，证明可拦截）✔；合计 23/23。
+- 至此 specs/019 全部 30 个任务完成（US1-US5 + 收口）。完整门禁见 push 前记录。
+
 ## 2026-09-23｜feat(feedback): specs/019 US3 反馈环——四项指标可测量、可重算、append-only 快照
 
 - 起因：specs/019-hub-event-backbone tasks.md T019-T023。前置 US1（业务事件）/US2（dispatcher）已让账本有原料——本故事把「推荐/判断/找人准不准」从感觉变成每周可看的数字。

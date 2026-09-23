@@ -71,6 +71,9 @@
 | `server.js` 超限、登录/OAuth 或人才库 HTTP 路由拆分 | [Server 登录与人才路由边界拆分规格](../specs/026-server-route-boundaries/spec.md)、[本轮重构施工总手册](2026-09-22-refactor-agentic-ranking-manual.md) |
 | 推荐入口分叉、API/CLI/worker/scheduler 复用或推荐 repository/use case 边界 | [推荐用例、仓储与入口边界收口规格](../specs/027-recommendation-use-case-boundary/spec.md)、[本轮重构施工总手册](2026-09-22-refactor-agentic-ranking-manual.md) |
 | TTC/CSV 来源解耦、职位事实版本、字段证据、提炼缓存或投影对账 | [来源适配与版本化职位事实规格](../specs/028-versioned-job-facts/spec.md)、[推荐重构数据契约](2026-09-22-ranking-data-migration.md) |
+| 顾问主动画像、短期信号、真实曝光、Case 结果或归因 | [画像、曝光与结果账本规格](../specs/029-profile-exposure-outcomes/spec.md)、[推荐重构数据契约](2026-09-22-ranking-data-migration.md) |
+| Agent 多轮用量、预算、Context Registry 或排名窄工具 | [Agent 上下文与完整用量规格](../specs/030-agent-context-usage/spec.md)、[Algorithm A 契约](2026-09-22-algorithm-a-contract.md) |
+| Algorithm A、Agent 最终排序、严格校验、弃权或 generation/CAS 发布 | [Algorithm A 最小端到端规格](../specs/031-agentic-ranking-v1/spec.md)、[Algorithm A 决策契约](2026-09-22-algorithm-a-contract.md) |
 | 前端重构排期、施工范围或阶段验收 | [前端真实数据重构施工清单](frontend-refactor-construction-checklist.md)、[前端交互架构](frontend-interaction-architecture.md) |
 | TTC 职位字段、筛选能力或字段变化 | [TTC 职位字段库](ttc-field-catalog.md)、[BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md) |
 | Commit、协作记录 | [Agent Commit 记录](AGENT_COMMIT_LOG.md) |
@@ -130,6 +133,9 @@
 - [Server 登录与人才路由边界拆分规格](../specs/026-server-route-boundaries/spec.md)：把 OAuth/session 与人才库 HTTP 路由移出超限入口，保持鉴权及响应契约不变并撤销行数例外。
 - [推荐用例、仓储与入口边界收口规格](../specs/027-recommendation-use-case-boundary/spec.md)：以唯一 use case 和 SQLite repository 统一 API、CLI、scheduler、worker，集中校验既有推荐配置并保留兼容 facade。
 - [来源适配与版本化职位事实规格](../specs/028-versioned-job-facts/spec.md)：统一 TTC 与本地 CSV/fixture 来源信封，追加事实版本和字段证据，复用草稿确认链并建立提炼缓存、冲突留痕及投影对账/补偿。
+- [画像、曝光与结果账本规格](../specs/029-profile-exposure-outcomes/spec.md)：版本化主动画像，分离短期信号与实时负载，幂等记录真实曝光和 Case 结果/更正/归因。
+- [Agent 上下文与完整用量规格](../specs/030-agent-context-usage/spec.md)：逐模型尝试记录成功、失败、重试、取消与缓存，建立授权 Context Registry 和 A 专用只读窄工具。
+- [Algorithm A 最小端到端规格](../specs/031-agentic-ranking-v1/spec.md)：默认关闭的独立 A 路径，覆盖硬过滤、多路召回、Agent 原序输出、严格校验和 generation/CAS 原子发布。
 - [BrainTex 飞书功能首页与新用户指引](2026-09-03-braintex-feishu-home.md)：定义 `/brainx` 确定性卡片、六个顾问任务入口、权限边界、首次出现时机和真实验收流程。
 - [候选人事实与 shortlist 数据契约](2026-09-03-candidate-data-contracts.md)：`candidate_fact_v1`、`candidate_match_bundle_v1`、reloop 真实数据转换、人才/职位双授权、固定飞书文案、MCP PoC 暴露条件及当前未完成项的唯一施工说明。
 - [候选人保留与项目共享上下文复核](frontend-reviews/2026-09-09-candidate-focus-context.md)：飞书候选行“保留”、项目级重点名单、后续群问答读取与安全边界。

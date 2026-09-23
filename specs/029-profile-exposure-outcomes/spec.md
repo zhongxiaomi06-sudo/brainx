@@ -1,6 +1,6 @@
 # 029 — 画像、曝光与结果账本
 
-状态：Specified（2026-09-23）
+状态：Implemented，待完整门禁（2026-09-23）
 
 上游：[仓库重构施工总手册](../../docs/2026-09-22-refactor-agentic-ranking-manual.md)阶段 05、
 [推荐重构数据契约](../../docs/2026-09-22-ranking-data-migration.md)。

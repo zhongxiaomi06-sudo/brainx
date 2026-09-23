@@ -7,6 +7,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { now } from './db.js';
 import { normalizeWeights } from './scorer.js';
+import { appendConsultantProfileVersion } from './profile-outcome-ledger.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -82,8 +83,22 @@ export function updateProfile(db, consultant_id, { profile_keywords, profile_not
   for (const k of ['profile_keywords', 'profile_note', 'weights']) delete preserved[k];
   const merged = { ...preserved, profile_keywords: kws, profile_note: note };
   if (weightsOut) merged.weights = weightsOut;
-  db.prepare('UPDATE consultants SET profile_json=? WHERE consultant_id=?')
-    .run(JSON.stringify(merged), consultant_id);
+  const ownsTransaction = !db.isTransaction;
+  if (ownsTransaction) db.exec('BEGIN');
+  try {
+    db.prepare('UPDATE consultants SET profile_json=? WHERE consultant_id=?')
+      .run(JSON.stringify(merged), consultant_id);
+    appendConsultantProfileVersion(db, {
+      consultantId: consultant_id,
+      profile: merged,
+      changedBy: consultant_id,
+      reason: 'SELF_SERVICE',
+    });
+    if (ownsTransaction) db.exec('COMMIT');
+  } catch (error) {
+    if (ownsTransaction) db.exec('ROLLBACK');
+    throw error;
+  }
   return { ok: true, consultant_id, profile_keywords: kws, profile_note: note,
            weights: weightsOut || null, weights_effective: weightsOut || 'baseline' };
 }

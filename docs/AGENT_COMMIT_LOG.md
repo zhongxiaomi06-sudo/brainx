@@ -1,5 +1,16 @@
 # Agent Commit 记录
 
+## 2026-09-23｜feat(ops): specs/021 US1——生产库每日一致性快照 brainx-backup（VACUUM INTO + 自检 + 滚动保留 + 锁互斥）
+
+- 起因：specs/021-data-governance US1（FR-001~FR-003）。生产 SQLite 决策库此前无自动备份，唯一副本动作是手动拉训练副本，单点单库是最大数据丢失风险。
+- 改动：
+  1. `bin/brainx-backup.mjs`（新，约 150 行）：`VACUUM INTO` 生成 `brainx-YYYYMMDD-HHMMSS.db` 快照（WAL 安全，源库只读打开零写入，参照 pull-cloud-data 远端快照做法）；快照后只读自检——`PRAGMA quick_check` 全 ok 且 workflow_event_log/lark_messages/job_facts 行数与源库一致，否则删半成品判失败；滚动保留删除超 `BRAINX_BACKUP_KEEP_DAYS`（默认 14）天的旧快照（按文件名日期，不动其他文件）；`.backup.lock` O_EXCL 重叠保护，占用时退出码 75；同秒撞名等下一秒重取时间戳（绝不覆盖已有快照）；成功 stdout 打 JSON 摘要，失败 stderr + 非零退出。env：BRAINX_DB_PATH / BRAINX_BACKUP_DIR / BRAINX_BACKUP_KEEP_DAYS。
+  2. `tests/data-backup.test.mjs`（新，5 例，真实 CLI 子进程黑盒）：快照可只读打开 + quick_check + 行数一致；超龄清理与窗口内保留、非本脚本文件不动；锁文件互斥退出码 75；源库不存在非零退出；模块可加载冒烟。
+  3. `deploy/systemd/brainx-backup.service` + `.timer`（新）：每日 03:17 OnCalendar、Persistent=true；User/EnvironmentFile/沙箱字段镜像 brainx-dispatcher.service，Type=oneshot，ReadWritePaths 含 /opt/brainx/data 与 /opt/brainx/backups。
+- 验证：新增 5 例全绿；全量 `npm test` 828/828 通过；`npm run verify:quick` 16/16 通过。
+- 偏差说明：源库路径 env 采用任务书指定的 `BRAINX_DB_PATH`（既有代码里 `BRAINX_DB` 是 openDb 默认库路径的 env，二者职责不同，本脚本不改动既有约定）。
+- 待部署：单元上 ECS 并 `systemctl enable --now brainx-backup.timer`；未 push。
+
 ## 2026-09-23｜feat(hub): specs/019 US2 dispatcher 调度层——消费移出 bridge 调用栈，错误可重试/死信/重放
 
 - 起因：specs/019-hub-event-backbone tasks.md T012-T018（本期最高风险段）。断点：账本只写不读、消费者靠 bridge 生产者手工同步调用、LLM 形状错配逼出 presetFields 注入 hack、错误散在 try/catch 里静默。

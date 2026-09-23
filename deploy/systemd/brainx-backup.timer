@@ -1,0 +1,9 @@
+[Unit]
+Description=BrainX daily backup timer (specs/021 US1)
+
+[Timer]
+OnCalendar=*-*-* 03:17:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

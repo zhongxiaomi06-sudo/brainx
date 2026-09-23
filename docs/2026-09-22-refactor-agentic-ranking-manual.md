@@ -126,7 +126,7 @@ flowchart TD
 ### 03｜收口边界与配置
 
 - [ ] 先拆超限的 `src/server.js`，保持 HTTP 契约；为本轮触达模块建立 use case/repository 接口和依赖检查。
-  - 进度：OAuth/session 与人才库/人才供给路由已迁入两个独立 route factory，`server.js` 从 625 行降至 483 行并移除质量门禁超限例外；其余业务路由和 use case/repository 边界仍待后续原子单元收口。
+  - 进度：OAuth/session 与人才库/人才供给路由已迁入两个独立 route factory，`server.js` 从 625 行降至 483 行并移除质量门禁超限例外；提交 `967ef84` 已通过完整门禁 25/25，Push 条件满足；其余业务路由和 use case/repository 边界仍待后续原子单元收口。
 - [ ] 让 API、CLI、scheduler、worker 复用同一推荐用例；迁移期间保留旧导出，禁止重复一套业务状态机。
 - **验收**：旧接口契约和关键回归通过；目标模块没有跨域 SQL、来源字段或循环依赖；新手写文件 ≤500 行。
 - **回滚**：恢复兼容入口路由，数据结构不变；不同时改变规则与目录。

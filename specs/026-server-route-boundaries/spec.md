@@ -1,6 +1,6 @@
 # 026 — Server 登录与人才路由边界拆分
 
-状态：Specified（2026-09-23）
+状态：Implemented，待最新提交完整门禁（2026-09-23）
 
 上游：[仓库重构施工总手册](../../docs/2026-09-22-refactor-agentic-ranking-manual.md)阶段 03、
 [阶段 00 冻结基线](../../docs/2026-09-22-refactor-phase-00-baseline.md)、

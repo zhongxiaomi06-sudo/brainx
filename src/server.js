@@ -5,7 +5,7 @@ import './env.js';
 import http from 'node:http';
 import { spawn } from 'node:child_process';
 import { existsSync, readFileSync, statSync } from 'node:fs';
-import { join, normalize, dirname, extname } from 'node:path';
+import { join, dirname, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openDb, now } from './db.js';
 import { runSync, latestSync, latestRealSync, latestBridgeError, latestCompleteSnapshot, friendlyBridgeError } from './sync.js';
@@ -15,12 +15,11 @@ import { replay, recordOutcome } from './replay.js';
 import { acceptCommitment, commitmentDetails, recordProgress, recordTerminalResult,
   releaseCommitment, suggestedAction, RELEASE_REASONS, CLOSE_REASONS } from './commitment.js';
 import { buildDailyCard, buildSyncAlertCard, pushCard, syncAlertKey } from './push.js';
-import { signSession, verifySession, cookieOf } from './session.js';
-import { signState, verifyState, buildAuthorizeUrl, exchangeCode, oauthConfigured } from './oauth.js';
-import { findByOpenId, updateProfile } from './roster.js';
+import { verifySession, cookieOf } from './session.js';
+import { updateProfile } from './roster.js';
 import { startWorkerTasks } from './worker.js';
 import { startRelayPump } from './worker-relay.js';
-import { saveUserTokens, tokenStatus } from './feishu.js';
+import { tokenStatus } from './feishu.js';
 import { jobVisibleTo } from './visibility.js';
 import { relationOf } from './relations.js';
 import { projectRoutes } from './project-routes.js';
@@ -30,8 +29,6 @@ import { openmaiRoutes } from './openmai-routes.js';
 import { radarPayload, clientRows } from './radar.js';
 import { ttcFieldReportForSync } from './ttc-field-report.js';
 import { ttcAuthStatus, ttcRoutes } from './ttc-routes.js';
-import { syncTalentsFromCsv, listTalents as listTalentsRepo, getTalent, talentBackendStatus, ingestResume, syncTalentsFromResumes, listResumes, talentHealth } from './talent.js';
-import { talentSupplyForJob, talentSupplyEnabled } from './talent-supply.js';
 import { effectiveJob, effectiveFactPayload, updateFactOverrides } from './facts.js';
 import { assistantRoutes } from './assistant-routes.js';
 import { personalModelRoutes } from './personal-model-routes.js';
@@ -41,6 +38,8 @@ import { quickActionRoute } from './quick-action-route.js';
 import { verifySnapshotKey, jobSnapshot } from './snapshot.js';
 import { createGuard } from './guard.js';
 import { makeClientErrorRoute } from './client-error.js';
+import { authRoutes } from './auth-routes.js';
+import { talentRoutes } from './talent-routes.js';
 import { body, err, isPathInside, json, normalizeWorkbenchPreferences, proxyFrontend,
   resolveRoute, safeJsonArray, STATIC_MIME } from './server-http.js';
 export { isPathInside } from './server-http.js';
@@ -51,8 +50,6 @@ const FRONTEND_PORT = Number(process.env.BRAINX_FRONTEND_PORT || 4321);
 // 本地静态资源目录：vinext 在部分环境（Windows）不提供 /assets，后端直接读 dist 产物绕过
 const STATIC_DIR = join(FRONTEND_DIR, 'dist', 'client');
 export function createServer(db = openDb(), deps = {}) {
-  const exchange = deps.exchangeCode || exchangeCode;
-  const devAuth = process.env.BRAINX_DEV_AUTH === '1';
   // 请求指标（预测告警装置数据源）：仅聚合数字，无业务数据，经 /api/v1/meta/guard 暴露
   const guard = createGuard();
   const auth = (req, res) => {
@@ -78,150 +75,11 @@ export function createServer(db = openDb(), deps = {}) {
     ...projectRoutes(db, { ...(deps.projectLaunch || {}), bus }),
     ...personalModelRoutes(db, deps),
     ...openmaiRoutes(db, bus),
+    ...authRoutes(db, { exchangeCode: deps.exchangeCode }),
+    ...talentRoutes(db, { rootDir: ROOT }),
     'GET /api/v1/consultants': (req, res) => {
       json(res, 200, { items: loadConsultants(db)
         .map((c) => ({ consultant_id: c.consultant_id, display_name: c.display_name })) });
-    },
-
-    // —— 人才库（显式持久层，故障失败关闭；读写独立于决策库，绝不进基础评分）——
-    'GET /api/v1/talent/status': async (req, res, cid) => {
-      try { json(res, 200, { ...(await talentBackendStatus()), supply_enabled: talentSupplyEnabled() }); }
-      catch (e) { err(res, 502, 'TALENT_BACKEND_ERROR', String(e.message).slice(0, 200)); }
-    },
-    // 人才库健康自检：后端类型 + RDS 连通性 + 建表状态（凭据只出 host/库名，不出密码）。
-    // 填完 .env 的 BRAINX_MYSQL_* 后请求此路由即可确认是否真的切到了阿里云 RDS。
-    'GET /api/v1/talent/health': async (req, res, cid) => {
-      try { json(res, 200, await talentHealth()); }
-      catch (e) { err(res, 502, 'TALENT_HEALTH_ERROR', String(e.message).slice(0, 200)); }
-    },
-    'GET /api/v1/talent': async (req, res, cid, q) => {
-      try {
-        const items = await listTalentsRepo({
-          limit: q.get('limit'), offset: q.get('offset'), status: q.get('status') || null });
-        json(res, 200, { items });
-      } catch (e) { err(res, 502, 'TALENT_LIST_FAILED', String(e.message).slice(0, 200)); }
-    },
-    'GET /api/v1/talent/:id': async (req, res, cid, q, id) => {
-      try {
-        const t = await getTalent(id);
-        if (!t) return err(res, 404, 'NOT_FOUND', '候选人不存在');
-        json(res, 200, t);
-      } catch (e) { err(res, 502, 'TALENT_GET_FAILED', String(e.message).slice(0, 200)); }
-    },
-    'POST /api/v1/talent/sync': async (req, res, cid) => {
-      const b = await body(req);
-      const csvPath = b?.csv_path
-        ? join(ROOT, b.csv_path)
-        : join(ROOT, '公司岗位情况-Shanon - Sheet1.csv');
-      if (!isPathInside(ROOT, normalize(csvPath)) || !existsSync(csvPath))
-        return err(res, 422, 'BAD_CSV', 'CSV 路径不合法或不存在');
-      try {
-        const out = await syncTalentsFromCsv(csvPath, { createdBy: null });
-        json(res, 200, out);
-      } catch (e) { err(res, 502, 'TALENT_SYNC_FAILED', String(e.message).slice(0, 300)); }
-    },
-    // 简历解析 → 真实候选人入库（单份纯文本；PDF/docx 先由前端转文本再传）
-    'POST /api/v1/talent/resume': async (req, res, cid) => {
-      const b = await body(req);
-      const text = b?.text;
-      if (!text || !String(text).trim()) return err(res, 422, 'EMPTY_RESUME', '简历内容为空');
-      try {
-        const out = await ingestResume(String(text), { fileName: b?.file_name || '', createdBy: null });
-        json(res, 200, out);
-      } catch (e) { err(res, 502, 'RESUME_INGEST_FAILED', String(e.message).slice(0, 300)); }
-    },
-    // 批量简历同步：resumes = [{ text, file_name }]
-    'POST /api/v1/talent/resumes': async (req, res, cid) => {
-      const b = await body(req);
-      const resumes = Array.isArray(b?.resumes) ? b.resumes.map((r) => ({ text: r.text, fileName: r.file_name })) : [];
-      if (!resumes.length) return err(res, 422, 'NO_RESUMES', '未提供简历');
-      try {
-        const out = await syncTalentsFromResumes(resumes, { createdBy: null });
-        json(res, 200, out);
-      } catch (e) { err(res, 502, 'RESUMES_SYNC_FAILED', String(e.message).slice(0, 300)); }
-    },
-    'GET /api/v1/talent/:id/resumes': async (req, res, cid, q, id) => {
-      try { json(res, 200, { items: await listResumes(id) }); }
-      catch (e) { err(res, 502, 'RESUME_LIST_FAILED', String(e.message).slice(0, 200)); }
-    },
-    // 职位供给参考（旁路适配层；BRAINX_TALENT_SUPPLY=1 才启用）
-    'GET /api/v1/opportunities/:id/talent-supply': async (req, res, cid, q, id) => {
-      const job = db.prepare('SELECT * FROM job_facts WHERE project_id=?').get(id);
-      if (!job || !jobVisibleTo(db, cid, id)) return err(res, 404, 'NOT_FOUND', '职位不存在');
-      try {
-        const snap = await talentSupplyForJob({ project_id: job.project_id, company: job.company, role: job.role, notes: job.notes });
-        json(res, 200, snap);
-      } catch (e) { err(res, 502, 'TALENT_SUPPLY_FAILED', String(e.message).slice(0, 200)); }
-    },
-    // —— /login：OAuth 回调失败回跳页（后端直出静态页，不依赖前端路由——前端 SPA fallback 会白屏）——
-    'GET /login': (req, res, cid, q) => {
-      const msgs = {
-        bad_state: '登录状态校验失败（页面打开太久或重复回调），请重新扫码。',
-        no_code: '飞书没有返回授权码，请重新扫码。',
-        exchange_failed: '授权码换令牌失败（App Secret 配置或网络问题），请稍后重试。',
-        not_in_roster: '你的飞书账号不在顾问花名册内——请联系管理员加入 roster。',
-      };
-      const code = q.get('error') || '';
-      const msg = code ? (msgs[code] || '登录过程出现未知错误，请重试。') : '';
-      const html = `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/><title>Brain X · 顾问登录</title></head>
-<body style="margin:0;min-height:100vh;display:grid;place-items:center;background:#f5f7fb;font-family:Inter,'PingFang SC',system-ui,sans-serif">
-<div style="width:min(420px,calc(100% - 32px));padding:36px 32px;border-radius:22px;background:#fff;border:1px solid rgba(31,49,83,.12);box-shadow:0 18px 60px rgba(28,42,73,.08)">
-<p style="margin:0 0 8px;color:#176B58;font-size:12px;font-weight:700;letter-spacing:.14em">BRAIN X · 顾问登录</p>
-<h1 style="margin:0 0 12px;font-size:26px;letter-spacing:-.03em;color:#172034">飞书扫码登录工作台</h1>
-<p style="margin:0 0 22px;color:#6c768c;font-size:13px;line-height:1.7">使用你的飞书账号扫码授权。登录后可查看你有权限的职位推荐、承接状态与 OpenMai 自动找人结果。</p>
-${msg ? `<div style="margin:0 0 18px;padding:12px 14px;border-radius:12px;border:1px solid rgba(198,75,89,.18);background:rgba(198,75,89,.07);color:#c64b59;font-size:13px;line-height:1.6"><b>登录未成功：</b>${msg}</div>` : ''}
-<a href="/api/v1/oauth/authorize" style="display:block;text-decoration:none;text-align:center;border:0;border-radius:12px;padding:13px 16px;background:#176B58;color:#fff;font-size:14px;font-weight:700">飞书扫码 / 授权登录</a>
-<p style="margin:16px 0 0;text-align:center"><a href="/" style="color:#6c768c;font-size:13px;text-decoration:none">先看看演示模式 →</a></p>
-</div></body></html>`;
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
-      res.end(html);
-    },
-
-    // —— 飞书 OAuth 网页授权（多顾问登录的唯一正式入口）——
-    'GET /api/v1/oauth/status': (req, res) => {
-      json(res, 200, { configured: oauthConfigured(), dev_auth: devAuth });
-    },
-    'GET /api/v1/oauth/authorize': (req, res) => {
-      if (!oauthConfigured()) {
-        return err(res, 503, 'OAUTH_NOT_CONFIGURED',
-          '缺 BRAINX_FEISHU_APP_SECRET（从 1Password 导出后 export 再启动服务）');
-      }
-      res.writeHead(302, { Location: buildAuthorizeUrl(signState()) });
-      res.end();
-    },
-    'GET /api/v1/oauth/callback': async (req, res, cid, q) => {
-      const fail = (code) => { res.writeHead(302, { Location: `/login?error=${code}` }); res.end(); };
-      if (!verifyState(q.get('state'))) return fail('bad_state');
-      const code = q.get('code');
-      if (!code) return fail('no_code');
-      let identity;
-      try { identity = await exchange(code); }
-      catch (e) { return fail('exchange_failed'); }
-      const consultant = findByOpenId(db, identity.open_id);
-      if (!consultant) return fail('not_in_roster'); // fail-closed：不在花名册 = 不是顾问
-      // 按人桥接的凭据：把这次授权拿到的用户令牌对加密入库（失败不阻断登录，
-      // 只是该顾问暂不能按人拉消息，下轮 sync_error 提醒重登）
-      try { saveUserTokens(db, consultant.consultant_id, identity.open_id, identity.tokens); }
-      catch (e) { console.error(`[oauth] 令牌入库失败 cid=${consultant.consultant_id}：${String(e.message).slice(0, 80)}`); }
-      res.writeHead(302, {
-        Location: '/',
-        'Set-Cookie': `brainx_session=${encodeURIComponent(signSession(consultant.consultant_id, identity.open_id))}; HttpOnly; SameSite=Strict; Path=/; Max-Age=604800`,
-      });
-      res.end();
-    },
-    // 开发者后门：仅 BRAINX_DEV_AUTH=1 时可用（离线演示），默认关闭
-    'POST /api/v1/session': async (req, res) => {
-      if (!devAuth) return err(res, 403, 'DEV_AUTH_OFF', '请使用飞书账号登录');
-      const b = await body(req);
-      const ok = loadConsultants(db).some((c) => c.consultant_id === b?.consultant_id);
-      if (!ok) return err(res, 422, 'UNKNOWN_CONSULTANT', '未知顾问身份');
-      res.writeHead(204, { 'Set-Cookie': `brainx_session=${encodeURIComponent(signSession(b.consultant_id))}; HttpOnly; SameSite=Strict; Path=/; Max-Age=604800` });
-      res.end();
-    },
-    'DELETE /api/v1/session': (req, res) => {
-      res.writeHead(204, { 'Set-Cookie': 'brainx_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0' });
-      res.end();
     },
 
     'GET /api/v1/workbench': (req, res, cid) => {

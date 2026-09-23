@@ -104,6 +104,7 @@
 - [带宽告警说明](guard-bandwidth-alert.md)：带宽监控与告警规则。
 - [数据治理运维手册：备份与高热表保留/归档](2026-09-23-data-governance-ops.md)：specs/021 的操作口径——每日 VACUUM INTO 快照（自检 + 滚动保留 + 锁互斥）、恢复演练确切命令、retention dry-run 审查流程、保留窗口 env 清单、journalctl 告警面与服务器规格基线采集清单。
 - [数据结构与磁盘用途规范](2026-09-23-data-structure-and-disk-layout.md)：数据域总表（载体/结构权威/生命周期）+ 磁盘用途铁律（系统盘只放代码、数据盘放全部数据、一个活库、备份必须出盘出机）+ 草稿落库纪律与历史遗留归置记录。
+- [云端数据安排](2026-09-23-cloud-data-arrangement.md)：阿里云账号全量资源盘点（ECS/RDS 七库五账号/OSS/RAM/密钥面）+ 每域一属主的目标安排 + 错乱点清单（hayden 超管、单实例七库、AK 散落）+ 治理顺序与调度纪律。
 - [0.9 冲刺交付清单](2026-09-12-sprint-delivery-checklist.md)：2026-09-12 排期的可交付施工条目、阻塞决策与完成度判定口径。
 - [D5 全链路灰测结论与演示脚本](2026-09-12-d5-e2e-greytest-and-demo-script.md)：接单→建群→找人→三按钮→RDS 入库的生产灰测证据、发现的问题与评审日演示纪律。
 - [0.9 冲刺核查处置方案（修正 + Reloop 变更）](2026-09-12-sprint-0.9-remediation-plan.md)：对核查报告的逐条复核修正、R1–R9 处置清单（含文件行号与验收）、Reloop 专项边界、原子 commit 切分与三项待拍板决策。

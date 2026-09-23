@@ -1,5 +1,14 @@
 # Agent Commit 记录
 
+## 2026-09-23｜docs(data): 云端数据安排——阿里云账号全量盘点 + 错乱点清单 + 治理顺序
+
+- 起因（用户指令）：「当前的结构在云端其实很错乱，先给一个完整的数据安排，连接云端账号调度全部资源」。
+- 盘点（本机 aliyun CLI root AK，只读）：ECS 单实例（2C8G + 20G/40G 双盘 + RAM 角色已绑）；RDS rm-bp12ok9so2ma3i3j7（MySQL 8.0）**7 库 5 账号**——生产用 hayden（Super 超管）；OSS 2 bucket；RAM 1 用户 1 角色。
+- 错乱点（按严重度写入文档）：①hayden 超管连生产 RDS（违 constitution 1.0.1 三账号分离）；②单实例 7 库混居（reloop 之外 6 库归属未确权）；③AK 散落（root AK 日常调度、服务器两死 profile）；④app_bot 孤儿账号。
+- 改动：`docs/2026-09-23-cloud-data-arrangement.md`（新）——资源盘点表、每域一属主目标安排、治理顺序（RDS 三账号分离/库确权/AK 治理/app_bot 停用/命名收口，删改类全部标 ⚑ 待拍板）、AI 调度纪律（只读→方案→拍板→执行→留痕；root AK 不跨机复制）。docs/README.md 目录登记。
+- 验证：纯文档，verify:quick 16/16。
+- 待 push；治理执行待用户拍板 ⚑ 项。
+
 ## 2026-09-23｜fix(specs/003 延伸): 清洗管线冒烟修复——classify --limit 开关 + extract 锁残留
 
 - 起因：咪指示直接开跑第一批清洗。无 GLM key，借财办项目 DeepSeek key 冒烟（stdin 临时传服务器、不落盘）。

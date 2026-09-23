@@ -28,7 +28,17 @@
 ## 3. 错乱点清单（按严重度）
 
 1. **生产用 hayden（Super）连 RDS**——超管账号可读写全部 7 个库，违背 constitution 1.0.1「三账号分离」与 DEPLOYMENT 检查项「专库最小权限」。这是当前最大的权限错乱。
-2. **RDS 单实例 7 库混居**：reloop 是生产人才库；brainx / recruit_bot / ttc_talent / reloop_app / york / zxm 六个库的归属与死活未经确权——是历史试验还是仍在被写，无人说得清。
+2. **RDS 单实例 7 库混居**：reloop 是生产人才库；其余 6 库 2026-09-23 确权数据如下——
+
+   | 库 | 表数 | 行数 | 最后写入 | 初步判断 |
+   |---|---|---|---|---|
+   | brainx | 18 | 4 | 2026-09-03 | 近空，遗留试验 |
+   | recruit_bot | 6 | 78,851 | 2026-06-18 | 有真实数据但休眠 3 个月，删前必须导出 |
+   | reloop_app | 13 | 13,787 | 2026-09-16 | **近期仍被写**，归属待查（疑似 reloop 应用侧） |
+   | ttc_talent | 26 | 2,218 | 2026-08-26 | 休眠近 1 个月 |
+   | york / zxm | 0 | 0 | — | 空壳占位 |
+
+   删除任一库前必须 mysqldump 导出到 OSS 并 ⚑ 拍板。
 3. **AK 散落**：本机 root AK 全量权限（日常调度不该用 root）；服务器两个死 profile（dms 空 OAuth、recruit_admin 占位符 AK）；简历桶另有 ot-plugin-oss-writer。
 4. **app_bot 无任何库权限**——疑似孤儿账号。
 

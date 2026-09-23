@@ -1,7 +1,7 @@
 import { currentStateMap, legalActionsForState } from './engagement.js';
 import { markServed } from './tier.js';
 import { sourceModeMap } from './data-isolation.js';
-import { latestRun, recommendationRun } from './recommend.js';
+import { createRecommendationUseCase } from './recommendation-use-case.js';
 import { presentationForRecommendation } from './recommendation-presentation.js';
 import { latestRealSync } from './sync.js';
 import { ignoredProjectIds } from './opportunity-ignore.js';
@@ -110,7 +110,12 @@ function emptyPage(extra = {}) {
  * 读取同一冻结运行内的一页。游标携带 run_id、排序条件与上一条稳定排序键，
  * 避免新运行或忽略动作导致偏移量漂移、重复或遗漏。
  */
-export function recommendationPage(db, consultantId, { cursor = null, search = '', sort = 'priority' } = {}) {
+export function recommendationPage(db, consultantId, {
+  cursor = null,
+  search = '',
+  sort = 'priority',
+  recommendations = createRecommendationUseCase(db),
+} = {}) {
   const normalizedSearch = normalizeSearch(search);
   const normalizedSort = normalizeSort(sort);
   if (!normalizedSort) {
@@ -136,8 +141,8 @@ export function recommendationPage(db, consultantId, { cursor = null, search = '
   }
 
   const selected = decoded
-    ? recommendationRun(db, consultantId, decoded.run_id)
-    : latestRun(db, consultantId);
+    ? recommendations.readRun(consultantId, decoded.run_id)
+    : recommendations.latest(consultantId);
   if (!selected) {
     if (decoded) {
       return { ok: false, status: 409, code: 'RECOMMENDATION_RUN_EXPIRED', message: '原推荐队列已不可用，请刷新到最新一轮' };

@@ -2,11 +2,12 @@
 /** braintex-local-recommend --consultant felix [--top 10] [--dry-run] */
 import '../src/env.js';
 import { openDb } from '../src/db.js';
-import { recommend } from '../src/recommend.js';
+import { createRecommendationUseCase } from '../src/recommendation-use-case.js';
 
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i > -1 ? process.argv[i + 1] : d; };
 const db = openDb();
-const out = recommend(db, arg('consultant', 'felix'),
+const recommendations = createRecommendationUseCase(db);
+const out = recommendations.run(arg('consultant', 'felix'),
   { top: Number(arg('top', 10)), dry_run: process.argv.includes('--dry-run') });
 if (out.blocked) { console.error(`⛔ ${out.reason}`); process.exit(2); }
 for (const r of out.items) {

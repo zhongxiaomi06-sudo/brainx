@@ -16,7 +16,7 @@ import { openDb } from './db.js';
 import { startBridge } from './bridge.js';
 import { startScheduler } from './scheduler.js';
 import { makeAutoPush } from './autopush.js';
-import { recommend, loadConsultants } from './recommend.js';
+import { createRecommendationUseCase } from './recommendation-use-case.js';
 import { relayBus } from './worker-relay.js';
 import { intakeAllConsultants } from './resume-intake.js';
 import { startOpenmaiDeliveryWorker } from './openmai-delivery.js';
@@ -28,17 +28,18 @@ import { startGroupIntakeWorker } from './group-intake.js';
 /** 启动全部批处理任务。bus 由调用方给（嵌入=server.bus；独立=relayBus）。 */
 export function startWorkerTasks(db, bus) {
   const handles = [];
+  const recommendations = createRecommendationUseCase(db);
   // 桥接常驻：BRAINX_BRIDGE_INTERVAL_MS（默认 180s）；BRAINX_BRIDGE_OFF=1 关闭
   if (process.env.BRAINX_BRIDGE_OFF !== '1') {
     handles.push(startBridge(db, bus, {
-      recommendFn: (cid) => recommend(db, cid, { top: 20, throttle: true }), // 方案 A：快照未变<2h 跳过冻结
-      consultantIdsFn: () => loadConsultants(db).map((c) => c.consultant_id),
-      onRecommended: makeAutoPush(db), // 重大变化自动推卡；BRAINX_PUSH_AUTO=1 才真发
+      recommendFn: (cid) => recommendations.run(cid, { top: 20, throttle: true }),
+      consultantIdsFn: () => recommendations.consultants().map((c) => c.consultant_id),
+      onRecommended: makeAutoPush(db, { recommendations }),
     }));
     console.log(`[worker] 桥接器已启动（间隔 ${Number(process.env.BRAINX_BRIDGE_INTERVAL_MS || 180000) / 1000}s）`);
   }
   // 定时推送：每天 07:00 / 19:00（CST）；BRAINX_PUSH_SCHEDULE=0 关闭
-  handles.push(startScheduler(db));
+  handles.push(startScheduler(db, { recommendations }));
   console.log('[worker] 定时推送已启动（07:00 / 19:00 CST）');
 
   if (process.env.BRAINX_OPENMAI_DELIVERY_OFF !== '1') {

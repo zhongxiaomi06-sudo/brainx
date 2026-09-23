@@ -1,6 +1,6 @@
 # 027 — 推荐用例、仓储与入口边界收口
 
-状态：Specified（2026-09-23）
+状态：Implemented，待最新提交完整门禁（2026-09-23）
 
 上游：[仓库重构施工总手册](../../docs/2026-09-22-refactor-agentic-ranking-manual.md)阶段 03、
 [Algorithm A 决策契约](../../docs/2026-09-22-algorithm-a-contract.md)、

@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-23｜refactor(推荐): 统一用例与仓储入口
+
+- 新增无 SQL 的 recommendation use case、SQLite repository adapter 和集中配置解析；节流、跳过审计与冻结上限保持既有环境变量及缺省值，非法值在组装时失败关闭。
+- 将 HTTP API、MCP、推荐/推送 CLI、worker bridge、自动推送和 scheduler 统一到同一用例接口；抽取推荐 route factory，`server.js` 降至 455 行，`recommend.js` 收缩为 21 行兼容 facade。
+- 保持 `baseline-1.1` 的资格、评分、排序、理由、冻结替补、节流、分页、反馈、事实修正和推送行为；未新增依赖、表或迁移。
+- 验证：结构测试先因边界模块不存在而失败；专项回归 51/51 通过，快速门禁在提交前复跑。本轮未连接生产、迁移、发布或 push。
+
 ## 2026-09-23｜docs(架构): 规格化推荐用例与仓储边界
 
 - 复核推荐生成与读取调用链，确认 API、CLI、worker 直接调用 `recommend.js`，scheduler 单独读取轮次，推荐配置也仍是模块级环境变量。

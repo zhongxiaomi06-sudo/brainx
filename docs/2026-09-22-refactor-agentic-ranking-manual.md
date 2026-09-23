@@ -1,7 +1,7 @@
 # BrainX 仓库重构与 Algorithm A 施工总手册
 
 > 上级入口：[文档书总目录](README.md)
-> 日期：2026-09-23；版本：施工设计 v1；状态：施工中，阶段 00 部分完成，阶段 01 已通过完整门禁，阶段 02 的持久化失败关闭、容量盘点、清理路径隔离及只读 dry-run 已通过完整门禁；阶段 03 已开始拆分超限入口。
+> 日期：2026-09-23；版本：施工设计 v1；状态：施工中，阶段 00 部分完成，阶段 01 已通过完整门禁，阶段 02 的持久化失败关闭、容量盘点、清理路径隔离及只读 dry-run 已通过完整门禁；阶段 03 的入口拆分和推荐用例边界已实现，待最新提交完整门禁。
 > 配套：[Algorithm A 决策契约](2026-09-22-algorithm-a-contract.md) · [数据契约与迁移手册](2026-09-22-ranking-data-migration.md)
 
 ## 1. 目标、依据与权威范围
@@ -126,8 +126,9 @@ flowchart TD
 ### 03｜收口边界与配置
 
 - [ ] 先拆超限的 `src/server.js`，保持 HTTP 契约；为本轮触达模块建立 use case/repository 接口和依赖检查。
-  - 进度：OAuth/session 与人才库/人才供给路由已迁入两个独立 route factory，`server.js` 从 625 行降至 483 行并移除质量门禁超限例外；提交 `967ef84` 已通过完整门禁 25/25，Push 条件满足；其余业务路由和 use case/repository 边界仍待后续原子单元收口。
+  - 进度：OAuth/session、人才库/人才供给和推荐路由均已迁入独立 route factory；`server.js` 从 625 行降至 455 行并移除超限例外。推荐编排已迁入无 SQL use case，SQLite 访问收进 repository，结构回归阻止入口直连旧实现和循环依赖。
 - [ ] 让 API、CLI、scheduler、worker 复用同一推荐用例；迁移期间保留旧导出，禁止重复一套业务状态机。
+  - 进度：HTTP API、MCP、推荐/推送 CLI、worker bridge、自动推送和 scheduler 已统一组装 recommendation use case；`recommend.js` 只保留 21 行兼容 facade，既有配置集中校验并保持原变量与缺省值。
 - **验收**：旧接口契约和关键回归通过；目标模块没有跨域 SQL、来源字段或循环依赖；新手写文件 ≤500 行。
 - **回滚**：恢复兼容入口路由，数据结构不变；不同时改变规则与目录。
 

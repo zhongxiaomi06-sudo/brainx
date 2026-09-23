@@ -9,7 +9,7 @@ import { join, dirname, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openDb, now } from './db.js';
 import { runSync, latestSync, latestRealSync, latestBridgeError, latestCompleteSnapshot, friendlyBridgeError } from './sync.js';
-import { recommend, latestRun, loadConsultants } from './recommend.js';
+import { createRecommendationUseCase } from './recommendation-use-case.js';
 import { engage, commitmentSummary, currentState, legalActions } from './engagement.js';
 import { replay, recordOutcome } from './replay.js';
 import { acceptCommitment, commitmentDetails, recordProgress, recordTerminalResult,
@@ -32,9 +32,7 @@ import { ttcAuthStatus, ttcRoutes } from './ttc-routes.js';
 import { effectiveJob, effectiveFactPayload, updateFactOverrides } from './facts.js';
 import { assistantRoutes } from './assistant-routes.js';
 import { personalModelRoutes } from './personal-model-routes.js';
-import { pickTray, nextBatch, feedback as recommendationFeedback, undoFeedback as recommendationUndoFeedback } from './recommendation-batch.js';
-import { recommendationPage } from './recommendation-page.js';
-import { quickActionRoute } from './quick-action-route.js';
+import { recommendationRoutes } from './recommendation-routes.js';
 import { verifySnapshotKey, jobSnapshot } from './snapshot.js';
 import { createGuard } from './guard.js';
 import { makeClientErrorRoute } from './client-error.js';
@@ -50,6 +48,7 @@ const FRONTEND_PORT = Number(process.env.BRAINX_FRONTEND_PORT || 4321);
 // 本地静态资源目录：vinext 在部分环境（Windows）不提供 /assets，后端直接读 dist 产物绕过
 const STATIC_DIR = join(FRONTEND_DIR, 'dist', 'client');
 export function createServer(db = openDb(), deps = {}) {
+  const recommendations = deps.recommendations || createRecommendationUseCase(db);
   // 请求指标（预测告警装置数据源）：仅聚合数字，无业务数据，经 /api/v1/meta/guard 暴露
   const guard = createGuard();
   const auth = (req, res) => {
@@ -77,15 +76,16 @@ export function createServer(db = openDb(), deps = {}) {
     ...openmaiRoutes(db, bus),
     ...authRoutes(db, { exchangeCode: deps.exchangeCode }),
     ...talentRoutes(db, { rootDir: ROOT }),
+    ...recommendationRoutes(db, { recommendations, bus, projectLaunch: deps.projectLaunch }),
     'GET /api/v1/consultants': (req, res) => {
-      json(res, 200, { items: loadConsultants(db)
+      json(res, 200, { items: recommendations.consultants()
         .map((c) => ({ consultant_id: c.consultant_id, display_name: c.display_name })) });
     },
 
     'GET /api/v1/workbench': (req, res, cid) => {
       const sync = latestRealSync(db, cid);
       const bridgeErr = latestBridgeError(db, cid, sync?.completed_at || '');
-      const run = latestRun(db, cid, { hideEngaged: true });
+      const run = recommendations.latest(cid, { hideEngaged: true });
       const c = commitmentSummary(db, cid);
       json(res, 200, {
         consultant_id: cid,
@@ -129,36 +129,6 @@ export function createServer(db = openDb(), deps = {}) {
       );
       json(res, 200, { ok: true, ...prefs, updatedAt });
     },
-    'GET /api/v1/recommendations': (req, res, cid, q) => {
-      const out = recommendationPage(db, cid, { cursor: q.get('cursor'), search: q.get('q'), sort: q.get('sort') });
-      if (out.ok === false) return err(res, out.status, out.code, out.message);
-      json(res, 200, out);
-    },
-
-    'GET /api/v1/recommendations/pick-tray': (req, res, cid, q) => {
-      const out = pickTray(db, cid, { limit: q.get('limit'), cursor: q.get('cursor') });
-      json(res, 200, out);
-    },
-    'POST /api/v1/recommendations/feedback': async (req, res, cid) => {
-      const out = recommendationFeedback(db, cid, await body(req));
-      json(res, out.ok ? 200 : out.status || 422, out);
-    },
-    'POST /api/v1/recommendations/feedback/undo': async (req, res, cid) => {
-      const out = recommendationUndoFeedback(db, cid, await body(req));
-      json(res, out.ok ? 200 : out.status || 422, out);
-    },
-    // 推荐卡一键动作：HMAC 签名代替工作台 session；忽略或接单建群都复用正式写链路。
-    'GET /api/v1/feedback/quick': quickActionRoute(db, bus, deps.projectLaunch),
-    'POST /api/v1/recommendations/next-batch': async (req, res, cid) => {
-      const out = nextBatch(db, cid, await body(req));
-      json(res, out.ok ? 200 : out.status || 409, out);
-    },
-
-    'POST /api/v1/recommendations/run': (req, res, cid) => {
-      const out = recommend(db, cid, { top: 20 });
-      json(res, out.blocked ? 409 : 200, out);
-    },
-
     'POST /api/v1/sync-runs': async (req, res, cid) => {
       const b = await body(req);
       try {
@@ -222,8 +192,8 @@ export function createServer(db = openDb(), deps = {}) {
         const out = updateFactOverrides(db, cid, id, b);
         if (!out.ok) return err(res, out.status || 422, 'FACT_UPDATE_REJECTED', out.error);
         // 覆盖写入后生成新冻结推荐；旧 run / replay 行永不更新。
-        const rec = out.already ? null : recommend(db, cid, { top: 20 });
-        const latest = latestRun(db, cid);
+        const rec = out.already ? null : recommendations.run(cid, { top: 20 });
+        const latest = recommendations.latest(cid);
         const item = latest?.items.find((r) => r.job?.project_id === id) || null;
         json(res, rec?.blocked ? 409 : 200, {
           ok: true, already: !!out.already, event_id: out.event_id,
@@ -304,7 +274,7 @@ export function createServer(db = openDb(), deps = {}) {
 
     // 我的档案（方向画像）：只许读/改自己；保存后下一轮 recommend 即生效
     'GET /api/v1/profile': (req, res, cid) => {
-      const c = loadConsultants(db).find((x) => x.consultant_id === cid);
+      const c = recommendations.consultants().find((x) => x.consultant_id === cid);
       json(res, 200, { consultant_id: cid, display_name: c?.display_name || cid,
         profile_keywords: c?.profile_keywords || [], profile_note: c?.profile_note || '',
         weights: c?.weights || null,
@@ -349,9 +319,10 @@ export function createServer(db = openDb(), deps = {}) {
     'POST /api/v1/push/preview': (req, res, cid) => {
       const sync = latestRealSync(db, cid);
       const snapshot = latestCompleteSnapshot(db, cid);
-      const run = latestRun(db, cid, { hideEngaged: true });
+      const run = recommendations.latest(cid, { hideEngaged: true });
       const c = commitmentSummary(db, cid);
-      const name = loadConsultants(db).find((x) => x.consultant_id === cid)?.display_name || cid;
+      const name = recommendations.consultants()
+        .find((x) => x.consultant_id === cid)?.display_name || cid;
       const card = sync && !sync.complete
         ? buildSyncAlertCard(sync)
         : buildDailyCard({ consultant_name: name, consultant_id: cid, run: run?.run, items: run?.items || [],
@@ -363,9 +334,10 @@ export function createServer(db = openDb(), deps = {}) {
       const b = await body(req);
       const sync = latestRealSync(db, cid);
       const snapshot = latestCompleteSnapshot(db, cid);
-      const run = latestRun(db, cid, { hideEngaged: true });
+      const run = recommendations.latest(cid, { hideEngaged: true });
       const c = commitmentSummary(db, cid);
-      const name = loadConsultants(db).find((x) => x.consultant_id === cid)?.display_name || cid;
+      const name = recommendations.consultants()
+        .find((x) => x.consultant_id === cid)?.display_name || cid;
       const kind = sync && !sync.complete ? 'SYNC_ALERT' : 'DAILY_TOP3';
       const card = kind === 'SYNC_ALERT'
         ? buildSyncAlertCard(sync)

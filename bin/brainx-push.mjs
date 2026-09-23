@@ -3,7 +3,7 @@
 import '../src/env.js';
 import { openDb } from '../src/db.js';
 import { latestSync, latestCompleteSnapshot } from '../src/sync.js';
-import { latestRun, loadConsultants } from '../src/recommend.js';
+import { createRecommendationUseCase } from '../src/recommendation-use-case.js';
 import { commitmentSummary } from '../src/engagement.js';
 import { buildDailyCard, buildSyncAlertCard, pushCard } from '../src/push.js';
 import { DEFAULT_PUSH_PREFERENCES, getPushPreferences } from '../src/push-preferences.js';
@@ -11,11 +11,12 @@ import { DEFAULT_PUSH_PREFERENCES, getPushPreferences } from '../src/push-prefer
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i > -1 ? process.argv[i + 1] : d; };
 const cid = arg('consultant', 'felix');
 const db = openDb();
+const recommendations = createRecommendationUseCase(db);
 const sync = latestSync(db, cid);
 const snapshot = latestCompleteSnapshot(db, cid);
-const run = latestRun(db, cid, { hideEngaged: true });
+const run = recommendations.latest(cid, { hideEngaged: true });
 const c = commitmentSummary(db, cid);
-const consultant = loadConsultants(db).find((x) => x.consultant_id === cid);
+const consultant = recommendations.consultants().find((x) => x.consultant_id === cid);
 const name = consultant?.display_name || cid;
 const preferences = getPushPreferences(db, cid) || DEFAULT_PUSH_PREFERENCES;
 const kind = sync && !sync.complete ? 'SYNC_ALERT' : 'DAILY_TOP3';

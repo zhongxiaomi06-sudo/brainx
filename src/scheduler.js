@@ -9,7 +9,7 @@
  *   - 开关：BRAINX_PUSH_SCHEDULE=0 关闭（默认开）。
  */
 import { now } from './db.js';
-import { latestRun } from './recommend.js';
+import { createRecommendationUseCase } from './recommendation-use-case.js';
 import { latestRealSync, latestCompleteSnapshot } from './sync.js';
 import { commitmentSummary } from './engagement.js';
 import { buildDailyCard, buildSyncAlertCard, pushCard, syncAlertKey } from './push.js';
@@ -32,12 +32,15 @@ export function slotState(at = new Date(), times = DEFAULT_PUSH_PREFERENCES.time
 }
 
 /** 给一位顾问发今日卡（幂等：该时段已发则跳过）。返回 pushCard 结果或 null。 */
-export async function pushSlotFor(db, consultant_id, open_id, slotKey, { send = true } = {}) {
+export async function pushSlotFor(db, consultant_id, open_id, slotKey, {
+  send = true,
+  recommendations = createRecommendationUseCase(db),
+} = {}) {
   const preferences = getPushPreferences(db, consultant_id) || DEFAULT_PUSH_PREFERENCES;
   if (!preferences.enabled) return null;
   const sync = latestRealSync(db, consultant_id);
   const snapshot = latestCompleteSnapshot(db, consultant_id);
-  const run = latestRun(db, consultant_id, { hideEngaged: true });
+  const run = recommendations.latest(consultant_id, { hideEngaged: true });
   const c = commitmentSummary(db, consultant_id);
   const name = db.prepare('SELECT display_name FROM consultants WHERE consultant_id=?')
     .get(consultant_id)?.display_name || consultant_id;
@@ -53,7 +56,10 @@ export async function pushSlotFor(db, consultant_id, open_id, slotKey, { send = 
                         target: open_id, send }); // pushCard 为 async，返回值透传 Promise
 }
 
-export function startScheduler(db, { log = console.log } = {}) {
+export function startScheduler(db, {
+  log = console.log,
+  recommendations = createRecommendationUseCase(db),
+} = {}) {
   if (process.env.BRAINX_PUSH_SCHEDULE === '0') return { stop: () => {} };
   const tick = () => {
     void (async () => {
@@ -66,7 +72,8 @@ export function startScheduler(db, { log = console.log } = {}) {
           const { inWindow, slotKey } = slotState(new Date(), preferences.times);
           if (!inWindow) continue;
           log(`[scheduler] 进入推送窗口 ${slotKey}，对象 ${c.consultant_id}`);
-          const out = await pushSlotFor(db, c.consultant_id, c.open_id, slotKey, { send: true });
+          const out = await pushSlotFor(db, c.consultant_id, c.open_id, slotKey,
+            { send: true, recommendations });
           log(`[scheduler] ${slotKey} ${c.consultant_id}: ${out ? out.status : 'null(无推荐轮)'}`);
         }
       } catch (e) { log(`[scheduler] tick 异常: ${String(e.message || e).slice(0, 120)}`); }

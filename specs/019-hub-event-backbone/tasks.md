@@ -19,7 +19,7 @@
 
 **Purpose**: 基线确认，无新项目结构（全部落在既有分层）
 
-- [ ] T001 运行 `npm run verify:quick` 确认基线 16/16 全绿；通读 specs/019-hub-event-backbone/ 的 spec.md、plan.md、research.md、contracts/event-types.md
+- [x] T001 运行 `npm run verify:quick` 确认基线 16/16 全绿；通读 specs/019-hub-event-backbone/ 的 spec.md、plan.md、research.md、contracts/event-types.md
 
 ---
 
@@ -29,8 +29,8 @@
 
 **⚠️ CRITICAL**: 完成前不得开始任何用户故事
 
-- [ ] T002 新建 `tests/helpers/event-ledger.js`：内存库建账本金表（workflow_event_log/processed_events/event_dlq）+ 快捷 appendEvent 的测试工具函数，供 US1/US2/US3 测试复用
-- [ ] T003 新建 `src/hub/emit.js`：`emitEvent(db, {...})` 包装 appendEvent——统一 actor/occurred_at/schema_version 约定，返回 {ok, deduplicated}；业务写入点在同一事务内调用（plan.md 结构中 event-log.js 不动，发射辅助独立成文件）
+- [x] T002 新建 `tests/helpers/event-ledger.js`：内存库建账本金表（workflow_event_log/processed_events/event_dlq）+ 快捷 appendEvent 的测试工具函数，供 US1/US2/US3 测试复用
+- [x] T003 新建 `src/hub/emit.js`：`emitEvent(db, {...})` 包装 appendEvent——统一 actor/occurred_at/schema_version 约定，返回 {ok, deduplicated}；业务写入点在同一事务内调用（plan.md 结构中 event-log.js 不动，发射辅助独立成文件）
 
 **Checkpoint**: 测试基座可用，US1/US2 可以开始
 
@@ -44,17 +44,17 @@
 
 ### Tests for User Story 1（先写，必须能失败）⚠️
 
-- [ ] T004 [US1] 新建 `tests/business-events.test.mjs`：五类事件（job.accepted / sourcing.search_started / sourcing.search_finished / job_fact.reviewed / job.terminal_recorded）的产生、幂等回放、evidence_refs 引用制（payload 无正文）用例，按 contracts/event-types.md 逐字段断言
+- [x] T004 [US1] 新建 `tests/business-events.test.mjs`：五类事件（job.accepted / sourcing.search_started / sourcing.search_finished / job_fact.reviewed / job.terminal_recorded）的产生、幂等回放、evidence_refs 引用制（payload 无正文）用例，按 contracts/event-types.md 逐字段断言
 
 ### Implementation for User Story 1
 
-- [ ] T005 [P] [US1] `src/agent-gateway/tools-actions.js` acceptJob 成功路径补发 job.accepted（already 幂等命中不重发），idem_key 用 `job.accepted:{project_id}:{consultant_id}`
-- [ ] T006 [P] [US1] `src/replay.js` recordOutcome 成功路径补发 job.terminal_recorded，idem_key 复用 job_outcomes.idempotency_key
-- [ ] T007 [P] [US1] `src/job-extract/confirm.js` confirmDraft/rejectDraft 成功路径补发 job_fact.reviewed（domain='job'）
-- [ ] T008 [P] [US1] `src/judgment-extract/confirm.js` confirmJudgment/rejectJudgment 成功路径补发 job_fact.reviewed（domain='judgment'）
-- [ ] T009 [P] [US1] `src/openmai-delivery.js` 结果投递（含失败分支）补发 sourcing.search_finished，payload 只放 status+result_count
-- [ ] T010 [US1] 找人任务登记处（`src/integration-jobs/production-handlers.js`）补发 sourcing.search_started，含 channel/round
-- [ ] T011 [US1] T004 测试转绿 + 受影响既有测试回归 + `npm run verify:quick` + 原子 commit（`feat(hub): 业务动作补发标准信封事件（US1）`），同步 docs/AGENT_COMMIT_LOG.md
+- [x] T005 [P] [US1] `src/agent-gateway/tools-actions.js` acceptJob 成功路径补发 job.accepted（already 幂等命中不重发），idem_key 用 `job.accepted:{project_id}:{consultant_id}`
+- [x] T006 [P] [US1] `src/replay.js` recordOutcome 成功路径补发 job.terminal_recorded，idem_key 复用 job_outcomes.idempotency_key
+- [x] T007 [P] [US1] `src/job-extract/confirm.js` confirmDraft/rejectDraft 成功路径补发 job_fact.reviewed（domain='job'）
+- [x] T008 [P] [US1] `src/judgment-extract/confirm.js` confirmJudgment/rejectJudgment 成功路径补发 job_fact.reviewed（domain='judgment'）
+- [x] T009 [P] [US1] `src/openmai-delivery.js` 结果投递（含失败分支）补发 sourcing.search_finished，payload 只放 status+result_count
+- [x] T010 [US1] 找人任务登记处（`src/integration-jobs/production-handlers.js`）补发 sourcing.search_started，含 channel/round
+- [x] T011 [US1] T004 测试转绿 + 受影响既有测试回归 + `npm run verify:quick` + 原子 commit（`feat(hub): 业务动作补发标准信封事件（US1）`），同步 docs/AGENT_COMMIT_LOG.md
 
 **Checkpoint**: US1 独立成立——五类动作留痕可查可重放，dispatcher 未建也不影响本故事价值
 

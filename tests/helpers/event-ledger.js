@@ -35,3 +35,8 @@ export function eventsByType(db, eventType) {
     .all(eventType)
     .map((row) => ({ ...row, payload: JSON.parse(row.payload), evidence_refs: JSON.parse(row.evidence_refs) }));
 }
+
+/** 某类型事件计数。 */
+export function countEvents(db, eventType) {
+  return db.prepare('SELECT COUNT(*) n FROM workflow_event_log WHERE event_type=?').get(eventType).n;
+}

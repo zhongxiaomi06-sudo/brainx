@@ -8,6 +8,7 @@
  */
 import { uuid, now } from '../db.js';
 import { jobVisibleTo } from '../visibility.js';
+import { emitEvent } from '../hub/emit.js';
 
 const SELECT_DRAFT = 'SELECT * FROM judgment_drafts WHERE draft_id = ?';
 const SELECT_JOB = 'SELECT 1 FROM job_facts WHERE project_id = ?';
@@ -58,6 +59,14 @@ export function confirmJudgment(db, { draft_id, consultant_id, project_id = null
       project_id, draft.draft_id, syncId, consultant_id, ts, draft.raw_json,
     );
     db.prepare(UPDATE_DRAFT).run('confirmed', ts, consultant_id, project_id, draft_id);
+    // specs/019 US1：确认事件与转正同事务（契约 specs/019 contracts/event-types.md）
+    emitEvent(db, {
+      event_type: 'job_fact.reviewed',
+      idem_key: `job_fact.reviewed:judgment:${draft_id}`,
+      actor: `user:${consultant_id}`,
+      payload: { domain: 'judgment', draft_id, action: 'confirm', project_id: project_id ?? null },
+      evidence_refs: [{ table: 'judgment_drafts', id: draft_id }],
+    });
     db.exec('COMMIT');
   } catch (err) {
     try { db.exec('ROLLBACK'); } catch { /* 已回滚 */ }
@@ -72,5 +81,13 @@ export function rejectJudgment(db, { draft_id, consultant_id }) {
   if (!draft) return fail(404, 'draft_not_found');
   if (draft.status !== 'pending') return fail(409, `already_${draft.status}`);
   db.prepare(UPDATE_DRAFT).run('rejected', now(), consultant_id, draft.project_id, draft_id);
+  // specs/019 US1：拒绝也是反馈信号
+  emitEvent(db, {
+    event_type: 'job_fact.reviewed',
+    idem_key: `job_fact.reviewed:judgment:${draft_id}`,
+    actor: `user:${consultant_id}`,
+    payload: { domain: 'judgment', draft_id, action: 'reject', project_id: draft.project_id ?? null },
+    evidence_refs: [{ table: 'judgment_drafts', id: draft_id }],
+  });
   return { ok: true, draft_id };
 }

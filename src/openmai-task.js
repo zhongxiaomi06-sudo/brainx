@@ -13,6 +13,25 @@ import { now, uuid } from './db.js';
 import { getAuthorizedTtcJwt } from './ttcsdk/auth.js';
 import { assessOpenmaiCandidateBatch, looksLikeSessionPollution } from './openmai-result.js';
 import { normalizeExcludedCandidateRefs } from './search-rounds.js';
+import { emitEvent } from './hub/emit.js';
+
+/** specs/019 US1：找人结算补发 search_finished 事件（契约 specs/019 contracts/event-types.md）。
+ *  与结算 UPDATE 同调用栈；重复结算（非 running）changes=0 不发事件。 */
+function emitSearchFinished(db, { projectId, consultantId, taskId, status, channel, resultCount }) {
+  const round = db.prepare('SELECT search_round FROM openmai_results WHERE project_id=? AND consultant_id=?')
+    .get(projectId, consultantId)?.search_round ?? null;
+  emitEvent(db, {
+    event_type: 'sourcing.search_finished',
+    idem_key: `sourcing.finished:${projectId}:${taskId}`,
+    actor: 'system:worker',
+    payload: {
+      project_id: projectId, channel,
+      round, status: status === 'failed' ? 'error' : 'success',
+      result_count: resultCount ?? 0,
+    },
+    evidence_refs: [{ table: 'openmai_results', id: `${projectId}|${consultantId}` }],
+  });
+}
 
 const API_BASE = process.env.BRAINX_TTC_API_BASE || 'https://api.ttcadvisory.com';
 const OPENMAI_BASE = process.env.BRAINX_OPENMAI_API_BASE || 'https://gateway.ttcadvisory.com';
@@ -24,6 +43,7 @@ const running = new Set(); // `${project_id}|${consultant_id}`
 
 export function settleOpenmaiTask(db, {
   projectId, consultantId, taskId, status, resultText = null, error = null, finishedAt = now(),
+  channel = 'openmai', resultCount = null,
 }) {
   if (!['done', 'needs_input', 'failed'].includes(status)) throw new Error('OPENMAI_SETTLE_STATUS_INVALID');
   const output = db.prepare(`UPDATE openmai_results SET status=?, result_text=?, error=?, finished_at=?
@@ -33,6 +53,9 @@ export function settleOpenmaiTask(db, {
     status === 'failed' ? String(error || 'OpenMai 执行失败').slice(0, 500) : null,
     finishedAt, projectId, consultantId, taskId,
   );
+  if (output.changes === 1) {
+    emitSearchFinished(db, { projectId, consultantId, taskId, status, channel, resultCount });
+  }
   return output.changes === 1;
 }
 
@@ -213,6 +236,14 @@ export function startOpenmaiTask(db, bus, consultant_id, project_id, {
         excluded_candidate_refs_json=excluded.excluded_candidate_refs_json`)
       .run(project_id, consultant_id, 'failed', '没有个人或已授权的团队 TTC 寻访凭证',
         t, t, brief || null, searchRound, JSON.stringify(exclusions));
+    // specs/019 US1：凭证快速失败也留痕（错误可调度），不产 search_started（任务未启动）
+    emitEvent(db, {
+      event_type: 'sourcing.search_finished',
+      idem_key: `sourcing.finished:${project_id}:cred-r${searchRound}`,
+      actor: 'agent:brainx_openmai_search',
+      payload: { project_id, channel: 'openmai', round: searchRound, status: 'error', result_count: 0 },
+      evidence_refs: [{ table: 'openmai_results', id: `${project_id}|${consultant_id}` }],
+    });
     bus?.emit?.({ type: 'openmai_result', consultant_id, project_id, status: 'failed' });
     return { status: 'error', message: '没有个人或已授权的团队 TTC 寻访凭证' };
   }
@@ -230,6 +261,15 @@ export function startOpenmaiTask(db, bus, consultant_id, project_id, {
       excluded_candidate_refs_json=excluded.excluded_candidate_refs_json`)
     .run(project_id, consultant_id, task_id, started_at, brief || null,
       searchRound, JSON.stringify(exclusions));
+
+  // specs/019 US1：找人启动补发 search_started（契约 specs/019 contracts/event-types.md）
+  emitEvent(db, {
+    event_type: 'sourcing.search_started',
+    idem_key: `sourcing.started:${project_id}:${task_id}`,
+    actor: 'agent:brainx_openmai_search',
+    payload: { project_id, channel: 'openmai', round: searchRound },
+    evidence_refs: [{ table: 'openmai_results', id: `${project_id}|${consultant_id}` }],
+  });
 
   (async () => {
     let status = 'failed';
@@ -282,9 +322,11 @@ export function startOpenmaiTask(db, bus, consultant_id, project_id, {
           throw new Error('OpenMai 会话上下文污染：两次均返回与找人无关的元回复，请稍后重试');
         }
       }
-      const resultStatus = assessOpenmaiCandidateBatch(result).needsInput ? 'needs_input' : 'done';
+      const batchQuality = assessOpenmaiCandidateBatch(result);
+      const resultStatus = batchQuality.needsInput ? 'needs_input' : 'done';
       settled = settleOpenmaiTask(db, { projectId: project_id, consultantId: consultant_id,
-        taskId: task_id, status: resultStatus, resultText: result });
+        taskId: task_id, status: resultStatus, resultText: result,
+        channel: 'openmai', resultCount: batchQuality.count });
       status = resultStatus;
     } catch (e) {
       settled = settleOpenmaiTask(db, { projectId: project_id, consultantId: consultant_id,

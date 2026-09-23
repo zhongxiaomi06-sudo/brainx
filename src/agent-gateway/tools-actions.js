@@ -3,6 +3,7 @@ import { currentState } from '../engagement.js';
 import { confirmMembership } from '../membership.js';
 import { jobVisibleTo, jobAccessibleFromGroup } from '../visibility.js';
 import { startOpenmaiTask } from '../openmai-task.js';
+import { emitEvent } from '../hub/emit.js';
 import { getPushPreferences, updatePushPreferences } from '../push-preferences.js';
 import { buildProjectLaunchCard, launchProject, workflowDueAt } from '../project-launch.js';
 import { bindGroupToProject, listBindableJobs } from '../group-intake.js';
@@ -63,6 +64,20 @@ function acceptJob(db, args, principal, startSearch) {
     relation: 'MY_JOB',
     idempotency_key: `bot:membership:${principal.consultantId}:${args.job_id}`,
   });
+  // specs/019 US1：接单成功补发业务事件（already 幂等命中不重发；契约见 contracts/event-types.md）
+  if (!result.already) {
+    emitEvent(db, {
+      event_type: 'job.accepted',
+      idem_key: `job.accepted:${args.job_id}:${principal.consultantId}`,
+      actor: `user:${principal.consultantId}`,
+      payload: {
+        project_id: args.job_id,
+        consultant_id: principal.consultantId,
+        source: principal.chatType === 'group' ? 'group_card' : 'private_chat',
+      },
+      evidence_refs: [{ table: 'job_memberships', id: `${principal.consultantId}:${args.job_id}` }],
+    });
+  }
   let search = null;
   if (!result.already || result.state === 'ACCEPTED') {
     search = startSearch(db, principal.consultantId, args.job_id);

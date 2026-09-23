@@ -5,6 +5,7 @@ import { sendInteractiveCard } from './feishu-bot.js';
 import { buildBrainxDeepLink, productionBaseUrl } from './brainx-deep-links.js';
 import { alignSoloAction } from './card-layout.js';
 import { assessOpenmaiCandidateBatch, extractOpenmaiCandidates } from './openmai-result.js';
+import { emitEvent } from './hub/emit.js';
 
 const PHONE = /(?<!\d)(?:\+?86[-\s]?)?1[3-9]\d{9}(?!\d)/g;
 const EMAIL = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
@@ -309,8 +310,25 @@ export function failStaleOpenmaiTasks(db, at = now(), maxAgeMs = STALE_SEARCH_MS
   let recovered = 0;
   db.exec('BEGIN');
   try {
-    for (const row of rows) recovered += update.run(at, row.project_id,
-      row.consultant_id, row.task_id).changes;
+    for (const row of rows) {
+      const changed = update.run(at, row.project_id,
+        row.consultant_id, row.task_id).changes;
+      recovered += changed;
+      // specs/019 US1：中断回收也是终态失败，留痕供反馈环统计（渠道按任务号前缀识别）
+      if (changed) {
+        emitEvent(db, {
+          event_type: 'sourcing.search_finished',
+          idem_key: `sourcing.finished:${row.project_id}:${row.task_id}`,
+          actor: 'system:worker',
+          payload: {
+            project_id: row.project_id,
+            channel: String(row.task_id).startsWith('sm_') ? 'supermai' : 'openmai',
+            round: null, status: 'error', result_count: 0,
+          },
+          evidence_refs: [{ table: 'openmai_results', id: `${row.project_id}|${row.consultant_id}` }],
+        });
+      }
+    }
     db.exec('COMMIT');
   } catch (error) { db.exec('ROLLBACK'); throw error; }
   return recovered;

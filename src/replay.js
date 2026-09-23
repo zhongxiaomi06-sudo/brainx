@@ -1,5 +1,6 @@
 /** replay.js + outcomes.js — 回放只读冻结行（§13.4）；结果关联推荐（PRD Slice 5）。 */
 import { now, uuid } from './db.js';
+import { emitEvent } from './hub/emit.js';
 
 /** 决策回放：冻结的推荐行 + 当轮上下文 + 后续事件与结果。不重算。 */
 export function replay(db, decision_id) {
@@ -42,5 +43,13 @@ export function recordOutcome(db, consultant_id, { project_id, stage, value = {}
     (project_id, consultant_id, stage, value_json, decision_id, idempotency_key, observed_at)
     VALUES (?,?,?,?,?,?,?)`)
     .run(project_id, consultant_id, stage, JSON.stringify(value), decision_id, idempotency_key, now());
+  // specs/019 US1：终局记录补发业务事件（dup 路径上面已短路，不会重发）
+  emitEvent(db, {
+    event_type: 'job.terminal_recorded',
+    idem_key: idempotency_key,
+    actor: `user:${consultant_id}`,
+    payload: { project_id, stage, kind: value?.kind ?? null },
+    evidence_refs: [{ table: 'job_outcomes', id: String(info.lastInsertRowid) }],
+  });
   return { ok: true, already: false, outcome_id: info.lastInsertRowid };
 }

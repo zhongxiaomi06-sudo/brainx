@@ -1,5 +1,16 @@
 # Agent Commit 记录
 
+## 2026-09-23｜feat(hub): specs/019 US1——五类业务动作补发标准信封事件（接单/找人启动与终态/双域草稿确认/终局）
+
+- 起因：specs/019-hub-event-backbone tasks.md T004-T011（测试先行：先写 8 例全红，再实现转绿）。
+- 改动：
+  1. `tests/business-events.test.mjs`（新，8 例）：五类事件的产生 + 幂等回放 + 载荷契约（payload 只放锚点/计数，evidence_refs 引用制），逐字段按 contracts/event-types.md 断言。
+  2. 发射点（全部走 `src/hub/emit.js` emitEvent，与业务写入同事务/同调用栈）：`tools-actions.js` acceptJob 成功且非 already → `job.accepted`；`replay.js` recordOutcome → `job.terminal_recorded`（idem 复用 job_outcomes 键）；`job-extract/confirm.js` 与 `judgment-extract/confirm.js` 确认/拒绝 → `job_fact.reviewed`（domain=job/judgment，确认在事务内 COMMIT 前）；`openmai-task.js` 启动 INSERT 后 → `sourcing.search_started`、settleOpenmaiTask（changes=1）→ `sourcing.search_finished`（新增 channel/resultCount 参数，计数取自 assessOpenmaiCandidateBatch().count）、无凭证快速失败 → search_finished(error)；`supermai-sourcing.js` 同三点（channel=supermai）；`openmai-delivery.js` failStaleOpenmaiTasks 中断回收 → search_finished(error)。
+  3. `tests/helpers/event-ledger.js`：补 countEvents（增量；基座主体已在 c067cd9 入库）。
+- 偏差说明（相对 tasks.md 假设）：①T010 的「找人登记处」实际是 `openmai-task.js`/`supermai-sourcing.js` 的 start* 函数而非 integration-jobs/production-handlers.js（后者只管 TALENT_SYNC/PARSE_DOCUMENT/MATCH_EVAL），以代码事实为准；②search_finished 的发射点从 openmai-delivery 投递层移到 settle 结算层（结果就绪即留痕，投递另有重试队列）；③基线核对发现早前会话已提交 Phase 2 基座（c067cd9），本轮重写被回退，改用已入库的 emit.js/helper API。
+- 验证：新增 8 例先红后绿；全量 `npm test` 809/809 通过；`npm run verify:quick` 16/16 通过。
+- 未 push。
+
 ## 2026-09-22｜feat(hub): specs/019 Phase 2 基座——账本测试基座 + 业务事件发射辅助
 
 - 起因：specs/019-hub-event-backbone tasks.md T002/T003，US1/US2/US3 共用的 Phase 2 基座。

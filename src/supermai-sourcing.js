@@ -19,8 +19,9 @@ import { createHash } from 'node:crypto';
 import { now, uuid } from './db.js';
 import { getValidTtcJwt } from './ttcsdk/auth.js';
 import { callOpenmaiContent, settleOpenmaiTask as settleSupermaiTask } from './openmai-task.js';
-import { looksLikeSessionPollution } from './openmai-result.js';
+import { assessOpenmaiCandidateBatch, looksLikeSessionPollution } from './openmai-result.js';
 import { normalizeExcludedCandidateRefs } from './search-rounds.js';
+import { emitEvent } from './hub/emit.js';
 
 const running = new Set(); // `${key}|${consultant_id}`
 
@@ -83,6 +84,14 @@ export function startSupermaiScoutTask(db, bus, consultant_id, criteria, {
         t, t, String(criteria || '').trim().slice(0, 2000) || null,
         searchRound, JSON.stringify(exclusions));
     bus?.emit?.({ type: 'supermai_result', consultant_id, project_id, status: 'failed' });
+    // specs/019 US1：凭证快速失败也留痕（错误可调度），不产 search_started（任务未启动）
+    emitEvent(db, {
+      event_type: 'sourcing.search_finished',
+      idem_key: `sourcing.finished:${project_id}:cred-r${searchRound}`,
+      actor: 'agent:brainx_supermai_scout',
+      payload: { project_id, channel: 'supermai', round: searchRound, status: 'error', result_count: 0 },
+      evidence_refs: [{ table: 'openmai_results', id: `${project_id}|${consultant_id}` }],
+    });
     return { status: 'error', message: '没有有效 TTC 凭证——请用浏览器扩展扫码同步' };
   }
 
@@ -101,6 +110,15 @@ export function startSupermaiScoutTask(db, bus, consultant_id, criteria, {
       String(criteria || '').trim().slice(0, 2000) || null,
       searchRound, JSON.stringify(exclusions));
 
+  // specs/019 US1：找人启动补发 search_started（契约 specs/019 contracts/event-types.md）
+  emitEvent(db, {
+    event_type: 'sourcing.search_started',
+    idem_key: `sourcing.started:${project_id}:${task_id}`,
+    actor: 'agent:brainx_supermai_scout',
+    payload: { project_id, channel: 'supermai', round: searchRound },
+    evidence_refs: [{ table: 'openmai_results', id: `${project_id}|${consultant_id}` }],
+  });
+
   (async () => {
     let status = 'failed';
     let settled = false;
@@ -115,11 +133,12 @@ export function startSupermaiScoutTask(db, bus, consultant_id, criteria, {
         }
       }
       settled = settleSupermaiTask(db, { projectId: project_id, consultantId: consultant_id,
-        taskId: task_id, status: 'done', resultText: result });
+        taskId: task_id, status: 'done', resultText: result,
+        channel: 'supermai', resultCount: assessOpenmaiCandidateBatch(result).count });
       status = 'done';
     } catch (e) {
       settled = settleSupermaiTask(db, { projectId: project_id, consultantId: consultant_id,
-        taskId: task_id, status: 'failed', error: e.message });
+        taskId: task_id, status: 'failed', error: e.message, channel: 'supermai' });
     } finally {
       running.delete(key);
       if (settled) bus?.emit?.({ type: 'supermai_result', consultant_id, project_id, status });

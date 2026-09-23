@@ -1,5 +1,18 @@
 # Agent Commit 记录
 
+## 2026-09-23｜feat(ops): OSS 出机同步接通上线——RAM 角色/console 三步 CLI 完成 + 脚本三处实测修复
+
+- 起因（用户指令）：授权用本机有效 AK 自主完成 OSS 出机同步全部剩余安排。
+- 控制台三步（本机 aliyun CLI，root 账号 1615281587880079 执行，全部 API 留痕）：
+  1. `ram CreateRole BrainXEcsOssBackup`（可信实体 ECS）；
+  2. bucket `brainx-backups-yorkteam-93f137`（cn-hangzhou，私有）创建；`ram CreatePolicy BrainXOssBackupRW`（最小权限：仅该 bucket 的 Put/Get/List/GetObjectMeta/HeadObject）+ AttachPolicyToRole；
+  3. `ecs AttachInstanceRamRole` 绑定 i-bp1dgg3rzmehc33fwpsn（200/success）。
+- 服务器接线：brainx 用户专属 `/var/lib/brainx/.aliyun/config.json`（EcsRamRole，0700/0600，**无密钥落盘**）——消除 systemd 沙箱下 CLI mkdir 崩溃；`BRAINX_OSS_BUCKET` 写入 /etc/brainx/worker.env；brainx-oss-sync.{service,timer} 安装并 enable（每日 03:47）。
+- 脚本三处实测修复（`bin/brainx-oss-sync.mjs`）：①`--profile` 为 aliyun CLI 全局 flag 必须置于 oss 子命令之前（后置报 Bad flag，云端实测）；②远端大小复核从 `oss stat` 改 `oss ls` 列举口径（最小策略下 stat 被 bucket ACL 拒，ls 在 ListObjects 授权下稳定）；③`--checkpoint-dir` 显式指到可写备份目录（ossutil 断点目录默认 CWD，ProtectSystem=strict 下只读）。另把 oss:GetObjectAcl 加入策略（CreatePolicyVersion v2）。
+- 验收证据（生产）：首跑 uploaded=[brainx-20260923-150346.db, brainx-20260923-152435.db] failed=[]；二跑幂等 skipped=2 uploaded=[]；bucket 远端两件 384MB/386MB 与本地一致；`oss:ListBuckets` 被拒（403）= 最小权限按设计生效；测试 `.write-test` 已清理。
+- 验证：oss-sync 测试 7/7；全量与门禁见 push 前记录。
+- 待 push。
+
 ## 2026-09-23｜fix(feedback): latestMetrics 同毫秒并列抖动根治——ROW_NUMBER 决胜取唯一
 
 - 起因：收口完整门禁抓到 `feedback-rollup` append-only 用例偶发失败——两次 runRollup 的 computed_at 落在同一毫秒时，旧实现（MAX(computed_at) JOIN）在该 key+dimension 上返回 2 行，`latestMetrics` 唯一性断言抖动。单测两次通过、全量套件高负载下复现。

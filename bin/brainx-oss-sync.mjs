@@ -113,13 +113,19 @@ function runCli(cli, args, { timeout = 300000 } = {}) {
   return { status: r.status, stdout: r.stdout || '', stderr: r.stderr || String(r.error || '') };
 }
 
-/** 远端对象大小；不存在或查询失败返回 null（404 与凭据失败对调用方都是「无有效远端副本」）。 */
+/** 远端对象大小；不存在或查询失败返回 null（404 与凭据失败对调用方都是「无有效远端副本」）。
+ *  实现口径：`oss ls <url>`（仅需 ListObjects 权限，解析列举输出的 Size 列）——
+ *  不用 `oss stat`（2026-09-23 实测：RAM 最小策略下 stat 仍被 bucket ACL 拒绝，
+ *  而 ls 在 ListObjects 授权下稳定返回大小）。 */
 export function ossObjectSize(cli, url, { profile, endpoint }) {
-  const args = ['oss', 'stat', url, '--profile', profile];
+  const args = ['--profile', profile, 'oss', 'ls', url];
   if (endpoint) args.push('--endpoint', endpoint);
   const r = runCli(cli, args);
   if (r.status !== 0) return null;
-  const m = /Content-Length\s*:\s*(\d+)/.exec(r.stdout);
+  const line = r.stdout.split('\n').find((l) => l.includes(url));
+  if (!line) return null;
+  // 行格式：<日期> <时间> <时区>  <Size(B)>  <StorageClass>  <ETAG>  <oss://...>
+  const m = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [+-]\d{4} \S+\s+(\d+)\s+/.exec(line);
   return m ? Number(m[1]) : null;
 }
 
@@ -128,6 +134,9 @@ export function runSync({ backupDir, bucketEnv, profile = 'ecs-oss', endpoint = 
                           cli = 'aliyun', apply = false }) {
   mkdirSync(backupDir, { recursive: true });
   const release = acquireLock(backupDir);
+  // ossutil 断点续传目录默认建在 CWD（systemd ProtectSystem=strict 下只读）——
+  // 显式指到可写的备份目录内（成功后 ossutil 自行清理）。
+  const checkpointDir = join(backupDir, '.oss-checkpoint');
   try {
     const { bucket, prefix } = parseOssTarget(bucketEnv);
     const localList = listLocalSnapshots(backupDir);
@@ -157,8 +166,9 @@ export function runSync({ backupDir, bucketEnv, profile = 'ecs-oss', endpoint = 
         failed.push({ file: f.name, reason: 'quick_check 不过关，拒绝出机' });
         continue;
       }
-      const r = runCli(cli, ['oss', 'cp', f.path, url, '-f', '--profile', profile,
-                             '--endpoint', endpoint]);
+      const r = runCli(cli, ['--profile', profile, 'oss', 'cp', f.path, url, '-f',
+                             `--checkpoint-dir=${checkpointDir}`,
+                             ...(endpoint ? ['--endpoint', endpoint] : [])]);
       const remoteSize = r.status === 0 ? ossObjectSize(cli, url, { profile, endpoint }) : null;
       if (remoteSize === f.size) uploaded.push(f.name);
       else failed.push({ file: f.name, reason: r.status !== 0 ? r.stderr.trim().slice(0, 300) : '上传后大小复核不一致' });

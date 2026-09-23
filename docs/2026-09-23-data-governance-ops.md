@@ -143,7 +143,7 @@ sqlite3 /opt/brainx/data/brainx.db \
 - 迁移后验证：新快照 brainx-20260923-152435.db（369M）落在 vdb；旧目录清理后系统盘降到 78%（4.1G 可用），数据盘 4%（36G 可用）。快照/归档自此离开系统盘，`BRAINX_BACKUP_KEEP_DAYS=14` 默认配置在 40G 下成立（红线选项①不再需要）。
 - RDS 核实：当前生产走 `reloop` 库（hayden 账号，连通正常）；AccessKey：本机 aliyun CLI default profile 有效（cn-hangzhou），**服务器上 aliyun CLI 的 dms profile 已失效（InvalidAccessKeyId.NotFound）**——备份同步 OSS 前需先修服务器侧 AK 或改用 RAM 角色。
 
-## 5. OSS 出机同步（specs/021 FR-002 对象存储面，2026-09-23 就绪待启用）
+## 5. OSS 出机同步（specs/021 FR-002 对象存储面，2026-09-23 已接通上线）
 
 实现：`bin/brainx-oss-sync.mjs` + `deploy/systemd/brainx-oss-sync.{service,timer}`。目的：盘坏/机坏级容灾——本地 14 天滚动快照之外，OSS 远端**全量留存、永不删除**（容量与冷热分层交给 bucket 生命周期规则，脚本不管删）。
 
@@ -161,6 +161,14 @@ sqlite3 /opt/brainx/data/brainx.db \
 
 - profile `ecs-oss` 已配置（`EcsRamRole:BrainXEcsOssBackup`，region cn-hangzhou）；角色未绑定时调用明确报错（404），不静默。
 - 代码与单元随仓库分发；**enable 前置两件事**：控制台建角色绑实例 + 建 bucket 写 env（下节）。
+
+### 接通记录（2026-09-23，全部完成）
+
+- 控制台三步已由 CLI 执行完毕：RAM 角色 `BrainXEcsOssBackup`（acs:ram::1615281587880079:role/）→ 最小策略 `BrainXOssBackupRW`（仅 bucket 读写）→ 绑定实例 i-bp1dgg3rzmehc33fwpsn（AttachInstanceRamRole 200/success）；bucket `brainx-backups-yorkteam-93f137`（cn-hangzhou，私有）已建，`BRAINX_OSS_BUCKET=oss://brainx-backups-yorkteam-93f137/brainx-backups` 已写入 `/etc/brainx/worker.env`。
+- brainx 用户专属 CLI 配置 `/var/lib/brainx/.aliyun/config.json`（EcsRamRole，0700/0600，无密钥落盘）——systemd 沙箱下 aliyun CLI 的 mkdir 崩溃因此消除。
+- 脚本修复两处实测缺陷并入库：①aliyun CLI 的 `--profile` 必须放 oss 子命令**之前**（后置报 Bad flag）；②远端大小复核改用 `oss ls` 列举口径（最小策略下 `oss stat` 被 bucket ACL 拒）；③大文件断点续传目录 `--checkpoint-dir` 显式指到可写备份目录（CWD 在 ProtectSystem=strict 下只读）。
+- 验收证据：首跑 `uploaded=[brainx-20260923-150346.db, brainx-20260923-152435.db] failed=[]`；二跑幂等 `skipped=2 uploaded=[]`；bucket 远端两件与本地一致（384MB/386MB）；`brainx-oss-sync.timer` 已 enable（每日 03:47）。
+- 权限边界验证：`oss:ListBuckets` 按策略被拒（403 AccessDenied）为预期——最小权限生效，同步只依赖 bucket 级动作。
 
 ### 启用清单（需账号管理员在控制台执行）
 

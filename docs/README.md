@@ -66,7 +66,7 @@
 | TTC 职位字段、筛选能力或字段变化 | [TTC 职位字段库](ttc-field-catalog.md)、[BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md) |
 | Commit、协作记录 | [Agent Commit 记录](AGENT_COMMIT_LOG.md) |
 | **Hub 架构重整（业务事件进账本、dispatcher、反馈环、session 隔离下沉、接口面收敛）** | **[Hub 事件骨干重整规格](../specs/019-hub-event-backbone/spec.md)**（五用户故事 + 四重难点数据来源契约）、[Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) |
-| **生产库备份、高热表 retention/归档、磁盘增长失控** | **[数据治理规格](../specs/021-data-governance/spec.md)**（自动备份 + 保留归档纪律 + 引用保护）、[Hub 事件骨干重整规格](../specs/019-hub-event-backbone/spec.md) |
+| **生产库备份、高热表 retention/归档、磁盘增长失控** | **[数据治理运维手册：备份与保留归档](2026-09-23-data-governance-ops.md)**（恢复演练命令 + dry-run 审查流程 + 窗口 env 清单 + journalctl 告警面 + 服务器规格基线采集）、[数据治理规格](../specs/021-data-governance/spec.md)（自动备份 + 保留归档纪律 + 引用保护）、[Hub 事件骨干重整规格](../specs/019-hub-event-backbone/spec.md) |
 | 密钥、登录、权限、数据隔离 | [安全操作手册](SECURITY.md) |
 | 构建、发布、服务器、容器 | [部署编排](DEPLOYMENT.md)、[云端恢复清单](cloud-recovery-checklist.md)、[安全操作手册](SECURITY.md) |
 | 验证历史行为或已有能力 | [开发验证报告](VERIFICATION.md) |
@@ -102,6 +102,7 @@
 - [BrainX × OpenClaw ECS 部署交接单](2026-09-03-openclaw-ecs-handoff.md)：给服务器维护同事的无密钥执行清单，覆盖前置检查、安装、迁移、身份绑定、启动、验收与脱敏证据回传。
 - [云端恢复清单](cloud-recovery-checklist.md)：现网唯一入口、标准恢复步骤与历史事件。
 - [带宽告警说明](guard-bandwidth-alert.md)：带宽监控与告警规则。
+- [数据治理运维手册：备份与高热表保留/归档](2026-09-23-data-governance-ops.md)：specs/021 的操作口径——每日 VACUUM INTO 快照（自检 + 滚动保留 + 锁互斥）、恢复演练确切命令、retention dry-run 审查流程、保留窗口 env 清单、journalctl 告警面与服务器规格基线采集清单。
 - [0.9 冲刺交付清单](2026-09-12-sprint-delivery-checklist.md)：2026-09-12 排期的可交付施工条目、阻塞决策与完成度判定口径。
 - [D5 全链路灰测结论与演示脚本](2026-09-12-d5-e2e-greytest-and-demo-script.md)：接单→建群→找人→三按钮→RDS 入库的生产灰测证据、发现的问题与评审日演示纪律。
 - [0.9 冲刺核查处置方案（修正 + Reloop 变更）](2026-09-12-sprint-0.9-remediation-plan.md)：对核查报告的逐条复核修正、R1–R9 处置清单（含文件行号与验收）、Reloop 专项边界、原子 commit 切分与三项待拍板决策。

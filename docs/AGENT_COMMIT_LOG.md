@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-23｜docs(ops): specs/021 数据治理运维手册——备份恢复演练 + retention 审查流程 + 服务器规格基线采集
+
+- 起因：specs/021 交付物第 4 项；FR-003 要求按文档可执行的恢复路径，SC-003 磁盘增长预测缺硬件基线。
+- 改动：`docs/2026-09-23-data-governance-ops.md`（新）——备份/恢复演练步骤（含从快照恢复的确切命令：选定快照 → 只读 quick_check + 表计数 → 停服替换 + 清旧 WAL/SHM → 起服冒烟）、retention dry-run 审查与窗口调整流程（含 VACUUM 空间回收提醒）、失败告警面（journalctl 两个单元 + 退出码 75/1 判读口径）、env 清单（7 项）、「服务器规格基线」节（仓库未记录 ECS 硬件规格，给出 lscpu/free -h/df -h/sqlite3 表行数采集命令清单，回填位置为本节「基线记录」小节）。`docs/README.md`：安全与运维目录登记 + 任务路由表「生产库备份/retention」行更新为指向本手册 + specs/021。
+- 验证：纯文档（前置 c4d4950/a9f5f73 已全量 828/828 + 门禁 16/16）；手册中命令与脚本实际参数/env 逐项核对一致。
+- 未 push。
+
 ## 2026-09-23｜feat(ops): specs/021 US2——高热表保留/归档 brainx-ledger-retention（dry-run 默认 + 归档不删除 + 引用保护）
 
 - 起因：specs/021-data-governance US2（FR-004/FR-005、SC-004 零误删）。recommendations 膨胀事故已演示无保留纪律的后果；lark_messages/workflow_event_log/openmai_results 此前无窗口与归档去向。

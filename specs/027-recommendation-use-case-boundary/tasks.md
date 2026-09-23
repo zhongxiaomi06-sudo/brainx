@@ -7,4 +7,4 @@
 - [x] T005 把推荐编排迁入唯一 use case，并保留兼容 facade。
 - [x] T006 抽取推荐 route factory，统一 server/CLI/scheduler/worker 组装。
 - [x] T007 跑专项测试、快速门禁并创建中文原子 commit。
-- [ ] T008 在最新 commit 上跑完整门禁并记录阶段 03 结论。
+- [x] T008 在最新 commit 上跑完整门禁并记录阶段 03 结论。

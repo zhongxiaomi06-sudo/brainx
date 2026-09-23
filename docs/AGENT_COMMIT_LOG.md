@@ -1,5 +1,16 @@
 # Agent Commit 记录
 
+## 2026-09-23｜feat(ops): specs/021 US2——高热表保留/归档 brainx-ledger-retention（dry-run 默认 + 归档不删除 + 引用保护）
+
+- 起因：specs/021-data-governance US2（FR-004/FR-005、SC-004 零误删）。recommendations 膨胀事故已演示无保留纪律的后果；lark_messages/workflow_event_log/openmai_results 此前无窗口与归档去向。
+- 改动：
+  1. `bin/brainx-ledger-retention.mjs`（新，约 200 行）：三表窗口 lark_messages 90 天（create_time）/ workflow_event_log 90 天（occurred_at）/ openmai_results 180 天（COALESCE(finished_at, started_at)），均可 env 调。默认 dry-run（只读连接，出 scanned/keep/archive 计数对照）；`--apply` 先复用 brainx-backup 的 runBackup 自动留 VACUUM INTO 安全快照，再把超龄行搬入归档库 `data/archive/brainx-archive-YYYYMMDD.db`（按需建同名表，列结构按源库 PRAGMA table_info 重建、主键保留、INSERT OR REPLACE 幂等），落盘后才从事务内删主库。引用保护：消息被 pending 的 job_facts_drafts/judgment_drafts（message_id）或被仍将留存事件的 evidence_refs 引用（LIKE 口径，_ % \ 已转义）则保留；事件被 pending 草稿（event_id）或 consumer_failures 未 resolved 行引用则保留。
+  2. `tests/ledger-retention.test.mjs`（新，4 例，真实 CLI 子进程 + 合成库全量真实迁移）：超龄未引用归档并删除 / 窗口内保留 / 三类引用保护（含 confirmed 草稿不保护、只被将归档事件引用的消息不保护、LIKE 转义精确性 om_look_alike vs omXlookXalike）/ dry-run 零写入且无产物 / --apply 幂等（第二轮 archive=0、归档不翻倍）/ 窗口 env 可调。
+  3. `deploy/systemd/brainx-ledger-retention.service` + `.timer`（新）：每周日 04:23，ExecStart 带 --apply，其余字段同备份单元。
+- 验证：新增 4 例全绿；全量 `npm test` 828/828 通过；`npm run verify:quick` 16/16 通过。
+- 偏差说明：①归档须搬走被 confirmed 草稿引用的事件行（草稿已含 *_evidence 原文锚点，血缘副本在归档库），retention 进程显式关闭逐连接 FK 强校验（enableForeignKeyConstraints:false），否则删除父行被误拦——这是维护连接的显式选择，不改 openDb 口径；②归档表 DDL 按 PRAGMA table_info 重建（覆盖 0015 之后的 ALTER 列），CHECK 约束不带入归档库。
+- 待部署：单元上 ECS 并 enable timer；未 push。
+
 ## 2026-09-23｜feat(ops): specs/021 US1——生产库每日一致性快照 brainx-backup（VACUUM INTO + 自检 + 滚动保留 + 锁互斥）
 
 - 起因：specs/021-data-governance US1（FR-001~FR-003）。生产 SQLite 决策库此前无自动备份，唯一副本动作是手动拉训练副本，单点单库是最大数据丢失风险。

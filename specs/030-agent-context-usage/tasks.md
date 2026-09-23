@@ -6,4 +6,4 @@
 - [x] T004 追加用量与上下文 schema。
 - [x] T005 实现 recorder、run 聚合、预算和 Agent loop 接入。
 - [x] T006 实现 Context Registry 与 A 只读窄工具。
-- [ ] T007 创建中文原子提交并在提交上跑完整门禁。
+- [x] T007 创建中文原子提交并在提交上跑完整门禁。

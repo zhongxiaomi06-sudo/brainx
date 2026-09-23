@@ -1,5 +1,65 @@
 # Agent Commit 记录
 
+## 2026-09-22｜test(judgment-extract): 跟进修正工具数与迁移记账断言（gateway 28→30、0051 入账）
+
+- 起因：9482b2a 提交后首次跑完整门禁 `npm run verify`，后端 4 个既有断言因新增 2 个 gateway 工具与 1 个迁移文件而失败（verify:quick 不覆盖这几项）。
+- 改动：`tests/agent-gateway-http.test.mjs` 健康检查工具数 28→30；`tests/agent-golden-workflow.test.mjs` 生产工具接入数 28→30；`tests/framework.test.mjs` schema_migrations 记账清单补 `0051_judgment_facts.sql`、旧库兼容断言 53→54。纯断言跟随接口变化，无逻辑改动。
+- 验证：`node --test` 三个受影响文件 27/27 通过；完整门禁重跑结果见 push 前记录。
+- 另查明：首次 full 门禁的另 3 项失败中，前后端依赖 audit 为网络瞬断（重跑 0 漏洞通过），工作区不干净系他人未跟踪文件 `bin/project-launch-no-jobcard.mjs`（非本任务，不处理）。
+
+## 2026-09-22｜docs(spec): 立项 specs/019 Hub 事件骨干重整——业务事件进账本 + dispatcher + 反馈环
+
+- 起因（用户指令）：对架构不满意（演示规模撞 300 顾问生产规模），要求立项重整。前置：2026-09-22 架构核实报告确认骨架（账本/幂等消费/Case 状态机/多租户鉴权）真实可留，三处形态待改。
+- 改动：
+  1. `specs/019-hub-event-backbone/spec.md`（新）：五个用户故事按核实报告修正顺序排优先级——P1 业务事件进账本（接单/找人/确认/终局补发标准信封事件）、P1 dispatcher 调度层（消费移出 bridge 调用栈、注册表、异步、DLQ）、P2 反馈环（决策↔结果对齐出指标）、P2 session 隔离下沉 gateway principal（破 maxAgents=20）、P3 接口面收敛（registry 唯一契约 + 发布验收门禁）。FR-001~012，SC-001~008。
+  2. 四个重难点专项（职位判断与匹配 / SuperMai+OpenMai 调度 / reloop 搜索 / 上下文总结）只在本规格钉死数据来源契约（全部从账本+权威表+原文锚点出），各立子规格施工。
+  3. `specs/019-hub-event-backbone/checklists/requirements.md`（新）：质量校验全过，无 NEEDS CLARIFICATION。
+  4. `docs/README.md`：路由表加 019 条目。
+  5. `.specify/feature.json`：指向 specs/019-hub-event-backbone。
+- 过程记录：开工前发现另一 Agent（kimi-code-main，judgment-extract-loop）已完成工作但未提交未释放锁；经用户确认其已完成，复核其 35/35 测试 + verify:quick 16/16 后按工作内容单独提交（9482b2a），再释放陈旧锁开始本任务。
+- 验证：docs/spec 改动，verify:quick 16/16 通过。后续走 speckit plan → tasks → implement。
+- 未 push。
+
+## 2026-09-22｜feat(judgment-extract): 顾问判断抽取回路——第二个信息域复刻四层模式，判断草稿经确认进 judgment_facts
+
+- 起因（用户指令）：「系统内部的飞书对话当前没办法处理非标准字段，想用『原文留档+LLM 结构化投影』这个方法把信息打通」。确认第一个域 = 顾问对话中的判断（客户偏好/硬性要求/例外规则/否决原因/评价），落地 = staging + 人工确认进权威表。job-extract 已是该模式的完整骨架，本任务复刻之，原文层（lark_messages）与账本层（workflow_event_log）零改动。
+- 改动：
+  1. `migrations/0051_judgment_facts.sql`（新）：`judgment_drafts`（staging，subject/kind/statement 各带 evidence 锚点 + confidence + raw_json 存档）+ `judgment_facts`（权威表，draft_id+sync_id 双血缘，V1 只追加无 supersede）。
+  2. `src/judgment-extract/`（新，四文件镜像 job-extract）：schema.js（zod 契约：subject_type=CLIENT_COMPANY|PROJECT|CANDIDATE|GENERAL，kind=PREFERENCE|CONSTRAINT|EXCEPTION|REJECTION|EVALUATION，statement≤120字）；classify.js（isJudgmentRelevant 关键词砍成本 + 规则层只抓「客户说…不接受/只要…」显式句型 + extractJudgmentLlm + mapJudgmentLlmFields 带 evidence 原文重合校验，不在原文出现的字段一律丢弃）；index.js（consumeJudgmentExtract，consumeOnce('judgment-extract') 与 job-extract 同事件各自幂等；statement=null 时 skip 不落空草稿）；confirm.js（confirmJudgment/rejectJudgment，血缘 sync_runs source='lark_judgment_extract'，关联职位 jobVisibleTo fail-closed）。
+  3. `src/job-extract/bridge-producer.js`：produceOne 在 consumeJobExtract 后追加 consumeJudgmentExtract；LLM 预抽取独立开关 `AI_JUDGMENT_EXTRACT_ENABLED`（默认关），schema 违规回退规则层（同现有纪律）。
+  4. `src/agent-gateway/tools-judgments.js`（新）：brainx_pending_judgments / brainx_review_judgment，可见性与 evidence 脱敏镜像 tools-job-facts.js，复用 job_fact_review 授权域；tool-registry.js 注册两行工具定义。
+  5. OpenClaw 外露：runtime.js BRAINX_OPENCLAW_TOOLS +2、openclaw.plugin.json、deploy/openclaw/openclaw.production.json tools.allow、tests/fixtures/openclaw-production/plugin-contract.json 同步（白名单 27→29 项）。
+  6. 测试（新三文件 18 例）：judgment-extract-rules（规则句型/schema/LLM 映射防幻觉锚定）、judgment-extract-consumer（幂等/irrelevant/no_judgment skip/与 job-extract 互不干扰/bridge 全链双草稿）、judgment-extract-confirm（转正+血缘/重复确认 409/可见职位关联/不可见 404 fail-closed/reject 终态）。
+  7. 文档：`docs/2026-09-22-judgment-extraction.md`（schema 契约+纪律+已知边界）+ `specs/016-judgment-extract-loop/spec.md` + docs/README.md 路由登记。
+- 验证：新增 18 例 + 受影响契约测试共 38/38 通过；`npm run verify:quick` 16/16 门禁通过。修复过两处：EXPLICIT_RE 内容组补逗号终止符（原贪婪吞后半句）、测试夹具 sync_runs.consultant_id NOT NULL。
+- 已知边界：WS 网关链路未接任何抽取消费者（job-extract 同此现状，单独任务）；judgment_facts 下游消费（回流排序/画像）是后续任务；不外露旧 MCP 白名单文档管辖范围（该文档只管 src/agent/registry.js 工具集）。
+- 未 push（本地领先 origin/main 2 个提交，push 需单独获准）。
+
+## 2026-09-22｜refactor(hook): 硬编码 per-user hook 收编为配置——开通新顾问=写 user-hooks.json 不写代码
+
+- 起因（用户指令）：「先消灭硬编码 hook：把 linda/wendy/yang-* 这类 hook 表达为 per-user 配置（触发条件+动作模板），开通新顾问 = 写配置而不是写代码——这是复制的前提」。此前每个顾问级 hook 都是一个按人名硬编码的 JS 文件，加人要写代码改 index.js 发版。
+- 改动：
+  1. `plugins/brainx-openclaw/user-hooks.js`（新，约 340 行）：通用 per-user hook 引擎。`loadUserHooksConfig()` 读 `BRAINX_USER_HOOKS_FILE`（缺省插件自带 `user-hooks.json`），逐条校验、非法条目记 warn 跳过、文件缺失/损坏 fail-open；`createUserHookHandler(hook)` 按配置生成 handler，保持 mention-silence 模式（message_received 缓存入站文本，before_agent_reply 取，丢缓存 fail-open 交 LLM）。三种动作模板：`fixed_reply`（固定文案，text 支持按行数组避免超长行）、`accept_job`（直调 brainx_accept_job，replies 可覆盖默认文案）、`offer_group`（候选人映射建/找 Offer 群+幂等发报告卡，success_template 占位符）。
+  2. `plugins/brainx-openclaw/user-hooks.json`（新）：三条历史 hook 原样迁为配置——yang-offer-fixed-reply（priority 90）、wendy-private-group（95）、linda-private-launch（96），open_id/chat_id/幂等键/文案不变。
+  3. `plugins/brainx-openclaw/index.js`：删掉三个硬编码工厂 import，改为加载配置循环注册（priority 取配置值）。
+  4. 删除 `linda-private-launch.js`、`wendy-private-group.js`、`yang-offer-reply.js`（含 wendy 里从未被调用的 disbandGroup 死代码）。
+  5. `plugins/brainx-openclaw/package.json`：files[] 换 user-hooks.js/json，版本 1.4.21 → 1.5.0；`runtime.js` PLUGIN_VERSION 同步；`tests/openclaw-plugin.test.mjs` 版本断言同步。
+  6. 测试：删 `tests/{linda-private-launch,wendy-private-group,yang-offer-reply}.test.mjs`（21 例），新增 `tests/user-hooks.test.mjs`（18 例）——覆盖三种动作模板全部原有用例 + 配置加载/env 覆盖/损坏 fail-open + 「纯配置开通新顾问」验收例。
+  7. `bin/brainx-yang-offer-demo.mjs`：3 处注释更新为指向 user-hooks.json（该脚本本身是演示种子脚本，未动逻辑）。
+  8. 文档：新增 `docs/2026-09-22-user-hooks-config.md`（配置格式、安全边界、验证方法），登记 docs/README.md 路由+目录；插件 README 加 Per-user hook 章节。
+- 验证：`node --test tests/user-hooks.test.mjs tests/openclaw-plugin.test.mjs tests/openclaw-production-config.test.mjs` 35/35 通过；`npm run verify:quick` 首次 2 项失败（删除文件未入索引导致"完整检出"失败 + user-hooks.json 超长行 896 字符），修复（fixed_reply text 改按行数组，引擎 join）并暂存后复检通过。
+- 待部署：scp 插件副本（index.js + user-hooks.js + user-hooks.json + package.json + runtime.js）到 ECS `/var/lib/brainx/.openclaw/extensions/brainx-openclaw/` + chown brainx:brainx + 重启 openclaw-brainx；或走 install.sh 重装。重启后三个 hook 行为应与线上一致（配置逐值迁移）。
+
+## 2026-09-17｜feat(hook): linda 私聊接单 hook——直调 brainx_accept_job 接单+自动找人，省略接单卡
+
+- 起因（咪需求）：帮 linda 演练「私聊 @bot 说接单 → 接单 → 建群 → 找人 → 出第一批人」链路。JC3V82F（北京脑利科技 CEO助理）的 project_launches 已 READY+linda+message_id=NULL，launchProject 返回 already → 不发接单卡（"省略接单卡"由 READY 态自动达成）。hook 必须用 mention-silence 模式（lastDirectInbound 缓存 + onMessageReceived 存 + onBeforeAgentReply 读缓存），避免 before_agent_reply 的 event 不含入站文本的 bug。
+- 改动：
+  1. `plugins/brainx-openclaw/linda-private-launch.js`（新，118 行）：before_agent_reply hook，私聊 + linda open_id（`ou_4c810c0729050de5877347697aee2c29`）+ 含"接单"关键词 → 拦截 LLM，直调 `callBrainxGatewayTool('brainx_accept_job', {job_id:'JC3V82F', confirm:true, idempotency_key:'linda-private-launch-JC3V82F'}, principal)`。principal 构造参考 search-start-notice.js（account_id 默认 'mia'，chat_type='p2p'，chat_id=sender）。acceptJob line 67 `!already || state===ACCEPTED` 对 dup 路径永真 → 重复接单仍触发 startSearch。响应解析参考 envelopes.js：`result.error` 存在=失败，`result.data` 存在=成功。
+  2. `plugins/brainx-openclaw/index.js`：import + 注册 linda-private-launch hook（priority 96，在 wendy-private 95 之前；两者互斥于 senderId，不竞争）。同注册 message_received 缓存入站文本。
+  3. `tests/linda-private-launch.test.mjs`（新，116 行）：8 例——正常接单+找人触发/dup 路径仍找人/409 冲突 already=true/网关错误/群聊不触发/无关键词不触发/非 linda 不触发/丢缓存 fail-open。
+- 验证：`npm run verify:quick` 16/16 通过，53 测试全绿。新增 8 例 + 已有 21 例 openclaw 测试全过。
+- 待部署：scp 插件副本到 ECS `/var/lib/brainx/.openclaw/extensions/brainx-openclaw/` + chown brainx:brainx + 重启 openclaw-brainx。部署后让 linda 私聊 braintex 说"接单"验证端到端。
+
 ## 2026-09-16｜feat(prompt): 杨东旭 Offer 群端到端验证脚本 + 固定文案回复 hook
 
 - 起因（咪需求）：验证「拉群 → 生成报告 → @ 问顾虑 → braintex 回固定文案」端到端流程。braintex 的 LLM 对话在 docx scope 未开时 fail-open 降级答非所问，咪要 wendy @ braintex 问"总结顾虑"时直接输出她审定过的固定文案，不走 LLM。

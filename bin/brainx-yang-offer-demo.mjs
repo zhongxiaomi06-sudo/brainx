@@ -4,7 +4,7 @@
  *  流程：
  *    1. 检查/创建飞书群「杨东旭-Ai infra-Offer决策」
  *    2. 在群里发 Offer 决策报告卡片（链接到 TrFHdPfc3oXzyLxa2TRcVxQvn6b）
- *    3. 验证 yang-offer-reply hook 已部署（特征串检查）
+ *    3. 验证 yang-offer-fixed-reply hook 已部署（特征串检查，配置见插件 user-hooks.json）
  *
  *  用法（在 ECS 上跑，读 /etc/brainx/openclaw.env 凭据）：
  *    set -a; source /etc/brainx/openclaw.env; set +a; node /opt/brainx/bin/brainx-yang-offer-demo.mjs
@@ -12,9 +12,9 @@
  *  本地跑（需手动 export BRAINX_FEISHU_APP_ID/BRAINX_FEISHU_APP_SECRET）：
  *    node bin/brainx-yang-offer-demo.mjs
  *
- *  注意：本脚本不监听消息、不回固定文案——固定文案由 yang-offer-reply.js 的
- *  before_agent_reply hook 在 openclaw-brainx 服务里拦截 LLM 实现。本脚本只负责
- *  拉群 + 发报告卡片，验证"群存在 + 报告卡已发"两步。 */
+ *  注意：本脚本不监听消息、不回固定文案——固定文案由插件 user-hooks.json 里
+ *  yang-offer-fixed-reply 配置（before_agent_reply hook）在 openclaw-brainx 服务里
+ *  拦截 LLM 实现。本脚本只负责拉群 + 发报告卡片，验证"群存在 + 报告卡已发"两步。 */
 import { sendInteractiveCard } from '../src/feishu-bot.js';
 
 const GROUP_NAME = '杨东旭-Ai infra-Offer决策';
@@ -120,7 +120,7 @@ async function main() {
   console.log(`群名：${GROUP_NAME}`);
   console.log(`群 chat_id：${chatId}`);
   console.log(`报告链接：${REPORT_DOC_URL}`);
-  console.log('\n下一步：在群里 @braintex 问"总结一下杨东旭的顾虑" → braintex 应回固定文案（由 yang-offer-reply hook 拦截）');
+  console.log('\n下一步：在群里 @braintex 问"总结一下杨东旭的顾虑" → braintex 应回固定文案（由 user-hooks.json 的 yang-offer-fixed-reply hook 拦截）');
 }
 
 main().catch((e) => { console.error('FAIL:', e.message); process.exit(1); });

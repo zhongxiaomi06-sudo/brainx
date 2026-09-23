@@ -11,6 +11,7 @@
 import { uuid, now } from '../db.js';
 import { appendEvent } from '../hub/event-log.js';
 import { consumeJobExtract } from './index.js';
+import { consumeJudgmentExtract } from '../judgment-extract/index.js';
 
 const INSERT_MSG_SQL = `INSERT OR IGNORE INTO lark_messages
   (message_id, chat_id, message_type, text, mentions_json, create_time, received_at)
@@ -44,6 +45,20 @@ async function presetFromLlm(text) {
   } catch { return null; }
 }
 
+/** 判断域 E2 LLM 预抽取（异步层，AI_JUDGMENT_EXTRACT_ENABLED=1 且 llm 已配置时）：
+ * 抽到有效 statement 才注入，否则让消费链走规则层（rules 保底）。 */
+async function presetJudgmentFromLlm(text) {
+  if (process.env.AI_JUDGMENT_EXTRACT_ENABLED !== '1') return null;
+  try {
+    const { isLlmConfigured } = await import('../llm.js');
+    if (!isLlmConfigured()) return null;
+    const { extractJudgmentLlm, isJudgmentRelevant } = await import('../judgment-extract/classify.js');
+    if (!isJudgmentRelevant(text)) return null; // 规则先行砍 LLM 调用：闲聊不烧额度
+    const fields = await extractJudgmentLlm(text);
+    return fields && fields.statement ? fields : null;
+  } catch { return null; }
+}
+
 /** 单条消息：落原文表 → 追加账本 → 抽 draft。返回 {produced, draft_id?}。 */
 export async function produceOne(db, { message_id, chat_id, msg_type = 'text', text = '',
                                  sender = {}, mentions = [], create_time }) {
@@ -69,9 +84,20 @@ export async function produceOne(db, { message_id, chat_id, msg_type = 'text', t
     presetFields = null;
     consumed = consumeJobExtract(db, ev.event.event_id, { presetFields: null });
   }
+  // 判断域：同一事件上的独立消费者（consumeOnce 各自幂等，互不干扰）。
+  let judgmentPreset = await presetJudgmentFromLlm(String(text || ''));
+  let judgment;
+  try {
+    judgment = consumeJudgmentExtract(db, ev.event.event_id, { presetFields: judgmentPreset });
+  } catch (e) {
+    if (!judgmentPreset || !String(e.message || '').includes('schema_invalid')) throw e;
+    judgmentPreset = null;
+    judgment = consumeJudgmentExtract(db, ev.event.event_id, { presetFields: null });
+  }
   return { produced: !ev.deduplicated, event_id: ev.event.event_id,
            draft: consumed?.result?.draft_id || null, action: consumed?.result?.action || null,
-           layer: consumed?.result?.layer || (presetFields ? 'llm' : 'rules') };
+           layer: consumed?.result?.layer || (presetFields ? 'llm' : 'rules'),
+           judgment_draft: judgment?.result?.draft_id || null };
 }
 
 /** 一批 bridge 消息（与 ingestMessages 同批）：逐条生产+抽取，返回计数。 */

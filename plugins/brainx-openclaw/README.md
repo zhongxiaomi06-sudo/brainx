@@ -8,6 +8,12 @@
 
 生产安装器还会同步七个已审核顾问 Skill：今日安排、职位判断、人才事实、人才匹配、沟通草稿、面试准备和个人复盘。Skill 决定 Agent 如何组织工作，原生插件负责受控取数；二者缺一不可。
 
+## Per-user hook 配置
+
+「某人私聊/群里说 X → 确定性做 Y」类 hook（私聊接单、私聊拉 Offer 群、群固定文案等）不写代码，全部在 `user-hooks.json` 里配置：`trigger`（会话类型 + 发送人 open_id/群 chat_id + 关键词）+ `action`（`accept_job` / `offer_group` / `fixed_reply` 三种动作模板）+ `priority`。开通新顾问 = 在 JSON 里加一条配置并重启服务，不需要新增 JS 文件。生产可用环境变量 `BRAINX_USER_HOOKS_FILE` 指向插件目录外的配置文件，便于不改包内容直接改配置。配置加载失败 fail-open（记日志、不注册 hook），不影响其余能力。
+
+配置字段与修改方法详见 [Per-user Hook 配置](../../docs/2026-09-22-user-hooks-config.md)。
+
 ## 飞书功能首页
 
 已授权顾问在私聊输入 `/brainx` 会直接打开不调用模型的功能卡片。卡片提供今日优先事项、职位推荐、候选人匹配、职位判断、跟进建议和个人复盘六个入口。按钮只发起问答，不直接写业务状态。如果 `BRAINX_BASE_URL` 是 HTTPS，卡片还会显示正式工作台入口。

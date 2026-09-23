@@ -20,6 +20,7 @@
 | BrainTex 飞书欢迎页、功能菜单、按钮卡片或新用户指引 | [BrainTex 飞书功能首页与新用户指引](2026-09-03-braintex-feishu-home.md)、[BrainTex 群聊工作流技术 PRD](prd-2026-09-01-braintex-group-workflow.md) |
 | OpenClaw 多顾问安装、上线、运维、故障或回滚 | [BrainTex 服务器部署与飞书接入 Agent 完整施工手册](2026-09-03-braintex-server-deployment-agent-manual.md)、[OpenClaw 多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md)、[部署编排](DEPLOYMENT.md) |
 | 新同事开通 BrainTex、飞书首次使用或将开通任务交给部署 Agent | [BrainTex 同事开通与首次使用实用手册](2026-09-10-braintex-coworker-onboarding-runbook.md)、[BrainTex 飞书功能首页与新用户指引](2026-09-03-braintex-feishu-home.md) |
+| **给顾问加私聊/群关键词确定性 hook（私聊接单、拉 Offer 群、群固定文案），或给新顾问开通此类动作** | **[Per-user Hook 配置](2026-09-22-user-hooks-config.md)**（user-hooks.json 触发条件+动作模板，写配置不写代码）、[OpenClaw 多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md) |
 | 顾问个人模型、自带 API Key、按飞书用户隔离 Agent 或模型切换 | [顾问个人模型配置规格](../specs/004-personal-model-config/spec.md)、[OpenClaw 多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md)、[安全操作手册](SECURITY.md) |
 | 服务器由同事或 Agent 维护、需要从空环境到异机可用的完整步骤与验收证据 | [BrainTex 服务器部署与飞书接入 Agent 完整施工手册](2026-09-03-braintex-server-deployment-agent-manual.md)、[BrainX × OpenClaw ECS 部署交接单](2026-09-03-openclaw-ecs-handoff.md) |
 | 候选人事实版本、人才 RDS 迁移、shortlist 数据契约或授权查询 | [候选人事实与 shortlist 数据契约](2026-09-03-candidate-data-contracts.md)、[BrainX × OpenClaw AI 猎头工作流产品需求文档](prd-2026-09-02-openclaw-ai-recruiting-workflow.md) |
@@ -44,6 +45,7 @@
 | **BrainX 下游交付、MCP server 工具契约、接口打包或部署** | **[BrainX 下游交付文档](2026-09-02-brainx-mcp-deliverable.md)**（用户职责边界内）、[OpenClaw 壳子架构 §6 接口挂载](2026-09-02-openclaw-shell-architecture.md) |
 | **后端侧有哪些模块、各自什么状态、下一步做什么（不负责 OpenClaw 接口）** | **[后端侧模块结构与下一步安排](2026-09-02-backend-module-structure.md)**（六层结构 + 已建成/待补对照 + 9/3 排期）、[下游交付文档](2026-09-02-brainx-mcp-deliverable.md) |
 | **群消息怎么提炼成 job_facts、信息抽取开源组件选型或抽取层排期** | **[群消息 → job_facts 提炼层研发路径](2026-09-02-job-facts-extraction-roadmap.md)**（开源调研综合 + 挂账本消费者的架构 + E0-E4 时间线）、[后端侧模块结构 §3 待补第 5 项](2026-09-02-backend-module-structure.md) |
+| **顾问群聊中的业务判断（客户偏好/硬性要求/否决原因）怎么抽取、确认或进权威表** | **[顾问判断抽取回路](2026-09-22-judgment-extraction.md)**（第二抽取域 + 四层模式复刻 + judgment_facts 契约）、[规格 016](../specs/016-judgment-extract-loop/spec.md) |
 | **顾问私聊直接发 JD 建岗草稿、JD 提交幂等或 p2p 草稿可见性** | **[私聊 JD 直接提交建岗草稿规格](../specs/005-private-jd-job-draft/spec.md)**（brainx_submit_job_jd 工具 + sha256 幂等 + LLM/规则双层提炼 + 仅提交人可见）、[群消息 → job_facts 提炼层研发路径](2026-09-02-job-facts-extraction-roadmap.md) |
 | **给 OpenClaw 侧打包对接信息、MCP 接入配置、consultant_id 映射规则或 Skill 交付** | **[BrainX → OpenClaw 接口包](2026-09-02-openclaw-interface-pack.md)**（三接缝一屏 + 15 工具快照 + 交付包清单）、[下游交付文档](2026-09-02-brainx-mcp-deliverable.md) |
 | **群消息读取归谁（OpenClaw 还是后端）** | **[后端侧模块结构 §1 边界裁定](2026-09-02-backend-module-structure.md)**（**关键纠正：通道层 `src/gateway/ws-client.js` 已在后端仓库建成，不依赖 OpenClaw**）、[飞书权限清单 §6.1](2026-09-02-feishu-permission-scopes.md) |
@@ -63,6 +65,7 @@
 | 前端重构排期、施工范围或阶段验收 | [前端真实数据重构施工清单](frontend-refactor-construction-checklist.md)、[前端交互架构](frontend-interaction-architecture.md) |
 | TTC 职位字段、筛选能力或字段变化 | [TTC 职位字段库](ttc-field-catalog.md)、[BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md) |
 | Commit、协作记录 | [Agent Commit 记录](AGENT_COMMIT_LOG.md) |
+| **Hub 架构重整（业务事件进账本、dispatcher、反馈环、session 隔离下沉、接口面收敛）** | **[Hub 事件骨干重整规格](../specs/019-hub-event-backbone/spec.md)**（五用户故事 + 四重难点数据来源契约）、[Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) |
 | 密钥、登录、权限、数据隔离 | [安全操作手册](SECURITY.md) |
 | 构建、发布、服务器、容器 | [部署编排](DEPLOYMENT.md)、[云端恢复清单](cloud-recovery-checklist.md)、[安全操作手册](SECURITY.md) |
 | 验证历史行为或已有能力 | [开发验证报告](VERIFICATION.md) |
@@ -91,6 +94,7 @@
 - [部署编排](DEPLOYMENT.md)：生产 systemd、本地开发、隔离 Docker 测试和 CI。
 - [BrainTex 服务器部署与飞书接入 Agent 完整施工手册](2026-09-03-braintex-server-deployment-agent-manual.md)：交给部署 Agent 或服务器同事的权威端到端手册，覆盖飞书后台、OpenClaw 插件、三类环境文件、RDS 权限、身份绑定、启动、九步真实验收、故障与回滚。
 - [BrainTex 同事开通与首次使用实用手册](2026-09-10-braintex-coworker-onboarding-runbook.md)：可直接发给 Codex/部署 Agent 的单人开通任务文案，覆盖脱敏就绪计划、人工审批边界、身份与 TTC 授权、飞书首次使用及真机验收。
+- [Per-user Hook 配置](2026-09-22-user-hooks-config.md)：OpenClaw 插件 per-user hook（私聊接单、私聊拉 Offer 群、群固定文案）的配置化机制——trigger（会话/发送人/关键词）+ action 模板，开通新顾问只改 `user-hooks.json` 不写代码；含安全边界与验证方法。
 - [OpenClaw 多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md)：服务端安装、权限绑定、灰度验收、日常运维与可恢复回滚。
 - [顾问个人模型配置规格](../specs/004-personal-model-config/spec.md)：定义飞书私聊一人一 Agent、个人模型凭据隔离、自助配置、同意留痕、共享群模型边界和多人验收标准；StepFun 仅是可选个人供应商，不是全员默认模型。
 - [私聊 JD 直接提交建岗草稿规格](../specs/005-private-jd-job-draft/spec.md)：顾问私聊整段 JD → 带证据待确认草稿（brainx_submit_job_jd，sha256 幂等，LLM 提炼规则保底，origin='p2p_jd' 仅提交人可见，确认复用 confirmDraft 衔接接单/找人链路）。

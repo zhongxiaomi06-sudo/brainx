@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-23｜docs(specs): specs/022 客户反馈信号回流与推送精准度——规格起草 + 四项决策拍板
+
+- 起因（用户指令）：基于 2026-09-23 客户健康指标报告（200 家 × 90 天，规则版 v2，带 chat_id）讨论「BrainTex 推送更准」，先敲定方案细节。用户对四个分叉逐项拍板：①规则抽取先行 + LLM 带 kill-switch（默认关）②客户反馈事件进 workflow_event_log 账本（specs/019 同口径，不立第二事实源）③断档触发器绕过 2h 限流、范围严格限触发客户 ④休眠客户完全静默 + 移交 BD 清单。
+- 改动：`specs/022-client-feedback-signals/spec.md`（新，Draft）——三层拆解（A 信号层：16,993 条存量群消息规则抽取回填 + client_metrics 日常化；B 特征层：ltr-feat-v2 六个客户健康特征 + supply_issue 归因分层降权；C 时机层：断档定向跑批 + 生命周期分档推送 + served 4.3% 断点诊断），7 个 user story、7 项 SC、数据契约与成本开关（BRAINX_CLIENT_FEEDBACK_LLM / BRAINX_STALL_TRIGGER）。
+- 关键事实核对：specs/019 dispatcher 已于今日上线（首轮 dispatched=125，job-extract/judgment-extract 消费中），故规格直接注册消费者，不建独立管道；生产回流基线（drafts 确认 4/8,037、served 340/7,820=4.3%、feedback 72 全 NOT_INTERESTED、outcomes 11、LTR 203 行）写入立项依据。
+- 验证：纯文档改动，未跑 verify（无代码/契约变更）；锁 logs/agent-work.lock 已建，本 commit 后释放。
+
 ## 2026-09-23｜ops(deploy): ECS 部署新代码 + 四单元 enable + 规格基线与磁盘红线回填手册
 
 - 起因（用户指令）：在 ECS 部署新代码并 enable brainx-dispatcher / brainx-backup / brainx-ledger-retention 单元，跑规格采集回填手册，观察首轮证据。

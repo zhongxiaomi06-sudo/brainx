@@ -1,6 +1,6 @@
 # 030 — Agent 上下文与完整用量
 
-状态：Specified（2026-09-23）
+状态：Implemented，待完整门禁（2026-09-23）
 
 上游：[施工总手册](../../docs/2026-09-22-refactor-agentic-ranking-manual.md)阶段 06、
 [Algorithm A 决策契约](../../docs/2026-09-22-algorithm-a-contract.md)。

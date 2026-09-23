@@ -3,6 +3,7 @@
  * {role:'tool'} 消息(含参数解析失败/未知工具),否则下一轮请求会被协议拒绝;
  * 超过 maxRounds 后下一轮不再带 tools,强制模型用已有信息收尾;
  * 总超时独立 AbortController(与请求 signal 串联),超时抛错由路由统一转 error 帧。 */
+import { aggregateUsageRows, normalizeUsage } from './usage-ledger.js';
 
 export const AGENT_MAX_ROUNDS = Number(process.env.BRAINX_AGENT_MAX_ROUNDS) || 8;
 export const AGENT_TOTAL_TIMEOUT_MS = Number(process.env.BRAINX_AGENT_TOTAL_TIMEOUT_MS) || 180000;
@@ -24,21 +25,60 @@ function toProtocolToolCalls(calls) {
 export async function runAgentLoop({
   messages, tools, callTool, chatFn, onTool, signal,
   maxRounds = AGENT_MAX_ROUNDS, totalTimeoutMs = AGENT_TOTAL_TIMEOUT_MS,
+  usageRecorder = null, contextRefs = [], budget = {}, maxModelRetries = 0,
 }) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), totalTimeoutMs);
   if (signal) signal.addEventListener('abort', () => ctrl.abort(), { once: true });
   const toolCalls = [];
   let rounds = 0;
-  let usage = null;
+  let callCount = 0;
+  let observedTotal = 0;
+  const usageRows = [];
+  const maxCalls = Number.isInteger(budget.maxCalls) ? budget.maxCalls : Infinity;
+  const maxTotalTokens = Number.isInteger(budget.maxTotalTokens)
+    ? budget.maxTotalTokens : Infinity;
+  const retryLimit = Number.isInteger(maxModelRetries) && maxModelRetries > 0
+    ? maxModelRetries : 0;
+  const budgetCheck = () => {
+    if (callCount >= maxCalls || observedTotal >= maxTotalTokens) {
+      const error = new Error('AGENT_BUDGET_EXHAUSTED');
+      error.code = 'AGENT_BUDGET_EXHAUSTED';
+      throw error;
+    }
+  };
   try {
     for (let round = 1; ; round++) {
       const withTools = round <= maxRounds;
-      const reply = await chatFn(messages, { tools: withTools ? tools : undefined, signal: ctrl.signal });
+      let reply;
+      for (let attempt = 1; attempt <= retryLimit + 1; attempt++) {
+        budgetCheck();
+        callCount += 1;
+        const callId = usageRecorder?.start({ round, attempt, contextRefs });
+        try {
+          reply = await chatFn(messages, {
+            tools: withTools ? tools : undefined, signal: ctrl.signal,
+          });
+          const normalized = normalizeUsage(reply.usage);
+          usageRows.push(normalized);
+          if (normalized.total_tokens != null) observedTotal += normalized.total_tokens;
+          usageRecorder?.finish(callId, {
+            status: reply.cacheHit ? 'CACHED' : 'SUCCEEDED', usage: reply.usage,
+            toolCount: Array.isArray(reply.toolCalls) ? reply.toolCalls.length : 0,
+          });
+          break;
+        } catch (error) {
+          usageRecorder?.finish(callId, {
+            status: error?.name === 'AbortError' || ctrl.signal.aborted ? 'CANCELLED' : 'FAILED',
+            error,
+          });
+          if (error?.name === 'AbortError' || ctrl.signal.aborted || attempt > retryLimit) throw error;
+        }
+      }
       rounds = round;
-      if (reply.usage) usage = reply.usage;
       const calls = withTools ? (reply.toolCalls || []) : [];
       if (!calls.length) {
+        const usage = usageRecorder?.aggregate() || aggregateUsageRows(usageRows);
         return { text: reply.content || '', rounds, toolCalls, usage };
       }
       messages.push({ role: 'assistant', content: reply.content || '', tool_calls: toProtocolToolCalls(calls) });

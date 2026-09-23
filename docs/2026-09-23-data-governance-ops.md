@@ -125,7 +125,16 @@ sqlite3 /opt/brainx/data/brainx.db \
 
 ### 基线记录
 
-- 待回填（首次部署本手册后采集）：CPU / 内存 / 数据盘 / 各高热表行数与库体积。
+**2026-09-23 首次采集（iZbp1dgg3rzmehc33fwpsnZ，阿里云 ECS）**：
+
+- CPU：2 vCPU，Intel Xeon Platinum 8369B @ 2.70GHz
+- 内存：7.2GiB（已用 2.0Gi，可用 5.2Gi）
+- 数据盘（/，/dev/vda3）：20G 总量 / 已用 16G / **可用仅 3.2G（84%）**
+- 库与快照：brainx-20260923-150346.db 367M（首个快照，quick_check ok）
+- 高热表行数：workflow_event_log 17,141 / processed_events 22,259 / lark_messages 17,158 / job_facts 23,294 / job_facts_drafts 8,144 / judgment_drafts 4 / openmai_results 106 / consumer_failures 0
+- 部署证据：brainx-dispatcher 上线即消费生产积压（首轮 dispatched=125，job-extract 25 + judgment-extract 100，failed=0，journalctl 可查）；brainx-backup 首次手动触发成功（systemd status=0/SUCCESS）。
+
+**⚠️ 磁盘红线（本次采集发现）**：14 天滚动快照 × ~370M ≈ 5.2G，超过当前 3.2G 可用。处置选项：① /etc/brainx/worker.env 设 `BRAINX_BACKUP_KEEP_DAYS=5`（约 1.9G，可承受）；② `BRAINX_BACKUP_DIR` 指向挂载的数据盘；③ 扩容系统盘。回填时未改生产配置，待拍板。
 
 ## 相关文档
 

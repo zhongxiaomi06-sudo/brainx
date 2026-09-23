@@ -1,5 +1,18 @@
 # Agent Commit 记录
 
+## 2026-09-23｜ops(deploy): ECS 部署新代码 + 四单元 enable + 规格基线与磁盘红线回填手册
+
+- 起因（用户指令）：在 ECS 部署新代码并 enable brainx-dispatcher / brainx-backup / brainx-ledger-retention 单元，跑规格采集回填手册，观察首轮证据。
+- 过程与证据：
+  1. 服务器 /opt/brainx 本地 merge --ff-only 到 5844a75（git pull 因 ECS→GitHub 网络超时失败，fetch 已完成故本地 merge，未触碰服务器本地脏文件）；npm ci。插件目录与 live openclaw.json（tools.allow=29，judgments 已外露）经核对已是最新，无需同步。
+  2. 四单元安装：brainx-dispatcher.service enable --now（active）；brainx-backup.timer、brainx-ledger-retention.timer enable。重启 brainx/brainx-agent-gateway/brainx-worker/openclaw-brainx 全部 active；guard 端点正常；gateway `/internal/v1/agent/health` ready（7 账号 9 绑定）。
+  3. dispatcher 首轮证据：上线即消费生产积压，首轮 dispatched=125（job-extract 25 + judgment-extract 100）failed=0，后续按 100/轮吞吐 backlog，consumer_failures=0。
+  4. backup 首个快照：手动触发 brainx-backup.service 成功，brainx-20260923-150346.db 367M，quick_check ok，行数对照一致（wel 17,141 / lark 17,158 / job_facts 23,294）。
+  5. 规格采集：2 vCPU Xeon 8369B / 7.2GiB 内存 / 数据盘 20G 已用 84% 仅剩 3.2G——**发现磁盘红线**：14 天滚动快照 ~5.2G 装不下，手册已列三个处置选项（KEEP_DAYS=5 / 异盘 / 扩容），未改生产配置待拍板。
+- 改动：`docs/2026-09-23-data-governance-ops.md` 基线记录小节回填（含上述全部数字与证据位置）。
+- 验证：verify:quick 16/16（纯文档改动）；服务器侧证据见 journalctl 与 systemd status。
+- 待 push。
+
 ## 2026-09-23｜docs(ops): specs/021 数据治理运维手册——备份恢复演练 + retention 审查流程 + 服务器规格基线采集
 
 - 起因：specs/021 交付物第 4 项；FR-003 要求按文档可执行的恢复路径，SC-003 磁盘增长预测缺硬件基线。

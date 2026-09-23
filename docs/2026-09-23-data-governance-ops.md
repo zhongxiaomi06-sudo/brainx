@@ -136,6 +136,13 @@ sqlite3 /opt/brainx/data/brainx.db \
 
 **⚠️ 磁盘红线（本次采集发现）**：14 天滚动快照 × ~370M ≈ 5.2G，超过当前 3.2G 可用。处置选项：① /etc/brainx/worker.env 设 `BRAINX_BACKUP_KEEP_DAYS=5`（约 1.9G，可承受）；② `BRAINX_BACKUP_DIR` 指向挂载的数据盘；③ 扩容系统盘。回填时未改生产配置，待拍板。
 
+### 数据盘迁移记录（2026-09-23，已完成）
+
+- 新购 40G ESSD 数据盘（d-bp1dgg3rzmehc33ih22a，与系统盘同实例 i-bp1dgg3rzmehc33fwpsn），ext4 整盘格式化，挂载至 `/opt/brainx/data`，fstab 持久化（UUID=9b0e6669-bc5f-4571-960f-806e67d225b7）。
+- 迁移过程：停 brainx/brainx-worker/brainx-agent-gateway/brainx-dispatcher → rsync /opt/brainx/data → 副本行数核验（wel 17,185 / lark 17,202 / job_facts 23,294，与源一致）→ 换挂载点 → 起服健康检查全过。停机约 4 分钟。openclaw-brainx 被联动停止，已单独恢复 active。
+- 迁移后验证：新快照 brainx-20260923-152435.db（369M）落在 vdb；旧目录清理后系统盘降到 78%（4.1G 可用），数据盘 4%（36G 可用）。快照/归档自此离开系统盘，`BRAINX_BACKUP_KEEP_DAYS=14` 默认配置在 40G 下成立（红线选项①不再需要）。
+- RDS 核实：当前生产走 `reloop` 库（hayden 账号，连通正常）；AccessKey：本机 aliyun CLI default profile 有效（cn-hangzhou），**服务器上 aliyun CLI 的 dms profile 已失效（InvalidAccessKeyId.NotFound）**——备份同步 OSS 前需先修服务器侧 AK 或改用 RAM 角色。
+
 ## 相关文档
 
 - [specs/021 数据治理规格](../specs/021-data-governance/spec.md)：验收标准与范围边界。

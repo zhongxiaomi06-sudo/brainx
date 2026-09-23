@@ -1,5 +1,15 @@
 # Agent Commit 记录
 
+## 2026-09-23｜ops(deploy): 40G 数据盘挂载与 /opt/brainx/data 迁移——快照/归档离开系统盘
+
+- 起因（用户指令）：数据盘与 RDS 已购置，核实并完成数据盘迁移。前置：规格采集发现系统盘 84% 红线。
+- 核实结果：① 40G ESSD 数据盘已挂到实例（lsblk /dev/vdb + 本机 aliyun CLI DescribeDisks 双重确认 In_use）；② RDS 生产走 reloop 库（hayden 账号连通正常）；③ AccessKey 本机 default profile 有效（cn-hangzhou），服务器侧 aliyun CLI dms profile 已失效（InvalidAccessKeyId.NotFound），OSS 同步前需先修。
+- 迁移执行：/dev/vdb ext4 整盘格式化 → 停四服务 → rsync /opt/brainx/data（1.0G）→ 副本行数核验一致（wel 17,185 / lark 17,202 / job_facts 23,294）→ 换挂载 + fstab（UUID 持久化）→ 起服。停机约 4 分钟；openclaw-brainx 被联动停止已单独恢复。
+- 验证：五服务全部 active + guard/gateway 健康；dispatcher 对迁移后库正常消费；新快照 brainx-20260923-152435.db（369M）落在 vdb；旧目录清理后系统盘 84%→78%、数据盘 4%（36G 可用）。14 天滚动快照在 40G 下成立，磁盘红线解除。
+- 改动：`docs/2026-09-23-data-governance-ops.md` 加「数据盘迁移记录」小节（含盘 ID、UUID、RDS/AK 核实结论）。
+- 验证：verify:quick 16/16（纯文档改动）。
+- 待 push。
+
 ## 2026-09-23｜docs(specs): specs/022 客户反馈信号回流与推送精准度——规格起草 + 四项决策拍板
 
 - 起因（用户指令）：基于 2026-09-23 客户健康指标报告（200 家 × 90 天，规则版 v2，带 chat_id）讨论「BrainTex 推送更准」，先敲定方案细节。用户对四个分叉逐项拍板：①规则抽取先行 + LLM 带 kill-switch（默认关）②客户反馈事件进 workflow_event_log 账本（specs/019 同口径，不立第二事实源）③断档触发器绕过 2h 限流、范围严格限触发客户 ④休眠客户完全静默 + 移交 BD 清单。

@@ -86,6 +86,11 @@ export function toJobRow(j) {
   const steps = j.pipeline_info?.pipeline_step_count || {};
   const cities = Array.isArray(j.cities) ? j.cities.map((city) => String(city).trim()).filter(Boolean) : [];
   const pipe = Object.entries(steps).map(([k, v]) => `${k}×${v}`).join(' ');
+  const observedAt = j.update_time ? new Date(Number(j.update_time)).toISOString() : undefined;
+  const evidence = Object.fromEntries([
+    'company', 'role', 'city', 'cities', 'pipeline', 'hc', 'active_state',
+    'owner_name', 'owner_unique_id', 'chat_id', 'notes',
+  ].map((field) => [field, { ref: `ttc://job/${j.unique_id}#${field}`, confidence: 'HIGH' }]));
   return {
     project_id: j.unique_id,              // 真 ATS project_id（替换 P-FIX 占位）
     company, role: j.name || '职位待定',
@@ -96,13 +101,20 @@ export function toJobRow(j) {
     active_state: j.status === 1 ? 'OPEN' : j.status === 0 ? 'COOLING' : 'UNKNOWN',
     priority: null,                       // TTC priority 字段实测恒 0，无信号
     notes: j.analytics || j.description || null,
-    company_type: null,                   // industry_tags 形态未稳定，暂不映射（raw_json 有全量）
+    company_type: null,                   // industry_tags 形态未稳定，暂不进规范事实
     owner_name: j.managers?.[0]?.name || null,
     owner_unique_id: j.managers?.[0]?.unique_id || null,
     chat_id: j.group_chat?.id || null,      // 驾驶舱群（活跃判定数据源；一群可挂多职位）
     relation: null,
     source_url: `ttc://job/${j.unique_id}`,
-    captured_at: j.update_time ? new Date(Number(j.update_time)).toISOString() : undefined,
+    captured_at: observedAt,
+    source_meta: {
+      external_id: j.unique_id,
+      adapter_version: 'ttc-job-v1',
+      schema_version: 'canonical-job-v1',
+      observed_at: observedAt,
+      evidence,
+    },
     ttc: { schema_version: TTC_FIELD_SCHEMA_VERSION, field_errors: fieldCheck.errors,
            field_warnings: fieldCheck.warnings, cities, pipeline_steps: steps,
            company_unique_id: j.company_unique_id, cooperation: j.cooperation || '',

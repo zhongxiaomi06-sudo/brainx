@@ -1,6 +1,6 @@
 # 028 — 来源适配与版本化职位事实
 
-状态：Specified（2026-09-23）
+状态：Implemented（2026-09-23，待最新提交完整门禁）
 
 上游：[仓库重构施工总手册](../../docs/2026-09-22-refactor-agentic-ranking-manual.md)阶段 04、
 [推荐重构数据契约](../../docs/2026-09-22-ranking-data-migration.md)、

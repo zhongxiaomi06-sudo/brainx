@@ -13,22 +13,15 @@ import { profileTtcFields, TTC_MAIN_COLUMNS } from './ttc-field-catalog.js';
 import { latestTtcFieldReport } from './ttc-field-report.js';
 import { ignoredProjectIds } from './opportunity-ignore.js';
 
-const parseRaw = (value) => {
-  try { return JSON.parse(value || '{}'); } catch { return {}; }
-};
-
-const citiesOf = (job, raw) => {
-  const values = raw.cities || raw.ttc?.cities;
-  if (Array.isArray(values)) return values.map((value) => String(value).trim()).filter(Boolean);
+const citiesOf = (job) => {
   return String(job.city || '').split(/[、,，]/).map((value) => value.trim()).filter(Boolean);
 };
 
-const pipelineStepsOf = (raw) => {
-  const steps = raw.ttc?.pipeline_steps;
-  if (!steps || typeof steps !== 'object' || Array.isArray(steps)) return null;
-  const normalized = Object.fromEntries(Object.entries(steps)
-    .filter(([, value]) => Number.isFinite(Number(value)) && Number(value) >= 0)
-    .map(([key, value]) => [key, Number(value)]));
+const pipelineStepsOf = (pipeline) => {
+  const normalized = Object.fromEntries(String(pipeline || '').split(/\s+/)
+    .map((part) => part.match(/^(.+?)×(\d+)$/))
+    .filter(Boolean)
+    .map((match) => [match[1], Number(match[2])]));
   return Object.keys(normalized).length ? normalized : null;
 };
 
@@ -46,15 +39,14 @@ export function radarRows(db, consultant_id) {
     const relation = deriveRelation(relCtx, j.project_id);
     if (relation === 'NOT_JOINED' || relation === 'UNKNOWN') continue;
     const c = cMap[j.project_id];
-    const raw = parseRaw(j.raw_json);
     rows.push({
       project_id: j.project_id,
       company: j.company,
       role: j.role,
       city: j.city ?? null,
-      cities: citiesOf(j, raw),
+      cities: citiesOf(j),
       pipeline: j.pipeline ?? null,
-      pipeline_steps: pipelineStepsOf(raw),
+      pipeline_steps: pipelineStepsOf(j.pipeline),
       hc: j.hc ?? null,
       active_state: j.active_state ?? null,
       priority: j.priority ?? null,

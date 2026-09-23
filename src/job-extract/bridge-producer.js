@@ -11,6 +11,7 @@
 import { uuid, now } from '../db.js';
 import { appendEvent } from '../hub/event-log.js';
 import { consumeJobExtract } from './index.js';
+import { extractWithCache } from './cache.js';
 
 const INSERT_MSG_SQL = `INSERT OR IGNORE INTO lark_messages
   (message_id, chat_id, message_type, text, mentions_json, create_time, received_at)
@@ -31,7 +32,7 @@ export function normalizeCreateTime(value, fallback = now()) {
 
 /** E2 LLM 预抽取（异步层，AI_JOB_EXTRACT_ENABLED=1 且 llm 已配置时）：
  * 至少一个有效字段才注入，否则让消费链走规则层（rules 保底）。 */
-async function presetFromLlm(text) {
+async function presetFromLlm(db, text, chatId) {
   if (process.env.AI_JOB_EXTRACT_ENABLED !== '1') return null;
   try {
     const { isLlmConfigured } = await import('../llm.js');
@@ -39,7 +40,16 @@ async function presetFromLlm(text) {
     const { extractLlm, isJobRelevant } = await import('./classify.js');
     // isJobRelevant 先行砍 LLM 调用（设计口径）：闲聊不烧额度
     if (!isJobRelevant(text)) return null;
-    const fields = await extractLlm(text);
+    const result = await extractWithCache(db, {
+      tenantId: 'brainx',
+      scopeId: `group:${chatId}`,
+      text,
+      extractorVersion: 'group-job-extract-v1',
+      modelId: process.env.BRAINX_LLM_MODEL || 'configured-default',
+      promptVersion: 'group-job-extract-v1',
+      extractor: async () => ({ fields: await extractLlm(text), layer: 'llm', extra: null }),
+    });
+    const fields = result.fields;
     return fields && Object.values(fields).some((f) => f && f.text) ? fields : null;
   } catch { return null; }
 }
@@ -59,7 +69,7 @@ export async function produceOne(db, { message_id, chat_id, msg_type = 'text', t
     schema_version: 1,
   });
   if (!ev.ok) return { produced: false, reason: ev.reason };
-  let presetFields = await presetFromLlm(String(text || ''));
+  let presetFields = await presetFromLlm(db, String(text || ''), chat_id);
   let consumed;
   try {
     consumed = consumeJobExtract(db, ev.event.event_id, { presetFields });

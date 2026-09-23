@@ -1,5 +1,16 @@
 # Agent Commit 记录
 
+## 2026-09-23｜feat(feedback): specs/019 US3 反馈环——四项指标可测量、可重算、append-only 快照
+
+- 起因：specs/019-hub-event-backbone tasks.md T019-T023。前置 US1（业务事件）/US2（dispatcher）已让账本有原料——本故事把「推荐/判断/找人准不准」从感觉变成每周可看的数字。
+- 改动：
+  1. `migrations/0053_feedback_metrics.sql`（新）：append-only 指标快照表（窗口+metric_key+dimension+sample_size+value_num+inputs_json 口径追溯）；0 样本强制落行防静默漏数。
+  2. `src/feedback/rollup.js`（新，约 190 行）：四项指标——recommendation.accept_rate（job.accepted / 真实曝光 served_at 非空）、extract.field_confirm_rate（confirm/(confirm+reject) 按 domain 切片）、sourcing.channel_conversion（success/(success+error) 按 channel 切片）、job.terminal_cycle_days（接单→终局中位天数）。**形态修正（相对 research.md 决策 4）**：不做增量计数消费者——账本事件即唯一事实源，runRollup 按窗口直接重算，无第二份状态可漂移；latestMetrics 每 key+dimension 取最新。
+  3. `bin/brainx-feedback-rollup.mjs`（新）：默认汇总最近 7 天并打印最新指标（--days/--print-only/--db）；`deploy/systemd/brainx-feedback-rollup.{service,timer}`（每日 05:11，镜像既有单元纪律）。
+  4. 测试：`tests/feedback-rollup.test.mjs`（新，3 例，先红后绿——口径与人工计算一致/0 样本落行/同窗重算 append-only + latestMetrics 取最新）；`tests/framework.test.mjs` 迁移记账跟进（0053 入账、旧库兼容 55→56）。
+- 验证：新增 3 例 + 全量 `npm test` 838/838；`npm run verify:quick` 16/16；bin 冒烟（本地库写入 4 行快照并正确打印）。
+- 待部署：服务器 git pull + enable brainx-feedback-rollup.timer。未 push。
+
 ## 2026-09-23｜feat(ops): OSS 出机同步就绪——specs/021 FR-002 对象存储面（脚本 + systemd 单元 + 启用手册）
 
 - 起因（用户指令）：磁盘红线解除后，出机同步（盘坏/机坏容灾）留待决定。服务器实测：aliyun CLI 两个 profile（dms/recruit_admin）对 OSS 均无效（recruit_admin 本地 Valid 但 oss ls 403 InvalidAccessKeyId）——拍板走 **ECS 实例 RAM 角色免 AK**，不新增长期凭据。

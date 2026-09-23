@@ -93,11 +93,11 @@
 
 ### Implementation for User Story 3
 
-- [ ] T019 [US3] 新建 `migrations/0052_feedback_metrics.sql`（结构见 data-model.md）+ 跟进 `tests/framework.test.mjs` 迁移记账清单断言
-- [ ] T020 [US3] 新建 `tests/feedback-rollup.test.mjs`（先红）：四项指标口径（contracts/event-types.md 表）各一组已知答案用例 + 0 样本落行 + 重算 append-only
-- [ ] T021 [US3] 新建 `src/feedback/rollup.js`：注册为 dispatcher 消费者（增量计数）+ `runRollup(db, window)` 周期汇总写 feedback_metrics
-- [ ] T022 [US3] 汇总结果读取入口：既有报告 CLI/技能可查询快照（最小实现：只读 SQL 查询脚本或 server 只读端点）
-- [ ] T023 [US3] 测试转绿 + `npm run verify:quick` + 原子 commit（`feat(feedback): 反馈环指标快照（US3）`），同步 docs/AGENT_COMMIT_LOG.md
+- [x] T019 [US3] 新建 `migrations/0052_feedback_metrics.sql`（结构见 data-model.md）+ 跟进 `tests/framework.test.mjs` 迁移记账清单断言
+- [x] T020 [US3] 新建 `tests/feedback-rollup.test.mjs`（先红）：四项指标口径（contracts/event-types.md 表）各一组已知答案用例 + 0 样本落行 + 重算 append-only
+- [x] T021 [US3] 新建 `src/feedback/rollup.js`：注册为 dispatcher 消费者（增量计数）+ `runRollup(db, window)` 周期汇总写 feedback_metrics
+- [x] T022 [US3] 汇总结果读取入口：既有报告 CLI/技能可查询快照（最小实现：只读 SQL 查询脚本或 server 只读端点）
+- [x] T023 [US3] 测试转绿 + `npm run verify:quick` + 原子 commit（`feat(feedback): 反馈环指标快照（US3）`），同步 docs/AGENT_COMMIT_LOG.md
 
 **Checkpoint**: SC-005 成立——每周可出推荐采纳率与抽取确认率报告
 

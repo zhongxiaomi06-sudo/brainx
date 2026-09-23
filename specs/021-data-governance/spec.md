@@ -63,6 +63,7 @@
 
 - **FR-001**: 系统 MUST 每日自动生成生产库一致性快照（在线安全方式），保留滚动窗口（默认 14 天），失败可见。
 - **FR-002**: 快照 MUST 存放于生产库所在磁盘以外的位置（本机另一磁盘或对象存储）。
+  - 实现（2026-09-23）：本机另一磁盘＝数据盘 `/opt/brainx/data`（ESSD 40G，fstab 持久化）；对象存储＝OSS 出机同步（`bin/brainx-oss-sync.mjs` + `deploy/systemd/brainx-oss-sync.{service,timer}`，ECS 实例 RAM 角色免 AK、默认 dry-run + `--apply`、幂等 + quick_check 门禁、远端永不删除），启用步骤见[数据治理运维手册](../../docs/2026-09-23-data-governance-ops.md) §5。
 - **FR-003**: 系统 MUST 提供按文档可执行的恢复路径，恢复产物可只读打开且校验表计数。
 - **FR-004**: lark_messages、workflow_event_log、openmai_results MUST 各自有声明的保留窗口与归档规则；被证据引用（evidence_refs）的行不得删除。
 - **FR-005**: 保留/归档任务 MUST 默认 dry-run，显式参数才执行删除，删除前自动留档。

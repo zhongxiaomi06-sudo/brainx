@@ -143,6 +143,75 @@ sqlite3 /opt/brainx/data/brainx.db \
 - 迁移后验证：新快照 brainx-20260923-152435.db（369M）落在 vdb；旧目录清理后系统盘降到 78%（4.1G 可用），数据盘 4%（36G 可用）。快照/归档自此离开系统盘，`BRAINX_BACKUP_KEEP_DAYS=14` 默认配置在 40G 下成立（红线选项①不再需要）。
 - RDS 核实：当前生产走 `reloop` 库（hayden 账号，连通正常）；AccessKey：本机 aliyun CLI default profile 有效（cn-hangzhou），**服务器上 aliyun CLI 的 dms profile 已失效（InvalidAccessKeyId.NotFound）**——备份同步 OSS 前需先修服务器侧 AK 或改用 RAM 角色。
 
+## 5. OSS 出机同步（specs/021 FR-002 对象存储面，2026-09-23 就绪待启用）
+
+实现：`bin/brainx-oss-sync.mjs` + `deploy/systemd/brainx-oss-sync.{service,timer}`。目的：盘坏/机坏级容灾——本地 14 天滚动快照之外，OSS 远端**全量留存、永不删除**（容量与冷热分层交给 bucket 生命周期规则，脚本不管删）。
+
+**纪律**（与 backup/retention 一脉）：
+- 默认 dry-run（只出 uploads/skips/failed 计划），`--apply` 才实传；
+- 幂等：远端同名且同大小 → 跳过；上传后重读远端大小复核，不一致判失败；
+- quick_check 门禁：上传前对本地快照做完整性校验，不过关的文件拒绝出机；
+- 只碰 `brainx-YYYYMMDD-HHMMSS.db` 命名规范的文件；
+- 凭据走 **ECS 实例 RAM 角色**（profile `ecs-oss`，EcsRamRole 模式），不落 AK——服务器上 dms/recruit_admin 两个 profile 的 AK 对 OSS 均已 403/404，不再新增 AK；
+- ECS 与 bucket 同地域走**内网 endpoint**（`oss-cn-hangzhou-internal.aliyuncs.com`），免公网流量；
+- 锁 `.oss-sync.lock`（与 backup 锁分离），退出码语义一致：75=占用（EX_TEMPFAIL），1=真失败；
+- timer 03:47（backup 03:17 之后 30 分钟），`After=brainx-backup.service`。
+
+### 服务器侧就绪状态（2026-09-23）
+
+- profile `ecs-oss` 已配置（`EcsRamRole:BrainXEcsOssBackup`，region cn-hangzhou）；角色未绑定时调用明确报错（404），不静默。
+- 代码与单元随仓库分发；**enable 前置两件事**：控制台建角色绑实例 + 建 bucket 写 env（下节）。
+
+### 启用清单（需账号管理员在控制台执行）
+
+1. **RAM 建角色** `BrainXEcsOssBackup`（可信实体：阿里云服务 → ECS），挂最小化策略（bucket 名以实际为准）：
+
+   ```json
+   {
+     "Version": "1",
+     "Statement": [
+       {
+         "Effect": "Allow",
+         "Action": ["oss:PutObject", "oss:GetObject", "oss:ListObjects", "oss:GetBucketInfo"],
+         "Resource": ["acs:oss:*:*:brainx-backups-yorkteam", "acs:oss:*:*:brainx-backups-yorkteam/*"]
+       }
+     ]
+   }
+   ```
+
+2. **绑定实例**：ECS 实例 `i-bp1dgg3rzmehc33fwpsn`（实例详情 → 授予实例 RAM 角色）。服务器上验证：
+
+   ```bash
+   aliyun oss ls --profile ecs-oss    # 不再 403/404 即通
+   ```
+
+3. **建 bucket**：建议 `brainx-backups-yorkteam`，地域 cn-hangzhou（与 ECS 同域），读写权限**私有**；生命周期规则按成本拍板（如 30 天转低频、90 天转归档）。写 env：
+
+   ```bash
+   echo 'BRAINX_OSS_BUCKET=oss://brainx-backups-yorkteam/brainx' | sudo tee -a /etc/brainx/worker.env
+   ```
+
+4. **首跑与启用**：
+
+   ```bash
+   # 先看计划（dry-run，不实传；需角色已绑定，否则报错为预期）
+   sudo -u brainx node /opt/brainx/bin/brainx-oss-sync.mjs
+
+   # 确认计划后实传（service 的 ExecStart 自带 --apply；全量 14 快照 ~5G 内网上传数分钟）
+   sudo systemctl start brainx-oss-sync.service
+
+   # 启用每日调度
+   sudo systemctl enable --now brainx-oss-sync.timer
+   ```
+
+5. **验收判据**：
+   - 首跑摘要 JSON：`uploaded` 非空、`failed` 为空；
+   - 幂等复核：紧接着再 `start` 一次，`skipped` == 本地快照数、`uploaded` 为空、`failed` 空；
+   - `journalctl -u brainx-oss-sync.service -n 30 --no-pager` 无异常；
+   - 控制台/OSS 工具抽查对象大小与本地一致（脚本已自动复核，抽查属双重确认）。
+
+失败面：退出码 1 时 stderr 带具体原因（凭据/网络/quick_check 门禁/大小复核）；退出码 75 = 上一次实例仍在跑。`Persistent=true`，停机漏跑会补跑。
+
 ## 相关文档
 
 - [specs/021 数据治理规格](../specs/021-data-governance/spec.md)：验收标准与范围边界。

@@ -1,5 +1,17 @@
 # Agent Commit 记录
 
+## 2026-09-23｜feat(ops): OSS 出机同步就绪——specs/021 FR-002 对象存储面（脚本 + systemd 单元 + 启用手册）
+
+- 起因（用户指令）：磁盘红线解除后，出机同步（盘坏/机坏容灾）留待决定。服务器实测：aliyun CLI 两个 profile（dms/recruit_admin）对 OSS 均无效（recruit_admin 本地 Valid 但 oss ls 403 InvalidAccessKeyId）——拍板走 **ECS 实例 RAM 角色免 AK**，不新增长期凭据。
+- 改动：
+  1. `bin/brainx-oss-sync.mjs`（新）：默认 dry-run + `--apply`；幂等（远端同名同大小跳过 + 上传后大小复核）；上传前 PRAGMA quick_check 门禁（坏库拒出机）；远端永不删除（容量交 bucket 生命周期规则）；内网 endpoint 免公网流量；锁 `.oss-sync.lock` 退出码 75/1 与 backup 一致。
+  2. `tests/oss-sync.test.mjs`（新，7 用例）：目标解析/幂等计划/清单过滤/quick_check 门禁/锁互斥/入口报错。
+  3. `deploy/systemd/brainx-oss-sync.{service,timer}`（新）：03:47（backup 03:17 后 30 分钟），After=brainx-backup.service，hardening 对齐 backup 单元。
+  4. `specs/021-data-governance/spec.md`：FR-002 下补实现记录；`docs/2026-09-23-data-governance-ops.md`：新增 §5「OSS 出机同步」——纪律、服务器侧就绪状态、控制台启用清单（角色策略 JSON/绑实例/建 bucket/首跑/验收判据/失败面）。
+- 服务器侧（凭据无关部分已完成）：profile `ecs-oss` 已配置（EcsRamRole:BrainXEcsOssBackup）；角色未绑定时报 404 为预期。timer 诊断：`list-timers brainx-*` 首次为 0 系未加载单元误报，`--all` 核实 backup/retention timer 均 enabled 且下次触发正常（03:17 / 周日 04:23）。
+- 验证：oss-sync 测试 7/7；verify:quick 与全量门禁结果见下一条（push 前置）。
+- 待 push；enable 待用户控制台完成角色绑定 + bucket。
+
 ## 2026-09-23｜ops(deploy): 40G 数据盘挂载与 /opt/brainx/data 迁移——快照/归档离开系统盘
 
 - 起因（用户指令）：数据盘与 RDS 已购置，核实并完成数据盘迁移。前置：规格采集发现系统盘 84% 红线。

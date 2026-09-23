@@ -1,5 +1,17 @@
 # Agent Commit 记录
 
+## 2026-09-23｜docs(data): 数据结构与磁盘用途规范——数据域总表 + 磁盘铁律 + 历史遗留归置
+
+- 起因（用户指令）：「先规范当前的数据的结构，正确的规范，不要磁盘误用」。
+- 双边盘点发现的误用与处置（全部归置不删除，可逆）：
+  1. `data/brainx.sqlite{,-shm,-wal}`：9/10 某进程误开的空 schema 库（55 表零行 + 漂移 WAL）→ `archive/legacy-20260923/`；
+  2. 仓库根 `/opt/brainx/backups/`（演示脚本备份+灰测产物，违「仓库根不落数据」）→ `archive/legacy-20260923/repo-root-backups/`；
+  3. 仓库根 `diag-fact.tmp.mjs`（直连 MySQL 临时诊断脚本）→ 同上。归置后五服务 active 无影响。
+  4. 未动并标注：`bin/ttc-multi-pull.mjs`、`deploy/openclaw/sandbox/`（他人未跟踪工具）、服务器删除态 demo-offer-seed.mjs（待属主）。
+- 改动：`docs/2026-09-23-data-structure-and-disk-layout.md`（新）——①数据域总表（决策主库/账本/原文/草稿/指标/RDS/快照/OSS/归档/本地副本，各带结构权威与生命周期）；②磁盘铁律 6 条（系统盘只放 OS+代码、数据盘放全部数据、一个活库、备份必须出盘出机、密钥与 PII 边界、RDS 专库账号）；③保留窗口表；④草稿落库纪律（第一批清洗教训转正：company/role 双缺即 skip、系统清洗置 rejected 不发事件）；⑤归置记录。docs/README.md 路由与目录登记。
+- 验证：纯文档改动，verify:quick 16/16。
+- 待 push。
+
 ## 2026-09-23｜feat(specs/003 延伸): 草稿 GLM 语义清洗管线——extract 全量就绪（云端运行）
 
 - 起因（用户指令）：待确认队列从 8,185 瘦身到可确认规模后，用 GLM 5.3 对第一批做语义清洗、按语义理解找规则进度。拍板：**不抽样全量处理**；**全流程上云（ECS 直读生产库）**，本地零拷贝。

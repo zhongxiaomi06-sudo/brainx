@@ -1,5 +1,16 @@
 # Agent Commit 记录
 
+## 2026-09-23｜ops(data): 第一批信息数据清洗——8,132 条死草稿拒绝 + retention 首次归档执行
+
+- 起因（用户指令）：完成第一批信息数据清洗。盘点发现：dispatcher 消费 1.7 万条积压后 job_facts_drafts 达 8,189 条，其中 8,132 条缺 company/role 且 project_id 恒空，按 confirmDraft 规则永远无法转正，且会淹没顾问的待确认队列（brainx_pending_job_facts）。
+- 执行（先留快照 brainx-20260923-170947.db）：
+  1. 草稿清洗：单事务 UPDATE 8,132 条 → rejected（confirmed_by='system:cleanup-20260923'）。pending 8,185 → 55（company+role 齐全留人工审）+ judgment 14。**刻意不发 job_fact.reviewed 事件**——系统清洗≠人工评审信号，保护 extract.field_confirm_rate 指标口径。
+  2. retention 首跑：dry-run 复核后 --apply，107+107 行（2026-06 超龄）归档 brainx-archive-20260923.db，主库同步减量，服务全 active。
+- 发现转规则：规则层「无证据不编造」纪律有效（无伪造字段），但缺字段草稿不应落 staging（judgment 域 statement=null 即 skip 已是此纪律）——extract 层「company/role 双缺即 skip」改进记入 specs/019 后续专项。
+- 改动：`docs/2026-09-23-data-governance-ops.md` 加 §6 第一批数据清洗记录。
+- 验证：清洗前后行数对照、归档库行数核验、五服务 active；verify:quick 16/16。
+- 待 push。
+
 ## 2026-09-23｜feat(ops): OSS 出机同步接通上线——RAM 角色/console 三步 CLI 完成 + 脚本三处实测修复
 
 - 起因（用户指令）：授权用本机有效 AK 自主完成 OSS 出机同步全部剩余安排。

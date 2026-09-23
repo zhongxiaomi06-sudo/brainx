@@ -220,6 +220,17 @@ sqlite3 /opt/brainx/data/brainx.db \
 
 失败面：退出码 1 时 stderr 带具体原因（凭据/网络/quick_check 门禁/大小复核）；退出码 75 = 上一次实例仍在跑。`Persistent=true`，停机漏跑会补跑。
 
+## 6. 第一批数据清洗记录（2026-09-23，生产执行）
+
+**背景**：dispatcher 上线后对 1.7 万条积压消息做规则抽取，产出 8,189 条 job_facts_drafts——其中 8,132 条缺 company 或 role 且 project_id 恒空（E4 实体对齐未建），按 confirmDraft 规则永远无法转正，属于 backlog 回放的规则噪音，且会把 `brainx_pending_job_facts` 的待确认队列淹掉。
+
+**执行**（先快照 brainx-20260923-170947.db 再动数）：
+
+1. **草稿队列清洗**：单事务把 8,132 条死草稿置 `rejected`（confirmed_by='system:cleanup-20260923'）。结果：pending 从 8,185 降到 **55 条可确认**（company+role 齐全，留人工审）+ judgment_drafts 14 条。**刻意不发 `job_fact.reviewed` 事件**——系统清洗不是人工评审信号，否则会污染 `extract.field_confirm_rate` 指标口径。
+2. **retention 首次执行**：dry-run 复核后 `--apply`——lark_messages 107 行 + workflow_event_log 107 行（2026-06 超龄数据）归档至 `data/archive/brainx-archive-20260923.db`（212K），主库行数同步下降，openmai_results 窗口内零归档。归档管线端到端验证通过（服务全部 active）。
+
+**教训转规则**：规则抽取对「无证据不编造」的纪律是对的（8,132 条里没有一条伪造 company/role），但**缺字段草稿不该落 staging**——后续应在 extract 层加「company 与 role 双缺即 skip 不落草稿」（judgment 域已是此纪律：statement=null 即 skip）。该改进记入 specs/019 后续专项。
+
 ## 相关文档
 
 - [specs/021 数据治理规格](../specs/021-data-governance/spec.md)：验收标准与范围边界。

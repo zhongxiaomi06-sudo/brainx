@@ -1,5 +1,17 @@
 # Agent Commit 记录
 
+## 2026-09-23｜feat(specs/003 延伸): 草稿 GLM 语义清洗管线——extract 全量就绪（云端运行）
+
+- 起因（用户指令）：待确认队列从 8,185 瘦身到可确认规模后，用 GLM 5.3 对第一批做语义清洗、按语义理解找规则进度。拍板：**不抽样全量处理**；**全流程上云（ECS 直读生产库）**，本地零拷贝。
+- 改动：
+  1. `src/draft-cleanup.js`（新，纯逻辑）：A 批三分类解析（REAL_JOB/SUSPECTED/NOT_JOB，容忍围栏）、复活稿构造（source='llm-recovery'，raw_json 记 llm_recovery_of 留痕）、B 批拆稿构造（source='llm-split'，记 llm_split_of）、幂等键、规则缺口四类对账（role_missed_by_rules/company_missed_by_rules/rules_over_extracted/ambiguous）。
+  2. `bin/brainx-draft-cleanup.mjs`（新，四阶段 CLI）：extract（只读连接导出全量清单 join 消息原文）/ classify（GLM 5.3 批量，并发与断点续跑）/ apply（默认 dry-run，--apply 才写库，事务包裹，复活/拆稿一律 pending 等人工确认，绝不直接转正，不发评审事件）/ report（规则缺口清单 markdown）。
+  3. `tests/draft-cleanup.test.mjs`（新，5 用例）全过；kill-switch BRAINX_LLM_CLEANUP=1 才允许 classify/apply；key 走 ZHIPU_API_KEY（GLM_MODEL 缺省 glm-5.3）。
+- 云端执行（ECS，以 brainx 用户，工作文件在数据盘 data/draft-cleanup/）：extract 完成——A 批 8,132 条全量（16M，59 条缺原文对应已归档超龄消息）、B 批 99 条 pending（dispatcher 持续消费中，B 批为流动队列，apply 按快照处理可重跑）。
+- 数据事实：8,132 条 rejected 中 1,796 条带 company（22%，拒因是无 role）——GLM 复活的主要靶子；pending 里存在一稿多职位（一条 6 公司 5 岗）与字段错位（项目名当公司名），是拆稿/纠偏的对象。
+- 验证：本地测试 5/5；服务器 node --check 过；extract 云端跑通（EXIT=0，只读连接零写入）。
+- 待办：ZHIPU_API_KEY 就位后 → classify a + classify b → apply 先 dry-run 复核计划 → --apply → report 出规则缺口清单。
+
 ## 2026-09-23｜ops(data): 第一批信息数据清洗——8,132 条死草稿拒绝 + retention 首次归档执行
 
 - 起因（用户指令）：完成第一批信息数据清洗。盘点发现：dispatcher 消费 1.7 万条积压后 job_facts_drafts 达 8,189 条，其中 8,132 条缺 company/role 且 project_id 恒空，按 confirmDraft 规则永远无法转正，且会淹没顾问的待确认队列（brainx_pending_job_facts）。

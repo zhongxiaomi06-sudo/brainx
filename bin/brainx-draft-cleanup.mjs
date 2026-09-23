@@ -28,7 +28,7 @@ import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { now } from '../src/db.js';
 import {
-  buildRecoveryDraft, buildSplitDrafts, diffAgainstRules, parseClassifyResponse, parseJobsResponse,
+  buildSplitDrafts, diffAgainstRules, parseClassifyResponse, parseJobsResponse, recoveryUpdateOf,
 } from '../src/draft-cleanup.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -100,8 +100,9 @@ function phaseExtract() {
   const counts = { a: 0, a_missing_text: 0, b: 0, b_missing_text: 0 };
   const dump = (status, suffix, counter, missCounter) => {
     const out = createWriteStream(join(dir, suffix));
-    const rows = d.prepare(`SELECT dr.draft_id, dr.message_id, dr.chat_id, dr.company, dr.company_evidence,
-        dr.role, dr.role_evidence, dr.city, dr.pipeline_stage, dr.hc, dr.active_state, dr.state_evidence,
+    const rows = d.prepare(`SELECT dr.draft_id, dr.event_id, dr.message_id, dr.chat_id, dr.company, dr.company_evidence,
+        dr.role, dr.role_evidence, dr.city, dr.city_evidence, dr.pipeline_stage, dr.pipeline_evidence,
+        dr.hc, dr.hc_evidence, dr.active_state, dr.state_evidence,
         dr.origin, dr.raw_json, lm.text AS raw_text
       FROM job_facts_drafts dr
       LEFT JOIN lark_messages lm ON lm.message_id = dr.message_id
@@ -205,22 +206,28 @@ function phaseApply({ apply }) {
     const nowIso = now();
     if (apply) d.exec('BEGIN');
 
-    // —— A 批复活 ——
+    // —— A 批复活：UPDATE 原行（message_id 部分唯一索引，不插新行）——
     const aItems = new Map((existsSync(join(dir, A_SUFFIX)) ? readJsonlSync(join(dir, A_SUFFIX)) : []).map((x) => [x.draft_id, x]));
     const aResults = existsSync(join(dir, A_RESULT)) ? readJsonlSync(join(dir, A_RESULT)) : [];
     for (const r of aResults) {
       if (r.result?.verdict !== 'REAL_JOB') { summary.a.skipped_verdict += 1; continue; }
-      const exists = d.prepare(`SELECT 1 FROM job_facts_drafts WHERE message_id=? AND source='llm-recovery' LIMIT 1`).get(r.message_id);
-      if (exists) { summary.a.skipped_existing += 1; continue; }
       const src = aItems.get(r.draft_id);
       if (!src) { summary.a.failed_parse += 1; continue; }
-      const draft = buildRecoveryDraft(src, r.result, { nowIso, draftId: `dclr_${randomUUID()}` });
-      if (!draft) { summary.a.skipped_verdict += 1; continue; }
-      if (apply) insertDraft(d, draft);
-      summary.a.recovered += 1;
+      const upd = recoveryUpdateOf(src, r.result, { nowIso });
+      if (!upd) { summary.a.skipped_verdict += 1; continue; }
+      if (apply) {
+        const res = d.prepare(`UPDATE job_facts_drafts
+          SET role=?, role_evidence=?, source=?, status='pending', raw_json=?, extracted_at=?
+          WHERE draft_id=? AND status='rejected'`)
+          .run(upd.role, upd.role_evidence, upd.source, upd.raw_json, upd.extracted_at, src.draft_id);
+        if (res.changes > 0) summary.a.recovered += 1;
+        else summary.a.skipped_existing += 1; // 已被复活/处置过（幂等）
+      } else {
+        summary.a.recovered += 1;
+      }
     }
 
-    // —— B 批拆稿 ——
+    // —— B 批拆稿：多职位必须多行（group 来源不撞 p2p 部分唯一索引；p2p 原稿跳过转人工）——
     const bItems = new Map((existsSync(join(dir, B_SUFFIX)) ? readJsonlSync(join(dir, B_SUFFIX)) : []).map((x) => [x.draft_id, x]));
     const bResults = existsSync(join(dir, B_RESULT)) ? readJsonlSync(join(dir, B_RESULT)) : [];
     for (const r of bResults) {
@@ -230,6 +237,7 @@ function phaseApply({ apply }) {
       if (exists) { summary.b.skipped_existing += 1; continue; }
       const src = bItems.get(r.draft_id);
       if (!src) { summary.b.failed_parse += 1; continue; }
+      if (src.origin === 'p2p_jd') { summary.b.skipped_p2p = (summary.b.skipped_p2p || 0) + 1; continue; }
       const drafts = buildSplitDrafts(src, jobs, { nowIso, newId: () => `dclr_${randomUUID()}` });
       if (!apply) { summary.b.split_drafts += drafts.length; summary.b.originals_retired += 1; continue; }
       for (const draft of drafts) insertDraft(d, draft);

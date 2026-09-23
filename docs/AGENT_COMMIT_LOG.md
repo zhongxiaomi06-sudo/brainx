@@ -1,5 +1,16 @@
 # Agent Commit 记录
 
+## 2026-09-23｜fix(specs/003 延伸): 清洗 apply 两次落库修复 + 1,457 条复活/拆稿实写完成
+
+- 起因：apply 实写撞两个真实约束，逐一根因修复后成功落库（咪已批准「全部应用」）。
+- 修复：
+  1. extract SELECT 漏 event_id 列 → 复活稿绑定 undefined 被 SQLite 拒（事务已回滚无半写）；补列 + build 函数 `?? null` 容错。
+  2. **设计错误修正：复活从 INSERT 新行改为 UPDATE 原行**——`job_facts_drafts` 存在部分唯一索引 `idx_jfd_p2p_message (message_id) WHERE origin='p2p_jd'`，且复活语义本来就是「平反被冤枉的原行」；`recoveryUpdateOf` 替代 `buildRecoveryDraft`，幂等靠 `WHERE status='rejected'`（已复活行不再命中），通吃 group/p2p。B 批拆稿保留 INSERT（一稿多职位必须多行；group 来源不撞部分索引；p2p 原稿跳过转人工）。
+- 实写结果（生产库验证）：pending 1,644（llm-recovery 1,340 + llm-split 117 + rules 187）；rejected 6,877（含 85 条拆稿原稿留底，raw_json 记 llm_superseded_by）；1,459/1,644 pending 带 role 预填。13 条 B 批「无可拆职位」原稿保留 pending 转人工。
+- 凭据收尾：服务器 /etc/brainx/.cleanup-key.tmp 已删除。
+- 验证：本地测试 5/5；extract 重跑（B 批清单 272 条因 dispatcher 持续产新，apply 幂等只处理已判定 draft_id）。
+- 待 push；规则缺口清单 rule-gap-report.md 在服务器 data/draft-cleanup/，随 specs/003 迭代回灌。
+
 ## 2026-09-23｜docs(data): 云端数据安排——阿里云账号全量盘点 + 错乱点清单 + 治理顺序
 
 - 起因（用户指令）：「当前的结构在云端其实很错乱，先给一个完整的数据安排，连接云端账号调度全部资源」。

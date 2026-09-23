@@ -4,8 +4,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  buildRecoveryDraft, buildSplitDrafts, diffAgainstRules, parseClassifyResponse, parseJobsResponse,
-  recoveryIdemKey, CLASSIFY_VALUES,
+  buildSplitDrafts, diffAgainstRules, parseClassifyResponse, parseJobsResponse,
+  recoveryIdemKey, recoveryUpdateOf, CLASSIFY_VALUES,
 } from '../src/draft-cleanup.js';
 
 const NOW = '2026-09-23T09:00:00.000Z';
@@ -28,27 +28,25 @@ test('parseJobsResponse：要求 jobs 数组，过滤空项', () => {
   assert.equal(parseJobsResponse('bad'), null);
 });
 
-test('buildRecoveryDraft：REAL_JOB 才复活、留痕字段齐、NOT_JOB/无凭据拒绝', () => {
+test('recoveryUpdateOf：REAL_JOB 才复活、UPDATE 字段与留痕齐、NOT_JOB/无凭据拒绝', () => {
   const rejected = {
-    draft_id: 'old-1', event_id: 'ev-1', message_id: 'om-1', chat_id: 'oc-1',
-    company: 'KVCache.AI', company_evidence: 'KVCache.AI', role: '', role_evidence: null,
-    city: null, city_evidence: null, pipeline_stage: null, pipeline_evidence: null,
-    hc: null, hc_evidence: null, active_state: 'UNKNOWN', state_evidence: null,
+    draft_id: 'old-1', message_id: 'om-1', chat_id: 'oc-1',
+    company: 'KVCache.AI', role: '', role_evidence: null,
     origin: 'group', raw_json: '{"k":"v"}',
   };
-  const d = buildRecoveryDraft(rejected, { verdict: 'REAL_JOB', reason: '在招算子', role_hint: '算子开发工程师' },
-    { nowIso: NOW, draftId: 'new-1' });
-  assert.equal(d.status, 'pending');
-  assert.equal(d.source, 'llm-recovery');
-  assert.equal(d.role, '算子开发工程师');
-  const raw = JSON.parse(d.raw_json);
+  const upd = recoveryUpdateOf(rejected, { verdict: 'REAL_JOB', reason: '在招算子', role_hint: '算子开发工程师' },
+    { nowIso: NOW });
+  assert.equal(upd.status, 'pending');
+  assert.equal(upd.source, 'llm-recovery');
+  assert.equal(upd.role, '算子开发工程师');
+  const raw = JSON.parse(upd.raw_json);
   assert.equal(raw.llm_recovery_of, 'old-1');
   assert.equal(raw.k, 'v');
-  assert.equal(d.extracted_at, NOW);
+  assert.equal(upd.extracted_at, NOW);
 
-  assert.equal(buildRecoveryDraft(rejected, { verdict: 'NOT_JOB' }, { nowIso: NOW, draftId: 'x' }), null);
-  assert.equal(buildRecoveryDraft({ ...rejected, company: '' }, { verdict: 'REAL_JOB', reason: 'r' },
-    { nowIso: NOW, draftId: 'x' }), null);
+  assert.equal(recoveryUpdateOf(rejected, { verdict: 'NOT_JOB' }, { nowIso: NOW }), null);
+  assert.equal(recoveryUpdateOf({ ...rejected, company: '' }, { verdict: 'REAL_JOB', reason: 'r' },
+    { nowIso: NOW }), null);
 });
 
 test('buildSplitDrafts：一稿拆多职位、原稿 id 留痕、无 company/role 的项被过滤', () => {

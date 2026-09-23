@@ -37,11 +37,14 @@ export function parseJobsResponse(text) {
   return obj.jobs.filter((j) => j && typeof j === 'object');
 }
 
-/** A 批复活稿：从 rejected 草稿 + GLM 判定构造新 pending 草稿行（含幂等与留痕字段）。 */
-export function buildRecoveryDraft(rejected, classify, { nowIso, draftId }) {
+/** A 批复活（UPDATE 方案）：直接平反原 rejected 行，不新建行。
+ * 原因：message_id 有部分唯一索引（idx_jfd_p2p_message，WHERE origin='p2p_jd'），
+ * 且复活语义本来就是「这行草稿被冤枉了」——改原行比造重复行干净，通吃 group/p2p。
+ * 幂等由调用方的 `WHERE status='rejected'` 保证（已复活行 status=pending 不再命中）。
+ */
+export function recoveryUpdateOf(rejected, classify, { nowIso }) {
   if (!classify || classify.verdict !== 'REAL_JOB') return null;
-  const role = classify.role_hint || rejected.role || '';
-  if (!rejected.company && !role) return null; // 无公司无岗位无从建稿
+  if (!rejected.company && !(classify.role_hint || '').trim()) return null;
   const raw = {
     ...safeParse(rejected.raw_json),
     llm_recovery_of: rejected.draft_id,
@@ -49,28 +52,12 @@ export function buildRecoveryDraft(rejected, classify, { nowIso, draftId }) {
     llm_role_hint: classify.role_hint || null,
   };
   return {
-    draft_id: draftId,
-    event_id: rejected.event_id,
-    message_id: rejected.message_id,
-    chat_id: rejected.chat_id,
-    project_id: null,
-    company: rejected.company || null,
-    company_evidence: rejected.company_evidence || null,
-    role: role || null,
+    role: (classify.role_hint || '').trim() || rejected.role || null,
     role_evidence: classify.role_hint ? `llm:${classify.reason.slice(0, 120)}` : rejected.role_evidence,
-    city: rejected.city || null,
-    city_evidence: rejected.city_evidence || null,
-    pipeline_stage: rejected.pipeline_stage || null,
-    pipeline_evidence: rejected.pipeline_evidence || null,
-    hc: rejected.hc || null,
-    hc_evidence: rejected.hc_evidence || null,
-    active_state: rejected.active_state || 'UNKNOWN',
-    state_evidence: rejected.state_evidence || null,
     source: 'llm-recovery',
     status: 'pending',
     raw_json: JSON.stringify(raw),
     extracted_at: nowIso,
-    origin: rejected.origin || 'group',
   };
 }
 
@@ -80,7 +67,7 @@ export function buildSplitDrafts(pending, llmJobs, { nowIso, newId }) {
   if (!jobs.length) return [];
   return jobs.map((j, i) => ({
     draft_id: newId(i),
-    event_id: pending.event_id,
+    event_id: pending.event_id ?? null,
     message_id: pending.message_id,
     chat_id: pending.chat_id,
     project_id: null,

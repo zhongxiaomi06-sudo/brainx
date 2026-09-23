@@ -127,7 +127,7 @@ test('E1: 正文缺失（网关旧事件/异常）→ skip message_text_missing�
   assert.equal(db.prepare('SELECT COUNT(*) n FROM job_facts_drafts').get().n, 0);
 });
 
-test('bridge-producer：消息→账本→draft 全链 + 三层幂等', async () => {
+test('bridge-producer：消息→账本全链 + 幂等（提炼由 dispatcher 完成，specs/019 US2）', async () => {
   const db = newDb();
   const r1 = await produceOne(db, { message_id: 'om_prod_1', chat_id: 'oc_x',
     text: '示例客户招高级数据产品经理 2 名，base 上海', create_time: Date.now() });

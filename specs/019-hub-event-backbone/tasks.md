@@ -68,16 +68,16 @@
 
 ### Tests for User Story 2（先写，必须能失败）⚠️
 
-- [ ] T012 [US2] 新建 `tests/hub-dispatcher.test.mjs`：未消费扫描派发、恰好一次、maxRetries 重试后进 event_dlq、单消费者故障不影响其他消费者与消息落账、DLQ 重放无二次副作用、新注册消费者收到存量事件、prepare 抛错零业务写入
+- [x] T012 [US2] 新建 `tests/hub-dispatcher.test.mjs`：未消费扫描派发、恰好一次、maxRetries 重试后进 event_dlq、单消费者故障不影响其他消费者与消息落账、DLQ 重放无二次副作用、新注册消费者收到存量事件、prepare 抛错零业务写入
 
 ### Implementation for User Story 2
 
-- [ ] T013 [US2] `src/hub/consumer.js` 新增 `consumeOnceAsync(db, eventId, name, {prepare, apply}, deps)`：先 await prepare（事务外），再把 apply 包进既有同步 consumeOnce；prepare 缺省时等价原同步行为
-- [ ] T014 [US2] 新建 `src/hub/dispatcher.js`：消费者注册表（形状见 contracts/event-types.md 注册契约）+ 按消费者扫未消费事件（workflow_event_log LEFT JOIN processed_events）+ 逐条派发 + 失败计数重试 + 超限写 event_dlq；单消费者异常 try/catch 隔离
-- [ ] T015 [US2] 新建 `bin/brainx-dispatcher.mjs` 常驻入口（参照 bin/brainx-integration-worker.mjs 的 21 行循环模式）+ `deploy/systemd/` 新增 brainx-dispatcher.service 单元
-- [ ] T016 [US2] 迁移既有消费者进注册表：`src/job-extract/index.js` 与 `src/judgment-extract/index.js` 改为 {prepare（内含 LLM 预抽取，原 presetFromLlm 逻辑迁入）, apply} 形状；`src/job-extract/bridge-producer.js` 删除消费调用与双份 try/catch 补偿；`src/bridge.js` 329/361 两处瘦身为只落原文+账本
-- [ ] T017 [US2] 按 quickstart.md 场景 3 验收：grep 判据通过 + dispatcher 停摆期间消息落账不受影响、重启后积压补消费（测试或手动脚本记录证据）
-- [ ] T018 [US2] T012 转绿 + 既有 job-extract/judgment-extract 测试全绿（幂等语义不变）+ `npm run verify:quick` + 原子 commit（`feat(hub): dispatcher 调度层——消费移出 bridge 调用栈（US2）`），同步 docs/AGENT_COMMIT_LOG.md
+- [x] T013 [US2] `src/hub/consumer.js` 新增 `consumeOnceAsync(db, eventId, name, {prepare, apply}, deps)`：先 await prepare（事务外），再把 apply 包进既有同步 consumeOnce；prepare 缺省时等价原同步行为
+- [x] T014 [US2] 新建 `src/hub/dispatcher.js`：消费者注册表（形状见 contracts/event-types.md 注册契约）+ 按消费者扫未消费事件（workflow_event_log LEFT JOIN processed_events）+ 逐条派发 + 失败计数重试 + 超限写 event_dlq；单消费者异常 try/catch 隔离
+- [x] T015 [US2] 新建 `bin/brainx-dispatcher.mjs` 常驻入口（参照 bin/brainx-integration-worker.mjs 的 21 行循环模式）+ `deploy/systemd/` 新增 brainx-dispatcher.service 单元
+- [x] T016 [US2] 迁移既有消费者进注册表：`src/job-extract/index.js` 与 `src/judgment-extract/index.js` 改为 {prepare（内含 LLM 预抽取，原 presetFromLlm 逻辑迁入）, apply} 形状；`src/job-extract/bridge-producer.js` 删除消费调用与双份 try/catch 补偿；`src/bridge.js` 329/361 两处瘦身为只落原文+账本
+- [x] T017 [US2] 按 quickstart.md 场景 3 验收：grep 判据通过 + dispatcher 停摆期间消息落账不受影响、重启后积压补消费（测试或手动脚本记录证据）
+- [x] T018 [US2] T012 转绿 + 既有 job-extract/judgment-extract 测试全绿（幂等语义不变）+ `npm run verify:quick` + 原子 commit（`feat(hub): dispatcher 调度层——消费移出 bridge 调用栈（US2）`），同步 docs/AGENT_COMMIT_LOG.md
 
 **Checkpoint**: US2 独立成立——错误可调度、消费可插拔、bridge 不再背 LLM 延迟
 

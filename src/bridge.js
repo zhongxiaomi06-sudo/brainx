@@ -326,7 +326,7 @@ export async function bridgeOnce(db, { consultant_ids, execImpl = lark, api = { 
         try {
           const msgs = await fetchNewMessagesApi(db, cid, chat.chat_id, token, fetchImpl);
           const { inserted, matched } = ingestMessages(db, chat.chat_id, msgs, cid);
-          try { await produceAndExtract(db, chat.chat_id, msgs); } // E3：群消息→账本→draft
+          try { await produceAndExtract(db, chat.chat_id, msgs); } // 群消息→账本（提炼由 dispatcher 异步消费，specs/019 US2）
           catch (e) { errors.push(`e3:${chat.chat_id.slice(0, 10)}:${String(e.message || e).slice(0, 60)}`); }
           newMessages += inserted; matchedTotal += matched;
         } catch (e) {
@@ -358,7 +358,7 @@ export async function bridgeOnce(db, { consultant_ids, execImpl = lark, api = { 
           try {
             const msgs = await fetchNewMessagesApi(db, cid, chatId, token, fetchImpl);
             const { inserted, matched } = ingestMessages(db, chatId, msgs, cid);
-            try { await produceAndExtract(db, chatId, msgs); } // E3：同上
+            try { await produceAndExtract(db, chatId, msgs); } // 同上：群消息→账本（提炼由 dispatcher 异步消费）
             catch (e) { errors.push(`e3:${chatId.slice(0, 10)}:${String(e.message || e).slice(0, 60)}`); }
             newMessages += inserted; matchedTotal += matched;
           } catch (e) {

@@ -106,14 +106,19 @@ test('非 lark.message_received 事件（DENY）→ skip 不抽', () => {
   assert.equal(r.result.reason, 'not_message_event');
 });
 
-test('bridge-producer 全链：消息同时产出职位草稿与判断草稿，重放幂等', async () => {
+test('bridge-producer 全链：消息落账本后经 dispatcher 产出双域草稿，重放幂等', async () => {
   const db = newDb();
   const text = '星曜科技说不接受异地，急招后端工程师 HC 2，base 上海';
   const r1 = await produceOne(db, { message_id: 'om_jp_1', chat_id: 'oc_x', text, create_time: Date.now() });
   assert.equal(r1.produced, true);
-  assert.ok(r1.judgment_draft, '判断域应产出草稿');
-  assert.ok(r1.draft, '职位事实域应产出草稿');
+  assert.ok(r1.event_id, '生产只产事件，提炼由 dispatcher 完成（specs/019 US2）');
+  // dispatcher 派发：两个注册消费者（job-extract / judgment-extract）各自产草稿
+  const { dispatchOnce, defaultConsumers } = await import('../src/hub/dispatcher.js');
+  await dispatchOnce(db, defaultConsumers());
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM job_facts_drafts').get().n, 1, '职位事实域草稿');
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM judgment_drafts').get().n, 1, '判断域草稿');
   const again = await produceOne(db, { message_id: 'om_jp_1', chat_id: 'oc_x', text: '重复' });
   assert.equal(again.produced, false, 'idem_key 去重');
-  assert.equal(db.prepare('SELECT COUNT(*) n FROM judgment_drafts').get().n, 1);
+  await dispatchOnce(db, defaultConsumers());
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM judgment_drafts').get().n, 1, '重放不重复消费');
 });

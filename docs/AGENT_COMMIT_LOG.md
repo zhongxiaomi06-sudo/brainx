@@ -1,5 +1,20 @@
 # Agent Commit 记录
 
+## 2026-09-23｜feat(hub): specs/019 US2 dispatcher 调度层——消费移出 bridge 调用栈，错误可重试/死信/重放
+
+- 起因：specs/019-hub-event-backbone tasks.md T012-T018（本期最高风险段）。断点：账本只写不读、消费者靠 bridge 生产者手工同步调用、LLM 形状错配逼出 presetFields 注入 hack、错误散在 try/catch 里静默。
+- 改动：
+  1. `migrations/0052_consumer_failures.sql`（新）：「事件 × 消费者」失败台账——attempts < maxRetries 下轮重试，到限且未 resolved 即死信，replayConsumerFailure 置 resolved 后可重放。与 0027 event_dlq（upcast 失败）职责分离。
+  2. `src/hub/consumer.js`：新增 `consumeOnceAsync` 两段式——已消费快速短路（不调 prepare，省 LLM 钱）；prepare（异步 IO）在事务外；apply 仍由同步 consumeOnce 包裹进事务。消费者拿到的事件 payload/evidence_refs 已解析为对象。
+  3. `src/hub/dispatcher.js`（新，约 110 行）：`defaultConsumers()` 注册表（job-extract + judgment-extract）、`dispatchOnce` 按消费者扫未消费集合逐条派发（eventTypes 过滤、单消费者异常隔离）、`replayConsumerFailure` 死信重放。多实例并发底线由 consumeOnce BEGIN IMMEDIATE 兜底，但生产只跑一个实例（prepare 可能重复付费）。
+  4. `src/job-extract/index.js` / `src/judgment-extract/index.js`：新增注册项 jobExtractConsumer / judgmentExtractConsumer——LLM 预抽取从 bridge-producer 的 presetFromLlm 注入挪回 prepare（AI_*_ENABLED 开关不变），schema 违规回退规则层的补偿收进 apply（单点，删除生产者双份 try/catch）。consumeJobExtract/consumeJudgmentExtract 直调入口保留兼容。
+  5. `src/job-extract/bridge-producer.js` 瘦身：只生产（落原文表 + 追加账本），删除消费调用与 preset 函数；`src/bridge.js` 329/361 注释更新。架构红利：WS 网关（processLarkEvent）写入的事件也自动进入提炼——此前「WS 链路未接抽取消费者」的已知边界随 dispatcher 闭合。
+  6. `bin/brainx-dispatcher.mjs`（新，常驻循环，间隔可由 BRAINX_DISPATCHER_INTERVAL_MS 调，默认 2s）+ `deploy/systemd/brainx-dispatcher.service`（镜像 integration-worker 单元）。
+  7. 测试：`tests/hub-dispatcher.test.mjs`（新，10 例，先红后绿——派发/恰好一次/eventTypes 过滤/两段式/prepare 抛错零写入/重试死信/故障隔离/重放/backlog/默认注册表端到端双域草稿）；`tests/judgment-extract-consumer.test.mjs` 全链用例改走 dispatcher（架构形态变化，非弱化断言）；`tests/framework.test.mjs` 迁移记账跟进（0052 入账、旧库兼容 54→55）。
+- 验证：新增 10 例 + 全量 `npm test` 819/819 通过；`npm run verify:quick` 16/16；T017 grep 判据通过（bridge-producer/bridge.js 无 consume 调用残留）。
+- 偏差说明：event_dlq（0027）无 consumer_name/attempts 列，死信台账按事实新建 consumer_failures，plan 中「复用 event_dlq」的表述以本实现为准。
+- 待部署：`brainx-dispatcher.service` 上 ECS 并 enable；未 push。
+
 ## 2026-09-23｜docs(spec): 立项 specs/021 数据治理——生产库自动备份 + 高热表保留归档纪律
 
 - 起因（用户指令）：「整个数据的方案是不稳定的」，核实后立项。现状：生产 SQLite 无自动备份（pull-cloud-data.mjs 是手动训练副本拉取，非备份）；retention 只管 recommendations 域（8/24 膨胀事故后的救急脚本）；lark_messages/workflow_event_log/openmai_results 无保留策略；云本地单向无回流。

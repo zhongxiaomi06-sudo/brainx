@@ -36,3 +36,27 @@ export function consumeOnce(db, eventId, consumerName, fn) {
     throw err;
   }
 }
+
+/** 两段式异步消费（specs/019 US2，research.md 决策 2）：
+ *  prepare（可选，异步 IO，如 LLM）在事务外执行；apply（同步写库）仍由 consumeOnce
+ *  包裹进同一事务。恰好一次语义不破：已消费直接短路（不调 prepare，省外部调用）；
+ *  prepare 抛错则 apply 不执行、无任何业务写入（错误由调用方按重试/死信处理）。
+ *  consumer 形状：{ prepare?: (event, deps) => Promise<any>, apply: (db, event, prepared) => any }。
+ *  @returns {{ok:true, skipped:boolean, result?:any} | {ok:false, reason}} */
+export async function consumeOnceAsync(db, eventId, consumerName, consumer = {}, deps = {}) {
+  if (db.prepare(CHECK_SQL).get(eventId, consumerName)) return { ok: true, skipped: true };
+  const event = db.prepare('SELECT * FROM workflow_event_log WHERE event_id = ?').get(eventId);
+  if (!event) return { ok: false, reason: 'event_not_found' };
+  // 消费者拿到的是可用形态：payload/evidence_refs 解析为对象（账本存的是 JSON 串）
+  const view = {
+    ...event,
+    payload: JSON.parse(event.payload ?? '{}'),
+    evidence_refs: JSON.parse(event.evidence_refs ?? '[]'),
+  };
+  const prepared = consumer.prepare ? await consumer.prepare(view, deps) : undefined;
+  let result;
+  const r = consumeOnce(db, eventId, consumerName, (d) => {
+    result = consumer.apply ? consumer.apply(d, view, prepared) : undefined;
+  });
+  return { ...r, result };
+}

@@ -1,17 +1,19 @@
-/** bridge-producer.js — 群消息 → E3 提炼闭环的常驻生产者（2026-09-03）。
+/** bridge-producer.js — 群消息 → 账本的生产者（2026-09-03；2026-09-23 specs/019 US2 瘦身）。
  *
- * 角色：把 bridge 已拉取的群消息同时喂给 L1 事件账本（workflow_event_log +
- * lark_messages 原文表），并立刻交给 job-extract 消费者抽 draft——
- * 补齐「群消息自动形成职位事实」缺失的常驻 handler，零新增凭据
- * （复用 bridge 的顾问用户令牌通道，不落 DENY 事件、正文 PII 不进账本 payload）。
+ * 角色：把 bridge 已拉取的群消息喂给 L1 事件账本（workflow_event_log +
+ * lark_messages 原文表）——零新增凭据（复用 bridge 的顾问用户令牌通道，
+ * 不落 DENY 事件、正文 PII 不进账本 payload）。
  *
- * 幂等三层：lark_messages 主键去重 → workflow_event_log idem_key 唯一 →
- * consumeOnce('job-extract') 消费幂等。重复喂同一条消息全部安全短路。
+ * specs/019 US2 起：本模块只生产，不消费。提炼（job-extract / judgment-extract）
+ * 由 dispatcher 按注册表异步派发（src/hub/dispatcher.js），LLM 预抽取与
+ * schema 回退补偿收进消费者自身的 prepare/apply——此前生产者内联调用消费者 +
+ * presetFields 注入 + 双份 try/catch 的形态已删除。
+ *
+ * 幂等两层：lark_messages 主键去重 → workflow_event_log idem_key 唯一；
+ * 消费幂等由 consumeOnce（processed_events）在 dispatcher 侧兜底。
  */
 import { uuid, now } from '../db.js';
 import { appendEvent } from '../hub/event-log.js';
-import { consumeJobExtract } from './index.js';
-import { consumeJudgmentExtract } from '../judgment-extract/index.js';
 
 const INSERT_MSG_SQL = `INSERT OR IGNORE INTO lark_messages
   (message_id, chat_id, message_type, text, mentions_json, create_time, received_at)
@@ -30,40 +32,11 @@ export function normalizeCreateTime(value, fallback = now()) {
   return Number.isFinite(parsed.getTime()) ? parsed.toISOString() : fallback;
 }
 
-/** E2 LLM 预抽取（异步层，AI_JOB_EXTRACT_ENABLED=1 且 llm 已配置时）：
- * 至少一个有效字段才注入，否则让消费链走规则层（rules 保底）。 */
-async function presetFromLlm(text) {
-  if (process.env.AI_JOB_EXTRACT_ENABLED !== '1') return null;
-  try {
-    const { isLlmConfigured } = await import('../llm.js');
-    if (!isLlmConfigured()) return null;
-    const { extractLlm, isJobRelevant } = await import('./classify.js');
-    // isJobRelevant 先行砍 LLM 调用（设计口径）：闲聊不烧额度
-    if (!isJobRelevant(text)) return null;
-    const fields = await extractLlm(text);
-    return fields && Object.values(fields).some((f) => f && f.text) ? fields : null;
-  } catch { return null; }
-}
-
-/** 判断域 E2 LLM 预抽取（异步层，AI_JUDGMENT_EXTRACT_ENABLED=1 且 llm 已配置时）：
- * 抽到有效 statement 才注入，否则让消费链走规则层（rules 保底）。 */
-async function presetJudgmentFromLlm(text) {
-  if (process.env.AI_JUDGMENT_EXTRACT_ENABLED !== '1') return null;
-  try {
-    const { isLlmConfigured } = await import('../llm.js');
-    if (!isLlmConfigured()) return null;
-    const { extractJudgmentLlm, isJudgmentRelevant } = await import('../judgment-extract/classify.js');
-    if (!isJudgmentRelevant(text)) return null; // 规则先行砍 LLM 调用：闲聊不烧额度
-    const fields = await extractJudgmentLlm(text);
-    return fields && fields.statement ? fields : null;
-  } catch { return null; }
-}
-
-/** 单条消息：落原文表 → 追加账本 → 抽 draft。返回 {produced, draft_id?}。 */
+/** 单条消息：落原文表 → 追加账本。返回 {produced, event_id?, reason?}。 */
 export async function produceOne(db, { message_id, chat_id, msg_type = 'text', text = '',
                                  sender = {}, mentions = [], create_time }) {
   const createIso = normalizeCreateTime(create_time);
-  const wrote = db.prepare(INSERT_MSG_SQL).run(message_id, chat_id, msg_type, String(text || ''),
+  db.prepare(INSERT_MSG_SQL).run(message_id, chat_id, msg_type, String(text || ''),
                                  JSON.stringify(mentions || []), createIso, now());
   const ev = appendEvent(db, {
     event_id: uuid(), idem_key: `lark.message_received:${message_id}`,
@@ -74,35 +47,13 @@ export async function produceOne(db, { message_id, chat_id, msg_type = 'text', t
     schema_version: 1,
   });
   if (!ev.ok) return { produced: false, reason: ev.reason };
-  let presetFields = await presetFromLlm(String(text || ''));
-  let consumed;
-  try {
-    consumed = consumeJobExtract(db, ev.event.event_id, { presetFields });
-  } catch (e) {
-    // LLM 输出形状违反 draft schema 时，整条回退规则层（rules 保底纪律）
-    if (!presetFields || !String(e.message || '').includes('schema_invalid')) throw e;
-    presetFields = null;
-    consumed = consumeJobExtract(db, ev.event.event_id, { presetFields: null });
-  }
-  // 判断域：同一事件上的独立消费者（consumeOnce 各自幂等，互不干扰）。
-  let judgmentPreset = await presetJudgmentFromLlm(String(text || ''));
-  let judgment;
-  try {
-    judgment = consumeJudgmentExtract(db, ev.event.event_id, { presetFields: judgmentPreset });
-  } catch (e) {
-    if (!judgmentPreset || !String(e.message || '').includes('schema_invalid')) throw e;
-    judgmentPreset = null;
-    judgment = consumeJudgmentExtract(db, ev.event.event_id, { presetFields: null });
-  }
-  return { produced: !ev.deduplicated, event_id: ev.event.event_id,
-           draft: consumed?.result?.draft_id || null, action: consumed?.result?.action || null,
-           layer: consumed?.result?.layer || (presetFields ? 'llm' : 'rules'),
-           judgment_draft: judgment?.result?.draft_id || null };
+  return { produced: !ev.deduplicated, event_id: ev.event.event_id };
 }
 
-/** 一批 bridge 消息（与 ingestMessages 同批）：逐条生产+抽取，返回计数。 */
+/** 一批 bridge 消息（与 ingestMessages 同批）：逐条生产，返回计数。
+ *  提炼由 dispatcher 异步完成，本函数不再返回 drafts。 */
 export async function produceAndExtract(db, chat_id, messages) {
-  let produced = 0, drafts = 0, skipped = 0;
+  let produced = 0, skipped = 0;
   for (const m of messages || []) {
     if (!m?.message_id) { skipped++; continue; }
     const text = typeof m.content === 'string' ? m.content
@@ -112,24 +63,22 @@ export async function produceAndExtract(db, chat_id, messages) {
                                create_time: m.create_time });
     if (r.produced) produced++;
     else skipped++;
-    if (r.draft) drafts++;
   }
-  return { produced, drafts, skipped };
+  return { produced, skipped };
 }
 
 /** 回填：从 job_messages 表（bridge 已落库的历史消息）补进提炼闭环。
- * 用途：handler 上线前的存量消息补课；按 chat_id+天数窗口，幂等安全。 */
+ * 用途：dispatcher 上线前的存量消息补课；按 chat_id+天数窗口，幂等安全。 */
 export async function backfillFromJobMessages(db, { chat_id = null, days = 7, limit = 500 } = {}) {
   const cutoff = new Date(Date.now() - days * 86400000).toISOString();
   const rows = db.prepare(`SELECT message_id, chat_id, msg_type, text, sent_at
     FROM job_messages WHERE ingested_at >= ? ${chat_id ? 'AND chat_id=?' : ''}
     ORDER BY ingested_at ASC LIMIT ?`).all(...(chat_id ? [cutoff, chat_id, limit] : [cutoff, limit]));
-  let produced = 0, drafts = 0;
+  let produced = 0;
   for (const r of rows) {
     const out = await produceOne(db, { message_id: r.message_id, chat_id: r.chat_id,
                                  msg_type: r.msg_type, text: r.text, create_time: Date.parse(r.sent_at) || null });
     if (out.produced) produced++;
-    if (out.draft) drafts++;
   }
-  return { scanned: rows.length, produced, drafts };
+  return { scanned: rows.length, produced };
 }

@@ -1,5 +1,13 @@
 # Agent Commit 记录
 
+## 2026-09-23｜docs(spec): 立项 specs/021 数据治理——生产库自动备份 + 高热表保留归档纪律
+
+- 起因（用户指令）：「整个数据的方案是不稳定的」，核实后立项。现状：生产 SQLite 无自动备份（pull-cloud-data.mjs 是手动训练副本拉取，非备份）；retention 只管 recommendations 域（8/24 膨胀事故后的救急脚本）；lark_messages/workflow_event_log/openmai_results 无保留策略；云本地单向无回流。
+- 改动：`specs/021-data-governance/spec.md`（新，立项占位）——US1 每日自动备份可恢复（P1，滚动窗口+失败可见+异盘存放）、US2 高热表保留归档（P1，dry-run 默认 + evidence_refs 引用保护 + 账本只归档不删引用窗口内事件）；FR-001~006、SC-001~004；明确不做：换库/分库、异地容灾（后续项）。`docs/README.md` 路由登记。
+- 边界：与 specs/019 并行不阻塞（019 改链路形态，021 管数据底盘）；plan/tasks 待排期。
+- 验证：纯文档，无需门禁外测试。
+- 未 push。
+
 ## 2026-09-23｜feat(hub): specs/019 US1——五类业务动作补发标准信封事件（接单/找人启动与终态/双域草稿确认/终局）
 
 - 起因：specs/019-hub-event-backbone tasks.md T004-T011（测试先行：先写 8 例全红，再实现转绿）。

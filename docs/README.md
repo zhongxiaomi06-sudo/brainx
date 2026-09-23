@@ -66,6 +66,7 @@
 | TTC 职位字段、筛选能力或字段变化 | [TTC 职位字段库](ttc-field-catalog.md)、[BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md) |
 | Commit、协作记录 | [Agent Commit 记录](AGENT_COMMIT_LOG.md) |
 | **Hub 架构重整（业务事件进账本、dispatcher、反馈环、session 隔离下沉、接口面收敛）** | **[Hub 事件骨干重整规格](../specs/019-hub-event-backbone/spec.md)**（五用户故事 + 四重难点数据来源契约）、[Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) |
+| **生产库备份、高热表 retention/归档、磁盘增长失控** | **[数据治理规格](../specs/021-data-governance/spec.md)**（自动备份 + 保留归档纪律 + 引用保护）、[Hub 事件骨干重整规格](../specs/019-hub-event-backbone/spec.md) |
 | 密钥、登录、权限、数据隔离 | [安全操作手册](SECURITY.md) |
 | 构建、发布、服务器、容器 | [部署编排](DEPLOYMENT.md)、[云端恢复清单](cloud-recovery-checklist.md)、[安全操作手册](SECURITY.md) |
 | 验证历史行为或已有能力 | [开发验证报告](VERIFICATION.md) |

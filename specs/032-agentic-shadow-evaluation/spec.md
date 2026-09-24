@@ -1,6 +1,6 @@
 # 032 — Algorithm A 离线与影子评估
 
-状态：Implemented（2026-09-24；完整门禁待在实现提交上复跑）
+状态：Verified（2026-09-24）
 
 上游：[施工总手册](../../docs/2026-09-22-refactor-agentic-ranking-manual.md)阶段 08、
 [Algorithm A 决策契约](../../docs/2026-09-22-algorithm-a-contract.md)、

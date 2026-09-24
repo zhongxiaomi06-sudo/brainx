@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-24｜test(framework)+chore(ops): 迁移记账测试补齐 0054-0056 + 收录运维脚本 project-launch-no-jobcard
+
+- 起因：full verify 25 项挂 3，逐项定性——①migrations 记账测试硬编码列表停在 0053（0054/0055 加入时只跑了 quick 未发现，0056 又增一行），补齐 0054/0055/0056 三项 + 计数 56→59；②「浏览器前后端链路」失败为并发时序抖动（页面停在加载态断言落空），单独重跑通过，与本次改动无关；③Git 干净检查被 9-16 另一会话的 untracked 运维脚本阻塞，**用户拍板「提交入库」**。
+- 改动：tests/framework.test.mjs（列表补齐+计数）；bin/project-launch-no-jobcard.mjs 收录（跳过接单卡建群+找人发卡链路，引用现有 feishu-bot/openmai 模块的完整运维脚本）。
+- 验证：framework.test.mjs 21/21；e2e 单跑 EXIT=0；工作区干净后重跑 full verify。
+
 ## 2026-09-24｜feat(sync): lark_messages 历史回填工具（migration 0056 origin 列）——第二批 24 群 922 条入生产库
 - 起因（用户指令）：「让使用 braintex 的机器人阅读最新的 cli 的数据，更新数据的来源……读飞书群的第二批的数据进行增加验证」。
 - 根因定位：`lark_messages` 由网关事件驱动写入（bot 在群才有事件流），bot 不在群的 69 个用户可见群（含 24 个客户/项目群、13 家第一批未覆盖公司）永远进不了库。

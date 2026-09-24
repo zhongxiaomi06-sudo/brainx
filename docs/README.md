@@ -70,6 +70,7 @@
 | **数据读取链路（怎么进来/怎么消费）、生产数据错位/字段错位/时间错位/主键冲突诊断** | **[数据读取链路与错位诊断规范](2026-09-24-data-reading-pipeline.md)**（入料 W1-W7 + 消费 R1-R7 总表 + 错位四类根源目录 A/B/C/D + 读取纪律六条红线）、[数据结构与磁盘用途规范](2026-09-23-data-structure-and-disk-layout.md)（存储归属） |
 | **数据渠道不够要扩渠道、TTC 顾问面板数据（pipeline/任务/名单/推荐报告）、jobwater 市场数据、LinkedIn/技能包怎么接** | **[数据渠道全景与接入路线规范](2026-09-24-data-channels-roadmap.md)**（四层渠道全景：飞书 F1-F4 / TTC JWT T1-T12 / 独立服务 J1 / GUI G1-G2，逐条带已接/未接状态与最佳读取方式 + 技能包 8 技能映射 + 接入优先级 P0=Pipeline 补 current_stage + 安全红线）、[数据读取链路与错位诊断规范](2026-09-24-data-reading-pipeline.md) |
 | **推荐全是 OBSERVE 没有可执行档、要用 agent 从群消息补 current_stage/active_state、或修卡片 served 埋点** | **[字段补全 Agent 与 served 埋点规格](../specs/023-fact-agent/spec.md)**（job_agent_facts 新表 + GLM 抽取 + 消歧三分叉 + 合成层插档 + 置信打折，agent 产字段不产决定）、[数据基线与验证方法论](../specs/023-fact-agent/data-baseline.md)（全部实测数字与影子对照口径）、[数据渠道全景与接入路线规范](2026-09-24-data-channels-roadmap.md)（T7 Pipeline = current_stage 第一供给线） |
+| **field-clean / 草稿字段清洗产出的质量审计、evidence 锚定率、file 消息假阳性** | **[field-clean 两批清洗数据审计](2026-09-24-field-clean-batch-audit.md)**（batch1/batch2 全量确定性校验 + LLM 双标注一致率 + 三个缺陷处置） |
 | 密钥、登录、权限、数据隔离 | [安全操作手册](SECURITY.md) |
 | 构建、发布、服务器、容器 | [部署编排](DEPLOYMENT.md)、[云端恢复清单](cloud-recovery-checklist.md)、[安全操作手册](SECURITY.md) |
 | 验证历史行为或已有能力 | [开发验证报告](VERIFICATION.md) |
@@ -115,6 +116,7 @@
 - [冷启动规则 v2 与客户画像](2026-09-24-cold-start-rules-v2-profiles.md)：GLM 全量判定对账反推的规则 v2 清单（岗位词表 top40 + 通知类误报抑制 + 规则/LLM 分工边界）+ 客户画像（client_profiles 表 141 家/85 家活跃）及其匹配消费口径。
 - [顾问画像对应与第一版评估](2026-09-24-consultant-profile-matching-v1.md)：consultant_profiles 表（9 位顾问岗位族画像）× 85 家活跃客户的第一版对应——覆盖 61%（修正口径 93%）、结构性瓶颈（管理岗/市场增长承接厚度仅 1 人）、routed push 灰测范围与画像置信度声明。
 - [冷启动数据评判 v1](2026-09-24-cold-start-verdict-v1.md)：第一版数据评判交付——全量快照（回填后 18,694 条/196 会话）、画像 v3 渠道归因（84 ACCEPTED 仅 58% 真人）、13 家新公司第二批增量验证、14 个验收节点（✅6/⬜8）与数据可信度声明。
+- [field-clean 两批清洗数据审计](2026-09-24-field-clean-batch-audit.md)：pending 1,792 + backfill 922 字段清洗产出的实测审计——确定性全量（零解析错/零枚举违规/锚定率 93%/98%）+ LLM 双标注（batch1 全字段 83%~100%）+ 三个真实缺陷（file 消息假阳性 / 日报类 stage_hint 口径模糊 / evidence 7% 改写）与处置建议 + batch2 true 行复验未闭环（待 key）。
 - [0.9 冲刺交付清单](2026-09-12-sprint-delivery-checklist.md)：2026-09-12 排期的可交付施工条目、阻塞决策与完成度判定口径。
 - [D5 全链路灰测结论与演示脚本](2026-09-12-d5-e2e-greytest-and-demo-script.md)：接单→建群→找人→三按钮→RDS 入库的生产灰测证据、发现的问题与评审日演示纪律。
 - [0.9 冲刺核查处置方案（修正 + Reloop 变更）](2026-09-12-sprint-0.9-remediation-plan.md)：对核查报告的逐条复核修正、R1–R9 处置清单（含文件行号与验收）、Reloop 专项边界、原子 commit 切分与三项待拍板决策。

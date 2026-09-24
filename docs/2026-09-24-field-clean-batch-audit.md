@@ -78,6 +78,29 @@ batch2 true 行双标注中 role_family 一致率 **76%（唯一破 80% 线）**
 - LLM 双标注：`ZHIPU_API_KEY=... node /tmp/fc-judge.mjs <sample.json> <report.json>`；锚定校验内联于审计脚本（拍平 + squash + 前 12 字）。
 - 判定模型：清洗与 batch1 judge 为 `gpt-5.6-luna`（tunnel 端点，同模型双标注）；锚定校验与确定性检查不依赖模型。
 
+## 6. Tier 复核与计算审核落库（2026-09-24 晚）
+
+**分层口径（从 `draft_clean_results` 实测复现）**：
+- **Tier1 = 498** = `task=pending AND is_real_job=1`（llm-recovery 442 + llm-split 44 + rules 12）→ 置顶确认队列候选
+- **Tier2 = 898** = `task=pending AND is_real_job=0 AND source=llm-recovery`（A 批复活稿清洗后非真岗位）→ 降档处置
+- 其余 396（llm-split 73 + rules 323 的 false 行）不在两 Tier 处置范围
+
+**复核规则**（来自本报告 §3 实证）：source_kind = file / daily_report / normal；evidence 锚定（拍平+去空白+前 12 字）。
+
+**落库**：ECS `brainx.db` 新表 `field_clean_tier_audit`（draft_id 主键 / tier / verdict / source_kind / anchor_ok / reasons / audited_at），1,396 行，INSERT OR REPLACE 幂等可重跑；**未改 `job_facts_drafts` 任何行**。
+
+| Tier | verdict | n | 含义 |
+|---|---|---|---|
+| T2_demote | demote_confirmed | 898 | 维持降档（其中 daily_report 源占比高，佐证降档正确） |
+| T1_confirm_queue | pass | 426 | 干净通过，可置顶确认 |
+| T1_confirm_queue | pass_anchor_weak | 63 | 字段值可用，evidence 为改写不可回溯 |
+| T1_confirm_queue | flag_daily_report | 5 | 日报类，is_real_job 待人工 |
+| T1_confirm_queue | demote_file_false_positive | **4** | file 源假阳性（与 §3.1 审计实证的 4 条完全吻合，互证） |
+
+**待拍板的状态处置**（本审计只落审核结果，不改 drafts 状态；机制二选一后一条 SQL 的事）：
+- Tier2 降档 = 退回 rejected：`UPDATE job_facts_drafts SET status='rejected' WHERE draft_id IN (SELECT draft_id FROM field_clean_tier_audit WHERE tier='T2_demote' AND verdict='demote_confirmed')`
+- Tier1 置顶标记：确认队列按 `field_clean_tier_audit.verdict='pass'` 优先排序（426 条先行，63 条 anchor_weak 次之，5+4 条人工单看）
+
 ## 相关文档
 
 - [数据读取链路与错位诊断规范](2026-09-24-data-reading-pipeline.md)：evidence 弱锚定（C 类）已在案，本报告 §3.3 是其量化实证

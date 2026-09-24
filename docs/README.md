@@ -77,6 +77,7 @@
 | Algorithm A 离线对照、影子评估、召回覆盖、稳定性、成本或晋升门槛 | [Algorithm A 离线与影子评估规格](../specs/032-agentic-shadow-evaluation/spec.md)、[Algorithm A 决策契约](2026-09-22-algorithm-a-contract.md) |
 | Algorithm A 工作台/飞书展示、原序分页、异步状态、主动偏好、排除项或容量设置 | [Algorithm A 忠实展示与主动设置规格](../specs/033-agentic-presentation/spec.md)、[前端审核台账](frontend-reviews/README.md)、[飞书卡片排版规范](standards/CARD_TYPOGRAPHY.md) |
 | 运营看板、事件投影、checkpoint、真实漏斗、排序分歧、Agent 成本或样本成熟度 | [事件投影运营、业务、效果与成本看板规格](../specs/034-operations-dashboard/spec.md)、[推荐数据迁移手册](2026-09-22-ranking-data-migration.md)、[前端审核台账](frontend-reviews/README.md) |
+| 桌面客户端下载、统一登录、官方浏览器授权、OpenMai/SuperMai/Reloop 找人连接器或设备会话 | [BrainX 桌面端统一登录与找人连接器规格](../specs/035-desktop-auth-connectors/spec.md)、[安全操作手册](SECURITY.md)、[Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) |
 | 前端重构排期、施工范围或阶段验收 | [前端真实数据重构施工清单](frontend-refactor-construction-checklist.md)、[前端交互架构](frontend-interaction-architecture.md) |
 | TTC 职位字段、筛选能力或字段变化 | [TTC 职位字段库](ttc-field-catalog.md)、[BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md) |
 | Commit、协作记录 | [Agent Commit 记录](AGENT_COMMIT_LOG.md) |
@@ -134,6 +135,7 @@
 - [数据增长、引用与保留责任只读盘点](2026-09-22-retention-inventory.md)：本地聚合规模、跨表引用、责任矩阵、安全 dry-run、执行阻断和下一单元准入条件。
 - [清理路径隔离与显式策略 dry-run 规格](../specs/025-retention-dry-run-safety/spec.md)：停止推荐事务隐式删除，禁用旧 apply，并以只读聚合验证引用保护；不提供执行器。
 - [Server 登录与人才路由边界拆分规格](../specs/026-server-route-boundaries/spec.md)：把 OAuth/session 与人才库 HTTP 路由移出超限入口，保持鉴权及响应契约不变并撤销行数例外。
+- [BrainX 桌面端统一登录与找人连接器规格](../specs/035-desktop-auth-connectors/spec.md)：以 BrainX 单一身份、系统浏览器官方授权、设备安全存储和统一 provider/task 契约收口 OpenMai、SuperMai、Reloop 三条找人链路。
 - [推荐用例、仓储与入口边界收口规格](../specs/027-recommendation-use-case-boundary/spec.md)：以唯一 use case 和 SQLite repository 统一 API、CLI、scheduler、worker，集中校验既有推荐配置并保留兼容 facade。
 - [来源适配与版本化职位事实规格](../specs/028-versioned-job-facts/spec.md)：统一 TTC 与本地 CSV/fixture 来源信封，追加事实版本和字段证据，复用草稿确认链并建立提炼缓存、冲突留痕及投影对账/补偿。
 - [画像、曝光与结果账本规格](../specs/029-profile-exposure-outcomes/spec.md)：版本化主动画像，分离短期信号与实时负载，幂等记录真实曝光和 Case 结果/更正/归因。

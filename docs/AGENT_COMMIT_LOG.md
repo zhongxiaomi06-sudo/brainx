@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-24｜docs(登录): 规格化桌面端统一登录与找人连接器
+
+- 明确 BrainX 只保留一个产品身份，飞书走系统浏览器官方 OAuth；OpenMai、SuperMai、Reloop 作为能力连接统一呈现状态、重新授权、撤销和用户动作，不再要求用户复制 token 或配置回调。
+- 核实现状：OpenMai 是真实服务端链路，当前 SuperMai 工具仍复用 OpenMai criteria 模式，Reloop 是组织级 MySQL 连接；记录本机 Sourcing 0.3.6 的官方页面登录、loopback harness、任务事件和 ingest 模式，但禁止读取其 Cookie 或 renderer token。
+- 冻结门户、桌面安全代理、Cloud/API、机器人四层边界，以及 provider adapter、统一任务/结果、设备认证、任务级 ingest、分阶段迁移与验收标准。本轮只形成规格，不发布、不 push。
+
 ## 2026-09-24｜docs(验证): 记录阶段 10 完整门禁
 
 - 在运营看板权限修复提交 `f913081` 上运行完整质量门禁：25/25 通过，报告结论“通过”，Push 条件“满足”。

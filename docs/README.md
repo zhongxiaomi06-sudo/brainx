@@ -76,6 +76,7 @@
 | Algorithm A、Agent 最终排序、严格校验、弃权或 generation/CAS 发布 | [Algorithm A 最小端到端规格](../specs/031-agentic-ranking-v1/spec.md)、[Algorithm A 决策契约](2026-09-22-algorithm-a-contract.md) |
 | Algorithm A 离线对照、影子评估、召回覆盖、稳定性、成本或晋升门槛 | [Algorithm A 离线与影子评估规格](../specs/032-agentic-shadow-evaluation/spec.md)、[Algorithm A 决策契约](2026-09-22-algorithm-a-contract.md) |
 | Algorithm A 工作台/飞书展示、原序分页、异步状态、主动偏好、排除项或容量设置 | [Algorithm A 忠实展示与主动设置规格](../specs/033-agentic-presentation/spec.md)、[前端审核台账](frontend-reviews/README.md)、[飞书卡片排版规范](standards/CARD_TYPOGRAPHY.md) |
+| 运营看板、事件投影、checkpoint、真实漏斗、排序分歧、Agent 成本或样本成熟度 | [事件投影运营、业务、效果与成本看板规格](../specs/034-operations-dashboard/spec.md)、[推荐数据迁移手册](2026-09-22-ranking-data-migration.md)、[前端审核台账](frontend-reviews/README.md) |
 | 前端重构排期、施工范围或阶段验收 | [前端真实数据重构施工清单](frontend-refactor-construction-checklist.md)、[前端交互架构](frontend-interaction-architecture.md) |
 | TTC 职位字段、筛选能力或字段变化 | [TTC 职位字段库](ttc-field-catalog.md)、[BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md) |
 | Commit、协作记录 | [Agent Commit 记录](AGENT_COMMIT_LOG.md) |

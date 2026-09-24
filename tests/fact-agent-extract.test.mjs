@@ -146,6 +146,7 @@ function seedScenario(db) {
     text: JSON.stringify({ title: '', content: [[{ tag: 'text', text: 'Pix又发出了一张MLE实习offer' }]] }),
   });
   seedMessage(db, { messageId: 'om_m2', chatId: 'oc_multi', text: '创联数科那个职位暂停了' });
+  seedMessage(db, { messageId: 'om_g1', chatId: 'oc_nobind', text: '客户那边这个职位暂停了，先不推人' }); // 群无绑定 → 群级
   seedMessage(db, { messageId: 'om_n1', chatId: 'oc_quiet', text: '今天天气不错，出去走走' });
 }
 
@@ -163,6 +164,9 @@ function fakeLlm({ user }) {
     } else if (id === 'om_m2') {
       out.push({ message_id: id, facts: [
         { field: 'active_state', value: 'COOLING', confidence: 0.8, project_hint: '创联数科', evidence: '创联数科那个职位暂停了' }] });
+    } else if (id === 'om_g1') {
+      out.push({ message_id: id, facts: [
+        { field: 'active_state', value: 'COOLING', confidence: 0.8, evidence: '这个职位暂停了' }] }); // 无 hint + 群无绑定 → 群级
     }
   }
   return Promise.resolve(JSON.stringify({ results: out }));
@@ -172,37 +176,40 @@ test('端到端：三分叉落位正确，群级行不串职位级；统计结�
   const db = newDb();
   seedScenario(db);
   const { stats, rows } = await runFactAgentPipeline(db, { llm: fakeLlm, extractedAt: '2026-09-24T00:00:00.000Z' });
-  assert.equal(stats.candidates, 3, 'om_n1 闲聊不进候选');
-  assert.equal(stats.inserted, 3);
+  assert.equal(stats.candidates, 4, 'om_n1 闲聊不进候选');
+  assert.equal(stats.inserted, 4);
   const stageA = db.prepare("SELECT value FROM job_agent_facts WHERE project_id='pj_a'").get();
   assert.equal(stageA.value, '二面', '1:1 群直落职位级');
   const pix = db.prepare("SELECT value FROM job_agent_facts WHERE project_id='pj_c2'").get();
   assert.equal(pix.value, 'Offer', '多职位群 GLM 指名 → 职位级');
-  const group = db.prepare("SELECT value FROM job_agent_facts WHERE project_id IS NULL AND message_id='om_m2'").get();
-  assert.equal(group, undefined, '创联数科被指名 → 不落群级');
+  const group = db.prepare("SELECT value FROM job_agent_facts WHERE project_id IS NULL AND message_id='om_g1'").get();
+  assert.equal(group.value, 'COOLING', '无绑定群落群级（project_id NULL）');
+  const m2Group = db.prepare("SELECT value FROM job_agent_facts WHERE project_id IS NULL AND message_id='om_m2'").get();
+  assert.equal(m2Group, undefined, '创联数科被指名 → 不落群级');
   assert.equal(stats.fork.single, 1);
   assert.equal(stats.fork.named, 2);
-  assert.ok(stats.byField.current_stage === 2 && stats.byField.active_state === 1);
-  assert.equal(rows.length, 3);
+  assert.equal(stats.fork.group, 1);
+  assert.ok(stats.byField.current_stage === 2 && stats.byField.active_state === 2);
+  assert.equal(rows.length, 4);
 });
 
-test('端到端幂等：同批重跑第二轮零新增（AC-1）', async () => {
+test('端到端幂等（含群级行）：同批重跑第二轮零新增（AC-1 全层级）', async () => {
   const db = newDb();
   seedScenario(db);
   const r1 = await runFactAgentPipeline(db, { llm: fakeLlm, extractedAt: '2026-09-24T00:00:00.000Z' });
-  assert.equal(r1.stats.inserted, 3);
+  assert.equal(r1.stats.inserted, 4);
   const r2 = await runFactAgentPipeline(db, { llm: fakeLlm, extractedAt: '2026-09-24T01:00:00.000Z' });
-  assert.equal(r2.stats.inserted, 0, '第二轮零新增');
-  assert.equal(r2.stats.duplicates, 3);
-  assert.equal(statsAgentFacts(db).total, 3);
+  assert.equal(r2.stats.inserted, 0, '第二轮零新增——职位级与群级一并成立');
+  assert.equal(r2.stats.duplicates, 4);
+  assert.equal(statsAgentFacts(db).total, 4, '总行数不得翻倍（群级 NULL≠NULL 防回归）');
 });
 
 test('开关关闭路径：无 llm 注入 → 只跑解析+预筛，零 GLM 批次零落库（US1-AC3）', async () => {
   const db = newDb();
   seedScenario(db);
   const { stats, rows } = await runFactAgentPipeline(db, { llm: null });
-  assert.equal(stats.scanned, 4);
-  assert.equal(stats.candidates, 3);
+  assert.equal(stats.scanned, 5);
+  assert.equal(stats.candidates, 4);
   assert.equal(stats.llmBatches, 0, '零 token');
   assert.equal(stats.inserted, 0);
   assert.equal(rows.length, 0);
@@ -227,7 +234,7 @@ test('增量窗口：--since 只扫窗口内消息；管线按 20 条切批（FR
   seedScenario(db);
   seedMessage(db, { messageId: 'om_old', chatId: 'oc_single', text: '还在招', createTime: '2026-09-01T00:00:00.000Z' });
   const { stats } = await runFactAgentPipeline(db, { llm: fakeLlm, since: '2026-09-10T00:00:00.000Z' });
-  assert.equal(stats.scanned, 4, 'om_old（09-01）在窗口外');
+  assert.equal(stats.scanned, 5, 'om_old（09-01）在窗口外');
   // 25 条信号消息 → 2 个批次（20+5）
   seedMessage(db, { messageId: 'om_b00', chatId: 'oc_single', text: '还在招' }); // 群已有职位绑定，1:1 通道
   for (let i = 1; i < 25; i++) {

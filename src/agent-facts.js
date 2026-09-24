@@ -3,8 +3,10 @@
  * 权威契约: specs/023-fact-agent/spec.md FR-1；
  * 职责：表读写、按职位取最新有效值、幂等 upsert、结构化统计。
  * 纪律：
- *  - 幂等键 message_id+field+project_id（SQLite 主键 NULL 互不冲突 → 群级行不塌缩）；
- *    INSERT OR IGNORE 首写优先——同一条消息的事实重抽不覆盖（审计链稳定）。
+ *  - 幂等键 message_id+field+project_id；**唯一性由两层保证**：
+ *    职位级行（project_id 非空）靠 PRIMARY KEY；**群级行（NULL）不被主键唯一性覆盖
+ *    （SQL 复合主键里 NULL 与 NULL 互不相等，INSERT OR IGNORE 永不触发冲突）**——
+ *    幂等由写前存在性预检补齐（下 EXISTS_SQL），首写优先，重抽不覆盖（审计链稳定）。
  *  - 抽取行必须可回溯：evidence 原文锚点 + message_id + model，缺一不落库（FR-6），
  *    不合格行进返回值 invalid 列表由调用方计数，不静默丢（禁止静默失败）。
  *  - 群级行（project_id NULL）与 confidence<0.7 的行本层照存——「永不进合成」
@@ -14,6 +16,13 @@
 export const AGENT_FACT_FIELDS = ['current_stage', 'active_state'];
 export const AGENT_SYNTHESIS_THRESHOLD = 0.7; // >=0.7 才进合成（specs/023 FR-1）
 const EVIDENCE_MAX = 200;
+
+/** 群级行幂等预检：NULL 不参与主键唯一性（NULL≠NULL），必须 NULL 安全比较。 */
+const EXISTS_SQL = `
+  SELECT 1 FROM job_agent_facts
+  WHERE message_id = ? AND field = ?
+    AND ((project_id IS NULL AND ? IS NULL) OR project_id = ?)
+  LIMIT 1`;
 
 const INSERT_SQL = `
   INSERT OR IGNORE INTO job_agent_facts
@@ -35,13 +44,19 @@ export function upsertAgentFacts(db, rows, extractedAt = null) {
   for (const row of rows || []) {
     const v = validateAgentFactRow(row);
     if (!v.ok) { invalid.push({ row, reason: v.reason }); continue; }
-    const r = db.prepare(INSERT_SQL).run(
-      row.message_id, row.chat_id, row.project_id ?? null,
+    const pid = row.project_id ?? null;
+    // 群级行（NULL）主键不防重：预检命中即 duplicates（职位级行命中也走同路，语义一致）
+    if (db.prepare(EXISTS_SQL).get(row.message_id, row.field, pid, pid)) {
+      duplicates += 1;
+      continue;
+    }
+    db.prepare(INSERT_SQL).run(
+      row.message_id, row.chat_id, pid,
       row.field, row.value, row.confidence,
       String(row.evidence).slice(0, EVIDENCE_MAX),
       row.model, at,
     );
-    if (r.changes > 0) inserted += 1; else duplicates += 1;
+    inserted += 1;
   }
   return { inserted, duplicates, invalid };
 }

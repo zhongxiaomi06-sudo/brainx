@@ -3,8 +3,11 @@
 -- 与 T7 Pipeline 渠道（第一供给线，specs/023 §背景）在合成层汇合：
 -- effectiveJob 优先级 manual > AGENT(conf>=0.7) > cockpit_facts > sync（FR-3，施工序④接线）。
 --
--- 幂等键 = message_id + field + project_id（FR-1 红线：缺一不可；
--- SQLite 主键 NULL 互不冲突 → 群级行（project_id IS NULL）不塌缩）。
+-- 幂等键 = message_id + field + project_id（FR-1 红线：缺一不可）。
+-- ⚠️ 唯一性是两层机制，别只看主键：职位级行（project_id 非空）由主键防重；
+-- **群级行（NULL）不被主键唯一性覆盖——SQL 复合主键里 NULL 与 NULL 互不相等，
+-- INSERT OR IGNORE 对群级行永不触发冲突**。群级幂等由存储层写前存在性预检补齐
+-- （src/agent-facts.js EXISTS_SQL，NULL 安全比较），本表主键只作职位级兜底。
 -- 时间戳一律 ISO 8601 UTC（库内既有约定）；evidence 是原文锚点（截断 200 字符）。
 -- 红线：群级行与 confidence<0.7 的行【只存储展示，永不进合成层】（合成层过滤，
 -- 本表不强制——存储层保持中立，消费口径在 src/facts.js）。

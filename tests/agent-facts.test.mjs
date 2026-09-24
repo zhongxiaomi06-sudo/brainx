@@ -42,6 +42,41 @@ test('群级行（project_id NULL）主键不塌缩：同消息两群级行共�
   assert.equal(r.inserted, 2, 'field 不同即不同幂等键，群级行不得互相吃掉');
 });
 
+test('P0 回归：群级行重跑零新增（SQL 复合主键 NULL≠NULL，唯一性靠存储层预检）', () => {
+  const db = newDb();
+  const g = { ...baseRow, message_id: 'om_g', chat_id: 'oc_gA', project_id: null, value: 'OPEN', field: 'active_state' };
+  const r1 = upsertAgentFacts(db, [g], '2026-09-24T00:00:00.000Z');
+  assert.equal(r1.inserted, 1);
+  const r2 = upsertAgentFacts(db, [g], '2026-09-24T01:00:00.000Z');
+  assert.equal(r2.inserted, 0, '群级行第二轮必须零新增（AC-1 对 NULL 同样成立）');
+  assert.equal(r2.duplicates, 1);
+  const n = db.prepare('SELECT COUNT(*) n FROM job_agent_facts').get().n;
+  assert.equal(n, 1, '总行数不得翻倍');
+});
+
+test('P0 回归：混合批次（职位级+群级）重放，两层级都零新增', () => {
+  const db = newDb();
+  const batch = [
+    baseRow,
+    { ...baseRow, message_id: 'om_g', chat_id: 'oc_gA', project_id: null, value: 'OPEN', field: 'active_state' },
+  ];
+  const r1 = upsertAgentFacts(db, batch, '2026-09-24T00:00:00.000Z');
+  assert.equal(r1.inserted, 2);
+  const r2 = upsertAgentFacts(db, batch, '2026-09-24T01:00:00.000Z');
+  assert.deepEqual({ inserted: r2.inserted, duplicates: r2.duplicates }, { inserted: 0, duplicates: 2 });
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM job_agent_facts').get().n, 2);
+});
+
+test('P0 回归：不同群的同名群级行互不吞（message_id 相同、chat_id 不同仍应算重复——幂等键不含 chat_id）', () => {
+  const db = newDb();
+  const g1 = { ...baseRow, message_id: 'om_g', chat_id: 'oc_gA', project_id: null, value: 'OPEN', field: 'active_state' };
+  const r1 = upsertAgentFacts(db, [g1], '2026-09-24T00:00:00.000Z');
+  assert.equal(r1.inserted, 1);
+  const g2 = { ...g1, chat_id: 'oc_gB' };
+  const r2 = upsertAgentFacts(db, [g2], '2026-09-24T01:00:00.000Z');
+  assert.equal(r2.inserted, 0, '幂等键 = message_id+field+project_id，chat_id 不参与——同一消息的抽取行唯一');
+});
+
 test('可回溯三要素（FR-6）：缺 evidence / model / message_id 一律不落库并进 invalid', () => {
   const noEvidence = validateAgentFactRow({ ...baseRow, evidence: '' });
   assert.equal(noEvidence.ok, false);

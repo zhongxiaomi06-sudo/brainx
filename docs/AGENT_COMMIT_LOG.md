@@ -1,5 +1,13 @@
 # Agent Commit 记录
 
+## 2026-09-24｜fix(fact-agent): 审核修复——群级行幂等预检（P0）+ backfill 无上限 + CLI 改走 openDb（P1×2）
+
+- 起因（用户/另一窗口审核结论）：实测复现 P0——SQL 复合主键里 **NULL 与 NULL 互不相等**，`INSERT OR IGNORE` 对 (message_id, field, NULL) 永不触发冲突，群级行重跑必重复（in-memory 实验第二轮 inserted=1、总行数翻倍），AC-1 对群级行破防；且错误认知被固化进 migration 与存储层注释（「NULL 互不冲突→不塌缩」只对了 NULL≠X 半边）。P1×2：backfill 默认 limit=5000 静默截断存量语义；CLI 裸 DatabaseSync 无 busy_timeout，生产持库时 timer 写入会 SQLITE_BUSY。
+- 修复（采纳审核修法 A，不动 FR-1 表契约）：①`src/agent-facts.js` upsertAgentFacts 写前 NULL 安全存在性预检（EXISTS_SQL：`(project_id IS NULL AND ? IS NULL) OR project_id = ?`），命中计 duplicates；职位级/群级同路语义一致；②错误注释三处纠正（migration 0057 / 存储层 docstring / spec 023 红线区机制描述——契约不变，只改错误机制表述）；③`runFactAgentPipeline` limit 缺省 null=无上限（backfill 存量语义，显式 --limit 才截断；LLM 成本由预筛候选数决定与扫描数无关）；④CLI 改走 `openDb`（busy_timeout=5000 + migration 兜底）；⑤P2 顺手：`--limit=abc` 报错退出 1（不静默回落）。
+- 测试堵盲区：+3 例存储层（群级重放零新增 / 混合批次重放 / 不同 chat 同 message 群级行互不吞——幂等键不含 chat_id 语义钉死）+ 端到端场景补 om_g1 群无绑定落群级、重跑断言覆盖群级（原 21 例全绿但 NULL 重放是盲区——审核实证）；24/24 全绿。
+- 验证：审核者的复现实验修复后重跑 round2 inserted=0 duplicates=1 total=1；CLI 冒烟（无上限默认 / --limit=abc EXIT=1）；verify:quick 16/16；最大文件 322 行（≤500 内）。未 push。
+- 遗留（审核 P2，不阻断）：SIGNAL_RE 含泛词（面试/招聘/招人），dry-run candidates 会大于基线 2,237 口径，成本估算待首轮 dry-run 校准；evidence 前 12 字弱锚定沿用 job-extract 旧约定，首轮抽样核对时盯。
+
 ## 2026-09-24｜feat(fact-agent): specs/023 施工序①②③——字段补全 Agent 框架（migration + 存储层 + 抽取管线 + CLI）
 
 - 起因（用户指令）：「按照这个字段进行数据的第一轮的验证和 MVP 的开发完整度；另一个窗口在跑数据的分析，你就做好框架的开发就可以」——按 spec 023 施工依赖序，只做 ①②③（不动现有运行行为、可先行合入的部分），不跑真实数据分析（留给另一窗口）。

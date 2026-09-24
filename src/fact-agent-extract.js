@@ -225,6 +225,14 @@ const SELECT_CANDIDATES_SQL = `
   ORDER BY create_time DESC
   LIMIT $limit`;
 
+// 无上限版（backfill/存量语义：--limit 显式传才截断，禁默认静默截断）
+const SELECT_CANDIDATES_UNBOUNDED_SQL = `
+  SELECT message_id, chat_id, text, create_time
+  FROM lark_messages
+  WHERE text IS NOT NULL AND TRIM(text) != ''
+    AND ($since IS NULL OR create_time > $since)
+  ORDER BY create_time DESC`;
+
 const SELECT_JOBS_SQL = `
   SELECT project_id, company, role FROM job_facts WHERE chat_id = ?`;
 
@@ -238,13 +246,13 @@ export function jobsForChat(db, chatId) {
  * @param {object} opts
  *   - llm: async ({system, user}) => string（注入；缺省=只跑解析+预筛，零 token）
  *   - modelName: 落库 model 标识（默认 'glm-fact-agent-v1'）
- *   - since/limit: 增量窗口与上限
+ *   - since/limit: 增量窗口与上限；limit=null 表示无上限（backfill 存量语义，缺省）
  *   - batchSize: 每批消息数（默认 20，spec FR-2）
  *   - extractedAt: 固定时间戳（测试用）
  * @returns {{stats:object, rows:object[]}} 统计与全部落库行（回放/影子对照用）
  */
 export async function runFactAgentPipeline(db, opts = {}) {
-  const { llm = null, modelName = 'glm-fact-agent-v1', since = null, limit = 5000, batchSize = 20 } = opts;
+  const { llm = null, modelName = 'glm-fact-agent-v1', since = null, limit = null, batchSize = 20 } = opts;
   const stats = {
     scanned: 0, candidates: 0, llmBatches: 0, llmFailures: 0,
     extracted: 0, inserted: 0, duplicates: 0, invalid: 0, dropReasons: {},
@@ -252,7 +260,9 @@ export async function runFactAgentPipeline(db, opts = {}) {
   };
   const rows = [];
 
-  const msgs = db.prepare(SELECT_CANDIDATES_SQL).all({ $since: since, $limit: limit });
+  const msgs = limit == null
+    ? db.prepare(SELECT_CANDIDATES_UNBOUNDED_SQL).all({ $since: since })
+    : db.prepare(SELECT_CANDIDATES_SQL).all({ $since: since, $limit: limit });
   stats.scanned = msgs.length;
 
   // 解析 + 预筛（零 token，开关关闭时的唯一执行路径）

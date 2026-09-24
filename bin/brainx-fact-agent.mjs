@@ -3,9 +3,9 @@
  *
  * 模式（显式传参，缺省 dry-run）：
  *   --dry-run    只跑解析+预筛并输出统计（零 token、零落库；第一轮数据验证入口）
- *   --backfill   存量信号消息回填（GLM 抽取 + 落库）
+ *   --backfill   存量信号消息回填（GLM 抽取 + 落库；默认无上限，--limit 显式传才截断）
  *   --since=Nd   增量抽取（近 N 天滚动窗口，幂等键天然去重）
- *   --limit=N    候选扫描上限（默认 5000）
+ *   --limit=N    候选扫描上限（缺省无上限；非法值直接报错退出，不静默回落）
  *   --json       统计以单行 JSON 输出（供 systemd/脚本消费）
  *
  * 开关（FR-5）：BRAINX_FACT_AGENT=1 才允许 --backfill/--since 走 GLM+落库；
@@ -19,13 +19,14 @@
 import '../src/env.js';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { DatabaseSync } from 'node:sqlite';
+import { openDb } from '../src/db.js';
 import { runFactAgentPipeline } from '../src/fact-agent-extract.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 function parseArgs(argv) {
-  const args = { mode: 'dry-run', limit: 5000, since: null, json: false };
+  // limit 缺省 null = 无上限（backfill 存量语义；LLM 成本由预筛候选数决定，与扫描数无关）
+  const args = { mode: 'dry-run', limit: null, since: null, json: false };
   for (const a of argv) {
     if (a === '--dry-run') args.mode = 'dry-run';
     else if (a === '--backfill') args.mode = 'backfill';
@@ -34,8 +35,14 @@ function parseArgs(argv) {
       if (!m) { console.error('--since 只支持 Nd 形式（如 --since=7d）'); process.exit(1); }
       args.since = new Date(Date.now() - Number(m[1]) * 86400000).toISOString();
       args.mode = 'since';
-    } else if (a.startsWith('--limit=')) args.limit = Number(a.slice(8)) || 5000;
-    else if (a === '--json') args.json = true;
+    } else if (a.startsWith('--limit=')) {
+      const v = a.slice(8);
+      if (!/^\d+$/.test(v) || Number(v) <= 0) {
+        console.error(`--limit 必须是正整数，收到: ${v}`);
+        process.exit(1);
+      }
+      args.limit = Number(v);
+    } else if (a === '--json') args.json = true;
     else { console.error(`未知参数: ${a}`); process.exit(1); }
   }
   return args;
@@ -73,8 +80,10 @@ async function main() {
     args.mode = 'dry-run';
   }
 
-  const dbPath = process.env.BRAINX_DB_PATH || join(ROOT, 'data', 'brainx.db');
-  const db = new DatabaseSync(dbPath);
+  const dbPath = process.env.BRAINX_DB_PATH;
+  // 走 openDb：busy_timeout=5000（生产主服务持库时 timer 写入不至 SQLITE_BUSY 直接失败）
+  // + migration 兜底（表不存在时报错友好，零一 09-24 审核 P1-2）
+  const db = dbPath ? openDb(dbPath) : openDb();
 
   let llm = null;
   let modelName = 'glm-fact-agent-v1';

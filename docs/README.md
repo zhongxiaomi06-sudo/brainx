@@ -74,6 +74,7 @@
 | 顾问主动画像、短期信号、真实曝光、Case 结果或归因 | [画像、曝光与结果账本规格](../specs/029-profile-exposure-outcomes/spec.md)、[推荐重构数据契约](2026-09-22-ranking-data-migration.md) |
 | Agent 多轮用量、预算、Context Registry 或排名窄工具 | [Agent 上下文与完整用量规格](../specs/030-agent-context-usage/spec.md)、[Algorithm A 契约](2026-09-22-algorithm-a-contract.md) |
 | Algorithm A、Agent 最终排序、严格校验、弃权或 generation/CAS 发布 | [Algorithm A 最小端到端规格](../specs/031-agentic-ranking-v1/spec.md)、[Algorithm A 决策契约](2026-09-22-algorithm-a-contract.md) |
+| Algorithm A 离线对照、影子评估、召回覆盖、稳定性、成本或晋升门槛 | [Algorithm A 离线与影子评估规格](../specs/032-agentic-shadow-evaluation/spec.md)、[Algorithm A 决策契约](2026-09-22-algorithm-a-contract.md) |
 | 前端重构排期、施工范围或阶段验收 | [前端真实数据重构施工清单](frontend-refactor-construction-checklist.md)、[前端交互架构](frontend-interaction-architecture.md) |
 | TTC 职位字段、筛选能力或字段变化 | [TTC 职位字段库](ttc-field-catalog.md)、[BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md) |
 | Commit、协作记录 | [Agent Commit 记录](AGENT_COMMIT_LOG.md) |
@@ -136,6 +137,7 @@
 - [画像、曝光与结果账本规格](../specs/029-profile-exposure-outcomes/spec.md)：版本化主动画像，分离短期信号与实时负载，幂等记录真实曝光和 Case 结果/更正/归因。
 - [Agent 上下文与完整用量规格](../specs/030-agent-context-usage/spec.md)：逐模型尝试记录成功、失败、重试、取消与缓存，建立授权 Context Registry 和 A 专用只读窄工具。
 - [Algorithm A 最小端到端规格](../specs/031-agentic-ranking-v1/spec.md)：默认关闭的独立 A 路径，覆盖硬过滤、多路召回、Agent 原序输出、严格校验和 generation/CAS 原子发布。
+- [Algorithm A 离线与影子评估规格](../specs/032-agentic-shadow-evaluation/spec.md)：冻结门槛后同池比较旧基线与 A，拆分召回/选择遗漏并保存稳定性、成本、延迟、分组和样本不确定性证据；影子不投递也不伪造转化。
 - [BrainTex 飞书功能首页与新用户指引](2026-09-03-braintex-feishu-home.md)：定义 `/brainx` 确定性卡片、六个顾问任务入口、权限边界、首次出现时机和真实验收流程。
 - [候选人事实与 shortlist 数据契约](2026-09-03-candidate-data-contracts.md)：`candidate_fact_v1`、`candidate_match_bundle_v1`、reloop 真实数据转换、人才/职位双授权、固定飞书文案、MCP PoC 暴露条件及当前未完成项的唯一施工说明。
 - [候选人保留与项目共享上下文复核](frontend-reviews/2026-09-09-candidate-focus-context.md)：飞书候选行“保留”、项目级重点名单、后续群问答读取与安全边界。

@@ -1,5 +1,14 @@
 # Agent Commit 记录
 
+## 2026-09-24｜feat(sync): lark_messages 历史回填工具（migration 0056 origin 列）——第二批 24 群 922 条入生产库
+- 起因（用户指令）：「让使用 braintex 的机器人阅读最新的 cli 的数据，更新数据的来源……读飞书群的第二批的数据进行增加验证」。
+- 根因定位：`lark_messages` 由网关事件驱动写入（bot 在群才有事件流），bot 不在群的 69 个用户可见群（含 24 个客户/项目群、13 家第一批未覆盖公司）永远进不了库。
+- 改动：`migrations/0056_lark_messages_origin.sql`（origin 列，DEFAULT 'gateway' 兜底存量）+ `src/lark-backfill.js`（映射：飞书分钟精度本地时间→UTC ISO、mentions 归一、deleted 过滤、message_id 幂等）+ `bin/brainx-lark-backfill.mjs`（dry-run 默认，--apply 事务化，migration 前置校验）+ `tests/lark-backfill.test.mjs`（6/6）。
+- 生产执行：ECS 拉取 24 群 page-all 934 条 → 落库 922 条（12 条已撤回/非法过滤，0 重复，gateway 17,772 条未动）。库内 18,694 条/196 会话。
+- 第二批验证（规则口径，一次性脚本，不入仓库）：信号密度 24%（第一批 15%）；13 家新公司确认（思博威视/自然映射/智子芯元/Unipat/海马云/巨日禄/国投/物外智趣/普罗资本/穿越者/硅羽/优艾智合/懂车族）；硬件产品经理需求带为第一批画像盲区。
+- 已知偏差：docs 规则 v2 引用的 FAMILY_RULES 正则表实际在已删的服务器临时脚本里（文档-代码脱节），评判报告节点 9 登记待修复。
+- 验证：本地 6/6 测试；ECS dry-run 与本地一致（922/0 重复）后 --apply；origin 分组核对 gateway|17772 + backfill|922。
+
 ## 2026-09-23｜fix(specs/003 延伸): 清洗 apply 两次落库修复 + 1,457 条复活/拆稿实写完成
 
 - 起因：apply 实写撞两个真实约束，逐一根因修复后成功落库（咪已批准「全部应用」）。

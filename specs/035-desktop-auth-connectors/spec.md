@@ -1,6 +1,6 @@
 # 035 — BrainX 桌面端统一登录与找人连接器
 
-状态：In Progress（2026-09-24；阶段 A 的 provider 目录、统一只读连接状态和 SuperMai loopback 探针已实现；桌面客户端、统一任务与正式 SuperMai relay 尚未实现）
+状态：In Progress（2026-09-24；阶段 A 的 provider 目录、统一连接状态、SuperMai 官方登录启动、`/join` 与正式连接中心已实现；桌面客户端、统一任务与正式 SuperMai relay 尚未实现）
 
 上游：[BrainX × OpenClaw AI 猎头工作流产品需求文档](../../docs/prd-2026-09-02-openclaw-ai-recruiting-workflow.md)、
 [Workflow Hub 与猎头全链路架构](../../docs/workflow-hub-architecture.md)、
@@ -221,6 +221,8 @@ POST /api/v1/sourcing/tasks/{task_id}/finish
 在不改变现有飞书 Web 登录行为的前提下建立 provider registry、统一状态信封和 `/auth/providers`、`/connections` 只读接口；把静态名册、Agent 身份绑定和 OpenMai grant 的差异转成明确状态。此阶段不做桌面安装包。
 
 实现证据：`GET /api/v1/auth/providers` 公开返回当前唯一主身份提供方；登录后的 `GET /api/v1/connections` 统一返回飞书、OpenMai、SuperMai、Reloop 的状态。SuperMai 探针只允许 HTTP loopback、短超时并过滤端口、Cookie、token 与本地路径；`POST /api/v1/connections/supermai/start` 只接受 BOSS、脉脉、猎聘三个内建平台并打开官方登录页，不接受调用方 URL。该状态与登录启动能力不等同于任务链路已经接通。
+
+最小用户链路已接入：`/join` 提供首次进入说明和飞书官方 OAuth 入口；正式工作台主导航与设置中心均进入同一 `ConnectionCenter`，展示真实四来源状态，并按需打开 SuperMai 官方平台页面。当前继续复用本机已安装 SuperMai/Sourcing，不提供虚假下载链接，也不把 Web 页面称作已完成的桌面客户端。
 
 ### 阶段 B｜统一找人任务
 

@@ -274,8 +274,8 @@ export default function DecisionWorkbench({demo=false}:{demo?:boolean}={}){
   onOpen:(job,kind)=>{setPage("today");openDecision(job,kind==="replay"?"judgement":"facts")},
   onCandidate:(candidateRef,jobRef)=>{setAssistantOpen(true);setAssistantInput(`请分析候选人 ${candidateRef} 与职位 ${jobRef} 的匹配、证据、风险和待确认项。`)}});
  const commitmentJobs=allDecisionJobs.filter(job=>["WATCHED","ACCEPTED"].includes(engagement[job.id]||"NEW"));
- const shellPage:WorkspaceShellPage=page==="accepted"?"projects":page==="clients"?"clients":page==="jobs"?"jobs":page==="today"?"today":"settings";
- const navigateShell=(next:WorkspaceShellPage)=>{if(next==="jobs")setJobCompanyFilter(null);if(next==="settings")setAssistantOpen(false);go(next==="projects"?"accepted":next==="settings"?"settings":next)};
+ const shellPage:WorkspaceShellPage=page==="accepted"?"projects":page==="clients"?"clients":page==="jobs"?"jobs":page==="today"?"today":page==="sources"?"connections":"settings";
+ const navigateShell=(next:WorkspaceShellPage)=>{if(next==="jobs")setJobCompanyFilter(null);if(next==="settings")setAssistantOpen(false);go(next==="projects"?"accepted":next==="connections"?"sources":next==="settings"?"settings":next)};
  const recommendationPagination=demo?undefined:{
   pageIndex:recommendationQueue.pageIndex,
   totalCount:recommendationQueue.current?.totalCount??activeDecisionJobs.length,

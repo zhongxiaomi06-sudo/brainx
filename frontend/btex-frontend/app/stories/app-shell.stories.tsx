@@ -22,7 +22,7 @@ export const FullWorkbench: Story = {
     await expect(canvas.getByLabelText("主要导航")).toBeInTheDocument();
     await expect(within(canvas.getByRole("navigation", { name: "日常工作" })).getAllByRole("button")
       .map((button) => button.getAttribute("aria-label")))
-      .toEqual(["精选盘", "我的项目", "全部职位", "客户洞察"]);
+      .toEqual(["精选盘", "我的项目", "全部职位", "客户洞察", "连接中心"]);
     await expect(canvas.getByRole("button", { name: "全部职位" })).toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: "我的项目" }));
     await expect(canvas.getByRole("heading", { name: "我的项目" })).toBeInTheDocument();
@@ -34,6 +34,7 @@ const pageCopy: Record<Exclude<WorkspaceShellPage, "today" | "settings">, string
   jobs: "集中检索、筛选和核验 TTC 职位事实。",
   projects: "跟进已经关注、开始推进和等待记录结果的项目。",
   clients: "按客户聚合真实职位、HC 和最近变化。",
+  connections: "统一查看身份与找人来源的真实连接状态。",
 };
 
 function TodayBlocks() {
@@ -72,7 +73,7 @@ function ShellReviewHarness() {
       assistant={<div className="shell-assistant-preview"><p>助手按需出现，只读取当前页面上下文。</p><div>当前页面：{page === "today" ? "精选盘" : page}</div></div>}
     >
       {page === "today" ? <TodayBlocks /> : (
-        <div className="shell-settings-page"><header><p className="shell-review-kicker">WORKSPACE</p><h1>{page === "jobs" ? "全部职位" : page === "projects" ? "我的项目" : "客户洞察"}</h1><p>{pageCopy[page]}</p></header><section className="shell-review-section">此阶段只审核页面归属和大板块，不改造内部业务组件。</section></div>
+        <div className="shell-settings-page"><header><p className="shell-review-kicker">WORKSPACE</p><h1>{page === "jobs" ? "全部职位" : page === "projects" ? "我的项目" : page === "connections" ? "连接中心" : "客户洞察"}</h1><p>{pageCopy[page]}</p></header><section className="shell-review-section">此阶段只审核页面归属和大板块，不改造内部业务组件。</section></div>
       )}
     </WorkspaceShell>
   );
@@ -88,7 +89,7 @@ export const MainBlocksReview: Story = {
     await expect(canvas.queryByRole("button", { name: /提醒/ })).not.toBeInTheDocument();
     await expect(within(canvas.getByRole("navigation", { name: "日常工作" })).getAllByRole("button")
       .map((button) => button.getAttribute("aria-label")))
-      .toEqual(["精选盘", "我的项目", "全部职位", "客户洞察"]);
+      .toEqual(["精选盘", "我的项目", "全部职位", "客户洞察", "连接中心"]);
     await userEvent.click(canvas.getByRole("button", { name: "用户与设置" }));
     await expect(canvas.getByText("工作台设置")).toBeInTheDocument();
     await userEvent.click(canvas.getByRole("menuitem", { name: "工作台设置" }));

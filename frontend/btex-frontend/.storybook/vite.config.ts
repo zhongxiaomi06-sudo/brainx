@@ -6,4 +6,5 @@ import { defineConfig } from "vite";
 // config instead of loading the deployment pipeline from ../vite.config.ts.
 export default defineConfig({
   plugins: [react()],
+  define: { "process.env": "{}" },
 });

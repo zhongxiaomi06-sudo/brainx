@@ -37,6 +37,7 @@ const cssSource = async () => (await Promise.all([
   source("app/jobs-workspace-review.css"),
   source("app/client-insights-review.css"),
   source("app/settings-center-review.css"),
+  source("app/connection-center.css"),
 ])).join("\n");
 
 test("keeps demo datasets behind the explicit demo mode", async () => {
@@ -341,14 +342,24 @@ test("the corrected package has one workbench implementation", async () => {
   assert.doesNotMatch(page, /PrototypeWorkbench|variant=/);
 });
 
-test("exposes the real TTC job source without persisting its credential in the browser", async () => {
-  const sources = await source("app/workbench-sources.tsx");
+test("uses one connection center without collecting third-party credentials", async () => {
+  const [sources, api, center, shell, join] = await Promise.all([
+    source("app/workbench-sources.tsx"),
+    source("app/brainx-connections-api.ts"),
+    source("app/connection-center.tsx"),
+    source("app/workspace-shell.tsx"),
+    source("app/join/page.tsx"),
+  ]);
 
-  assert.match(sources, /TTC 职位系统/);
-  assert.match(sources, /\/api\/v1\/ttc\/connect/);
-  assert.match(sources, /method: "PUT", body: \{ jwt: token \}/);
-  assert.match(sources, /type="password"/);
-  assert.match(sources, /autoComplete="off"/);
-  assert.doesNotMatch(sources, /localStorage|sessionStorage/);
-  assert.doesNotMatch(sources, /演示状态|sourceNames|查看字段/);
+  assert.match(api, /\/api\/v1\/connections/);
+  assert.match(api, /\/api\/v1\/connections\/supermai\/start/);
+  assert.match(sources, /startSupermaiLogin/);
+  assert.match(center, /OpenMai/);
+  assert.match(center, /SuperMai/);
+  assert.match(center, /Reloop/);
+  assert.match(center, /密码和验证码始终留在官方页面/);
+  assert.match(shell, /id: "connections", label: "连接中心"/);
+  assert.match(join, /使用飞书进入/);
+  assert.match(join, /当前最小版本复用已安装的 SuperMai/);
+  assert.doesNotMatch(`${sources}\n${center}`, /type="password"|ottin-jwt-token-v2|localStorage|sessionStorage/);
 });

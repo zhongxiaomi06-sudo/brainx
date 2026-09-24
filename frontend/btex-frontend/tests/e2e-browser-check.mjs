@@ -235,17 +235,16 @@ try {
   const dailyNavigation = page.getByRole("navigation", { name: "日常工作" });
   assert.deepEqual(await dailyNavigation.getByRole("button").evaluateAll((buttons) =>
     buttons.map((button) => button.getAttribute("aria-label"))),
-  ["精选盘", "我的项目", "全部职位", "客户洞察"], "正式主导航必须把我的项目放在精选盘之后");
+  ["精选盘", "我的项目", "全部职位", "客户洞察", "连接中心"], "正式主导航必须包含统一连接中心");
   await page.getByRole("button", { name: "全部职位" }).click();
   await page.getByRole("button", { name: "客户洞察" }).click();
   await page.getByRole("heading", { name: "客户洞察" }).waitFor({ state: "visible" });
   await accountEntry.click();
   await page.getByRole("menuitem", { name: "工作台设置" }).click();
   await page.getByRole("button", { name: "数据连接" }).click();
-  await page.getByRole("heading", { name: "数据连接" }).waitFor({ state: "visible" });
-  await page.getByText("TTC 职位系统", { exact: true }).waitFor({ state: "visible" });
-  assert.match(await page.locator("main").innerText(), /真实职位来源/);
-  await page.getByRole("button", { name: "返回应用" }).click();
+  await page.getByRole("heading", { name: "连接中心" }).waitFor({ state: "visible" });
+  await page.getByRole("heading", { name: "SuperMai" }).waitFor({ state: "visible" });
+  assert.match(await page.locator("main").innerText(), /OpenMai[\s\S]*SuperMai[\s\S]*Reloop/);
   await page.getByRole("button", { name: "精选盘", exact: true }).click();
   await page.getByRole("heading", { name: /推荐队列|还没有可判断的职位/ }).waitFor({ state: "visible" });
 

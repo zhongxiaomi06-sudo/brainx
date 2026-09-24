@@ -77,7 +77,7 @@
 | Algorithm A 离线对照、影子评估、召回覆盖、稳定性、成本或晋升门槛 | [Algorithm A 离线与影子评估规格](../specs/032-agentic-shadow-evaluation/spec.md)、[Algorithm A 决策契约](2026-09-22-algorithm-a-contract.md) |
 | Algorithm A 工作台/飞书展示、原序分页、异步状态、主动偏好、排除项或容量设置 | [Algorithm A 忠实展示与主动设置规格](../specs/033-agentic-presentation/spec.md)、[前端审核台账](frontend-reviews/README.md)、[飞书卡片排版规范](standards/CARD_TYPOGRAPHY.md) |
 | 运营看板、事件投影、checkpoint、真实漏斗、排序分歧、Agent 成本或样本成熟度 | [事件投影运营、业务、效果与成本看板规格](../specs/034-operations-dashboard/spec.md)、[推荐数据迁移手册](2026-09-22-ranking-data-migration.md)、[前端审核台账](frontend-reviews/README.md) |
-| 桌面客户端下载、统一登录、官方浏览器授权、OpenMai/SuperMai/Reloop 找人连接器或设备会话 | [BrainX 桌面端统一登录与找人连接器规格](../specs/035-desktop-auth-connectors/spec.md)、[安全操作手册](SECURITY.md)、[Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) |
+| 桌面客户端下载、统一登录、官方浏览器授权、OpenMai/SuperMai/Reloop 找人连接器或设备会话 | [BrainX 桌面端统一登录与找人连接器规格](../specs/035-desktop-auth-connectors/spec.md)、[首次入口与统一连接中心接入记录](frontend-reviews/2026-09-24-onboarding-connection-center.md)、[安全操作手册](SECURITY.md)、[Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) |
 | 前端重构排期、施工范围或阶段验收 | [前端真实数据重构施工清单](frontend-refactor-construction-checklist.md)、[前端交互架构](frontend-interaction-architecture.md) |
 | TTC 职位字段、筛选能力或字段变化 | [TTC 职位字段库](ttc-field-catalog.md)、[BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md) |
 | Commit、协作记录 | [Agent Commit 记录](AGENT_COMMIT_LOG.md) |

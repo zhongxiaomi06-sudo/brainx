@@ -31,8 +31,8 @@ export function projectSearchCandidate(db, jobId, candidateRef) {
   const ref = validCandidateRef(candidateRef);
   if (!ref) return null;
   const results = db.prepare(`SELECT task_id,result_text FROM openmai_results
-    WHERE project_id=? AND status IN ('done','needs_input')
-    ORDER BY finished_at DESC, started_at DESC`).all(jobId);
+    WHERE project_id IN (?,?) AND status IN ('done','needs_input')
+    ORDER BY finished_at DESC, started_at DESC`).all(jobId, `supermai-result:${jobId}`);
   for (const result of results) {
     const candidate = extractOpenmaiCandidates(result.result_text)
       .find((item) => item.candidateRefValid !== false && item.candidateRef === ref);

@@ -1,6 +1,6 @@
 # 035 — BrainX 桌面端统一登录与找人连接器
 
-状态：In Progress（2026-09-24；阶段 A 的 provider 目录、统一连接状态、SuperMai 官方登录启动、`/join` 与正式连接中心已实现；桌面客户端、统一任务与正式 SuperMai relay 尚未实现）
+状态：In Progress（2026-09-24；阶段 A 与 SuperMai 正式 relay 已实现；签名原生客户端、自动更新及 OpenMai/Reloop 统一任务迁移尚未实现）
 
 上游：[BrainX × OpenClaw AI 猎头工作流产品需求文档](../../docs/prd-2026-09-02-openclaw-ai-recruiting-workflow.md)、
 [Workflow Hub 与猎头全链路架构](../../docs/workflow-hub-architecture.md)、
@@ -27,7 +27,7 @@ Chrome 是承载官方页面的浏览器，不是身份提供方。飞书是当�
 ### 2.2 三条找人链路
 
 - **OpenMai**：`brainx_openmai_search` 使用当前顾问的 TTC JWT 调 OpenMai，再由 worker 把结果发回项目群；该链路是真实服务端连接。
-- **SuperMai**：现有 `brainx_supermai_scout` 只是把同一 OpenMai 引擎切为 criteria 模式，并未调用已安装的 Sourcing/SuperMai 客户端。
+- **SuperMai**：旧实现把同一 OpenMai 引擎切为 criteria 模式；本规格落地后已改为云端排队、顾问设备出站领取、Sourcing harness 真执行和任务级 token 回传。
 - **Reloop**：`brainx_candidate_shortlist` 从 BrainX 授权下的 MySQL 人才与预计算匹配结果读取；它是组织级服务连接，不应要求每位用户在桌面端重复登录。
 
 ### 2.3 本机 Sourcing 0.3.6 的可复用模式
@@ -230,11 +230,13 @@ POST /api/v1/sourcing/tasks/{task_id}/finish
 
 ### 阶段 C｜SuperMai 正式连接
 
-先以本地开发模式验证 8910 健康、平台状态、run、SSE、ingest、finish 和取消，再接桌面出站 relay。验收前，旧 `brainx_supermai_scout` 必须清晰标记为 OpenMai fallback，不能宣称已调用 SuperMai。
+已实现。`brainx_supermai_scout` 创建 `sourcing_tasks`，不再读取 TTC 凭证或调用 OpenMai；一次性配对码把设备绑定到当前飞书身份，设备凭独立可撤销 token 出站轮询。云端以租约下发任务和任务级短时 ingest token，桌面连接器只调用本机 `127.0.0.1:8910` 的正式 `agent/run`、`state`、`ingest`、`finish` 契约。候选人按 `task_id + platform + external_id` 幂等，定稿后写入兼容结果并由原项目群投递 worker 回传。
+
+当前连接器以可下载的 macOS 常驻 sidecar 安装脚本交付，复用已安装 Sourcing 内置 Bun；它不是签名原生 BrainX 客户端。服务器永不访问用户电脑 loopback，招聘平台 Cookie、密码和验证码不离开官方页面与本机 profile。部署、配对、撤销和验收见[SuperMai 桌面 relay 运行手册](../../docs/2026-09-24-supermai-desktop-relay-runbook.md)。
 
 ### 阶段 D｜桌面客户端与门户
 
-以最小原型比较 Tauri 与 Electron：签名/自动更新、系统浏览器回调、Keychain、Chrome profile、崩溃恢复和团队维护成本通过门槛后再选型。随后建设下载门户、版本发布和支持页面。
+当前连接中心已提供配对码和连接器下载入口，覆盖内部灰度的最小安装链路；设备 token 以 `0600` 文件保存并可由服务端单设备撤销。正式对外发行仍需比较 Tauri 与 Electron，并补齐签名、公证、Keychain、自动更新、崩溃恢复和版本停用，不能把 sidecar 安装器描述成最终原生客户端。
 
 ### 阶段 E｜清理人工开通
 

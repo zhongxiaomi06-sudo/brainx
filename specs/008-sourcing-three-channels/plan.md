@@ -16,3 +16,7 @@
 
 - `node --test tests/agent-tools.test.mjs`（skills 发现/frontmatter/安装集断言不受影响）。
 - `npm run verify:quick`。
+
+## 2026-09-24 现行修订
+
+本计划中“不改工具逻辑”只适用于 008 当时的 Skill 分拆。现行 SuperMai 已按 [035 规格](../035-desktop-auth-connectors/spec.md) 迁移为桌面 relay，不再调用 OpenMai。部署与验收见 [SuperMai 桌面 Relay 运行手册](../../docs/2026-09-24-supermai-desktop-relay-runbook.md)。

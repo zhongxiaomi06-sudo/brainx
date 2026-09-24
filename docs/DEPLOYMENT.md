@@ -14,6 +14,8 @@ BrainX 是后端统一代理前端的一体化应用：
 
 后端会启动前端子进程，因此生产不需要 docker-compose。前端构建生成的 `wrangler.json` 由 vinext 管理；不要手写 `wrangler.toml`。若未来部署 Cloudflare Workers，应修改 `vite.config.ts` 的绑定源头。
 
+SuperMai 生产链路是出站桌面 relay：飞书/Agent Gateway 把任务写入与主应用共享的 SQLite，顾问电脑的连接器经 HTTPS 轮询 BrainX，再调用本机 Sourcing harness。ECS 不访问用户电脑的 `127.0.0.1`，不保存招聘平台 Cookie。完整拓扑与同事安装步骤见 [SuperMai 桌面 Relay 运行手册](2026-09-24-supermai-desktop-relay-runbook.md)。
+
 ## 生产：ECS + systemd（唯一正式方案）
 
 现网固定口径：
@@ -30,9 +32,10 @@ git pull --ff-only
 npm ci
 npm --prefix frontend/btex-frontend ci
 npm --prefix frontend/btex-frontend run build
-systemctl restart brainx
-systemctl status brainx --no-pager
+systemctl restart brainx-agent-gateway brainx-worker brainx
+systemctl status brainx-agent-gateway brainx-worker brainx --no-pager
 curl -fsS https://base.yorkteam.cn/api/v1/meta/guard
+curl -fsSI https://base.yorkteam.cn/api/v1/supermai/connector/install
 ```
 
 禁止在这台生产机启动 BrainX Docker 容器或执行 `scripts/deploy-ecs-docker.sh`。详细排障、端口确认和历史事件见[云端恢复清单](cloud-recovery-checklist.md)。
@@ -84,6 +87,7 @@ docker run --rm -p 3300:3000 --env-file .env -v brainx-test-data:/app/data brain
 | `BRAINX_FEISHU_*` | 飞书应用与授权配置 |
 | `BRAINX_FEEDBACK_SECRET` | 每日推荐卡“接单并建群/忽略”的 HMAC 密钥；正式环境必须独立、持久配置。仅在显式允许 HTTP 回环且基址为本机时，可从 `BRAINX_DEV_AUTH` 稳定派生；其他缺失场景安全降级为打开工作台 |
 | `BRAINX_LLM_*` | 服务端统一模型配置；密钥不得下发浏览器 |
+| `BRAINX_BASE_URL` | 正式 HTTPS 根地址；SuperMai relay 只用它生成任务 ingest URL，缺失时失败关闭 |
 
 ## 上线安全清单
 
@@ -92,3 +96,6 @@ docker run --rm -p 3300:3000 --env-file .env -v brainx-test-data:/app/data brain
 - [ ] RDS 使用专库最小权限账号，白名单只允许 ECS，外网连接启用 SSL
 - [ ] `data/.secret` 与数据库分别做加密备份，恢复流程已验证
 - [ ] 只有 `brainx.service` 监听 3101，nginx upstream 与 HTTPS 健康检查正常
+- [ ] 发布前已备份 SQLite 与 `data/.secret`，`0060_supermai_desktop_relay.sql` 为 additive 迁移
+- [ ] 主应用与 Agent Gateway 指向同一 `BRAINX_DB`，`BRAINX_BASE_URL` 为正式 HTTPS
+- [ ] SuperMai 安装包返回 `application/zip` + `no-store`，无设备 token 的 relay poll 返回 401

@@ -52,7 +52,8 @@ export function groupSafeOpenmaiText(value, max = 6500) {
   return cleaned.length > max ? `${cleaned.slice(0, max)}\n\n*内容较长，完整结果请在工作台查看。*` : cleaned;
 }
 
-export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publicBaseUrl }) {
+export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publicBaseUrl,
+  source = 'openmai' }) {
   // freeform = SuperMai 自由找人模式（无职位）：判据摘要替代 company/role，不放 deep link。
   // 项目模式 job.freeform 不传，行为不变（AGENTS.md §2 最小实现：复用同一函数）。
   const freeform = job?.freeform === true;
@@ -67,7 +68,8 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
   const searchRound = Math.max(1, Number(job.search_round || 1));
   // 2026-09-16 用户拍板：首轮才写「首轮」，其他轮次用「续搜」，不写「第 N 轮」。
   const roundWord = searchRound > 1 ? '续搜' : '首轮';
-  const brand = freeform ? 'SuperMai 自由找人' : 'Reloop 候选人推荐';
+  const brand = freeform ? 'SuperMai 自由找人'
+    : source === 'supermai' ? 'SuperMai 候选人推荐' : 'OpenMai 候选人推荐';
   const readyTitle = `${brand} · ${roundWord}已就绪`;
   const partialTitle = `${brand} · ${roundWord}候选人不足`;
   const headline = freeform
@@ -79,7 +81,7 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
         + (quality.message ? `\n\n> ${quality.message}` : '')
       : `${headline}\n\n${groupSafeOpenmaiText(resultText)}`)
     : `${headline}\n\n本轮候选人搜索失败：${groupSafeOpenmaiText(error, 500)}\n\n请修复连接后在工作台重试。`;
-  const rows = candidates.length ? candidateFocusRows(job, candidates) : [];
+  const rows = candidates.length ? candidateFocusRows(job, candidates, source) : [];
   return {
     config: { wide_screen_mode: true },
     header: { template: complete ? 'green' : success ? 'orange' : 'red', title: { tag: 'plain_text',
@@ -89,9 +91,9 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
     elements: [
       { tag: 'markdown', content },
       // 说明收成一行小灰字 note：按钮与候选人随行后不再需要长段教学。
-      ...(candidates.length ? [focusIntroNote()] : []),
+      ...(candidates.length ? [focusIntroNote(source)] : []),
       ...rows,
-      ...candidateQualityNotes(candidates),
+      ...candidateQualityNotes(candidates, source),
       ...(candidates.length ? [continueSearchActions(job), continueSearchHint()] : []),
       // 失败 / 空结果卡只有这一个动作 → 右对齐收口（F4）。
       // freeform 无真实职位 → target 为 null → 不渲染「打开工作台」按钮，避免伪造链接（2026-09-16）。
@@ -104,7 +106,7 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
 
 /** 候选人每人一行：姓名直接打开 TTC，右侧只保留初筛通过与加入 reloop。
  *  三列权重 3/5/3，动作按钮纵向排列，确保四字姓名和两个动作都不被截断。 */
-function candidateFocusRows(job, candidates) {
+function candidateFocusRows(job, candidates, source) {
   const freeform = job?.freeform === true;
   return [
     { tag: 'column_set', flex_mode: 'none', background_style: 'grey',
@@ -115,7 +117,7 @@ function candidateFocusRows(job, candidates) {
         backgroundText(candidate),
         groupSafeOpenmaiText(candidate.evaluation, 300),
       ].filter(Boolean).join('\n');
-      const url = ttcTalentUrl(candidate);
+      const url = ttcTalentUrl(candidate) || (source === 'supermai' ? candidate.profileUrl : null);
       const name = groupSafeOpenmaiText(candidate.name, 12);
       return { tag: 'column_set', flex_mode: 'none',
         background_style: index % 2 === 0 ? 'default' : 'grey', columns: [
@@ -144,20 +146,22 @@ function candidateLinkButton(url, no, name) {
 }
 
 /** 一句话说明三个入口，避免用户先点开二次卡片才找到人才链接。 */
-function focusIntroNote() {
+function focusIntroNote(source) {
   return { tag: 'note', elements: [{ tag: 'plain_text',
-    content: '点姓名直接查看 TTC；初筛通过后发送人才链接；加入 reloop 为独立操作。' }] };
+    content: source === 'supermai'
+      ? '有来源链接时可点姓名查看官方资料；初筛通过与加入 reloop 是独立操作。'
+      : '点姓名直接查看 TTC；初筛通过后发送人才链接；加入 reloop 为独立操作。' }] };
 }
 
 /** 表格原来的「操作」列兼作「链接待核实」提示，该列移除后信号改在这里披露，避免静默丢失。 */
-function candidateQualityNotes(candidates) {
+function candidateQualityNotes(candidates, source) {
   const numbered = candidates.map((candidate, index) => ({ candidate, no: index + 1 }));
   const invalid = numbered.filter(({ candidate }) => candidate.candidateRefValid === false);
   const unverified = numbered.filter(({ candidate }) => candidate.candidateRefValid !== false
-    && !ttcTalentUrl(candidate));
+    && !ttcTalentUrl(candidate) && !(source === 'supermai' && candidate.profileUrl));
   const notes = [];
   if (invalid.length) notes.push(`${invalid.map(({ no }) => no).join('、')} 号候选人编号无效，未生成关注按钮`);
-  if (unverified.length) notes.push(`${unverified.map(({ no }) => no).join('、')} 号 TTC 链接待核实`);
+  if (unverified.length) notes.push(`${unverified.map(({ no }) => no).join('、')} 号 ${source === 'supermai' ? '来源资料' : 'TTC'} 链接待核实`);
   return notes.length
     ? [{ tag: 'note', elements: [{ tag: 'plain_text', content: notes.join('；') }] }] : [];
 }
@@ -243,11 +247,14 @@ function backgroundText(candidate) {
 }
 
 export function enqueueOpenmaiDeliveries(db, at = now()) {
-  const rows = db.prepare(`SELECT r.task_id, r.consultant_id, r.project_id, r.status, r.result_text,
+  const rows = db.prepare(`SELECT r.task_id, r.consultant_id,
+      COALESCE(st.project_id,r.project_id) project_id, r.status, r.result_text,
       l.launch_id, l.chat_id
-    FROM openmai_results r JOIN project_launches l
+    FROM openmai_results r
+    LEFT JOIN sourcing_tasks st ON st.task_id=r.task_id AND st.provider='supermai'
+    JOIN project_launches l
       ON l.launch_id=(SELECT pl.launch_id FROM project_launches pl
-        WHERE pl.project_id=r.project_id
+        WHERE pl.project_id=COALESCE(st.project_id,r.project_id)
         ORDER BY CASE pl.status WHEN 'READY' THEN 0 WHEN 'POSTING_JOB' THEN 1
           WHEN 'CREATING_CHAT' THEN 2 ELSE 3 END, pl.created_at, pl.launch_id LIMIT 1)
     WHERE l.status='READY' AND l.chat_id IS NOT NULL AND r.task_id IS NOT NULL
@@ -282,14 +289,15 @@ function finishProjectDelivery(db, row, at) {
     ? assessOpenmaiCandidateBatch(row.result_text) : null;
   const incomplete = quality && !quality.complete;
   const failed = row.result_status === 'failed';
+  const source = String(row.task_id || '').startsWith('sm_') ? 'SUPERMAI' : 'OPENMAI';
   db.prepare(`UPDATE project_launches SET search_status=?, search_task_id=?, error_code=?,
     error_message=?, updated_at=? WHERE launch_id=(SELECT launch_id FROM project_launches
       WHERE project_id=? ORDER BY CASE status WHEN 'READY' THEN 0 WHEN 'POSTING_JOB' THEN 1
         WHEN 'CREATING_CHAT' THEN 2 ELSE 3 END, created_at, launch_id LIMIT 1)`).run(
     failed || incomplete ? 'FAILED' : 'DONE', row.task_id,
-    failed ? 'OPENMAI_SEARCH_FAILED' : quality?.needsInput ? 'OPENMAI_SEARCH_BRIEF_REQUIRED'
-      : incomplete ? 'OPENMAI_CANDIDATES_INCOMPLETE' : null,
-    failed ? String(row.error || 'OpenMai 搜索失败').slice(0, 240)
+    failed ? `${source}_SEARCH_FAILED` : quality?.needsInput ? `${source}_SEARCH_BRIEF_REQUIRED`
+      : incomplete ? `${source}_CANDIDATES_INCOMPLETE` : null,
+    failed ? String(row.error || `${source === 'SUPERMAI' ? 'SuperMai' : 'OpenMai'} 搜索失败`).slice(0, 240)
       : incomplete ? quality.message : null,
     at, row.project_id,
   );
@@ -308,7 +316,7 @@ export function retryOpenmaiDelivery(db, consultantId, projectId, at = now()) {
 export function failStaleOpenmaiTasks(db, at = now(), maxAgeMs = STALE_SEARCH_MS) {
   const cutoff = new Date(Date.parse(at) - maxAgeMs).toISOString();
   const rows = db.prepare(`SELECT project_id,consultant_id,task_id FROM openmai_results
-    WHERE status='running' AND started_at<=?`).all(cutoff);
+    WHERE status='running' AND task_id LIKE 'om_%' AND started_at<=?`).all(cutoff);
   const update = db.prepare(`UPDATE openmai_results SET status='failed',
     error='OpenMai 任务因服务中断或超时未完成；为避免重复费用，请由顾问明确重试。',finished_at=?
     WHERE project_id=? AND consultant_id=? AND task_id=? AND status='running'`);
@@ -390,7 +398,8 @@ export async function deliverOpenmaiResultsOnce(db, dependencies = {}) {
       const output = await send({
         target: row.chat_id,
         card: buildOpenmaiDeliveryCard({ job: row, status: row.result_status,
-          resultText: row.result_text, error: row.error, publicBaseUrl: dependencies.publicBaseUrl }),
+          resultText: row.result_text, error: row.error, publicBaseUrl: dependencies.publicBaseUrl,
+          source: String(row.task_id || '').startsWith('sm_') ? 'supermai' : 'openmai' }),
         idempotencyKey: row.delivery_id,
       });
       db.prepare(`UPDATE openmai_deliveries SET delivery_status='SENT', message_id=?, last_error=NULL,

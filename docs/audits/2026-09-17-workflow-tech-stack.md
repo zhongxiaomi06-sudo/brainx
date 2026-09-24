@@ -9,6 +9,8 @@
 
 核心结构是：飞书 / OpenClaw 负责交互与工具编排，BrainX 负责确定性业务规则、权限和持久化，上游找人接口负责外部搜索。后端为 Node.js / JavaScript，基础数据使用 `node:sqlite`，人才数据使用 `mysql2` 连接 RDS MySQL；没有理由把架构规划中的组件全部写成当前技术栈。
 
+2026-09-24 修订：SuperMai 已停止与 OpenMai 共用 completions，改为云端 `sourcing_tasks` + 顾问桌面出站 relay + 本机 Sourcing harness。下表以此修订为准。
+
 ## 逐节点证据
 
 | 节点 | 当前机制与技术 | 直接代码证据 |
@@ -18,7 +20,7 @@
 | 顾问选项目 | 画像关键词、历史项目、公司级正负反馈；人工确认后记决策和首个行动 | [scorer.js](../../src/scorer.js)、[engagement.js](../../src/engagement.js)、[commitment.js](../../src/commitment.js) |
 | 自动派单 | Node Worker 定时推送，个人订阅，`push_log` 防重；接单与建群为受控动作 | [scheduler.js](../../src/scheduler.js)、[push.js](../../src/push.js)、[project-launch.js](../../src/project-launch.js) |
 | 职位画像 | 职位事实与 criteria 拼接；独立 JD 入口为 LLM JSON 抽取、Zod 校验、规则兜底与确认转正 | [openmai-task.js](../../src/openmai-task.js)、[jd-extract.js](../../src/job-extract/jd-extract.js)、[p2p-submit.js](../../src/job-extract/p2p-submit.js)、[schema.js](../../src/job-extract/schema.js)、[confirm.js](../../src/job-extract/confirm.js) |
-| 多渠道推人 | OpenMai/SuperMai 共用 completions，分别按职位/判据；SSE+Polling；Reloop 入口为授权预计算 shortlist | [openmai-task.js](../../src/openmai-task.js)、[supermai-sourcing.js](../../src/supermai-sourcing.js)、[candidate-shortlist.js](../../src/candidate-shortlist.js)、[tools-talent.js](../../src/agent-gateway/tools-talent.js) |
+| 多渠道推人 | OpenMai 是服务端 completions；SuperMai 是配对设备出站领取 + Sourcing harness + 任务 token 回传；Reloop 为授权预计算 shortlist | [openmai-task.js](../../src/openmai-task.js)、[supermai-sourcing.js](../../src/supermai-sourcing.js)、[supermai-relay.js](../../src/supermai-relay.js)、[candidate-shortlist.js](../../src/candidate-shortlist.js) |
 | 筛选与打标 | 人工初筛写 SQLite 重点名单；独立规则模块从技能事实/摘要回填 MySQL 标签 | [candidate-focus.js](../../src/candidate-focus.js)、[talent-tag-backfill.js](../../src/talent-tag-backfill.js) |
 | 人才入池 | `brainx_talent_pool_add` 将姓名、脱敏摘要、来源标记写入 RDS `talent`，写前检查已有记录 | [tools-candidate-actions.js](../../src/agent-gateway/tools-candidate-actions.js)、[db.js](../../src/db.js) |
 | 群内交互 | OpenClaw 原生插件 / Tool Calling → HTTP Agent Gateway；HMAC-SHA256 主体声明、nonce、防重放、项目用途范围、审计 | [runtime.js](../../plugins/brainx-openclaw/runtime.js)、[assertion.js](../../src/agent-gateway/assertion.js)、[authorization.js](../../src/agent-gateway/authorization.js)、[audit.js](../../src/agent-gateway/audit.js) |

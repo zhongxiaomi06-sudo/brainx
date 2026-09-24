@@ -353,11 +353,14 @@ test("uses one connection center without collecting third-party credentials", as
 
   assert.match(api, /\/api\/v1\/connections/);
   assert.match(api, /\/api\/v1\/connections\/supermai\/start/);
+  assert.match(api, /\/api\/v1\/connections\/supermai\/pairing-code/);
   assert.match(sources, /startSupermaiLogin/);
+  assert.match(sources, /createSupermaiPairingCode/);
   assert.match(center, /OpenMai/);
   assert.match(center, /SuperMai/);
   assert.match(center, /Reloop/);
   assert.match(center, /密码和验证码始终留在官方页面/);
+  assert.match(center, /下载连接器安装包/);
   assert.match(shell, /id: "connections", label: "连接中心"/);
   assert.match(join, /使用飞书进入/);
   assert.match(join, /当前最小版本复用已安装的 SuperMai/);

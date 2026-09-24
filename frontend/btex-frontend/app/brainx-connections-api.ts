@@ -18,6 +18,9 @@ export type ProviderConnection = {
     desktop_available?: boolean;
     desktop_busy?: boolean;
     version?: string | null;
+    registered?: boolean;
+    online?: boolean;
+    devices?: { device_id: string; name: string; online: boolean; last_seen_at: string | null }[];
     platforms?: Partial<Record<SupermaiPlatform, { running?: boolean; logged_in?: boolean }>>;
     backend?: string | null;
     schema?: string | null;
@@ -38,5 +41,12 @@ export function startSupermaiLogin(platform: SupermaiPlatform) {
   return brainxFetch<{ ok: true; platform: SupermaiPlatform; user_action: string }>(
     "/api/v1/connections/supermai/start",
     { method: "POST", body: { platform } },
+  );
+}
+
+export function createSupermaiPairingCode() {
+  return brainxFetch<{ code: string; expires_at: string }>(
+    "/api/v1/connections/supermai/pairing-code",
+    { method: "POST", body: {} },
   );
 }

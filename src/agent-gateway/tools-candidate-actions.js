@@ -102,7 +102,8 @@ function transition(db, principal, args) {
 
 function openmaiResume(db, jobId, candidateRef) {
   const results = db.prepare(`SELECT consultant_id,result_text FROM openmai_results
-    WHERE project_id=? AND status='done' ORDER BY finished_at DESC`).all(jobId);
+    WHERE project_id IN (?,?) AND status='done' ORDER BY finished_at DESC`)
+    .all(jobId, `supermai-result:${jobId}`);
   for (const result of results) {
     const candidate = extractOpenmaiCandidates(result.result_text)
       .find((item) => item.candidateRef === candidateRef);

@@ -42,6 +42,7 @@ const items: ProviderConnection[] = [
 
 const refresh = fn();
 const start = fn();
+const pair = fn();
 const reauthorize = fn();
 
 const meta = {
@@ -51,6 +52,7 @@ const meta = {
     items,
     onRefresh: refresh,
     onStartSupermai: start,
+    onCreatePairing: pair,
     onReauthorizeFeishu: reauthorize,
   },
 } satisfies Meta<typeof ConnectionCenter>;
@@ -77,6 +79,21 @@ export const DesktopUnavailable: Story = {
       details: { desktop_available: false, platforms: {} },
       error_code: "SUPERMAI_DESKTOP_UNAVAILABLE",
     } : item),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: /生成配对码/ }));
+    await expect(pair).toHaveBeenCalled();
+    await expect(canvas.getByRole("link", { name: /下载连接器安装包/ })).toHaveAttribute(
+      "href", "/api/v1/supermai/connector/install",
+    );
+  },
+};
+
+export const PairingCodeReady: Story = {
+  args: {
+    ...DesktopUnavailable.args,
+    pairingCode: "A1B2-C3D4-E5F6-7890",
   },
 };
 

@@ -40,6 +40,7 @@ import { createGuard } from './guard.js';
 import { makeClientErrorRoute } from './client-error.js';
 import { authRoutes } from './auth-routes.js';
 import { connectionRoutes } from './connection-routes.js';
+import { SUPERMAI_RELAY_OPEN_ROUTES, supermaiRelayRoutes } from './supermai-relay-routes.js';
 import { talentRoutes } from './talent-routes.js';
 import { body, err, isPathInside, json, normalizeWorkbenchPreferences, proxyFrontend,
   resolveRoute, safeJsonArray, STATIC_MIME } from './server-http.js';
@@ -86,6 +87,7 @@ export function createServer(db = openDb(), deps = {}) {
     ...openmaiRoutes(db, bus),
     ...authRoutes(db, { exchangeCode: deps.exchangeCode }),
     ...connectionRoutes(db, deps.connections),
+    ...supermaiRelayRoutes(db, { ...(deps.supermaiRelay || {}), bus }),
     ...talentRoutes(db, { rootDir: ROOT }),
     ...recommendationRoutes(db, { recommendations, bus, projectLaunch: deps.projectLaunch,
       agenticReadEnabled }),
@@ -388,8 +390,12 @@ export function createServer(db = openDb(), deps = {}) {
                     'POST /api/v1/meta/client-error', // 浏览器端错误探针：未必有 session，只写聚合日志
                     // 推荐卡一键动作：无 session，HMAC 签名即鉴权（verifyQuick fail-closed）
                     'GET /api/v1/feedback/quick'];
-      const cid = open.includes(`${req.method} ${path}`) ? null : auth(req, res);
-      if (open.includes(`${req.method} ${path}`) || cid) {
+      const routeKey = `${req.method} ${path}`;
+      const supermaiOpen = SUPERMAI_RELAY_OPEN_ROUTES.has(routeKey)
+        || /^POST \/api\/v1\/sourcing\/tasks\/[^/]+\/(?:ingest|finish)$/.test(routeKey);
+      const isOpen = open.includes(routeKey) || supermaiOpen;
+      const cid = isOpen ? null : auth(req, res);
+      if (isOpen || cid) {
         try { return await handler(req, res, cid, u.searchParams, dynId); }
         catch (e) { return err(res, 500, 'INTERNAL', String(e.message).slice(0, 300)); }
       }

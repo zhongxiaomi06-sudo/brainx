@@ -3,7 +3,7 @@ import { tokenStatus } from './feishu.js';
 import { oauthConfigured } from './oauth.js';
 import { talentHealth } from './talent.js';
 import { ttcOpenmaiAuthStatus } from './ttcsdk/auth.js';
-import { supermaiLocalStatus } from './supermai-local-connector.js';
+import { supermaiDeviceStatus } from './supermai-relay.js';
 
 export const CONNECTION_SCHEMA_VERSION = 'brainx-connections-v1';
 
@@ -54,24 +54,36 @@ function openmaiConnection(db, consultantId) {
 }
 
 function supermaiConnection(status) {
-  const platforms = status?.platforms || {};
-  const connected = status?.available === true
+  const active = status?.active || status || {};
+  const platforms = active.platforms || {};
+  const connected = (active.desktop_available === true || active.available === true)
     && Object.values(platforms).some((item) => item.logged_in === true);
-  const available = status?.available === true;
+  const available = active.desktop_available === true || active.available === true;
+  const registered = status?.registered ?? available;
+  const online = status?.online ?? available;
   return {
     provider: 'supermai', kind: 'sourcing', managed_by: 'device',
-    state: connected ? 'connected' : available ? 'action_required' : 'unavailable',
+    state: connected ? 'connected' : registered ? 'action_required' : 'unavailable',
     capabilities: ['candidate.search'], needs_user_action: !connected,
-    action: connected ? null : action('open_desktop', 'brainx://connections/supermai'),
-    last_checked_at: checkedAt(),
+    action: connected ? null : action(registered ? 'open_desktop' : 'install_connector',
+      registered ? 'brainx://connections/supermai' : '/api/v1/supermai/connector/install'),
+    last_checked_at: active.last_seen_at || checkedAt(),
     error_code: connected ? null
       : available ? 'SUPERMAI_PLATFORM_LOGIN_REQUIRED'
-        : (status?.error_code || 'SUPERMAI_DESKTOP_UNAVAILABLE'),
+        : registered && !online ? 'SUPERMAI_DEVICE_OFFLINE'
+          : registered ? 'SUPERMAI_DESKTOP_UNAVAILABLE'
+            : (status?.error_code || 'SUPERMAI_PAIRING_REQUIRED'),
     details: {
       desktop_available: available,
-      desktop_busy: status?.busy === true,
-      version: status?.version || null,
+      desktop_busy: active.desktop_busy === true || active.busy === true,
+      version: active.version || null,
       platforms,
+      registered,
+      online,
+      devices: Array.isArray(status?.devices) ? status.devices.map((device) => ({
+        device_id: device.device_id, name: device.name, online: device.online,
+        last_seen_at: device.last_seen_at,
+      })) : [],
     },
   };
 }
@@ -92,11 +104,11 @@ function reloopConnection(status) {
 }
 
 export async function connectionStatuses(db, consultantId, {
-  readSupermaiStatus = supermaiLocalStatus,
+  readSupermaiStatus = (database, cid) => supermaiDeviceStatus(database, cid),
   readReloopHealth = talentHealth,
 } = {}) {
   const [supermai, reloop] = await Promise.allSettled([
-    readSupermaiStatus(), readReloopHealth(),
+    readSupermaiStatus(db, consultantId), readReloopHealth(),
   ]);
   return {
     schema_version: CONNECTION_SCHEMA_VERSION,

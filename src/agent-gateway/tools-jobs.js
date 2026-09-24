@@ -4,10 +4,11 @@ import { jobVisibleTo, jobAccessibleFromGroup } from '../visibility.js';
 import { relationOf } from '../relations.js';
 import { currentState } from '../engagement.js';
 import { startOpenmaiTask, getOpenmaiResult } from '../openmai-task.js';
-import { supermaiCriteriaKey, startSupermaiScoutTask } from '../supermai-sourcing.js';
+import { getSupermaiResult, getSupermaiTask, supermaiCriteriaKey,
+  startSupermaiScoutTask } from '../supermai-sourcing.js';
 import { extractOpenmaiCandidates, buildOpenmaiDeliveryCard, STALE_SEARCH_MS } from '../openmai-delivery.js';
 import { getPushPreferences } from '../push-preferences.js';
-import { nextSearchExclusions } from '../search-rounds.js';
+import { nextSearchExclusions, nextSupermaiSearchExclusions } from '../search-rounds.js';
 import { ttcOpenmaiAuthStatus } from '../ttcsdk/auth.js';
 
 function fail(code) {
@@ -302,6 +303,7 @@ function trySendOpenmaiResultCard(sendCardFn, publicBaseUrl, args, principal, ro
       card: buildOpenmaiDeliveryCard({
         job: { ...row, search_round: cur.search_round || 1 },
         status: 'done', resultText: cur.result_text, publicBaseUrl,
+        source: String(cur.task_id || '').startsWith('sm_') ? 'supermai' : 'openmai',
       }),
       idempotencyKey: `openmai-result-card:${args.job_id}:${principal.chatId}:round${cur.search_round || 1}:${shanghaiDate()}`,
     })).catch(() => {});
@@ -356,7 +358,9 @@ function openmaiSearch(db, args, principal, sendCardFn, publicBaseUrl) {
     };
   }
   const shared = activeProjectSearch(db, args.job_id);
-  if (shared?.search_status === 'RUNNING' || (shared && !continuing)) {
+  if (shared?.search_status === 'RUNNING'
+      || (shared?.search_status === 'DONE' && !continuing
+        && String(shared.search_task_id || '').startsWith('om_'))) {
     return sharedProjectSearch(args.job_id, shared, 'openmai');
   }
   const exclusions = continuing ? nextSearchExclusions(db, args.job_id) : [];
@@ -379,10 +383,7 @@ function openmaiSearch(db, args, principal, sendCardFn, publicBaseUrl) {
   };
 }
 
-/** SuperMai 按判据找人（第 22 工具；2026-09-08 按 specs/007 纠正重接）：
- * SuperMai 找人 = 猎聘/脉脉渠道 → 与 openmai_search 共用 OpenMai 引擎，
- * 本入口是「无需职位、直接给判据」的自由找人（completions 无 job_id 模式）。
- * 触发/读取两段式：首次调用触发任务返回 running，完成后同参数再调读取结果。 */
+/** SuperMai 按判据找人：云端排队，顾问桌面连接器调用本机 SuperMai/Sourcing 执行。 */
 function supermaiScout(db, args, principal, sendCardFn, publicBaseUrl) {
   const jobId = String(args.job_id || '').trim();
   const continuing = args.continue_search === true;
@@ -399,7 +400,8 @@ function supermaiScout(db, args, principal, sendCardFn, publicBaseUrl) {
   const criteria = job ? projectCriteria(job, extra) : extra;
   if (criteria.length < 5) fail('INVALID_ARGUMENT');
   const project_id = jobId || supermaiCriteriaKey(criteria);
-  const cur = getOpenmaiResult(db, principal.consultantId, project_id) || {};
+  const cur = getSupermaiResult(db, principal.consultantId, project_id) || {};
+  const relayTask = getSupermaiTask(db, principal.consultantId, project_id);
   if (cur.status === 'running' || (cur.status === 'done' && !continuing)) {
     const candidates = cur.status === 'done' ? extractOpenmaiCandidates(cur.result_text) : [];
     const disc = cur.status === 'running' ? pollDiscipline(cur.started_at, 'supermai', Boolean(jobId)) : null;
@@ -417,6 +419,7 @@ function supermaiScout(db, args, principal, sendCardFn, publicBaseUrl) {
       && trySendOpenmaiResultCard(sendCardFn, publicBaseUrl, { job_id: project_id }, principal, synthJob, cur);
     return {
       data: { entry: 'supermai', job_ref: jobId || null, criteria, status: cur.status,
+              task_status: relayTask?.status || null,
               result_text: cardSent ? null : (noReply ? null : cur.result_text || null),
               candidates: cardSent ? [] : candidates,
               ...(cardSent ? { card_delivered: true } : {}),
@@ -427,7 +430,9 @@ function supermaiScout(db, args, principal, sendCardFn, publicBaseUrl) {
       recommendations: !cardSent && cur.status === 'done' && !noReply ? [{ action: 'present_result',
         note: '结果已就绪——请把 data.result_text 里的候选人列表完整、结构化地呈现给顾问，并询问下一步（约面/推荐）。' }] : [],
       unknowns: cardSent ? ['结果卡已发到本群：只用一句话引导群友点卡片上的按钮（初筛通过/加入reloop/继续找人），不要在回复里罗列名单、评分或自制表格。']
-        : disc ? [disc.discipline]
+        : relayTask?.status === 'waiting_for_device'
+          ? ['SuperMai 任务已安全排队，但当前没有在线桌面连接器。请顾问打开 BrainX 连接中心完成设备配对并保持 SuperMai 运行；设备上线后会自动领取，不要改用 OpenMai 冒充。']
+          : disc ? [disc.discipline]
         : noReply ? ['本轮未搜到匹配候选人——建议放宽判据（去掉具体公司名、缩短方向、拆成 2-3 个宽方向）后重新触发']
         : cur.status === 'done' ? [`这是第 ${cur.search_round || 1} 轮已完成结果的复用，不是新一轮找人；`
           + '不要声称启动了新一轮，也不要声称「已避开」任何候选人——排除名单只在显式新一轮（continue_search=true）时由 BrainX 生成。']
@@ -436,10 +441,12 @@ function supermaiScout(db, args, principal, sendCardFn, publicBaseUrl) {
     };
   }
   const shared = jobId ? activeProjectSearch(db, jobId) : null;
-  if (shared?.search_status === 'RUNNING' || (shared && !continuing)) {
+  if (shared?.search_status === 'RUNNING'
+      || (shared?.search_status === 'DONE' && !continuing
+        && String(shared.search_task_id || '').startsWith('sm_'))) {
     return sharedProjectSearch(jobId, shared, 'supermai');
   }
-  const exclusions = continuing ? nextSearchExclusions(db, jobId) : [];
+  const exclusions = continuing ? nextSupermaiSearchExclusions(db, jobId) : [];
   if (continuing && !exclusions.length) return missingExclusions(jobId, 'supermai');
   const out = startSupermaiScoutTask(db, null, principal.consultantId, criteria, {
     force: continuing, projectId: jobId || null, excludeCandidateRefs: exclusions,
@@ -449,11 +456,14 @@ function supermaiScout(db, args, principal, sendCardFn, publicBaseUrl) {
     data: { entry: 'supermai', job_ref: jobId || null, criteria,
             continue_search: continuing, excluded_candidate_refs: exclusions,
             status: out.status || 'triggered',
-            task_id: out.task_id || null, message: out.message || null,
+            task_id: out.task_id || null, task_status: out.task_status || null,
+            message: out.message || null,
             note: out.status === 'already_done'
               ? '同判据结果已存在，请再次调用本工具读取'
               : out.status === 'error'
                 ? '找人任务未启动，请处理提示后重试；正常启动后 3-5 分钟收敛，请每隔约 1 分钟读取进度'
+              : out.task_status === 'waiting_for_device'
+                ? 'SuperMai 任务已排队，等待顾问桌面连接器上线；请引导顾问打开连接中心配对设备，不要切换成 OpenMai。'
               : jobId ? '找人任务已触发。立即回复顾问“正在找人，通常需要 3-5 分钟，完成后候选人会自动发到本群”并结束本轮；'
                 + '除非顾问之后明确询问进度，不要原地轮询'
                 : '找人任务已触发，正常 3-5 分钟收敛；请每隔约 1 分钟（间隔至少 60 秒）再调本工具读取'
@@ -472,6 +482,8 @@ export function createJobToolHandlers({ db, sendCardFn = null, publicBaseUrl = p
     brainx_personal_review: (args, context) => personalReview(db, args, context.principal),
     brainx_run_status: (args, context) => runStatus(db, args, context.principal),
     brainx_openmai_search: (args, context) => openmaiSearch(db, args, context.principal, sendCardFn, publicBaseUrl),
-    brainx_supermai_scout: (args, context) => supermaiScout(db, args, context.principal),
+    brainx_supermai_scout: (args, context) => supermaiScout(
+      db, args, context.principal, sendCardFn, publicBaseUrl,
+    ),
   };
 }

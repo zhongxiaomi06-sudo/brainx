@@ -33,12 +33,18 @@ ECS：OpenClaw :18789(loopback)
   ← 事实、证据、风险、下一步
 飞书卡片 / 对话回复 ──可选 HTTPS──→ nginx :443 → BrainX :3101(loopback)
 
+顾问 macOS：BrainX SuperMai 连接器 ──出站 HTTPS──→ nginx :443
+  → BrainX 设备 relay / sourcing_tasks ←→ 同一 SQLite
+  → 本机 SuperMai/Sourcing :8910(loopback) → BOSS / 脉脉 / 猎聘官方页面
+
 ECS：integration worker
   → reloop 结构化来源 / 受控文档暂存
   → candidate_fact_v1 / candidate_match_bundle_v1 / shadow 评测
 ```
 
 公网只允许 nginx `443`。`3101`、`3102`、`18789`、SQLite 和 RDS 不得直接暴露公网。WebSocket 是服务器向飞书主动连接，不要求公网 webhook。
+
+SuperMai 与 OpenClaw 的桌面边界不同：顾问电脑不安装 OpenClaw，但需安装 SuperMai/Sourcing 和 BrainX 连接器。连接器主动访问 443；服务器不开反向端口、不访问顾问 loopback。
 
 ## 2. 人与 Agent 的职责分界
 
@@ -298,6 +304,12 @@ systemctl restart brainx
 
 依赖顺序是：BrainX 数据与迁移就绪 → Agent Gateway → worker → OpenClaw → 主应用/nginx。OpenClaw unit 明确依赖 Agent Gateway；不要通过循环重启掩盖配置错误。
 
+### 10.1 SuperMai Relay 发布补充
+
+启动前备份 `data/brainx.db` 与 `data/.secret`。主应用和 Agent Gateway 必须使用同一 `BRAINX_DB`，主应用必须有正式 HTTPS `BRAINX_BASE_URL`。`0060_supermai_desktop_relay.sql` 只新增设备、任务、事件、结果与命令表，不删除旧数据。发布时同时重启 `brainx-agent-gateway`、`brainx-worker` 和 `brainx`，否则可能出现工具已创建任务但网页/投递仍运行旧代码。
+
+该链路的同事安装、公开端点、撤销、故障和异机验收详见 [SuperMai 桌面 Relay 运行手册](2026-09-24-supermai-desktop-relay-runbook.md)。
+
 ## 11. 机器级验收
 
 ```bash
@@ -345,8 +357,9 @@ exit
 7. 手机和另一台没有 OpenClaw/源码的电脑登录飞书，重复步骤 1—4；结果应一致。
 8. 点击工作台：未登录先走飞书 OAuth，有权对象可见，无权对象拒绝；URL 不含身份、token 或 scope。
 9. 重启三个新增服务，再做一次查询，确认会话、任务租约和 outbox 可恢复。
+10. 对已配对顾问账号，从真实项目群点击 SuperMai；确认本人设备领取、已登录平台执行、候选人幂等入库并回到原群。
 
-这九项全部有脱敏证据，才能证明“任何电脑可用”。开发者本机成功、服务器 `curl` 成功或飞书能收到普通消息都不能替代。
+这十项全部有脱敏证据，才能证明“任何电脑可用”。开发者本机成功、服务器 `curl` 成功或飞书能收到普通消息都不能替代。
 
 ## 13. 新用户说明与当前限制
 
@@ -366,6 +379,8 @@ exit
 | 返回无权 | `(account, open_id)` 绑定、tenant、purpose、project grant | 复制 Mia 授权 |
 | 人才为空 | reloop 绑定、worker 状态、人才/职位双授权、事实版本 | 返回演示候选人 |
 | 工作台按钮不见 | `openclaw.env` 的 `BRAINX_BASE_URL` 是否 HTTPS | 使用 localhost 或裸 IP HTTP |
+| SuperMai 任务等待设备 | 本人是否配对、连接器最后在线、Sourcing 是否打开 | 用 OpenMai 结果冒充 SuperMai |
+| SuperMai 有结果没回群 | `brainx-worker`、原项目群绑定和 delivery 状态 | 重复点击启动收费任务 |
 | 回答过慢或费用升高 | 模型凭证、超时、工具轮次、任务上限 | 无限重试或放开 Shell |
 
 ## 15. 回滚

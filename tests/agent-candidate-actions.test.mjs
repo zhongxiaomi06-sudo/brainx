@@ -94,6 +94,27 @@ test('OpenMai 候选可进入项目，重点名单在项目成员间共享且不
   db.close();
 });
 
+test('SuperMai 隔离结果中的候选人仍可从原项目群初筛通过', async () => {
+  const { db, context, jobId } = fixture();
+  const resultText = `<!-- BRAINX_CANDIDATES_V1
+${JSON.stringify({ candidates: [{ candidate_ref: 'boss:sm-1', name: '王五',
+  role: '示例公司 / 产品经理', evaluation: '等待顾问核验' }] })}
+-->`;
+  db.prepare(`INSERT INTO openmai_results
+    (project_id,consultant_id,status,result_text,task_id,started_at,finished_at)
+    VALUES (?,?,'done',?,'sm-focus','2026-09-24T00:00:00.000Z','2026-09-24T00:01:00.000Z')`)
+    .run(`supermai-result:${jobId}`, 'felix', resultText);
+  const handlers = createCandidateActionToolHandlers({ db,
+    candidateShortlistFn: async () => ({ items: [], page: { next_page_token: null } }) });
+  const kept = await handlers.brainx_candidate_workflow({
+    job_id: jobId, candidate_ref: 'boss:sm-1', action: 'KEEP_FOR_REVIEW', confirm: true,
+  }, context);
+  assert.equal(kept.data.focus_status, 'FOCUSED');
+  assert.equal(db.prepare(`SELECT source_task_id FROM project_candidate_focus
+    WHERE position_id=? AND candidate_ref='boss:sm-1'`).get(jobId).source_task_id, 'sm-focus');
+  db.close();
+});
+
 test('初筛通过直接发送 TTC 人才链接，自然语言建群可自动加入重点名单', async () => {
   const { db, jobId } = fixture();
   const resultText = `候选结果\n<!-- BRAINX_CANDIDATES_V1

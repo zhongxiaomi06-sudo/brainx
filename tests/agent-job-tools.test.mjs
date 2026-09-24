@@ -5,7 +5,7 @@ import { runSync } from '../src/sync.js';
 import { recommend } from '../src/recommend.js';
 import { createJobToolHandlers } from '../src/agent-gateway/tools-jobs.js';
 import { createActionToolHandlers } from '../src/agent-gateway/tools-actions.js';
-import { supermaiCriteriaKey } from '../src/supermai-sourcing.js';
+import { supermaiCriteriaKey, supermaiResultKey } from '../src/supermai-sourcing.js';
 
 function fixture() {
   const db = openDb(':memory:');
@@ -139,14 +139,18 @@ test('SuperMai 项目入口留空时按职位生成判据并关联原项目群',
   const out = handlers.brainx_supermai_scout({ job_id: projectId }, context('felix', 'candidate_review'));
   assert.equal(out.data.entry, 'supermai');
   assert.equal(out.data.job_ref, projectId);
-  assert.equal(out.data.status, 'error');
+  assert.equal(out.data.status, 'triggered');
+  assert.equal(out.data.task_status, 'waiting_for_device');
   assert.match(out.data.criteria, /目标职位：/);
   const stored = db.prepare(`SELECT project_id,search_brief FROM openmai_results
-    WHERE consultant_id='felix' AND project_id=?`).get(projectId);
-  assert.equal(stored.project_id, projectId, '项目模式不使用脱离项目群的 supermai 合成键');
+    WHERE consultant_id='felix' AND project_id=?`).get(supermaiResultKey(projectId));
+  assert.equal(stored.project_id, supermaiResultKey(projectId), '兼容结果按渠道隔离');
   assert.match(stored.search_brief, /目标职位：/);
+  assert.equal(db.prepare(`SELECT project_id FROM sourcing_tasks
+    WHERE consultant_id='felix' AND task_id=?`).get(out.data.task_id).project_id, projectId,
+  '真实任务仍关联原项目群');
   assert.equal(db.prepare('SELECT search_status FROM project_launches WHERE launch_id=?')
-    .get('launch-sm').search_status, 'FAILED');
+    .get('launch-sm').search_status, 'RUNNING');
 });
 
 test('项目已有共享找人任务时另一位顾问选择渠道不会重复触发', () => {
@@ -173,6 +177,26 @@ test('项目已有共享找人任务时另一位顾问选择渠道不会重复�
   assert.doesNotMatch(out.unknowns.join(''), /每隔约 1 分钟/);
   assert.equal(db.prepare(`SELECT COUNT(*) count FROM openmai_results
     WHERE consultant_id='mia' AND project_id=?`).get(projectId).count, 0);
+});
+
+test('项目已完成 OpenMai 后仍可启动真实 SuperMai，不复用异渠道结果', () => {
+  const { db, projectId, handlers } = fixture();
+  const action = createActionToolHandlers({ db,
+    startSearchFn: () => ({ status: 'triggered', task_id: 'stub' }) });
+  const at = new Date().toISOString();
+  action.brainx_accept_job({ job_id: projectId, goal: '找到候选人', action_title: '选择找人渠道',
+    due_at: new Date(Date.now() + 2 * 86400000).toISOString(),
+    idempotency_key: 'agent:sm:after-openmai', confirm: true }, context('felix', 'job_review'));
+  db.prepare(`INSERT INTO project_launches
+    (launch_id,consultant_id,project_id,idempotency_key,status,current_step,chat_id,
+     search_status,search_task_id,created_at,updated_at)
+    VALUES ('launch-sm-after-om','felix',?,'launch-sm-after-om','READY','READY','oc_project',
+      'DONE','om_previous',?,?)`).run(projectId, at, at);
+  const out = handlers.brainx_supermai_scout({ job_id: projectId },
+    context('felix', 'candidate_review'));
+  assert.equal(out.data.status, 'triggered');
+  assert.match(out.data.task_id, /^sm_/);
+  assert.equal(out.data.shared, undefined);
 });
 
 test('OpenMai 继续找人自动带入上一轮 TTC 编号并进入第二轮', () => {
@@ -242,7 +266,7 @@ test('SuperMai 入口（specs/007）：done 结果带结构化 candidates + pres
     '-->',
   ].join('\n');
   db.prepare(`INSERT INTO openmai_results (project_id, consultant_id, status, result_text, task_id, started_at, finished_at)
-    VALUES (?,?,?,?,?,?,?)`).run(key, 'felix', 'done', resultText, 'sm_test1', at, at);
+    VALUES (?,?,?,?,?,?,?)`).run(supermaiResultKey(key), 'felix', 'done', resultText, 'sm_test1', at, at);
 
   const out = await handlers.brainx_supermai_scout({ criteria }, context('felix', 'candidate_review'));
   assert.equal(out.data.entry, 'supermai');
@@ -254,12 +278,13 @@ test('SuperMai 入口（specs/007）：done 结果带结构化 candidates + pres
     'SuperMai done 复用同样要硬写「不是新一轮、不得编造排除名单」');
 });
 
-test('SuperMai 入口（specs/007）：无 TTC 凭证 → error + 引导语，不臆断成功', async () => {
-  const { handlers } = fixture(); // fixture 库无 ttc_tokens
+test('SuperMai 入口不依赖 TTC 凭证；无桌面设备时安全排队并给出配对动作', async () => {
+  const { handlers } = fixture();
   const out = await handlers.brainx_supermai_scout(
     { criteria: '上海 3年 Java 后端工程师' }, context('felix', 'candidate_review'));
-  assert.equal(out.data.status, 'error');
-  assert.ok(out.data.message.includes('TTC 凭证'));
+  assert.equal(out.data.status, 'triggered');
+  assert.equal(out.data.task_status, 'waiting_for_device');
+  assert.match(out.data.note, /连接中心配对设备/);
 });
 
 test('SuperMai 入口（specs/008）：NO_REPLY 零命中语义化为未搜到，不当成成功交付', async () => {
@@ -268,7 +293,7 @@ test('SuperMai 入口（specs/008）：NO_REPLY 零命中语义化为未搜到�
   const key = supermaiCriteriaKey(criteria);
   const at = new Date().toISOString();
   db.prepare(`INSERT INTO openmai_results (project_id, consultant_id, status, result_text, task_id, started_at, finished_at)
-    VALUES (?,?,?,?,?,?,?)`).run(key, 'felix', 'done', 'NO_REPLY', 'sm_zero', at, at);
+    VALUES (?,?,?,?,?,?,?)`).run(supermaiResultKey(key), 'felix', 'done', 'NO_REPLY', 'sm_zero', at, at);
   const out = await handlers.brainx_supermai_scout({ criteria }, context('felix', 'candidate_review'));
   assert.equal(out.data.status, 'done');
   assert.equal(out.data.result_text, null, 'NO_REPLY 不作为结果文本交付');
@@ -283,7 +308,7 @@ test('找人任务 running/触发响应内嵌守候纪律（2026-09-09 事故：
   const key = supermaiCriteriaKey(criteria);
   const at = new Date().toISOString();
   db.prepare(`INSERT INTO openmai_results (project_id, consultant_id, status, task_id, started_at)
-    VALUES (?,?,?,?,?)`).run(key, 'felix', 'running', 'sm_wait', at);
+    VALUES (?,?,?,?,?)`).run(supermaiResultKey(key), 'felix', 'running', 'sm_wait', at);
 
   const running = await handlers.brainx_supermai_scout({ criteria }, context('felix', 'candidate_review'));
   assert.equal(running.data.status, 'running');
@@ -300,9 +325,9 @@ test('找人任务 running/触发响应内嵌守候纪律（2026-09-09 事故：
   assert.ok(guard.includes('不要向顾问承诺'), 'running 响应禁止承诺自动通知/设提醒');
 
   // 触发响应同样带守候纪律
-  db.prepare(`DELETE FROM openmai_results WHERE project_id=?`).run(key);
+  db.prepare(`DELETE FROM openmai_results WHERE project_id=?`).run(supermaiResultKey(key));
   const triggered = await handlers.brainx_supermai_scout({ criteria }, context('felix', 'candidate_review'));
-  assert.ok(triggered.data.note.includes('3-5 分钟'), '触发响应写明收敛时长');
-  assert.ok(triggered.data.note.includes('每隔约 1 分钟'), '触发响应写明轮询节奏');
-  assert.ok(!triggered.data.note.includes('自动回到'), '触发响应不再承诺结果自动回群（bot 路径无通知）');
+  assert.equal(triggered.data.task_status, 'waiting_for_device');
+  assert.ok(triggered.data.note.includes('连接中心配对设备'), '离线时明确给出设备配对动作');
+  assert.ok(triggered.data.note.includes('不要切换成 OpenMai'), '不得回退到冒名 OpenMai 链路');
 });

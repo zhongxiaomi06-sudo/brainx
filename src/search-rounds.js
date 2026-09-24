@@ -29,10 +29,28 @@ function resultRefs(row) {
     .map((candidate) => candidate.candidateRef);
 }
 
+function allResultRefs(row) {
+  return extractOpenmaiCandidates(row.result_text)
+    .filter((candidate) => candidate.candidateRefValid)
+    .map((candidate) => candidate.candidateRef);
+}
+
+function projectRows(db, projectId) {
+  return db.prepare(`SELECT task_id,result_text,excluded_candidate_refs_json
+    FROM openmai_results WHERE project_id IN (?,?)
+    ORDER BY finished_at DESC,started_at DESC`).all(projectId, `supermai-result:${projectId}`);
+}
+
 export function nextSearchExclusions(db, projectId) {
-  const rows = db.prepare(`SELECT task_id,result_text,excluded_candidate_refs_json
-    FROM openmai_results WHERE project_id=? ORDER BY finished_at DESC,started_at DESC`).all(projectId);
+  const rows = projectRows(db, projectId);
   return normalizeExcludedCandidateRefs(rows.flatMap((row) => [
     ...storedRefs(row.excluded_candidate_refs_json), ...resultRefs(row),
+  ]));
+}
+
+export function nextSupermaiSearchExclusions(db, projectId) {
+  const rows = projectRows(db, projectId);
+  return normalizeExcludedCandidateRefs(rows.flatMap((row) => [
+    ...storedRefs(row.excluded_candidate_refs_json), ...allResultRefs(row),
   ]));
 }

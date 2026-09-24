@@ -144,7 +144,7 @@ test('openmai_search done 群读回：发卡且 envelope 只留引导；running 
   assert.equal(sent.length, 1);
   assert.equal(sent[0].target, 'oc_group1');
   assert.match(sent[0].idempotencyKey, /^openmai-result-card:.+:oc_group1:round1:\d{4}-\d{2}-\d{2}$/);
-  assert.equal(sent[0].card.header.title.content, 'Reloop 候选人推荐 · 首轮已就绪');
+  assert.equal(sent[0].card.header.title.content, 'OpenMai 候选人推荐 · 首轮已就绪');
   assert.equal(out.data.card_delivered, true);
   assert.equal(out.data.result_text, null, '已发卡后 result_text 不再交给模型');
   assert.ok(out.recommendations.some((r) => r.action === 'guide_only'));

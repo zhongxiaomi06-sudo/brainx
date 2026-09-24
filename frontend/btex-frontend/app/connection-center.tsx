@@ -49,8 +49,11 @@ type ConnectionCenterProps = {
   loading?: boolean;
   error?: string;
   busyPlatform?: SupermaiPlatform | null;
+  pairingCode?: string;
+  pairingBusy?: boolean;
   onRefresh: () => void;
   onStartSupermai: (platform: SupermaiPlatform) => void;
+  onCreatePairing: () => void;
   onReauthorizeFeishu: () => void;
 };
 
@@ -62,12 +65,29 @@ function CheckedAt({ value }: { value: string }) {
   return <small>{text}</small>;
 }
 
-function SupermaiActions({ item, busyPlatform, onStart }: {
+function SupermaiActions({ item, busyPlatform, pairingCode, pairingBusy, onStart, onCreatePairing }: {
   item: ProviderConnection;
   busyPlatform?: SupermaiPlatform | null;
+  pairingCode?: string;
+  pairingBusy?: boolean;
   onStart: (platform: SupermaiPlatform) => void;
+  onCreatePairing: () => void;
 }) {
   const desktopReady = item.details?.desktop_available === true;
+  if (!desktopReady) return <div className="connection-connector-setup">
+    <p>{item.details?.registered
+      ? item.details?.online ? "连接器已在线，请打开这台电脑上的 SuperMai。" : "已配对设备目前离线。请打开那台电脑，或重新配对当前电脑。"
+      : "第一次使用需要把这台电脑与 BrainX 配对。"}</p>
+    {(!item.details?.registered || !item.details?.online) && <div>
+      <button type="button" onClick={onCreatePairing} disabled={pairingBusy}>
+        {pairingBusy ? <LoaderCircle className="spin" aria-hidden="true" /> : <Cable aria-hidden="true" />}
+        {pairingCode ? "换一个配对码" : "生成配对码"}
+      </button>
+      <a href="/api/v1/supermai/connector/install" download>下载连接器安装包 <ExternalLink aria-hidden="true" /></a>
+    </div>}
+    {pairingCode && <p className="connection-pair-code"><span>安装时输入</span><code>{pairingCode}</code><small>10 分钟内有效，只能使用一次</small></p>}
+    {(!item.details?.registered || !item.details?.online) && <small>先安装并打开 SuperMai，再下载并解压连接器；双击安装文件并输入配对码。</small>}
+  </div>;
   return <div className="connection-platforms" aria-label="SuperMai 招聘平台">
     {(Object.keys(platformCopy) as SupermaiPlatform[]).map(platform => {
       const status = item.details?.platforms?.[platform];
@@ -84,12 +104,12 @@ function SupermaiActions({ item, busyPlatform, onStart }: {
         {busy ? <LoaderCircle className="spin" aria-hidden="true" /> : <ExternalLink aria-hidden="true" />}
       </button>;
     })}
-    {!desktopReady && <p className="connection-platform-hint">请先打开本机已安装的 SuperMai，再刷新状态。</p>}
   </div>;
 }
 
 export function ConnectionCenter({ items, loading = false, error = "", busyPlatform = null,
-  onRefresh, onStartSupermai, onReauthorizeFeishu }: ConnectionCenterProps) {
+  pairingCode = "", pairingBusy = false, onRefresh, onStartSupermai, onCreatePairing,
+  onReauthorizeFeishu }: ConnectionCenterProps) {
   const ready = items.filter(item => item.state === "connected" || item.state === "organization_managed").length;
   return <div className="connection-center">
     <header className="connection-center-hero">
@@ -129,7 +149,9 @@ export function ConnectionCenter({ items, loading = false, error = "", busyPlatf
             {item.provider === "openmai" && item.needs_user_action && <span className="connection-guidance">请联系管理员开通</span>}
             {item.provider === "reloop" && <span className="connection-guidance">组织统一管理</span>}
           </div>
-          {item.provider === "supermai" && <SupermaiActions item={item} busyPlatform={busyPlatform} onStart={onStartSupermai} />}
+          {item.provider === "supermai" && <SupermaiActions item={item} busyPlatform={busyPlatform}
+            pairingCode={pairingCode} pairingBusy={pairingBusy} onStart={onStartSupermai}
+            onCreatePairing={onCreatePairing} />}
         </article>;
       })}
       {loading && items.length === 0 && [0, 1, 2, 3].map(index => <div className="connection-card connection-skeleton" key={index} aria-hidden="true"><i /><i /><i /></div>)}

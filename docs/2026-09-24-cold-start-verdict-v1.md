@@ -85,6 +85,19 @@ v1 画像被「launch 自动化代操作」污染。v3 按 idempotency_key 前�
 
 **结论**：served 率 5.4% 不是「顾问不看推荐」的单一原因——`markServed`（src/tier.js）只在 **Web 列表接口真实下发**时回填 served_at，**飞书卡片接单路径完全不经过它**。而 v3 归因已证明顾问主通道是飞书卡片（本人卡片接单存在）。两层证据合并：真人接单的职位大多来自 ttc-owner 同步/launch 建群等非推荐路径，且卡片路径的曝光永远不会被记为 served。specs/022 C 层的诊断动作应为：①给飞书卡片路径补 served 埋点；②推荐入口与实际接单路径的脱节本身是产品问题（顾问没有从推荐列表工作）。
 
+### 5.2 补充验证（同日）：飞书每日小卡机制审核
+
+**机制（代码 + push_log 实测证实）**：worker 每天 07:00 / 19:00 CST 两波调度（实测 403 条 SENT 全落在这两个钟点），按每顾问最新 COMPLETED 的 decision_runs 快照（2h 节流 + input_hash + complete=1 前置）取 Top3 建卡，`UNIQUE(consultant_id, kind, run_id)` 幂等（run_id 为波次键 `YYYY-MM-DD#HHMM`）。卡含总分/置信/档位/依据（关系事件计数 + 群活跃）/风险/下一步（工作台接单），接单走 `bot:accept:` 一键链路。另有无变化不推的 autopush（默认关，`BRAINX_PUSH_AUTO`）。近 7 天：DAILY_TOP3 126 条 SENT、STAGE_REMINDER 329 条 SENT——**推送机械面健康**。
+
+**验证发现 4 个问题**：
+
+1. **档位塌缩：89% 输出 OBSERVE**。全表 5,791 条推荐：OBSERVE 5,217 / RECOMMEND_WATCH 574 / RECOMMEND_ACCEPT **30**。卡片位（rank≤3）近 7 天 81 条中 OBSERVE 69（85%）——卡面写「今天建议优先处理」，实际几乎全是观察档，可执行的 ACCEPT 档基本到不了卡片。
+2. **ACCEPT 档只有 linda 能产出**：30 条全部来自 linda 今天 3 轮（脑利 Agent 工程师 / 恒星力量 PR 主管 / 脑利 CEO 助理——direction 100 + 高活跃）。其余 8 位顾问历史为 0。原因：linda 盘子小（3 个有效 membership）但个个高匹配；大盘顾问（york 189 个）职位证据覆盖率不足 → coverage 拉低 → 强制 OBSERVE。**这是「顾问不从推荐列表接单」的算法侧解释**：不是顾问不用，是卡片上没有可执行档位。
+3. **审计链断点**：`push_log.run_id` 是波次合成键，与 `decision_runs` 的 UUID 无法 JOIN——卡片发出的职位无法回溯推荐依据，只能按时间+顾问模糊对齐。specs/019 账本设计应吸收（push_log 记 decision run 引用）。
+4. **3 条 FAILED 为数据污染非机制故障**：wendy 两个 demo 假群（`oc_demo_src_TTC-*`）+ linda 一个 bot 已退出的群。demo 种子数据的 project chat 不应进推送目标，需过滤或清理。
+
+**与 §5.1 合并的结论**：served 5.4% = 埋点缺失（卡片路径无 markServed）+ 档位塌缩（卡片无 ACCEPT 可点）+ 入口脱节（接单来自推荐外路径）三因叠加。specs/022 C 层优先级排序：卡片 served 埋点 → 档位阈值放宽（coverage 惩罚在冷启动期过重）→ push_log 审计链 → demo 目标清理。
+
 ## 6. 节点清单（验收节点：✅ 已过 / ⬜ 未过）
 
 **数据地基（本评判范围）**

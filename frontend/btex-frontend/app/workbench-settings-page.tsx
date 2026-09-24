@@ -139,7 +139,9 @@ function WorkbenchSettingsPage({
 
   const initialSection = typeof window !== "undefined"
     && new URLSearchParams(window.location.search).get("settings") === "model" ? "model" : "profile";
-  return <SettingsCenterReview data={data} initialSection={initialSection} review={false} onBack={onBack} onAction={handleAction} />;
+  return <SettingsCenterReview data={data} initialSection={initialSection} review={false}
+    onBack={onBack} onSectionChange={section => { if (section === "connections") onOpenConnections(); }}
+    onAction={handleAction} />;
 }
 
 export { WorkbenchSettingsPage };

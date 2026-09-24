@@ -53,6 +53,7 @@ type SettingsCenterReviewProps = {
   initialSection?: SettingsSection;
   review?: boolean;
   onBack?: () => void;
+  onSectionChange?: (section: SettingsSection) => void;
   onAction?: (action: "edit-profile" | "connect-ttc" | "reauthorize-feishu" | "open-strategy" | "refresh-diagnostics" | "logout") => void;
 };
 
@@ -159,7 +160,8 @@ function DiagnosticsPanel({ data, onAction }: SettingsCenterReviewProps) {
   </div>;
 }
 
-export function SettingsCenterReview({ data, initialSection = "profile", review = true, onBack, onAction }: SettingsCenterReviewProps) {
+export function SettingsCenterReview({ data, initialSection = "profile", review = true, onBack,
+  onSectionChange, onAction }: SettingsCenterReviewProps) {
   const [active, setActive] = useState<SettingsSection>(initialSection);
   const [query, setQuery] = useState("");
   const visibleGroups = useMemo(() => sectionGroups(!!data.operations).map(group => ({ ...group, items: group.items.filter(item => item.label.includes(query.trim())) })).filter(group => group.items.length), [data.operations, query]);
@@ -169,7 +171,7 @@ export function SettingsCenterReview({ data, initialSection = "profile", review 
     <aside className="settings-sidebar">
       <button className="settings-back" type="button" onClick={onBack}><ArrowLeft />返回应用</button>
       <label className="settings-search"><Search /><span className="sr-only">搜索设置</span><input value={query} onChange={event => setQuery(event.target.value)} placeholder="搜索设置…" /></label>
-      <nav aria-label="设置分组">{visibleGroups.map(group => <section key={group.label}><h2>{group.label}</h2>{group.items.map(({ id, label, icon: Icon }) => <button key={id} type="button" className={active === id ? "active" : ""} aria-current={active === id ? "page" : undefined} onClick={() => setActive(id)}><Icon /><span>{label}</span></button>)}</section>)}</nav>
+      <nav aria-label="设置分组">{visibleGroups.map(group => <section key={group.label}><h2>{group.label}</h2>{group.items.map(({ id, label, icon: Icon }) => <button key={id} type="button" className={active === id ? "active" : ""} aria-current={active === id ? "page" : undefined} onClick={() => { setActive(id); onSectionChange?.(id); }}><Icon /><span>{label}</span></button>)}</section>)}</nav>
       <div className="settings-sidebar-account"><span>{data.profile.displayName.trim().slice(0, 1) || "M"}</span><div><b>{data.profile.displayName}</b><small>{data.profile.consultantId}</small></div></div>
     </aside>
     <main className="settings-main"><header><h1>{copy.title}</h1><p>{copy.description}</p></header><div className="settings-section-content">

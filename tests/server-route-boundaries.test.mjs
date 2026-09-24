@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { authRoutes } from '../src/auth-routes.js';
+import { connectionRoutes } from '../src/connection-routes.js';
 import { talentRoutes } from '../src/talent-routes.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -29,8 +30,14 @@ const TALENT_KEYS = [
   'POST /api/v1/talent/sync',
 ];
 
+const CONNECTION_KEYS = [
+  'GET /api/v1/auth/providers',
+  'GET /api/v1/connections',
+];
+
 test('登录与人才 route factory 完整拥有原路由清单', () => {
   assert.deepEqual(Object.keys(authRoutes({}, { devAuth: false })).sort(), AUTH_KEYS);
+  assert.deepEqual(Object.keys(connectionRoutes({})).sort(), CONNECTION_KEYS);
   assert.deepEqual(Object.keys(talentRoutes({}, { rootDir: ROOT })).sort(), TALENT_KEYS);
 });
 
@@ -38,6 +45,7 @@ test('server 入口回到 500 行内，只组装领域路由而不内嵌 handler
   const source = readFileSync(join(ROOT, 'src', 'server.js'), 'utf8');
   assert.ok(source.split(/\r?\n/).length - 1 <= 500, 'src/server.js 必须不超过 500 行');
   assert.match(source, /\.\.\.authRoutes\(db,/);
+  assert.match(source, /\.\.\.connectionRoutes\(db,/);
   assert.match(source, /\.\.\.talentRoutes\(db,/);
   assert.doesNotMatch(source, /['"]GET \/login['"]\s*:/);
   assert.doesNotMatch(source, /['"]GET \/api\/v1\/talent\/status['"]\s*:/);

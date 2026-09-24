@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-24｜feat(连接): 建立统一登录与找人来源状态
+
+- 新增公开的身份 provider 目录和登录后统一连接状态接口，把飞书、OpenMai、SuperMai、Reloop 映射为稳定的连接状态、能力、管理方、用户动作和错误码；保持原登录、工作台和机器人接口不变。
+- 新增 SuperMai/Sourcing 本机探针，只允许固定 HTTP loopback、短超时和窄字段输出；检测桌面 harness 与 BOSS/脉脉/猎聘会话，但不读取 Cookie、token、本地路径或任意远程 URL。
+- 新增接口鉴权、来源区分、loopback 限制、敏感字段过滤和路由边界回归；专项 6/6 通过。本阶段只完成只读 facade，尚未建设桌面安装包、统一任务/ingest 或正式 SuperMai relay，不发布、不 push。
+
 ## 2026-09-24｜docs(登录): 规格化桌面端统一登录与找人连接器
 
 - 明确 BrainX 只保留一个产品身份，飞书走系统浏览器官方 OAuth；OpenMai、SuperMai、Reloop 作为能力连接统一呈现状态、重新授权、撤销和用户动作，不再要求用户复制 token 或配置回调。

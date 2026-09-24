@@ -39,6 +39,7 @@ import { verifySnapshotKey, jobSnapshot } from './snapshot.js';
 import { createGuard } from './guard.js';
 import { makeClientErrorRoute } from './client-error.js';
 import { authRoutes } from './auth-routes.js';
+import { connectionRoutes } from './connection-routes.js';
 import { talentRoutes } from './talent-routes.js';
 import { body, err, isPathInside, json, normalizeWorkbenchPreferences, proxyFrontend,
   resolveRoute, safeJsonArray, STATIC_MIME } from './server-http.js';
@@ -84,6 +85,7 @@ export function createServer(db = openDb(), deps = {}) {
     ...personalModelRoutes(db, deps),
     ...openmaiRoutes(db, bus),
     ...authRoutes(db, { exchangeCode: deps.exchangeCode }),
+    ...connectionRoutes(db, deps.connections),
     ...talentRoutes(db, { rootDir: ROOT }),
     ...recommendationRoutes(db, { recommendations, bus, projectLaunch: deps.projectLaunch,
       agenticReadEnabled }),
@@ -373,6 +375,7 @@ export function createServer(db = openDb(), deps = {}) {
     if (handler) {
       const open = ['GET /api/v1/consultants', 'POST /api/v1/session', 'DELETE /api/v1/session',
                     'GET /api/v1/oauth/status', 'GET /api/v1/oauth/authorize', 'GET /api/v1/oauth/callback',
+                    'GET /api/v1/auth/providers',
                     'GET /login',
                     // 扩展自动同步 TTC JWT：免登录，凭来源校验+JWT 活验证+归属一致校验兜底；ttc/status 已收回需登录
                     'POST /api/v1/ttc/ext-sync',

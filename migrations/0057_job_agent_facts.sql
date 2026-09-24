@@ -5,9 +5,10 @@
 --
 -- 幂等键 = message_id + field + project_id（FR-1 红线：缺一不可）。
 -- ⚠️ 唯一性是两层机制，别只看主键：职位级行（project_id 非空）由主键防重；
--- **群级行（NULL）不被主键唯一性覆盖——SQL 复合主键里 NULL 与 NULL 互不相等，
--- INSERT OR IGNORE 对群级行永不触发冲突**。群级幂等由存储层写前存在性预检补齐
--- （src/agent-facts.js EXISTS_SQL，NULL 安全比较），本表主键只作职位级兜底。
+-- **群级行（NULL）不被主键唯一性覆盖——SQL 复合主键里 NULL 与 NULL 互不相等**。
+-- 群级防重靠下方部分唯一索引（原子，覆盖手工 CLI 与 timer 并行的 TOCTOU 竞态；
+-- 存储层写前预检只做 duplicates 计数与快路径，非唯一性保证）。
+-- 运维纪律：timer 保持单实例（部分唯一索引是数据兜底，不是并发设计的替身）。
 -- 时间戳一律 ISO 8601 UTC（库内既有约定）；evidence 是原文锚点（截断 200 字符）。
 -- 红线：群级行与 confidence<0.7 的行【只存储展示，永不进合成层】（合成层过滤，
 -- 本表不强制——存储层保持中立，消费口径在 src/facts.js）。
@@ -27,3 +28,8 @@ CREATE TABLE IF NOT EXISTS job_agent_facts (
 
 CREATE INDEX IF NOT EXISTS idx_agent_facts_job
   ON job_agent_facts(project_id, field, extracted_at);
+
+-- 群级行唯一性（原子）：主键对 NULL 不防重（NULL≠NULL），此索引补上
+-- （message_id+field 在群级维度唯一——chat_id 不参与幂等键，同消息唯一）。
+CREATE UNIQUE INDEX IF NOT EXISTS ux_agent_facts_group
+  ON job_agent_facts(message_id, field) WHERE project_id IS NULL;

@@ -217,7 +217,7 @@ CREATE INDEX idx_agent_facts_job ON job_agent_facts(project_id, field, extracted
 - **群级行永不进合成层**；confidence<0.7 永不进合成层。
 - **人工 override 永远最高优先**；agent 行不得覆盖任何 manual_fact_overrides。
 - **kill-switch 默认关**；上线灰度顺序 = dry-run → 影子对照 → 生产 --write，跳步即违规。
-- **幂等键不可削弱**：message_id+field+project_id 缺一不可（⚠️ 唯一性两层机制：职位级行靠主键；**群级行 NULL 不被主键唯一性覆盖（SQL 复合主键 NULL≠NULL）**，靠存储层写前存在性预检防重——2026-09-24 审核实证后修正机制描述，契约本身不变）。
+- **幂等键不可削弱**：message_id+field+project_id 缺一不可（⚠️ 唯一性两层索引原子保证：职位级行靠主键；**群级行（NULL）不被主键覆盖（SQL 复合主键 NULL≠NULL）**，靠部分唯一索引 `ux_agent_facts_group (message_id, field) WHERE project_id IS NULL` 原子防重（2026-09-24 审核二轮加，覆盖 CLI×timer 并行 TOCTOU）；存储层写前预检只做 duplicates 计数与竞态兜底，非唯一性保证。timer 保持单实例）。
 - **未展示不等于负反馈**（算法文档 §2.5）：served 修复前静默不计入任何负标签。
 - 修改 recommendation-presentation.js 必须 bump `DATA_CONFIDENCE_RULE_VERSION`（锚点纪律，specs/022 同款）。
 

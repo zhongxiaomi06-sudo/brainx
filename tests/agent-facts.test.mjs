@@ -67,6 +67,22 @@ test('P0 回归：混合批次（职位级+群级）重放，两层级都零新�
   assert.equal(db.prepare('SELECT COUNT(*) n FROM job_agent_facts').get().n, 2);
 });
 
+test('TOCTOU 回归：绕过预检裸插重复群级行 → 部分唯一索引原子拦截（changes=0）', () => {
+  const db = newDb();
+  // 模拟竞态：预检通过后、写入前，他人已插同一群级行——预检无从感知，只能靠索引
+  const r1 = upsertAgentFacts(db, [{
+    ...baseRow, message_id: 'om_race', chat_id: 'oc_gA', project_id: null,
+    value: 'OPEN', field: 'active_state',
+  }], '2026-09-24T00:00:00.000Z');
+  assert.equal(r1.inserted, 1);
+  // 裸 INSERT OR IGNORE（不经 upsertAgentFacts 的预检）→ 索引必须让 changes=0
+  const raw = db.prepare(`INSERT OR IGNORE INTO job_agent_facts
+    (message_id, chat_id, project_id, field, value, confidence, evidence, model, extracted_at)
+    VALUES ('om_race', 'oc_gB', NULL, 'active_state', 'OPEN', 0.9, '还在招', 'glm-x', '2026-09-24T01:00:00.000Z')`).run();
+  assert.equal(raw.changes, 0, '部分唯一索引必须原子拦截群级重复（chat_id 不同也拦——幂等键不含 chat_id）');
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM job_agent_facts').get().n, 1, '总行数不得翻倍');
+});
+
 test('P0 回归：不同群的同名群级行互不吞（message_id 相同、chat_id 不同仍应算重复——幂等键不含 chat_id）', () => {
   const db = newDb();
   const g1 = { ...baseRow, message_id: 'om_g', chat_id: 'oc_gA', project_id: null, value: 'OPEN', field: 'active_state' };

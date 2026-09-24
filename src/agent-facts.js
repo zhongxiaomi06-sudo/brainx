@@ -3,14 +3,18 @@
  * 权威契约: specs/023-fact-agent/spec.md FR-1；
  * 职责：表读写、按职位取最新有效值、幂等 upsert、结构化统计。
  * 纪律：
- *  - 幂等键 message_id+field+project_id；**唯一性由两层保证**：
- *    职位级行（project_id 非空）靠 PRIMARY KEY；**群级行（NULL）不被主键唯一性覆盖
- *    （SQL 复合主键里 NULL 与 NULL 互不相等，INSERT OR IGNORE 永不触发冲突）**——
- *    幂等由写前存在性预检补齐（下 EXISTS_SQL），首写优先，重抽不覆盖（审计链稳定）。
+ *  - 幂等键 message_id+field+project_id；**唯一性由两层索引原子保证**：
+ *    职位级行（project_id 非空）靠 PRIMARY KEY；**群级行（NULL）靠部分唯一索引
+ *    ux_agent_facts_group（migration 0057，`(message_id, field) WHERE project_id IS NULL`）**
+ *    ——SQL 复合主键里 NULL≠NULL，主键对群级行不防重，索引使其原子防重
+ *    （覆盖手工 CLI 与 timer 并行的 TOCTOU 竞态）。
+ *  - 写前预检（EXISTS_SQL）只做 duplicates 计数与快路径，**不是唯一性保证**；
+ *    真正兜底是 INSERT OR IGNORE + changes 计数：竞态下索引拦截 → changes=0 → 计 duplicates。
  *  - 抽取行必须可回溯：evidence 原文锚点 + message_id + model，缺一不落库（FR-6），
  *    不合格行进返回值 invalid 列表由调用方计数，不静默丢（禁止静默失败）。
  *  - 群级行（project_id NULL）与 confidence<0.7 的行本层照存——「永不进合成」
  *    是合成层（src/facts.js，施工序④）的过滤口径，存储保持中立。
+ *  - 运维纪律：timer 保持单实例（索引是数据兜底，不是并发设计的替身）。
  */
 
 export const AGENT_FACT_FIELDS = ['current_stage', 'active_state'];
@@ -45,18 +49,19 @@ export function upsertAgentFacts(db, rows, extractedAt = null) {
     const v = validateAgentFactRow(row);
     if (!v.ok) { invalid.push({ row, reason: v.reason }); continue; }
     const pid = row.project_id ?? null;
-    // 群级行（NULL）主键不防重：预检命中即 duplicates（职位级行命中也走同路，语义一致）
+    // 预检：命中即 duplicates（快路径计数，非唯一性保证——原子性由索引兜底）
     if (db.prepare(EXISTS_SQL).get(row.message_id, row.field, pid, pid)) {
       duplicates += 1;
       continue;
     }
-    db.prepare(INSERT_SQL).run(
+    const r = db.prepare(INSERT_SQL).run(
       row.message_id, row.chat_id, pid,
       row.field, row.value, row.confidence,
       String(row.evidence).slice(0, EVIDENCE_MAX),
       row.model, at,
     );
-    inserted += 1;
+    if (r.changes > 0) inserted += 1;
+    else duplicates += 1; // 竞态兜底：预检与写入之间他人已插 → 部分唯一索引/主键拦截
   }
   return { inserted, duplicates, invalid };
 }

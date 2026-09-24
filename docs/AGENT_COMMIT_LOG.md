@@ -1,5 +1,13 @@
 # Agent Commit 记录
 
+## 2026-09-24｜fix(fact-agent): 审核二轮——群级行部分唯一索引堵 TOCTOU（原子防重，一行索引 + 竞态兜底）
+
+- 起因（用户/审核二轮）：319ae98 的 EXISTS 预检与 INSERT 非原子（TOCTOU）——单 timer 串行安全，但手工 CLI 与 timer 并行时群级行仍可能双插（职位级有 INSERT OR IGNORE 兜底，群级预检后无兜底）。
+- 修复（采纳审核一行修法）：`migrations/0057_job_agent_facts.sql` 加部分唯一索引 `ux_agent_facts_group ON job_agent_facts(message_id, field) WHERE project_id IS NULL`——原子、不改 FR-1 表契约；`src/agent-facts.js` 补 changes=0 竞态兜底（预检只做 duplicates 计数与快路径，唯一性保证交给两层索引：职位级=主键、群级=部分唯一索引）；注释三处同步（migration/存储层/spec 红线区：预检非唯一性保证 + timer 单实例运维纪律）。
+- 0057 原地编辑安全性实证：本地 dev db `schema_migrations` 无 0057 记录（15:29 的 openDb 查询发生在 migration 写入前）、表不存在，0057 从未进任何真实库，原地编辑零分歧；生产未部署。
+- 测试：+1 TOCTOU 回归（绕过预检裸 INSERT OR IGNORE 重复群级行 → 索引拦截 changes=0、chat_id 不同也拦、总行数不翻倍）；25/25 全绿；verify:quick 16/16；文件行数红线内。
+- 未 push（本地 ahead 6）。
+
 ## 2026-09-24｜fix(fact-agent): 审核修复——群级行幂等预检（P0）+ backfill 无上限 + CLI 改走 openDb（P1×2）
 
 - 起因（用户/另一窗口审核结论）：实测复现 P0——SQL 复合主键里 **NULL 与 NULL 互不相等**，`INSERT OR IGNORE` 对 (message_id, field, NULL) 永不触发冲突，群级行重跑必重复（in-memory 实验第二轮 inserted=1、总行数翻倍），AC-1 对群级行破防；且错误认知被固化进 migration 与存储层注释（「NULL 互不冲突→不塌缩」只对了 NULL≠X 半边）。P1×2：backfill 默认 limit=5000 静默截断存量语义；CLI 裸 DatabaseSync 无 busy_timeout，生产持库时 timer 写入会 SQLITE_BUSY。

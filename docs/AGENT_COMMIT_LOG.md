@@ -1,5 +1,14 @@
 # Agent Commit 记录
 
+## 2026-09-24｜docs(specs): specs/023 字段补全 Agent 与 served 埋点立项——完整 MVP 边界 + 验收 AC-1~8 + 数据基线与跑动验证方法
+
+- 起因（用户指令）：档位塌缩诊断后续，用户拍板「②先行」（字段补全 agent + 卡片 served 埋点），要求「写入文档直接给开发：完整边界的框架、达成的验收效果、当前数据结论的不足、数据质量如何跑动验证」。
+- 改动：`specs/023-fact-agent/spec.md`（新）+ `specs/023-fact-agent/data-baseline.md`（新）+ `docs/README.md`（路由表 + 文档目录双登记）。纯文档，无代码改动。
+- spec.md 内容：①MVP 边界（做/不做对照表，与 T7 Pipeline 渠道划清两线关系——T7 结构化真值第一供给线、agent 群消息第二供给线，T7 落地后不退役）；②User Story 1-5 各带 acceptance（回填幂等 / 消歧三分叉 / 合成插档与打折 / 每日 timer / served 埋点）；③FR-1~6 数据契约（migration 0057 建表 job_agent_facts、GLM 抽取契约、合成层四层优先级 manual>AGENT>cockpit>sync、置信打折——AGENT 填补 band 上限压到 PARTIAL 不得洗成 SUFFICIENT、成本三重开关）；④模块结构施工清单（11 项，新文件全部 ≤500 行）与依赖序 ①→⑥（dry-run 抽样 ≥80% 才准 --write，④ 起影子对照随 commit）；⑤验收 AC-1~8（含量级锚点：linda 类 ACCEPT 8→20）；⑥数据质量跑动验证四层（回填前抽样人工核对 / 回填中幂等对账 / 回填后影子对照 / 上线后持续观测）+ 当前数据结论已知局限五条（模拟乐观假设、单轮快照、群活≠在招、served 4.3% 是断链读数、hc 缺失误判已纠正）；⑦红线八条（LLM 不打分不定档、群级永不进合成、人工 override 永远最高、kill-switch 默认关、幂等键不可削弱、未展示≠负反馈、版本必须 bump）。
+- data-baseline.md 内容：2026-09-24 生产库只读实测全量数字（OBSERVE 90.1% 十顾问分列、双闸门代码证据、york Top5 降档样本、linda 对照组、stale 结构性根源 captured_at 语义、字段填充率 hc 99.3%/current_stage 无列/active_state 12%、语料边界 18,763 条消息 147 绑定群信号 2,237 存量 75/天增量、六冷启动顾问 coverage<0.5 约束、推送侧 push_log 与 served 基线）+ 复现口径 SQL 骨架。
+- 与既有文档一致性：spec 与 [数据渠道全景](2026-09-24-data-channels-roadmap.md) T7（6b34535 已落）互链不打架；与 specs/003（解析复用）、specs/022（同为 lark_messages 消费者）、specs/004（模型配置体系）关系显式声明。
+- 验证：纯文档；README 两处登记 grep -E 复核落盘；spec 内全部数字与 data-baseline.md 交叉核对一致；无代码/迁移/配置改动，verify 不受影响（未 push，本地 commit）。
+
 ## 2026-09-24｜docs(data): 数据渠道全景与接入路线规范——四层渠道盘点 + 技能包解读 + Pipeline 补 current_stage 优先级
 
 - 起因（用户指令）：「数据读取还有一个小机器人，当前的数据读取是不到位的，还有可以读取获取的数据 cli，大家的 token 能拿到的各自面板的数据，还有之前的 ttc-recruitment-skills.tar(1).gz 可以阅读的数据进行分类列出最佳的合适的方式阅读，数据的渠道不够」。

@@ -68,6 +68,7 @@
 | **Hub 架构重整（业务事件进账本、dispatcher、反馈环、session 隔离下沉、接口面收敛）** | **[Hub 事件骨干重整规格](../specs/019-hub-event-backbone/spec.md)**（五用户故事 + 四重难点数据来源契约；**US1-US3 已建成**：五类业务事件契约见 [contracts/event-types.md](../specs/019-hub-event-backbone/contracts/event-types.md)、dispatcher=`src/hub/dispatcher.js`+`bin/brainx-dispatcher.mjs`、反馈指标=`src/feedback/rollup.js`+`bin/brainx-feedback-rollup.mjs`）、[Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) |
 | **生产库备份、高热表 retention/归档、磁盘增长失控** | **[数据结构与磁盘用途规范](2026-09-23-data-structure-and-disk-layout.md)**（数据域总表 + 磁盘铁律 + 草稿落库纪律）、[数据治理运维手册：备份与保留归档](2026-09-23-data-governance-ops.md)（恢复演练命令 + dry-run 审查流程 + 窗口 env 清单 + journalctl 告警面 + 服务器规格基线采集）、[数据治理规格](../specs/021-data-governance/spec.md)（自动备份 + 保留归档纪律 + 引用保护）、[Hub 事件骨干重整规格](../specs/019-hub-event-backbone/spec.md) |
 | **数据读取链路（怎么进来/怎么消费）、生产数据错位/字段错位/时间错位/主键冲突诊断** | **[数据读取链路与错位诊断规范](2026-09-24-data-reading-pipeline.md)**（入料 W1-W7 + 消费 R1-R7 总表 + 错位四类根源目录 A/B/C/D + 读取纪律六条红线）、[数据结构与磁盘用途规范](2026-09-23-data-structure-and-disk-layout.md)（存储归属） |
+| **数据渠道不够要扩渠道、TTC 顾问面板数据（pipeline/任务/名单/推荐报告）、jobwater 市场数据、LinkedIn/技能包怎么接** | **[数据渠道全景与接入路线规范](2026-09-24-data-channels-roadmap.md)**（四层渠道全景：飞书 F1-F4 / TTC JWT T1-T12 / 独立服务 J1 / GUI G1-G2，逐条带已接/未接状态与最佳读取方式 + 技能包 8 技能映射 + 接入优先级 P0=Pipeline 补 current_stage + 安全红线）、[数据读取链路与错位诊断规范](2026-09-24-data-reading-pipeline.md) |
 | 密钥、登录、权限、数据隔离 | [安全操作手册](SECURITY.md) |
 | 构建、发布、服务器、容器 | [部署编排](DEPLOYMENT.md)、[云端恢复清单](cloud-recovery-checklist.md)、[安全操作手册](SECURITY.md) |
 | 验证历史行为或已有能力 | [开发验证报告](VERIFICATION.md) |
@@ -106,6 +107,7 @@
 - [数据治理运维手册：备份与高热表保留/归档](2026-09-23-data-governance-ops.md)：specs/021 的操作口径——每日 VACUUM INTO 快照（自检 + 滚动保留 + 锁互斥）、恢复演练确切命令、retention dry-run 审查流程、保留窗口 env 清单、journalctl 告警面与服务器规格基线采集清单。
 - [数据结构与磁盘用途规范](2026-09-23-data-structure-and-disk-layout.md)：数据域总表（载体/结构权威/生命周期）+ 磁盘用途铁律（系统盘只放代码、数据盘放全部数据、一个活库、备份必须出盘出机）+ 草稿落库纪律与历史遗留归置记录。
 - [数据读取链路与错位诊断规范](2026-09-24-data-reading-pipeline.md)：数据入料通道（W1-W7）与消费链路（R1-R7）唯一权威总表 + 生产错位事故四类根源目录（A 位置映射 / B 时间语义 / C 字段语义 / D 键身份，逐条带根源代码与防复发规则）+ 读取纪律六条红线。
+- [数据渠道全景与接入路线规范](2026-09-24-data-channels-roadmap.md)：全部可用数据渠道盘点（飞书 F1-F4 / TTC JWT 面板 T1-T12 / 独立服务 J1 / GUI 浏览器 G1-G2，逐条带已接/未接与最佳读取方式）+ ttc-recruitment-skills 技能包 8 技能接入映射 + 接入优先级（P0=Pipeline 流程同步补 current_stage，档位塌缩的数据解法）+ 安全红线（JWT 到期 / key 不进 Git / 本人 token 拉本人面板）。
 - [云端数据安排](2026-09-23-cloud-data-arrangement.md)：阿里云账号全量资源盘点（ECS/RDS 七库五账号/OSS/RAM/密钥面）+ 每域一属主的目标安排 + 错乱点清单（hayden 超管、单实例七库、AK 散落）+ 治理顺序与调度纪律。
 - [第一批冷启动基线](2026-09-23-cold-start-baseline.md)：以 2026-09-23 回流清单为基准的第一批全链路激活记账口径——八环节基线/目标/动作映射（17:55 实测）、冷启动 DoD 六条、GLM 语义清洗纪律与进度钩子。
 - [冷启动规则 v2 与客户画像](2026-09-24-cold-start-rules-v2-profiles.md)：GLM 全量判定对账反推的规则 v2 清单（岗位词表 top40 + 通知类误报抑制 + 规则/LLM 分工边界）+ 客户画像（client_profiles 表 141 家/85 家活跃）及其匹配消费口径。

@@ -1,5 +1,13 @@
 # Agent Commit 记录
 
+## 2026-09-24｜docs(data): 数据渠道全景与接入路线规范——四层渠道盘点 + 技能包解读 + Pipeline 补 current_stage 优先级
+
+- 起因（用户指令）：「数据读取还有一个小机器人，当前的数据读取是不到位的，还有可以读取获取的数据 cli，大家的 token 能拿到的各自面板的数据，还有之前的 ttc-recruitment-skills.tar(1).gz 可以阅读的数据进行分类列出最佳的合适的方式阅读，数据的渠道不够」。
+- 盘点方法：解压阅读技能包（40 文件 8 技能：ttc-crm-pipeline/crm/talent/user/auth + talent-search + jobwater + linkedin-search-skill，逐 reference 提取接口清单）；对照 brainx 现有 `src/ttcsdk/`（仅封装 job/company/resume/user 四域）与 openmai/supermai 通道，逐条判定已接/未接。
+- 改动：`docs/2026-09-24-data-channels-roadmap.md`（新）——①四层渠道全景：飞书 F1-F4（bot 事件流/lark-cli 回填/Bitable/邮箱日历未接）、TTC JWT 面板 T1-T12（**T7 Pipeline 流程、T8 项目任务面板、T9 联系人备注、T10 人才直连、T11 名单与推荐报告均未接**——渠道不够的实锤）、独立服务 J1 jobwater（职位表查询+市场分析）、GUI G1 LinkedIn/G2 SuperMai；②每条渠道带最佳读取方式（定时同步/按需工具/事件驱动/人工分批）；③技能包 8 技能→brainx 接入映射；④接入优先级：P0=T7 Pipeline 同步（StepType 推荐面试 Offer 入职 = job_facts.current_stage 真值，档位塌缩 B6 的数据解法）、P0.5=T8 任务面板（顾问画像 v4 行为真值）、P1=T10/T11/J1；⑤安全红线（JWT 2026-10-13 到期、jobwater key 不进 Git、本人 token 拉本人面板）。README 路由+目录双登记。
+- 关键发现：档位塌缩缺的 current_stage 真值就在未接的 pipeline_service 里——不是没有数据源，是渠道没接。
+- 验证：纯文档；tar 解压于 /tmp 未入仓库；ttcsdk 导出清单逐文件 grep 核对；README 两处登记 grep -E 复核。
+
 ## 2026-09-24｜docs(data): 数据读取链路与错位诊断规范——入料/消费双总表 + 错位四类根源目录
 
 - 起因（用户指令）：「当前的数据读取的结构，是什么样子的，生产机子的数据读取经常发生错位，你进行诊断阅读，写到权威的表格，不要以后都出现错误」。

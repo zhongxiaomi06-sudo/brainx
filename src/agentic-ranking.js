@@ -63,14 +63,14 @@ function beginRun(db, request, versions) {
       .run(request.tenantId, request.consultantId, generation, versions.at);
     const input = buildFrozenRankingInput(db, request, { ...versions, generation });
     db.prepare(`INSERT INTO agentic_ranking_runs
-      (run_id, tenant_id, consultant_id, generation, status, algorithm_version,
+      (run_id, tenant_id, consultant_id, generation, status, run_mode, algorithm_version,
        source_snapshot_id, profile_version, signal_snapshot_id, load_version,
        authorization_version, candidate_set_ref, model_id, prompt_version,
        tool_schema_version, eligibility_policy_version, diversity_policy_version,
        budget_json, input_json, eligible_count, retrieved_count, created_at)
-      VALUES (?,?,?,?,'RUNNING',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+      VALUES (?,?,?,?,'RUNNING',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
       versions.runId, request.tenantId, request.consultantId, generation,
-      AGENTIC_RANKING_VERSION, input.source_snapshot_id, input.profile_version,
+      versions.runMode, AGENTIC_RANKING_VERSION, input.source_snapshot_id, input.profile_version,
       input.signal_snapshot_id, input.load_version, input.authorization_version,
       input.candidate_set_ref, versions.modelId, versions.promptVersion,
       versions.toolSchemaVersion, versions.eligibilityPolicyVersion,
@@ -123,6 +123,7 @@ function resultFor(db, runId) {
   const items = db.prepare(`SELECT * FROM agentic_ranking_items
     WHERE run_id=? ORDER BY rank`).all(runId).map(publicItem);
   return { run_id: runId, generation: run.generation, status: run.status,
+    run_mode: run.run_mode,
     repair_count: run.repair_count, failure_code: run.failure_code, items };
 }
 
@@ -194,6 +195,7 @@ export async function runAgenticRanking(db, request, options = {}) {
     currentAuthorizationVersionFn: options.currentAuthorizationVersionFn
       || (() => request.authorizationVersion),
     supplySummaryFn: options.supplySummaryFn || null,
+    runMode: options.runMode === 'SHADOW' ? 'SHADOW' : 'LIVE',
   };
   const runId = `arr_${dependencies.idFn()}`;
   const budget = budgetOf(request);
@@ -262,7 +264,8 @@ export async function runAgenticRanking(db, request, options = {}) {
       });
       recorder.finish(callId, {
         status: reply?.cacheHit ? 'CACHED' : 'SUCCEEDED', usage: reply?.usage,
-        toolCount: toolCallCount,
+        toolCount: toolCallCount, priceVersion: reply?.priceVersion,
+        estimatedCostMicros: reply?.estimatedCostMicros, currency: reply?.currency,
       });
     } catch (error) {
       const cancelled = error?.name === 'AbortError';

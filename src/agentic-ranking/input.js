@@ -81,6 +81,7 @@ export function buildFrozenRankingInput(db, request, versions) {
   const supplyIds = new Set(versions.supplyJobIds || []);
   const eligible = capacityBlocked ? [] : effectiveJobs(db, request.consultantId)
     .filter((job) => job.active_state === 'OPEN' && job.hc !== 0)
+    .filter((job) => text(job.company) && text(job.role))
     .filter((job) => jobVisibleTo(db, request.consultantId, job.project_id))
     .filter((job) => !ignored.has(job.project_id) && !accepted.has(job.project_id))
     .filter((job) => !excluded(job, context.profile) && facts.has(job.project_id))

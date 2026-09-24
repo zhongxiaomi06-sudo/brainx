@@ -220,7 +220,7 @@ POST /api/v1/sourcing/tasks/{task_id}/finish
 
 在不改变现有飞书 Web 登录行为的前提下建立 provider registry、统一状态信封和 `/auth/providers`、`/connections` 只读接口；把静态名册、Agent 身份绑定和 OpenMai grant 的差异转成明确状态。此阶段不做桌面安装包。
 
-实现证据：`GET /api/v1/auth/providers` 公开返回当前唯一主身份提供方；登录后的 `GET /api/v1/connections` 统一返回飞书、OpenMai、SuperMai、Reloop 的状态。SuperMai 探针只允许 HTTP loopback、短超时并过滤端口、Cookie、token 与本地路径；该状态能力不等同于任务链路已经接通。
+实现证据：`GET /api/v1/auth/providers` 公开返回当前唯一主身份提供方；登录后的 `GET /api/v1/connections` 统一返回飞书、OpenMai、SuperMai、Reloop 的状态。SuperMai 探针只允许 HTTP loopback、短超时并过滤端口、Cookie、token 与本地路径；`POST /api/v1/connections/supermai/start` 只接受 BOSS、脉脉、猎聘三个内建平台并打开官方登录页，不接受调用方 URL。该状态与登录启动能力不等同于任务链路已经接通。
 
 ### 阶段 B｜统一找人任务
 

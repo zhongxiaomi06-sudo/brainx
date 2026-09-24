@@ -33,6 +33,7 @@ const TALENT_KEYS = [
 const CONNECTION_KEYS = [
   'GET /api/v1/auth/providers',
   'GET /api/v1/connections',
+  'POST /api/v1/connections/supermai/start',
 ];
 
 test('登录与人才 route factory 完整拥有原路由清单', () => {

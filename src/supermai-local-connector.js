@@ -23,6 +23,20 @@ async function readJson(fetchImpl, base, path, timeoutMs) {
   return response.json();
 }
 
+async function postJson(fetchImpl, base, path, body, timeoutMs) {
+  const response = await fetchImpl(new URL(path, base), {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || payload?.ok !== true) {
+    throw new Error(payload?.message || `SUPERMAI_LOCAL_HTTP_${response.status}`);
+  }
+  return payload;
+}
+
 function safePlatforms(input) {
   const source = input?.platforms || input?.browsers || input || {};
   return Object.fromEntries(PLATFORMS.map((platform) => {
@@ -59,6 +73,24 @@ export async function supermaiLocalStatus({
         ? error.code : 'SUPERMAI_DESKTOP_UNAVAILABLE',
       platforms: safePlatforms(),
     };
+  }
+}
+
+/** 只允许启动内建招聘平台的官方登录页，不接受调用方提供 URL。 */
+export async function launchSupermaiPlatform(platform, {
+  fetchImpl = fetch,
+  baseUrl = process.env.BRAINX_SUPERMAI_LOCAL_BASE_URL || 'http://127.0.0.1:8910',
+  timeoutMs = 25_000,
+} = {}) {
+  if (!PLATFORMS.includes(platform)) {
+    return { ok: false, error_code: 'SUPERMAI_PLATFORM_INVALID' };
+  }
+  try {
+    await postJson(fetchImpl, localBase(baseUrl), '/api/v1/chrome/launch', { platform }, timeoutMs);
+    return { ok: true, platform, user_action: 'COMPLETE_OFFICIAL_LOGIN' };
+  } catch (error) {
+    return { ok: false, error_code: error?.code === 'SUPERMAI_LOCAL_BASE_INVALID'
+      ? error.code : 'SUPERMAI_DESKTOP_UNAVAILABLE' };
   }
 }
 

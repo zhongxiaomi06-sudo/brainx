@@ -1,5 +1,13 @@
 # Agent Commit 记录
 
+## 2026-09-24｜feat(fact-agent): specs/023 施工序①②③——字段补全 Agent 框架（migration + 存储层 + 抽取管线 + CLI）
+
+- 起因（用户指令）：「按照这个字段进行数据的第一轮的验证和 MVP 的开发完整度；另一个窗口在跑数据的分析，你就做好框架的开发就可以」——按 spec 023 施工依赖序，只做 ①②③（不动现有运行行为、可先行合入的部分），不跑真实数据分析（留给另一窗口）。
+- 改动：`migrations/0057_job_agent_facts.sql`（新，幂等键 message_id+field+project_id，群级行 NULL 主键不塌缩）+ `src/agent-facts.js`（新，幂等 upsert 首写优先 / latestAgentFact 按职位取最新 / 群级只走展示通道 / FR-6 结构化统计）+ `src/fact-agent-extract.js`（新，纯逻辑：post 富文本拍平（防御式回落原文，003 管线缺的这块补上）→ 信号正则预筛（零 token）→ 受控枚举归一化（current_stage 五档 / active_state OPEN-CLOSED-COOLING，OPEN×矛盾词交叉校验）→ 消歧三分叉（1:1 直落 / GLM 指名相似度≥0.7 / 指不出落群级）→ GLM 批量契约（≤20 条/批、evidence 前 12 字原文锚定、单批失败不阻塞））+ `bin/brainx-fact-agent.mjs`（新，--dry-run/--backfill/--since=Nd/--limit/--json；BRAINX_FACT_AGENT kill-switch 默认关，未开时 --backfill/--since 显式降级 dry-run 并打印提示，禁止静默失败）+ 两套单测 21 例全绿。
+- 架构纪律：LLM 走注入（llm 异步函数），核心模块零网络 IO；GLM 端点在 CLI 解析（FACT_AGENT_KEY/ZHIPU_API_KEY + GLM_BASE_URL/GLM_MODEL，specs/004 体系，key 不进 Git）；宁缺勿错（无原文锚定丢弃、非法枚举丢弃、conf<0.7 落库但不进合成——合成层过滤在 ④ 接线）。
+- 同步改动：`tests/framework.test.mjs`（migration 记账测试硬编码清单补 0057、计数 59→60，0054-0056 先例同款）+ `specs/023-fact-agent/spec.md`（施工进度表：①②③ ✅，④⑤⑥ 待 dry-run 抽样 ≥80% 后施工）。
+- 验证：新单测 21/21 绿（幂等重跑零新增 AC-1、三分叉 US2、开关关闭零 token 零落库 US1-AC3、批次失败不阻塞 US4、增量窗口、FK 约束 seed 对齐 job_facts/sync_runs 真实 schema）；CLI 冒烟（临时库：post 拍平预筛命中 1、kill-switch 降级路径打印正确）；`npm run verify:quick` 16/16 通过；新文件最大 312 行（≤500 红线内）。未跑 full verify、未 push；未碰生产数据与另一窗口的数据分析现场。
+
 ## 2026-09-24｜docs(specs): specs/023 字段补全 Agent 与 served 埋点立项——完整 MVP 边界 + 验收 AC-1~8 + 数据基线与跑动验证方法
 
 - 起因（用户指令）：档位塌缩诊断后续，用户拍板「②先行」（字段补全 agent + 卡片 served 埋点），要求「写入文档直接给开发：完整边界的框架、达成的验收效果、当前数据结论的不足、数据质量如何跑动验证」。

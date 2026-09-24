@@ -167,6 +167,13 @@ CREATE INDEX idx_agent_facts_job ON job_agent_facts(project_id, field, extracted
 - ②③ 不动现有运行行为，可先行合入；④ 起影响推荐输出，commit 必须附影子对照报告（开启前后 dataConfidence 分布 + action 分布对比，口径见 data-baseline §5.3）。
 - ⑤ 的前端改动须同步前端审核台账（docs/frontend-reviews/README.md 五维状态，缺一不得标完成）。
 
+### 施工进度
+
+| 序 | 状态 | 说明 |
+|---|---|---|
+| ①②③ | ✅ 已合入（2026-09-24） | `0057_job_agent_facts.sql` / `src/agent-facts.js` / `src/fact-agent-extract.js` / `bin/brainx-fact-agent.mjs` + 两套单测；框架级——LLM 走注入、kill-switch 默认关（关=只跑解析+预筛统计，零 token 零落库）；④⑤⑥ 未动 |
+| ④⑤⑥ | ⬜ 待施工 | 合成插档 / served 埋点 / timer，依赖 ③ 的 dry-run 抽样人工核对 ≥80% |
+
 ## 达成的验收效果（Definition of Done）
 
 | 编号 | 验收项 | 判据 | 量级锚点（来自模拟实验） |

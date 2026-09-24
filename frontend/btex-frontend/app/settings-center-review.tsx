@@ -5,6 +5,7 @@ import {
   Activity,
   AlertTriangle,
   ArrowLeft,
+  BarChart3,
   CheckCircle2,
   Cpu,
   Database,
@@ -16,9 +17,11 @@ import {
   UserRound,
 } from "lucide-react";
 import { PersonalModelPanel } from "./personal-model-panel";
+import { OperationsDashboard } from "./operations-dashboard";
+import type { OperationsDashboardModel } from "./operations-dashboard-model";
 import "./settings-center-review.css";
 
-export type SettingsSection = "profile" | "model" | "direction" | "connections" | "strategy" | "diagnostics";
+export type SettingsSection = "profile" | "model" | "direction" | "connections" | "strategy" | "diagnostics" | "operations";
 type ConnectionState = "healthy" | "attention" | "offline";
 
 export type SettingsCenterData = {
@@ -42,6 +45,7 @@ export type SettingsCenterData = {
     errors: string[];
     fieldReport: { schemaVersion: string; totalRows: number; filterableFields: string[]; unavailableFilters: string[] } | null;
   };
+  operations?: OperationsDashboardModel | null;
 };
 
 type SettingsCenterReviewProps = {
@@ -52,7 +56,7 @@ type SettingsCenterReviewProps = {
   onAction?: (action: "edit-profile" | "connect-ttc" | "reauthorize-feishu" | "open-strategy" | "refresh-diagnostics" | "logout") => void;
 };
 
-const sectionGroups = [
+const sectionGroups = (operations: boolean) => [
   { label: "个人", items: [
     { id: "profile", label: "个人资料", icon: UserRound },
     { id: "model", label: "我的模型", icon: Cpu },
@@ -63,6 +67,9 @@ const sectionGroups = [
     { id: "connections", label: "数据连接", icon: Database },
     { id: "diagnostics", label: "同步诊断", icon: Activity },
   ] },
+  ...(operations ? [{ label: "管理员", items: [
+    { id: "operations" as const, label: "运营看板", icon: BarChart3 },
+  ] }] : []),
 ] as const;
 
 const sectionCopy: Record<SettingsSection, { title: string; description: string }> = {
@@ -72,6 +79,7 @@ const sectionCopy: Record<SettingsSection, { title: string; description: string 
   connections: { title: "数据连接", description: "管理 TTC、飞书和人才库的真实连接状态。" },
   strategy: { title: "推荐策略", description: "查看当前策略版本，并进入独立策略审核页面。" },
   diagnostics: { title: "同步诊断", description: "核对职位快照、字段能力和最近同步异常。" },
+  operations: { title: "运营看板", description: "查看事件投影的新鲜度、真实漏斗、效果、成本与恢复证据。" },
 };
 
 function StatusPill({ state, children }: { state: ConnectionState; children: string }) {
@@ -154,7 +162,7 @@ function DiagnosticsPanel({ data, onAction }: SettingsCenterReviewProps) {
 export function SettingsCenterReview({ data, initialSection = "profile", review = true, onBack, onAction }: SettingsCenterReviewProps) {
   const [active, setActive] = useState<SettingsSection>(initialSection);
   const [query, setQuery] = useState("");
-  const visibleGroups = useMemo(() => sectionGroups.map(group => ({ ...group, items: group.items.filter(item => item.label.includes(query.trim())) })).filter(group => group.items.length), [query]);
+  const visibleGroups = useMemo(() => sectionGroups(!!data.operations).map(group => ({ ...group, items: group.items.filter(item => item.label.includes(query.trim())) })).filter(group => group.items.length), [data.operations, query]);
   const props = { data, initialSection, review, onBack, onAction };
   const copy = sectionCopy[active];
   return <div className="settings-center-review">
@@ -171,6 +179,7 @@ export function SettingsCenterReview({ data, initialSection = "profile", review 
       {active === "connections" && <ConnectionsPanel {...props} />}
       {active === "strategy" && <StrategyPanel {...props} />}
       {active === "diagnostics" && <DiagnosticsPanel {...props} />}
+      {active === "operations" && data.operations && <OperationsDashboard data={data.operations} />}
     </div></main>
   </div>;
 }

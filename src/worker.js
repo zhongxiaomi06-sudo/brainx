@@ -24,6 +24,7 @@ import { startProjectReminderWorker } from './project-reminder.js';
 import { startStageReminderWorker } from './stage-reminder.js';
 import { startOpenclawGroupRetryWorker } from './openclaw-group-retry.js';
 import { startGroupIntakeWorker } from './group-intake.js';
+import { startOperationsProjectionWorker } from './operations-dashboard.js';
 
 /** 启动全部批处理任务。bus 由调用方给（嵌入=server.bus；独立=relayBus）。 */
 export function startWorkerTasks(db, bus) {
@@ -41,6 +42,11 @@ export function startWorkerTasks(db, bus) {
   // 定时推送：每天 07:00 / 19:00（CST）；BRAINX_PUSH_SCHEDULE=0 关闭
   handles.push(startScheduler(db, { recommendations }));
   console.log('[worker] 定时推送已启动（07:00 / 19:00 CST）');
+
+  if (process.env.BRAINX_OPERATIONS_PROJECTION_OFF !== '1') {
+    handles.push(startOperationsProjectionWorker(db));
+    console.log('[worker] 运营看板事件投影已启动');
+  }
 
   if (process.env.BRAINX_OPENMAI_DELIVERY_OFF !== '1') {
     handles.push(startOpenmaiDeliveryWorker(db));

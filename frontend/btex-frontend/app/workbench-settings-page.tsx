@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { brainxFetch, type RadarFieldReport } from "./brainx-api";
 import type { AuthStatus, SyncStatus } from "./decision-demo";
 import { SettingsCenterReview, type SettingsCenterData } from "./settings-center-review";
+import { normalizeOperationsDashboard, type OperationsDashboardModel } from "./operations-dashboard-model";
 
 type TtcStatus = {
   connected: boolean;
@@ -58,15 +59,19 @@ function WorkbenchSettingsPage({
 }) {
   const [ttc, setTtc] = useState<TtcStatus>(emptyTtc);
   const [talent, setTalent] = useState<TalentHealth>(emptyTalent);
+  const [operations, setOperations] = useState<OperationsDashboardModel | null>(null);
   useEffect(() => {
     let active = true;
     void Promise.all([
       brainxFetch<TtcStatus>("/api/v1/ttc/connect").catch(() => emptyTtc),
       brainxFetch<TalentHealth>("/api/v1/talent/health").catch(() => emptyTalent),
-    ]).then(([nextTtc, nextTalent]) => {
+      brainxFetch<OperationsDashboardModel>("/api/v1/admin/operations/dashboard")
+        .then(normalizeOperationsDashboard).catch(() => null),
+    ]).then(([nextTtc, nextTalent, nextOperations]) => {
       if (!active) return;
       setTtc(nextTtc);
       setTalent(nextTalent);
+      setOperations(nextOperations);
     });
     return () => { active = false; };
   }, []);
@@ -108,7 +113,8 @@ function WorkbenchSettingsPage({
         unavailableFilters: fieldNames(fieldReport, false),
       } : null,
     },
-  }), [auth, consultantId, engine, fieldReport, keywords, note, policyVersion, sync, talent, ttc]);
+    operations,
+  }), [auth, consultantId, engine, fieldReport, keywords, note, operations, policyVersion, sync, talent, ttc]);
 
   const handleAction = (action: "edit-profile" | "connect-ttc" | "reauthorize-feishu" | "open-strategy" | "refresh-diagnostics" | "logout") => {
     if (action === "logout") {

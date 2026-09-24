@@ -34,6 +34,7 @@ import { effectiveJob, effectiveFactPayload, updateFactOverrides } from './facts
 import { assistantRoutes } from './assistant-routes.js';
 import { personalModelRoutes } from './personal-model-routes.js';
 import { recommendationRoutes } from './recommendation-routes.js';
+import { operationsRoutes } from './operations-routes.js';
 import { verifySnapshotKey, jobSnapshot } from './snapshot.js';
 import { createGuard } from './guard.js';
 import { makeClientErrorRoute } from './client-error.js';
@@ -86,6 +87,7 @@ export function createServer(db = openDb(), deps = {}) {
     ...talentRoutes(db, { rootDir: ROOT }),
     ...recommendationRoutes(db, { recommendations, bus, projectLaunch: deps.projectLaunch,
       agenticReadEnabled }),
+    ...operationsRoutes(db, deps),
     'GET /api/v1/consultants': (req, res) => {
       json(res, 200, { items: recommendations.consultants()
         .map((c) => ({ consultant_id: c.consultant_id, display_name: c.display_name })) });

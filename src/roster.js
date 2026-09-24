@@ -57,7 +57,10 @@ export function findByOpenId(db, open_id) {
  * （buildCtx 每轮实时读 consultants 表）。
  * 2026-08-25：接受 weights（六维权重覆盖，normalizeWeights 校验归一）；
  * 修正 profile_json 整体重写会擦掉 capacity_limit 等既有键的问题——改为合并保留。 */
-export function updateProfile(db, consultant_id, { profile_keywords, profile_note, weights } = {}) {
+export function updateProfile(db, consultant_id, {
+  profile_keywords, profile_note, weights, excluded_companies, excluded_roles,
+  excluded_cities, capacity_limit,
+} = {}) {
   const cur = withProfile(db.prepare('SELECT * FROM consultants WHERE consultant_id=? AND active=1')
     .get(consultant_id));
   if (!cur) return { ok: false, status: 404, error: '顾问不存在' };
@@ -68,6 +71,24 @@ export function updateProfile(db, consultant_id, { profile_keywords, profile_not
   if (cleaned.some((k) => k.length > 20)) return { ok: false, status: 422, error: '单个关键词最长 20 字' };
   const kws = [...new Set(cleaned)]; // 去重在数量校验之后（21 个相同词也是超限）
   const note = String(profile_note !== undefined ? profile_note : (cur.profile_note || '')).slice(0, 200);
+  const cleanList = (value, current, label) => {
+    const raw = value !== undefined ? value : (current || []);
+    if (!Array.isArray(raw)) return { error: `${label} 必须是字符串数组` };
+    const cleanedValues = raw.map((item) => String(item).trim()).filter(Boolean);
+    if (cleanedValues.length > 30) return { error: `${label} 最多 30 个` };
+    if (cleanedValues.some((item) => item.length > 60)) return { error: `${label} 单项最长 60 字` };
+    return { value: [...new Set(cleanedValues)] };
+  };
+  const companies = cleanList(excluded_companies, cur.excluded_companies, '排除公司');
+  const roles = cleanList(excluded_roles, cur.excluded_roles, '排除职位');
+  const cities = cleanList(excluded_cities, cur.excluded_cities, '排除城市');
+  const invalidList = [companies, roles, cities].find((item) => item.error);
+  if (invalidList) return { ok: false, status: 422, error: invalidList.error };
+  const capacity = capacity_limit !== undefined ? Number(capacity_limit)
+    : (cur.capacity_limit ?? null);
+  if (capacity !== null && (!Number.isInteger(capacity) || capacity < 1 || capacity > 100)) {
+    return { ok: false, status: 422, error: '容量上限必须是 1 到 100 的整数' };
+  }
   let weightsOut = cur.weights; // 未提交则保留原配置
   if (weights !== undefined) {
     const v = normalizeWeights(weights);
@@ -80,8 +101,12 @@ export function updateProfile(db, consultant_id, { profile_keywords, profile_not
     .get(consultant_id)?.profile_json || '{}';
   let preserved = {};
   try { preserved = JSON.parse(rawJson); } catch { /* 脏数据按空处理 */ }
-  for (const k of ['profile_keywords', 'profile_note', 'weights']) delete preserved[k];
-  const merged = { ...preserved, profile_keywords: kws, profile_note: note };
+  for (const k of ['profile_keywords', 'profile_note', 'weights', 'excluded_companies',
+    'excluded_roles', 'excluded_cities', 'capacity_limit']) delete preserved[k];
+  const merged = { ...preserved, profile_keywords: kws, profile_note: note,
+    excluded_companies: companies.value, excluded_roles: roles.value,
+    excluded_cities: cities.value };
+  if (capacity !== null) merged.capacity_limit = capacity;
   if (weightsOut) merged.weights = weightsOut;
   const ownsTransaction = !db.isTransaction;
   if (ownsTransaction) db.exec('BEGIN');
@@ -100,7 +125,9 @@ export function updateProfile(db, consultant_id, { profile_keywords, profile_not
     throw error;
   }
   return { ok: true, consultant_id, profile_keywords: kws, profile_note: note,
-           weights: weightsOut || null, weights_effective: weightsOut || 'baseline' };
+    excluded_companies: companies.value, excluded_roles: roles.value,
+    excluded_cities: cities.value, capacity_limit: capacity,
+    weights: weightsOut || null, weights_effective: weightsOut || 'baseline' };
 }
 
 /** 在线刷新：从群成员列表 upsert（slug = 名字首词小写，felix/mia/york 与历史数据兼容）。 */

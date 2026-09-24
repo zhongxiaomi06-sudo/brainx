@@ -16,7 +16,8 @@ const DIMENSIONS = [
 
 type DimKey = typeof DIMENSIONS[number]["dim"];
 type WeightMap = Record<DimKey, number>;
-type Profile = { weights?: Partial<WeightMap> | null };
+type Profile = { weights?: Partial<WeightMap> | null; excluded_companies?: string[];
+  excluded_roles?: string[]; excluded_cities?: string[]; capacity_limit?: number | null };
 type ProfileUpdate = { ok: boolean; weights?: Partial<WeightMap> | null };
 type Suggestion = { weights: WeightMap; reply: string };
 
@@ -64,9 +65,9 @@ function WeightAdvisor({ onApply, notify }: { onApply: (weights: WeightMap) => v
   </div>;
 }
 
-export function Rules({ notify, mode, policy, keywords, note, onRefresh, onProfileSaved }: {
+export function Rules({ notify, mode, policy, engine, keywords, note, onRefresh, onProfileSaved }: {
   notify: (text: string) => void; mode: "connecting" | "connected" | "offline";
-  policy: string | null; keywords: string[]; note: string;
+  policy: string | null; engine: "baseline-1.1" | "agentic-ranking-v1"; keywords: string[]; note: string;
   onRefresh: () => Promise<void>; onProfileSaved: (keywords: string[], note: string) => void;
 }) {
   const [weights, setWeights] = useState<WeightMap>({ ...BASELINE });
@@ -75,10 +76,18 @@ export function Rules({ notify, mode, policy, keywords, note, onRefresh, onProfi
   const [saving, setSaving] = useState(false);
   const [keywordDraft, setKeywordDraft] = useState(keywords.join("、"));
   const [noteDraft, setNoteDraft] = useState(note);
+  const [excludedCompanies, setExcludedCompanies] = useState("");
+  const [excludedRoles, setExcludedRoles] = useState("");
+  const [excludedCities, setExcludedCities] = useState("");
+  const [capacityLimit, setCapacityLimit] = useState("10");
   useEffect(() => {
     if (mode !== "connected") return;
     void brainxFetch<Profile>("/api/v1/profile").then((profile) => {
       setWeights(toPercentages(profile.weights)); setCustomized(!!profile.weights);
+      setExcludedCompanies((profile.excluded_companies || []).join("、"));
+      setExcludedRoles((profile.excluded_roles || []).join("、"));
+      setExcludedCities((profile.excluded_cities || []).join("、"));
+      setCapacityLimit(String(profile.capacity_limit || 10));
     }).catch(() => undefined);
   }, [mode, policy]);
 
@@ -95,30 +104,39 @@ export function Rules({ notify, mode, policy, keywords, note, onRefresh, onProfi
       notify(`保存失败：${error instanceof Error ? error.message : "后端未响应"}`);
     } finally { setSaving(false); }
   };
+  const split = (value: string) => value.split(/[、,，\n]+/).map(item => item.trim()).filter(Boolean);
   const saveProfile = async () => {
     const nextKeywords = keywordDraft.split(/[、,，\s]+/).filter(Boolean);
     try {
-      await brainxFetch<ProfileUpdate>("/api/v1/profile", { method: "PUT", body: { profile_keywords: nextKeywords, profile_note: noteDraft } });
-      onProfileSaved(nextKeywords, noteDraft); notify("画像已保存；下一轮推荐将生效");
+      await brainxFetch<ProfileUpdate>("/api/v1/profile", { method: "PUT", body: {
+        profile_keywords: nextKeywords, profile_note: noteDraft,
+        excluded_companies: split(excludedCompanies), excluded_roles: split(excludedRoles),
+        excluded_cities: split(excludedCities), capacity_limit: Number(capacityLimit),
+      } });
+      onProfileSaved(nextKeywords, noteDraft); notify("主动偏好与容量已保存；下一轮 Agent 判断将生效");
     } catch (error) { notify(`保存失败：${error instanceof Error ? error.message : "后端未响应"}`); }
   };
   const total = Object.values(weights).reduce((sum, value) => sum + value, 0);
   return <>
-    <Heading title="判断规则" desc="调整软权重，不会绕过 HC、关闭状态、项目归属或数据冲突等硬规则。" action={<div className={`tag ${customized ? "orange" : "blue"}`}>{customized ? "自定义权重" : "基线权重"}</div>}/>
-    <section className="card section"><div className="card-head"><h2>六维权重</h2><span>Policy {policy || "—"} · 合计 {total}%（保存时自动归一）</span></div>
+    <Heading title="判断规则" desc={engine === "agentic-ranking-v1" ? "设置 Agent 使用的主动偏好、明确排除项与同时承接容量。" : "历史 baseline-1.1 软权重；不会影响 Algorithm A。"} action={<div className={`tag ${engine === "agentic-ranking-v1" ? "blue" : customized ? "orange" : "blue"}`}>{engine === "agentic-ranking-v1" ? "Agent 主动设置" : customized ? "历史自定义权重" : "历史基线权重"}</div>}/>
+    {engine !== "agentic-ranking-v1" && <section className="card section"><div className="card-head"><h2>历史六维权重</h2><span>Policy {policy || "—"} · 合计 {total}%（仅 baseline-1.1）</span></div>
       <div className="card-body strategy-rules">
         <div className="preference-presets">{PRESETS.map((preset) => <button className="btn quiet" type="button" key={preset.label} onClick={() => setWeights({ ...preset.weights })}>{preset.label}</button>)}<button className="btn quiet" type="button" onClick={() => setAdvisorOpen((open) => !open)}>AI 建议</button></div>
         {advisorOpen && <WeightAdvisor onApply={setWeights} notify={notify}/>}
         {DIMENSIONS.map(({ dim, label, note: dimensionNote }) => <label className="rule-row" key={dim}><span><b>{label}</b><small>{dimensionNote}</small></span><input type="range" min="0" max="80" value={weights[dim]} disabled={mode !== "connected"} onChange={(event) => setWeights((current) => ({ ...current, [dim]: Number(event.target.value) }))}/><output>{weights[dim]}%</output></label>)}
         <div className="weight-save-actions"><button className="btn primary" disabled={mode !== "connected" || saving || total === 0} onClick={() => void saveWeights(weights)}><Check/>{saving ? "保存中…" : "保存并生成新推荐"}</button><button className="btn" disabled={mode !== "connected" || saving} onClick={() => void saveWeights(null)}><RotateCcw/>恢复基线</button></div>
         <p className="policy-boundary"><ShieldCheck/>只调软权重：HC、已入职、职位关闭、项目归属与数据冲突等硬规则不可调整。</p>
-      </div></section>
+      </div></section>}
     {mode === "connected" && <section className="card section">
-      <div className="card-head"><h2>方向画像</h2><span>下一轮推荐生效</span></div>
+      <div className="card-head"><h2>{engine === "agentic-ranking-v1" ? "主动偏好、排除项与容量" : "方向画像"}</h2><span>下一轮推荐生效</span></div>
       <div className="card-body"><div className="toolbar">
         <input className="field" value={keywordDraft} onChange={(event) => setKeywordDraft(event.target.value)} placeholder="画像关键词（顿号分隔）"/>
         <input className="field" value={noteDraft} onChange={(event) => setNoteDraft(event.target.value)} placeholder="画像备注（可选）"/>
-        <button className="btn primary" onClick={() => void saveProfile()}><Check/>保存画像</button>
+        {engine === "agentic-ranking-v1" && <><input className="field" value={excludedCompanies} onChange={(event) => setExcludedCompanies(event.target.value)} placeholder="排除公司（顿号分隔）"/>
+        <input className="field" value={excludedRoles} onChange={(event) => setExcludedRoles(event.target.value)} placeholder="排除职位（顿号分隔）"/>
+        <input className="field" value={excludedCities} onChange={(event) => setExcludedCities(event.target.value)} placeholder="排除城市（顿号分隔）"/>
+        <input className="field" type="number" min="1" max="100" value={capacityLimit} onChange={(event) => setCapacityLimit(event.target.value)} aria-label="同时承接容量" placeholder="同时承接容量"/></>}
+        <button className="btn primary" onClick={() => void saveProfile()}><Check/>保存主动设置</button>
       </div></div>
     </section>}
   </>;

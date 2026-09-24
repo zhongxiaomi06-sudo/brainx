@@ -79,7 +79,7 @@ export default function DecisionWorkbench({demo=false}:{demo?:boolean}={}){
  const assistantAbort=useRef<AbortController|null>(null);
  const [brainxJobs,setBrainxJobs]=useState<DecisionJob[]|null>(null);
  const [brainxConsultantId,setBrainxConsultantId]=useState("");
- const [brainxRun,setBrainxRun]=useState<{runId:string|null;snapshotId:string|null;policyVersion:string|null}>({runId:null,snapshotId:null,policyVersion:null});
+ const [brainxRun,setBrainxRun]=useState<{runId:string|null;snapshotId:string|null;policyVersion:string|null;engine:"baseline-1.1"|"agentic-ranking-v1"}>({runId:null,snapshotId:null,policyVersion:null,engine:"baseline-1.1"});
  const [brainxDismissReasons,setBrainxDismissReasons]=useState<string[]>(FALLBACK_DISMISS_REASONS);
  const [brainxReplay,setBrainxReplay]=useState<Record<string,BrainxReplay>>({});
  const [brainxKeywords,setBrainxKeywords]=useState<string[]>([]);
@@ -93,7 +93,7 @@ export default function DecisionWorkbench({demo=false}:{demo?:boolean}={}){
  const recommendationQueue=useRecommendationPages(page=>{
   setBrainxJobs(page.jobs as DecisionJob[]);
   setEngagement(current=>({...current,...page.engagement}));
-  setBrainxRun({runId:page.runId,snapshotId:page.snapshotId,policyVersion:page.policyVersion});
+  setBrainxRun({runId:page.runId,snapshotId:page.snapshotId,policyVersion:page.policyVersion,engine:page.engine});
  });
  const feedbackJob=(job:DecisionJob)=>{
   const doDelete=async(reason:string)=>{
@@ -135,7 +135,7 @@ export default function DecisionWorkbench({demo=false}:{demo?:boolean}={}){
   setBrainxConsultantId(snapshot.consultantId);setEngagement(snapshot.engagement);setOpenmaiByJob(snapshot.openmai||{});
   setDecisionEvents(snapshot.events);setOutcomes(snapshot.outcomes);setSync(snapshot.sync);setAuth(snapshot.auth);
   setNotifications(snapshot.notifications);setBrainxDismissReasons(snapshot.dismissReasons);
-  setBrainxRun({runId:snapshot.runId,snapshotId:snapshot.snapshotId,policyVersion:snapshot.policyVersion});
+  setBrainxRun({runId:snapshot.runId,snapshotId:snapshot.snapshotId,policyVersion:snapshot.policyVersion,engine:"baseline-1.1"});
   setBrainxKeywords(snapshot.profileKeywords);setTray(snapshot.preferences.tray);
   setFolders(snapshot.preferences.folders.length?snapshot.preferences.folders:DEFAULT_FOLDERS);
   setFolderMode(!!snapshot.preferences.folderMode);setBrainxMode("connected");
@@ -283,13 +283,15 @@ export default function DecisionWorkbench({demo=false}:{demo?:boolean}={}){
   runId:recommendationQueue.current?.runId||brainxRun.runId||"",
   generatedAt:recommendationQueue.current?.generatedAt||sync.updatedAt||"时间待确认",
   policyVersion:recommendationQueue.current?.policyVersion||brainxRun.policyVersion||"待确认",
+  engine:recommendationQueue.current?.engine||brainxRun.engine,
+  state:recommendationQueue.current?.state||"READY",
   loading:recommendationQueue.loading,error:recommendationQueue.error,
   newRunAvailable:recommendationQueue.current?.newRunAvailable??false,
   onPrevious:recommendationQueue.previous,onNext:recommendationQueue.next,
   onRefreshRun:recommendationQueue.refresh,
  };
  return <div className="btex-app formal-workbench">
-  {page==="settings"?<WorkbenchSettingsPage auth={auth} consultantId={brainxConsultantId||auth.consultant} keywords={brainxKeywords} note={brainxNote} policyVersion={brainxRun.policyVersion} sync={sync} fieldReport={brainxRadar?.fieldReport??null} onBack={()=>go("today")} onOpenConnections={()=>go("sources")} onEditProfile={()=>go("rules")} onRefresh={()=>{void loadBrainxSnapshot.current();void loadBrainxSide.current();notify("正在刷新同步诊断")}} notify={notify} />:<>
+  {page==="settings"?<WorkbenchSettingsPage auth={auth} consultantId={brainxConsultantId||auth.consultant} keywords={brainxKeywords} note={brainxNote} policyVersion={brainxRun.policyVersion} engine={brainxRun.engine} sync={sync} fieldReport={brainxRadar?.fieldReport??null} onBack={()=>go("today")} onOpenConnections={()=>go("sources")} onEditProfile={()=>go("rules")} onRefresh={()=>{void loadBrainxSnapshot.current();void loadBrainxSide.current();notify("正在刷新同步诊断")}} notify={notify} />:<>
   <WorkspaceShell activePage={shellPage} onNavigate={navigateShell} consultant={auth.consultant} assistantOpen={assistantOpen} onAssistantToggle={()=>setAssistantOpen(value=>!value)} assistantPlacement="overlay">
    {["today","accepted","jobs","clients"].includes(page)&&(brainxMode==="connecting"||workspaceIssue)?
     <WorkspaceEntry kind={brainxMode==="connecting"?"connecting":workspaceIssue!} onRetry={()=>setConnectAttempt(value=>value+1)} onCheckConnection={async()=>{await brainxFetch<BackendSessionStatus>("/api/v1/oauth/status");await loadBrainxSnapshot.current();await loadBrainxSide.current()}} onOpenSources={()=>go("sources")} />:<>
@@ -298,7 +300,7 @@ export default function DecisionWorkbench({demo=false}:{demo?:boolean}={}){
     {page==="jobs"&&<WorkbenchJobsPage items={brainxRadar?.items??[]} capabilities={brainxRadar?.fieldCapabilities??[]} projects={brainxProjects} company={jobCompanyFilter} onAddToProjects={addRadarJobToProjects} onIgnoreProject={ignoreProject} onOpenClient={()=>go("clients")} onOpenCockpit={()=>go("today")} />}
    {page==="clients"&&<WorkbenchClientsPage items={brainxClients??[]} onOpenJobs={company=>{setJobCompanyFilter(company);go("jobs")}} />}
    </>}
-   {page==="rules"&&<Rules key={`${brainxKeywords.join("|")}:${brainxNote}`} notify={notify} mode={brainxMode} policy={brainxRun.policyVersion} keywords={brainxKeywords} note={brainxNote} onRefresh={async()=>{await loadBrainxSnapshot.current();void loadBrainxSide.current()}} onProfileSaved={(nextKeywords,nextNote)=>{setBrainxKeywords(nextKeywords);setBrainxNote(nextNote)}}/>}
+   {page==="rules"&&<Rules key={`${brainxKeywords.join("|")}:${brainxNote}`} notify={notify} mode={brainxMode} policy={brainxRun.policyVersion} engine={brainxRun.engine} keywords={brainxKeywords} note={brainxNote} onRefresh={async()=>{await loadBrainxSnapshot.current();void loadBrainxSide.current()}} onProfileSaved={(nextKeywords,nextNote)=>{setBrainxKeywords(nextKeywords);setBrainxNote(nextNote)}}/>}
    {page==="sources"&&<Sources notify={notify}/>}
   </WorkspaceShell>
    {panel&&!pendingCommand&&<WorkbenchPanel panel={panel} motion={panelMotion} job={selectedDecisionJob} projects={brainxProjects} onIgnoreProject={ignoreProject} commitmentJobs={commitmentJobs} auth={auth} sync={sync} notifications={notifications} engagement={engagement} events={decisionEvents} outcomes={outcomes}

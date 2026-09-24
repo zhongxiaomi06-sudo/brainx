@@ -40,6 +40,8 @@ type TodayDecisionQueueProps = {
   mode: "connecting" | "connected" | "offline";
   onOpenSources: () => void;
   pagination?: {
+    engine?: "baseline-1.1" | "agentic-ranking-v1";
+    state?: string;
     pageIndex: number;
     totalCount: number;
     evaluatedCount: number;
@@ -81,6 +83,7 @@ function toQueueItem(job: DecisionJob, engagement: EngagementState | undefined, 
     if (job.brainxLegal?.includes("DISMISS") || !job.brainxLegal) legalActions.push("DISMISS");
   }
   return {
+    engine: job.rankingEngine || "baseline-1.1",
     projectId: job.id,
     rank: job.rank,
     tier,
@@ -111,6 +114,10 @@ function toQueueItem(job: DecisionJob, engagement: EngagementState | undefined, 
       ? job.facts["事实更新时间"] : null,
     engagementLabel: null,
     legalActions,
+    tradeoff: job.agenticTradeoff || null,
+    uncertainties: job.agenticUncertainties || [],
+    nextAction: job.agenticNextAction || null,
+    evidenceRefs: job.agenticEvidenceRefs || [],
   };
 }
 
@@ -129,6 +136,7 @@ export function TodayDecisionQueue(props: TodayDecisionQueueProps) {
     ? pendingJobs : pendingJobs.filter(job => !verificationJobs.includes(job));
   const usesQueueSearch = Boolean(pagination?.onSearch);
   const usesQueueSort = Boolean(pagination?.onSort);
+  const agentic = pagination?.engine === "agentic-ranking-v1";
   const sort = pagination?.sort || localSort;
   const query = usesQueueSearch ? pagination?.searchQuery || "" : localQuery;
   const normalizedQuery = query.trim().toLocaleLowerCase();
@@ -172,11 +180,11 @@ export function TodayDecisionQueue(props: TodayDecisionQueueProps) {
         {pagination?.loading ? "搜索中…" : `${pagination?.totalCount || 0} 条结果`}</small>}
     </label>
     <label className="concept-filter-select"><span className="sr-only">队列视图</span>
-      <select value={sort} onChange={event => { const value = event.target.value as RecommendationSort;
+      <select value={agentic ? "priority" : sort} onChange={event => { const value = event.target.value as RecommendationSort;
         if (usesQueueSort) pagination?.onSort?.(value); else setLocalSort(value); }} aria-label="队列视图">
-        <option value="priority">综合推荐</option><option value="activity">推进活跃</option>
+        <option value="priority">{agentic ? "Agent 原序" : "综合推荐"}</option>{!agentic && <><option value="activity">推进活跃</option>
         <option value="recent">最近活跃</option><option value="confidence">事实优先</option>
-        <option value="exploration">探索发现</option>
+        <option value="exploration">探索发现</option></>}
       </select><ChevronDown/></label>
     <button type="button" className={`concept-filter-button${onlyActionable ? " is-active" : ""}`}
       aria-pressed={onlyActionable} onClick={() => setOnlyActionable(value => !value)}>
@@ -202,6 +210,7 @@ export function TodayDecisionQueue(props: TodayDecisionQueueProps) {
           totalCount={queuePagination.totalCount} evaluatedCount={queuePagination.evaluatedCount}
           runId={queuePagination.runId} generatedAt={queuePagination.generatedAt}
           policyVersion={queuePagination.policyVersion} loading={queuePagination.loading} error={queuePagination.error}
+          presentationState={pagination?.state}
           newRunAvailable={queuePagination.newRunAvailable} onPrevious={queuePagination.onPrevious}
           onNext={queuePagination.onNext} onRefreshRun={queuePagination.onRefreshRun}
           emptyMessage={query.trim() ? `没有找到与“${query.trim()}”匹配的推荐职位` : undefined}

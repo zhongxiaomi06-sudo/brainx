@@ -14,7 +14,8 @@ import { engage, commitmentSummary, currentState, legalActions } from './engagem
 import { replay, recordOutcome } from './replay.js';
 import { acceptCommitment, commitmentDetails, recordProgress, recordTerminalResult,
   releaseCommitment, suggestedAction, RELEASE_REASONS, CLOSE_REASONS } from './commitment.js';
-import { buildDailyCard, buildSyncAlertCard, pushCard, syncAlertKey } from './push.js';
+import { buildAgenticDailyCard, buildDailyCard, buildSyncAlertCard, pushCard, syncAlertKey } from './push.js';
+import { agenticRecommendationPage } from './agentic-ranking/presentation.js';
 import { verifySession, cookieOf } from './session.js';
 import { updateProfile } from './roster.js';
 import { startWorkerTasks } from './worker.js';
@@ -49,6 +50,13 @@ const FRONTEND_PORT = Number(process.env.BRAINX_FRONTEND_PORT || 4321);
 const STATIC_DIR = join(FRONTEND_DIR, 'dist', 'client');
 export function createServer(db = openDb(), deps = {}) {
   const recommendations = deps.recommendations || createRecommendationUseCase(db);
+  const agenticReadEnabled = deps.agenticReadEnabled ?? process.env.BRAINX_AGENTIC_READ === '1';
+  const delivery = (cid) => agenticReadEnabled
+    ? agenticRecommendationPage(db, cid) : recommendations.latest(cid, { hideEngaged: true });
+  const dailyCard = (cid, name, run, commitments, sync, snapshotId) => agenticReadEnabled
+    ? buildAgenticDailyCard({ consultant_name: name, run, items: run?.items || [], commitments })
+    : buildDailyCard({ consultant_name: name, consultant_id: cid, run: run?.run,
+      items: run?.items || [], commitments, sync, snapshot_id: snapshotId });
   // 请求指标（预测告警装置数据源）：仅聚合数字，无业务数据，经 /api/v1/meta/guard 暴露
   const guard = createGuard();
   const auth = (req, res) => {
@@ -76,7 +84,8 @@ export function createServer(db = openDb(), deps = {}) {
     ...openmaiRoutes(db, bus),
     ...authRoutes(db, { exchangeCode: deps.exchangeCode }),
     ...talentRoutes(db, { rootDir: ROOT }),
-    ...recommendationRoutes(db, { recommendations, bus, projectLaunch: deps.projectLaunch }),
+    ...recommendationRoutes(db, { recommendations, bus, projectLaunch: deps.projectLaunch,
+      agenticReadEnabled }),
     'GET /api/v1/consultants': (req, res) => {
       json(res, 200, { items: recommendations.consultants()
         .map((c) => ({ consultant_id: c.consultant_id, display_name: c.display_name })) });
@@ -85,7 +94,7 @@ export function createServer(db = openDb(), deps = {}) {
     'GET /api/v1/workbench': (req, res, cid) => {
       const sync = latestRealSync(db, cid);
       const bridgeErr = latestBridgeError(db, cid, sync?.completed_at || '');
-      const run = recommendations.latest(cid, { hideEngaged: true });
+      const run = delivery(cid);
       const c = commitmentSummary(db, cid);
       json(res, 200, {
         consultant_id: cid,
@@ -277,6 +286,8 @@ export function createServer(db = openDb(), deps = {}) {
       const c = recommendations.consultants().find((x) => x.consultant_id === cid);
       json(res, 200, { consultant_id: cid, display_name: c?.display_name || cid,
         profile_keywords: c?.profile_keywords || [], profile_note: c?.profile_note || '',
+        excluded_companies: c?.excluded_companies || [], excluded_roles: c?.excluded_roles || [],
+        excluded_cities: c?.excluded_cities || [], capacity_limit: c?.capacity_limit || null,
         weights: c?.weights || null,
         feishu_auth: tokenStatus(db, cid) });
     },
@@ -325,8 +336,7 @@ export function createServer(db = openDb(), deps = {}) {
         .find((x) => x.consultant_id === cid)?.display_name || cid;
       const card = sync && !sync.complete
         ? buildSyncAlertCard(sync)
-        : buildDailyCard({ consultant_name: name, consultant_id: cid, run: run?.run, items: run?.items || [],
-                           commitments: c, sync, snapshot_id: snapshot?.sync_id });
+        : dailyCard(cid, name, run, c, sync, snapshot?.sync_id);
       json(res, 200, { card });
     },
 
@@ -334,18 +344,17 @@ export function createServer(db = openDb(), deps = {}) {
       const b = await body(req);
       const sync = latestRealSync(db, cid);
       const snapshot = latestCompleteSnapshot(db, cid);
-      const run = recommendations.latest(cid, { hideEngaged: true });
+      const run = delivery(cid);
       const c = commitmentSummary(db, cid);
       const name = recommendations.consultants()
         .find((x) => x.consultant_id === cid)?.display_name || cid;
       const kind = sync && !sync.complete ? 'SYNC_ALERT' : 'DAILY_TOP3';
       const card = kind === 'SYNC_ALERT'
         ? buildSyncAlertCard(sync)
-        : buildDailyCard({ consultant_name: name, consultant_id: cid, run: run?.run, items: run?.items || [],
-                           commitments: c, sync, snapshot_id: snapshot?.sync_id });
+        : dailyCard(cid, name, run, c, sync, snapshot?.sync_id);
       const target = b?.target || process.env.BRAINX_PUSH_TARGET || '';
       if (!target) return err(res, 400, 'NO_TARGET', '缺推送目标（chat_id/open_id 或 BRAINX_PUSH_TARGET）');
-      const rid = kind === 'SYNC_ALERT' ? syncAlertKey() : (run?.run?.run_id || null);
+      const rid = kind === 'SYNC_ALERT' ? syncAlertKey() : (run?.run_id || run?.run?.run_id || null);
       const out = await pushCard(db, { consultant_id: cid, kind, run_id: rid, card, target, send: true });
       json(res, out.ok ? 200 : 502, out);
     },

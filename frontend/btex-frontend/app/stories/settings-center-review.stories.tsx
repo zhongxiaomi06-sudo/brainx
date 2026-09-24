@@ -73,7 +73,7 @@ export const ConnectedHealthy: Story = {
     await expect(canvas.getByText("TTC 职位系统")).toBeInTheDocument();
     await expect(canvas.getByText("MySQL 已连接")).toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: /推荐策略/ }));
-    await expect(canvas.getByText(/后端尚无只读 dry-run 契约/)).toBeInTheDocument();
+    await expect(canvas.getByText(/六维权重仅属于历史 baseline-1.1/)).toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: /同步诊断/ }));
     await expect(canvas.getByText("同步完整")).toBeInTheDocument();
     await expect(canvas.getByText(/招聘意愿/)).toBeInTheDocument();

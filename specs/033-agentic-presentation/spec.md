@@ -1,6 +1,6 @@
 # 033 — Algorithm A 忠实展示与主动设置
 
-状态：Specified（2026-09-24）
+状态：Implemented（2026-09-24；待实现提交完整门禁）
 
 上游：[施工总手册](../../docs/2026-09-22-refactor-agentic-ranking-manual.md)阶段 09、
 [Algorithm A 决策契约](../../docs/2026-09-22-algorithm-a-contract.md)、

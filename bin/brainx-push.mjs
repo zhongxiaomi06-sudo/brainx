@@ -5,7 +5,8 @@ import { openDb } from '../src/db.js';
 import { latestSync, latestCompleteSnapshot } from '../src/sync.js';
 import { createRecommendationUseCase } from '../src/recommendation-use-case.js';
 import { commitmentSummary } from '../src/engagement.js';
-import { buildDailyCard, buildSyncAlertCard, pushCard } from '../src/push.js';
+import { buildAgenticDailyCard, buildDailyCard, buildSyncAlertCard, pushCard } from '../src/push.js';
+import { agenticRecommendationPage } from '../src/agentic-ranking/presentation.js';
 import { DEFAULT_PUSH_PREFERENCES, getPushPreferences } from '../src/push-preferences.js';
 
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i > -1 ? process.argv[i + 1] : d; };
@@ -14,14 +15,19 @@ const db = openDb();
 const recommendations = createRecommendationUseCase(db);
 const sync = latestSync(db, cid);
 const snapshot = latestCompleteSnapshot(db, cid);
-const run = recommendations.latest(cid, { hideEngaged: true });
+const agenticReadEnabled = process.env.BRAINX_AGENTIC_READ === '1';
+const run = agenticReadEnabled ? agenticRecommendationPage(db, cid)
+  : recommendations.latest(cid, { hideEngaged: true });
 const c = commitmentSummary(db, cid);
 const consultant = recommendations.consultants().find((x) => x.consultant_id === cid);
 const name = consultant?.display_name || cid;
 const preferences = getPushPreferences(db, cid) || DEFAULT_PUSH_PREFERENCES;
 const kind = sync && !sync.complete ? 'SYNC_ALERT' : 'DAILY_TOP3';
 const card = kind === 'SYNC_ALERT' ? buildSyncAlertCard(sync)
-  : buildDailyCard({ consultant_name: name, consultant_id: cid, run: run?.run,
+  : agenticReadEnabled ? buildAgenticDailyCard({ consultant_name: name, run,
+      items: (run?.items || []).slice(0, preferences.job_count), item_limit: preferences.job_count,
+      commitments: c })
+    : buildDailyCard({ consultant_name: name, consultant_id: cid, run: run?.run,
                      items: (run?.items || []).slice(0, preferences.job_count), item_limit: preferences.job_count,
                      commitments: c, sync, snapshot_id: snapshot?.sync_id });
 if (!process.argv.includes('--send')) {
@@ -35,6 +41,6 @@ if (!target) { console.error('该顾问没有 open_id，请配置 --target 或 B
 const slot = arg('slot', '');
 if (slot && !/^[A-Za-z0-9_-]{1,32}$/.test(slot)) { console.error('--slot 格式无效'); process.exit(1); }
 const cstDay = new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10);
-const deliveryKey = slot ? `openclaw:${cstDay}#${slot}` : run?.run?.run_id || null;
+const deliveryKey = slot ? `openclaw:${cstDay}#${slot}` : run?.run_id || run?.run?.run_id || null;
 const out = await pushCard(db, { consultant_id: cid, kind, run_id: deliveryKey, card, target, send: true });
 console.log(JSON.stringify(out, null, 2));

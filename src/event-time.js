@@ -20,5 +20,8 @@ export function decisionReferenceIsValid(db, consultantId, projectId, decisionId
   if (!decisionId) return true;
   return !!db.prepare(`SELECT 1 FROM recommendations
     WHERE decision_id=? AND consultant_id=? AND project_id=?`)
-    .get(decisionId, consultantId, projectId);
+    .get(decisionId, consultantId, projectId)
+    || !!db.prepare(`SELECT 1 FROM agentic_ranking_items
+      WHERE decision_id=? AND consultant_id=? AND job_id=?`)
+      .get(decisionId, consultantId, projectId);
 }

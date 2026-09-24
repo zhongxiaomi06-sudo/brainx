@@ -12,7 +12,8 @@ import { now } from './db.js';
 import { createRecommendationUseCase } from './recommendation-use-case.js';
 import { latestRealSync, latestCompleteSnapshot } from './sync.js';
 import { commitmentSummary } from './engagement.js';
-import { buildDailyCard, buildSyncAlertCard, pushCard, syncAlertKey } from './push.js';
+import { buildAgenticDailyCard, buildDailyCard, buildSyncAlertCard, pushCard, syncAlertKey } from './push.js';
+import { agenticRecommendationPage } from './agentic-ranking/presentation.js';
 import { DEFAULT_PUSH_PREFERENCES, getPushPreferences } from './push-preferences.js';
 
 const WINDOW_MS = 30 * 60 * 1000;
@@ -35,12 +36,14 @@ export function slotState(at = new Date(), times = DEFAULT_PUSH_PREFERENCES.time
 export async function pushSlotFor(db, consultant_id, open_id, slotKey, {
   send = true,
   recommendations = createRecommendationUseCase(db),
+  agenticReadEnabled = process.env.BRAINX_AGENTIC_READ === '1',
 } = {}) {
   const preferences = getPushPreferences(db, consultant_id) || DEFAULT_PUSH_PREFERENCES;
   if (!preferences.enabled) return null;
   const sync = latestRealSync(db, consultant_id);
   const snapshot = latestCompleteSnapshot(db, consultant_id);
-  const run = recommendations.latest(consultant_id, { hideEngaged: true });
+  const run = agenticReadEnabled ? agenticRecommendationPage(db, consultant_id)
+    : recommendations.latest(consultant_id, { hideEngaged: true });
   const c = commitmentSummary(db, consultant_id);
   const name = db.prepare('SELECT display_name FROM consultants WHERE consultant_id=?')
     .get(consultant_id)?.display_name || consultant_id;
@@ -48,7 +51,10 @@ export async function pushSlotFor(db, consultant_id, open_id, slotKey, {
   const kind = sync && !sync.complete ? 'SYNC_ALERT' : 'DAILY_TOP3';
   if (kind === 'DAILY_TOP3' && (!run || !run.items.length)) return null; // 无推荐不发（告警不受此限）
   const card = kind === 'SYNC_ALERT' ? buildSyncAlertCard(sync)
-    : buildDailyCard({ consultant_name: name, consultant_id, run: run.run,
+    : agenticReadEnabled ? buildAgenticDailyCard({ consultant_name: name, run,
+      items: run.items.slice(0, preferences.job_count), item_limit: preferences.job_count,
+      commitments: c })
+      : buildDailyCard({ consultant_name: name, consultant_id, run: run.run,
                        items: run.items.slice(0, preferences.job_count), item_limit: preferences.job_count,
                        commitments: c, sync, snapshot_id: snapshot?.sync_id });
   return pushCard(db, { consultant_id, kind,

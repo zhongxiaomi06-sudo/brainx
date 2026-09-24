@@ -44,6 +44,14 @@ function itemAt(index: number): RecommendationQueueItem {
 
 const allItems = Array.from({ length: 45 }, (_, index) => itemAt(index));
 
+function agenticItem(rank: number): RecommendationQueueItem {
+  return { ...itemAt(rank - 1), engine: "agentic-ranking-v1", rank, score: "—",
+    summary: `Agent 原因 ${rank}：当前事实支持按原序查看。`,
+    tradeoff: "机会时效较新，但供给规模仍需确认。",
+    uncertainties: ["候选供给更新时间待核实"], nextAction: "联系客户确认岗位与 HC",
+    evidenceRefs: [`evidence-${rank}`] };
+}
+
 const baseArgs = {
   items: allItems.slice(0, 20),
   pageIndex: 0,
@@ -193,6 +201,37 @@ export const ActionFailure: Story = {
     await expect(canvas.getByRole("status")).toHaveTextContent("职位状态已变化，请刷新后重试");
     await expect(canvas.getByRole("article")).toBeInTheDocument();
   },
+};
+
+export const AgentOriginalOrder: Story = {
+  name: "Algorithm A 原序与忠实字段",
+  args: { items: [agenticItem(2), agenticItem(7), agenticItem(11)], totalCount: 3,
+    evaluatedCount: 200, policyVersion: "agentic-ranking-v1" },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getAllByLabelText("Agent 原序判断")).toHaveLength(3);
+    await expect(canvas.queryByLabelText(/AI 匹配分/)).not.toBeInTheDocument();
+    await expect(canvas.getAllByText("候选供给更新时间待核实")).toHaveLength(3);
+    await expect(canvas.getAllByText("1 项可追溯引用")).toHaveLength(3);
+  },
+};
+
+export const AgentGenerating: Story = {
+  name: "Algorithm A 异步生成中",
+  args: { items: [], totalCount: 0, evaluatedCount: 0, policyVersion: "agentic-ranking-v1",
+    presentationState: "GENERATING", emptyMessage: "生成完成前没有可展示的 Agent 判断" },
+};
+
+export const AgentPreviousResult: Story = {
+  name: "Algorithm A 新运行失败后保留旧结果",
+  args: { items: [agenticItem(1)], totalCount: 1, policyVersion: "agentic-ranking-v1",
+    presentationState: "PREVIOUS_RESULT", onRefreshRun: refreshRun },
+};
+
+export const AgentRevokedRankGap: Story = {
+  name: "Algorithm A 撤权后保留 rank 缺口",
+  args: { items: [agenticItem(1), agenticItem(3)], totalCount: 2,
+    policyVersion: "agentic-ranking-v1" },
 };
 
 export const NarrowScreen: Story = {

@@ -52,6 +52,13 @@ function isHidden(db, consultantId, item) {
   return ['CLOSED', 'COMPLETED', 'COOLING'].includes(item.job.active_state);
 }
 
+function latestAgenticItem(db, consultantId, projectId) {
+  return db.prepare(`SELECT i.*, r.source_snapshot_id FROM agentic_ranking_items i
+    JOIN agentic_ranking_runs r ON r.run_id=i.run_id
+    WHERE i.consultant_id=? AND i.job_id=? AND r.run_mode='LIVE' AND r.status='PUBLISHED'
+    ORDER BY r.generation DESC LIMIT 1`).get(consultantId, projectId);
+}
+
 function page(db, consultantId, batch, cursor, recommendations) {
   const run = recommendations.latest(consultantId);
   if (!run || run.run.snapshot_id !== batch.snapshot_id) return { items: [], next_cursor: null, has_more: false };
@@ -92,6 +99,7 @@ export function nextBatch(db, consultantId, body, {
 
 export function feedback(db, consultantId, body, {
   recommendations = createRecommendationUseCase(db),
+  agenticReadEnabled = false,
 } = {}) {
   if (!body?.project_id || body.feedback !== 'NOT_INTERESTED' || !body.reason || !body.idempotency_key) {
     return { ok: false, status: 422, code: 'INVALID_FEEDBACK', message: '需要 project_id、NOT_INTERESTED、reason 和 idempotency_key' };
@@ -101,12 +109,14 @@ export function feedback(db, consultantId, body, {
     replacement: pickTray(db, consultantId, { limit: LIMIT }, { recommendations }) };
   const run = recommendations.latest(consultantId);
   const item = run?.items.find((entry) => entry.job.project_id === body.project_id);
-  if (!item) return { ok: false, status: 404, code: 'NOT_IN_SNAPSHOT', message: '职位不在当前冻结推荐快照中' };
-  const batch = batchFor(db, consultantId, run.run.snapshot_id, LIMIT);
+  const agenticItem = agenticReadEnabled ? latestAgenticItem(db, consultantId, body.project_id) : null;
+  if (!item && !agenticItem) return { ok: false, status: 404, code: 'NOT_IN_SNAPSHOT', message: '职位不在当前冻结推荐快照中' };
+  const snapshotId = agenticItem?.source_snapshot_id || run.run.snapshot_id;
+  const batch = item ? batchFor(db, consultantId, snapshotId, LIMIT) : null;
   // 2026-08-19：同顾问+职位+快照已有反馈时更新 reason（"补充原因"场景：
   // 点 × 先记默认 reason，toast「补充原因」二次提交用户自定义文本），不插新行。
   const existingForProject = db.prepare(`SELECT * FROM recommendation_feedback
-    WHERE consultant_id=? AND project_id=? AND snapshot_id=?`).get(consultantId, body.project_id, run.run.snapshot_id);
+    WHERE consultant_id=? AND project_id=? AND snapshot_id=?`).get(consultantId, body.project_id, snapshotId);
   if (existingForProject) {
     const corrected = transact(db, () => {
       const event = appendFeedbackEvent(db, consultantId, body.project_id, {
@@ -120,9 +130,9 @@ export function feedback(db, consultantId, body, {
       return { ...event, updated: true };
     });
     if (!corrected.ok || corrected.already) return { ...corrected,
-      replacement: pickTray(db, consultantId, { limit: LIMIT }, { recommendations }) };
+      replacement: item ? pickTray(db, consultantId, { limit: LIMIT }, { recommendations }) : null };
     return { ok: true, updated: true, feedback_id: existingForProject.feedback_id,
-      replacement: pickTray(db, consultantId, { limit: LIMIT }, { recommendations }) };
+      replacement: item ? pickTray(db, consultantId, { limit: LIMIT }, { recommendations }) : null };
   }
   const feedbackId = `feedback_${uuid()}`;
   const recorded = transact(db, () => {
@@ -134,14 +144,14 @@ export function feedback(db, consultantId, body, {
     if (!ignored.ok || ignored.already) return ignored;
     db.prepare(`INSERT INTO recommendation_feedback
       (feedback_id, consultant_id, project_id, snapshot_id, batch_id, feedback, reason, idempotency_key, created_at)
-      VALUES (?,?,?,?,?,?,?,?,?)`).run(feedbackId, consultantId, body.project_id, run.run.snapshot_id, body.batch_id || batch.batch_id,
+      VALUES (?,?,?,?,?,?,?,?,?)`).run(feedbackId, consultantId, body.project_id, snapshotId, body.batch_id || batch?.batch_id || null,
         body.feedback, String(body.reason).slice(0, 200), body.idempotency_key, now());
     return { ...ignored, feedback_id: feedbackId };
   });
   if (!recorded.ok || recorded.already) return { ...recorded,
-    replacement: pickTray(db, consultantId, { limit: LIMIT }, { recommendations }) };
+    replacement: item ? pickTray(db, consultantId, { limit: LIMIT }, { recommendations }) : null };
   return { ok: true, feedback_id: feedbackId,
-    replacement: pickTray(db, consultantId, { limit: LIMIT }, { recommendations }) };
+    replacement: item ? pickTray(db, consultantId, { limit: LIMIT }, { recommendations }) : null };
 }
 
 // 撤销"不感兴趣"：删除该顾问在当前快照下对该职位的 feedback 记录。
@@ -149,12 +159,13 @@ export function feedback(db, consultantId, body, {
 // 幂等：无记录时 removed=false，仍返回 ok（前端无需区分）。
 export function undoFeedback(db, consultantId, body, {
   recommendations = createRecommendationUseCase(db),
+  agenticReadEnabled = false,
 } = {}) {
   if (!body?.project_id) {
     return { ok: false, status: 422, code: 'INVALID_UNDO', message: '需要 project_id' };
   }
   const run = recommendations.latest(consultantId);
-  if (!run) return { ok: false, status: 409, code: 'NO_RECOMMENDATION', message: '暂无完整推荐快照' };
+  if (!run && !agenticReadEnabled) return { ok: false, status: 409, code: 'NO_RECOMMENDATION', message: '暂无完整推荐快照' };
   const current = db.prepare(`SELECT feedback_id, idempotency_key FROM recommendation_feedback
     WHERE consultant_id=? AND project_id=? ORDER BY created_at DESC LIMIT 1`)
     .get(consultantId, body.project_id);
@@ -168,5 +179,5 @@ export function undoFeedback(db, consultantId, body, {
     occurred_at: body.occurred_at || null, idempotency_key: idempotencyKey,
   });
   return { ...revoked,
-    replacement: pickTray(db, consultantId, { limit: LIMIT }, { recommendations }) };
+    replacement: run ? pickTray(db, consultantId, { limit: LIMIT }, { recommendations }) : null };
 }

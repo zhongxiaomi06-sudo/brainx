@@ -32,7 +32,8 @@ export type SettingsCenterData = {
   };
   ttc: { connected: boolean; userName: string | null; expiresAt: string | null; needsReauth: boolean };
   talent: { backend: string; connected: boolean; schema: string; database: string | null; host: string | null; degraded: string | null };
-  strategy: { policyVersion: string | null; customized: boolean | null };
+  strategy: { policyVersion: string | null; customized: boolean | null;
+    engine?: "baseline-1.1" | "agentic-ranking-v1" };
   sync: {
     state: "READY" | "INCOMPLETE" | "ERROR" | "EMPTY";
     rowsRead: number | null;
@@ -124,11 +125,14 @@ function ConnectionsPanel({ data, onAction }: SettingsCenterReviewProps) {
 }
 
 function StrategyPanel({ data, onAction, review }: SettingsCenterReviewProps) {
+  const agentic = data.strategy.engine === "agentic-ranking-v1";
   return <div className="settings-panel-stack"><SettingGroup title="当前策略">
     <SettingRow label="策略版本" description="当前工作台记录的推荐策略版本" value={data.strategy.policyVersion || "—"} />
-    <SettingRow label="权重状态" description="硬规则不会被个人权重覆盖" value={data.strategy.customized === null ? "待确认" : data.strategy.customized ? "自定义权重" : "系统基线"} />
+    <SettingRow label={agentic ? "生效设置" : "权重状态"}
+      description={agentic ? "Agent 使用主动偏好、排除项和容量；旧六维不参与 A" : "硬规则不会被个人权重覆盖"}
+      value={agentic ? "偏好 / 排除 / 容量" : data.strategy.customized === null ? "待确认" : data.strategy.customized ? "自定义权重" : "系统基线"} />
     <SettingRow label="画像输入" description="仅统计当前真实保存的方向关键词" value={`${data.profile.keywords.length} 个关键词`} />
-  </SettingGroup><div className="settings-honesty-note"><AlertTriangle /><p>后端尚无只读 dry-run 契约，当前不能在这里直接保存策略变化。</p></div><button className="settings-primary-action" type="button" onClick={() => onAction?.("open-strategy")}><SlidersHorizontal />{review ? "进入推荐策略审核" : "查看当前能力说明"}</button></div>;
+  </SettingGroup>{!agentic && <div className="settings-honesty-note"><AlertTriangle /><p>六维权重仅属于历史 baseline-1.1，不会连接 Algorithm A。</p></div>}<button className="settings-primary-action" type="button" onClick={() => onAction?.("open-strategy")}><SlidersHorizontal />{agentic ? "编辑主动设置" : review ? "进入推荐策略审核" : "查看历史能力说明"}</button></div>;
 }
 
 function DiagnosticsPanel({ data, onAction }: SettingsCenterReviewProps) {

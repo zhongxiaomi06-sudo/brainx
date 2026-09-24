@@ -33,6 +33,7 @@ function WorkbenchSettingsPage({
   keywords,
   note,
   policyVersion,
+  engine,
   sync,
   fieldReport,
   onBack,
@@ -46,6 +47,7 @@ function WorkbenchSettingsPage({
   keywords: string[];
   note: string;
   policyVersion: string | null;
+  engine: "baseline-1.1" | "agentic-ranking-v1";
   sync: SyncStatus;
   fieldReport: RadarFieldReport | null;
   onBack: () => void;
@@ -92,7 +94,7 @@ function WorkbenchSettingsPage({
       host: talent.config?.host || null,
       degraded: talent.degraded,
     },
-    strategy: { policyVersion, customized: null },
+    strategy: { policyVersion, customized: null, engine },
     sync: {
       state: sync.state === "READY" ? "READY" : sync.state === "ERROR" ? "ERROR" : sync.state === "EMPTY" ? "EMPTY" : "INCOMPLETE",
       rowsRead: sync.rowsRead ?? null,
@@ -106,7 +108,7 @@ function WorkbenchSettingsPage({
         unavailableFilters: fieldNames(fieldReport, false),
       } : null,
     },
-  }), [auth, consultantId, fieldReport, keywords, note, policyVersion, sync, talent, ttc]);
+  }), [auth, consultantId, engine, fieldReport, keywords, note, policyVersion, sync, talent, ttc]);
 
   const handleAction = (action: "edit-profile" | "connect-ttc" | "reauthorize-feishu" | "open-strategy" | "refresh-diagnostics" | "logout") => {
     if (action === "logout") {
@@ -123,7 +125,8 @@ function WorkbenchSettingsPage({
     if (action === "refresh-diagnostics") return onRefresh();
     // T7：方向画像「编辑」接入真实的画像编辑器（判断规则页），保存即生效并回显。
     if (action === "edit-profile") return onEditProfile();
-    notify("推荐策略将在只读预演接口完成后接入");
+    if (action === "open-strategy") return onEditProfile();
+    notify("当前设置入口不可用");
   };
 
   const initialSection = typeof window !== "undefined"

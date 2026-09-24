@@ -4,15 +4,18 @@ import { pickTray, nextBatch, feedback, undoFeedback } from './recommendation-ba
 import { recommendationPage } from './recommendation-page.js';
 import { quickActionRoute } from './quick-action-route.js';
 import { createRecommendationUseCase } from './recommendation-use-case.js';
+import { agenticRecommendationPage } from './agentic-ranking/presentation.js';
 
 export function recommendationRoutes(db, {
   recommendations = createRecommendationUseCase(db),
   bus,
   projectLaunch,
+  agenticReadEnabled = process.env.BRAINX_AGENTIC_READ === '1',
 } = {}) {
   return {
     'GET /api/v1/recommendations': (req, res, consultantId, query) => {
-      const output = recommendationPage(db, consultantId, {
+      const readPage = agenticReadEnabled ? agenticRecommendationPage : recommendationPage;
+      const output = readPage(db, consultantId, {
         cursor: query.get('cursor'),
         search: query.get('q'),
         sort: query.get('sort'),
@@ -29,11 +32,11 @@ export function recommendationRoutes(db, {
       }, { recommendations }));
     },
     'POST /api/v1/recommendations/feedback': async (req, res, consultantId) => {
-      const output = feedback(db, consultantId, await body(req), { recommendations });
+      const output = feedback(db, consultantId, await body(req), { recommendations, agenticReadEnabled });
       json(res, output.ok ? 200 : output.status || 422, output);
     },
     'POST /api/v1/recommendations/feedback/undo': async (req, res, consultantId) => {
-      const output = undoFeedback(db, consultantId, await body(req), { recommendations });
+      const output = undoFeedback(db, consultantId, await body(req), { recommendations, agenticReadEnabled });
       json(res, output.ok ? 200 : output.status || 422, output);
     },
     'GET /api/v1/feedback/quick': quickActionRoute(db, bus, projectLaunch),

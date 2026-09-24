@@ -99,6 +99,47 @@ export function buildDailyCard({ consultant_name, consultant_id, run, items, ite
     elements: els };
 }
 
+/** Algorithm A LIVE run 忠实卡片：只呈现 Agent 原序与原文，不推导旧分数或概率。 */
+export function buildAgenticDailyCard({ consultant_name, run, items, item_limit, commitments,
+  publicBaseUrl }) {
+  const baseUrl = productionBaseUrl(publicBaseUrl).href;
+  const limit = Math.min(item_limit || items.length, items.length);
+  const els = [{ tag: 'markdown', content:
+    `**${consultant_name || '你好'}，本轮 Agent 推荐 ${limit} 个职位**\n`
+    + `检索候选 ${run.evaluated_count || 0} 个 · 按 Agent 原序展示 · 每项保留依据与待核实项` }];
+  items.slice(0, limit).forEach((item, index) => {
+    const job = item.job;
+    const opportunityUrl = buildBrainxDeepLink({ baseUrl, objectType: 'opportunity',
+      objectRef: job.project_id });
+    const judgementUrl = buildBrainxDeepLink({ baseUrl, objectType: 'replay',
+      objectRef: item.decision_id });
+    els.push({ tag: 'markdown', content:
+      `**${item.rank}. ${job.role}**\n`
+      + `${job.company}${job.city ? ` · ${job.city}` : ''} · ${REL_LABEL[job.relation] || job.relation || '关系待确认'}\n`
+      + `${item.reason}\n\n`
+      + `**权衡**：${item.tradeoff}\n`
+      + `依据引用：${item.evidence_refs.join('；') || '无可展示引用'}\n`
+      + `**待核实**：${item.uncertainties.join('；') || '无额外待核实项'}\n`
+      + `**下一步**：${item.suggested_next_action}` });
+    els.push({ tag: 'action', actions: [
+      btn('查看职位', opportunityUrl, 'primary'), btn('查看判断', judgementUrl),
+    ] });
+    if (index < limit - 1) els.push({ tag: 'hr' });
+  });
+  if (!limit) els.push({ tag: 'markdown', content: '**本轮没有可安全推荐的职位**\n请在工作台查看缺失信息或稍后重试。' });
+  els.push({ tag: 'hr' });
+  els.push({ tag: 'markdown', content:
+    `我的承接：跟进中 ${commitments.accepted_count} · 需处理 ${commitments.need_action_count}` });
+  els.push(alignSoloAction({ tag: 'action', actions: [btn('打开工作台', baseUrl, 'primary')] }));
+  els.push({ tag: 'note', elements: [{ tag: 'plain_text', content:
+    `engine: ${AGENTIC_PRESENTATION_ENGINE_LABEL} · run: ${(run.run_id || '').slice(0, 8)} · ${run.state || 'READY'}` }] });
+  return { config: { wide_screen_mode: true }, header: { template: 'green',
+    title: { tag: 'plain_text', content: `BrainTex · Agent 职位推荐 ${now().slice(5, 16).replace('T', ' ')}` } },
+  elements: els };
+}
+
+const AGENTIC_PRESENTATION_ENGINE_LABEL = 'agentic-ranking-v1';
+
 /** 同步异常卡（文案与前端 PRD §10 逐字一致）。 */
 export function buildSyncAlertCard(sync, { publicBaseUrl } = {}) {
   const baseUrl = productionBaseUrl(publicBaseUrl).href;

@@ -7,7 +7,7 @@
  * 输入固定、不含真实人员数据；所有可变字段（时间戳、签名、运行号）在 run.mjs
  * 里统一归一化，保证截图跨天可比对。
  */
-import { buildDailyCard, buildSyncAlertCard, buildHeatingAlertCard } from '../../../src/push.js';
+import { buildAgenticDailyCard, buildDailyCard, buildSyncAlertCard, buildHeatingAlertCard } from '../../../src/push.js';
 import { buildProjectLaunchCard } from '../../../src/project-launch.js';
 import { buildOpenmaiDeliveryCard } from '../../../src/openmai-delivery.js';
 import { buildShortlistCard } from '../../../src/shortlist-card.js';
@@ -121,6 +121,16 @@ export function buildScenarios() {
         run: { run_id: 'run-1a2b3c4d', candidate_count: 137, policy_version: 'v1.2' },
         sync: { complete: true, rows_read: 137, rows_expected: 137 },
         snapshot_id: 'snap-9f8e7d6c', publicBaseUrl: BASE })],
+    ['agentic-daily-recommendation',
+      'Algorithm A 每日推荐卡（原序与忠实字段）',
+      buildAgenticDailyCard({ consultant_name: 'Felix 黄鑫', item_limit: 2,
+        run: { run_id: 'arr-1a2b3c4d', evaluated_count: 137, state: 'READY' },
+        items: items.slice(0, 2).map((item, index) => ({
+          decision_id: `ard-${index + 1}`, rank: index + 1,
+          reason: item.reasons.join('；'), tradeoff: '时效较新，但候选供给规模仍需确认',
+          uncertainties: item.risks, suggested_next_action: '联系客户确认岗位与 HC',
+          evidence_refs: [`evidence-${index + 1}`], job: item.job,
+        })), commitments: { accepted_count: 4, need_action_count: 2 }, publicBaseUrl: BASE })],
     ['sync-alert', '同步不完整提醒卡',
       buildSyncAlertCard({ complete: false, rows_read: 96, rows_expected: 137 }, { publicBaseUrl: BASE })],
     ['heating-alert', '重大变化提醒卡',

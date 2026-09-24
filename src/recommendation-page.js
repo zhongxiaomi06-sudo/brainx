@@ -90,6 +90,7 @@ function compareEntries(left, right, sort) {
 
 function emptyPage(extra = {}) {
   return {
+    engine: 'baseline-1.1',
     blocked: false,
     run_id: null,
     snapshot_id: null,
@@ -175,6 +176,7 @@ export function recommendationPage(db, consultantId, {
     project_ids: entries.map(({ item }) => item.job.project_id) });
 
   return {
+    engine: 'baseline-1.1',
     blocked: false,
     run_id: selected.run.run_id,
     snapshot_id: selected.run.snapshot_id,

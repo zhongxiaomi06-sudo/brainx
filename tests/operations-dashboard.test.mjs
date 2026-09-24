@@ -165,6 +165,10 @@ test('运营看板读取、投影和追溯独立验证管理员权限', async ()
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${server.address().port}`;
   try {
+    const ordinaryProfile = await fetch(`${base}/api/v1/profile`, { headers: cookie('mia') });
+    assert.equal((await ordinaryProfile.json()).operations_admin, false);
+    const adminProfile = await fetch(`${base}/api/v1/profile`, { headers: cookie('york') });
+    assert.equal((await adminProfile.json()).operations_admin, true);
     const denied = await fetch(`${base}/api/v1/admin/operations/dashboard`, { headers: cookie('mia') });
     assert.equal(denied.status, 403);
     const projected = await fetch(`${base}/api/v1/admin/operations/project`, {

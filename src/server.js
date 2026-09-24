@@ -34,7 +34,7 @@ import { effectiveJob, effectiveFactPayload, updateFactOverrides } from './facts
 import { assistantRoutes } from './assistant-routes.js';
 import { personalModelRoutes } from './personal-model-routes.js';
 import { recommendationRoutes } from './recommendation-routes.js';
-import { operationsRoutes } from './operations-routes.js';
+import { isOperationsAdmin, operationsRoutes } from './operations-routes.js';
 import { verifySnapshotKey, jobSnapshot } from './snapshot.js';
 import { createGuard } from './guard.js';
 import { makeClientErrorRoute } from './client-error.js';
@@ -291,6 +291,7 @@ export function createServer(db = openDb(), deps = {}) {
         excluded_companies: c?.excluded_companies || [], excluded_roles: c?.excluded_roles || [],
         excluded_cities: c?.excluded_cities || [], capacity_limit: c?.capacity_limit || null,
         weights: c?.weights || null,
+        operations_admin: isOperationsAdmin(deps, cid),
         feishu_auth: tokenStatus(db, cid) });
     },
     'PUT /api/v1/profile': async (req, res, cid) => {

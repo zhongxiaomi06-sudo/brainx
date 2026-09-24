@@ -6,12 +6,17 @@ import {
   traceOperationsMetric,
 } from './operations-dashboard.js';
 
-export function operationsRoutes(db, options = {}) {
+export function isOperationsAdmin(options, consultantId) {
   const admins = options.operationsAdmins
-    || String(process.env.BRAINX_AGENT_ADMIN_ALLOWLIST || '').split(',').map((value) => value.trim()).filter(Boolean);
+    || String(process.env.BRAINX_AGENT_ADMIN_ALLOWLIST || '').split(',')
+      .map((value) => value.trim()).filter(Boolean);
+  return admins.includes(consultantId);
+}
+
+export function operationsRoutes(db, options = {}) {
   const tenantId = options.operationsTenantId || 'brainx';
   const allowed = (res, consultantId) => {
-    if (admins.includes(consultantId)) return true;
+    if (isOperationsAdmin(options, consultantId)) return true;
     err(res, 403, 'ADMIN_FORBIDDEN', '无管理员权限');
     return false;
   };

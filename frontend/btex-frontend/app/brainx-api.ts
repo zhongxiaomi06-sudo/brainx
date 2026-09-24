@@ -66,7 +66,7 @@ export type BrainxSnapshot = {
   outcomes: Record<string, Outcome[]>;
   legal: Record<string, EngagementCommand[]>;
   sync: SyncStatus;
-  auth: { consultant: string; authorized: boolean; needsReauth: boolean };
+  auth: { consultant: string; authorized: boolean; needsReauth: boolean; operationsAdmin: boolean };
   notifications: Notification[];
   dismissReasons: string[];
   runId: string | null;
@@ -148,7 +148,7 @@ export type BackendReplay = {
   job_now?: { company?: string; role?: string; active_state?: string; note?: string } | null;
   events: BackendEvent[]; outcomes: BackendOutcome[];
 };
-export type BackendProfile = { consultant_id: string; display_name: string; profile_keywords: string[]; profile_note: string; feishu_auth?: { authorized?: boolean; needs_reauth?: boolean } };
+export type BackendProfile = { consultant_id: string; display_name: string; profile_keywords: string[]; profile_note: string; operations_admin?: boolean; feishu_auth?: { authorized?: boolean; needs_reauth?: boolean } };
 export type WorkbenchFolder = { id: string; name: string; jobIds: string[] };
 export type WorkbenchPreferences = { tray: string[]; folders: WorkbenchFolder[]; folderMode: boolean; updatedAt?: string | null };
 export type BackendDismissReasons = { items: string[] };
@@ -547,7 +547,7 @@ export async function getSnapshot(): Promise<BrainxSnapshot> {
     auth: {
       consultant: profile.display_name || wb.consultant_id || "顾问",
       authorized: !!profile.feishu_auth?.authorized,
-      needsReauth: !!profile.feishu_auth?.needs_reauth,
+      needsReauth: !!profile.feishu_auth?.needs_reauth, operationsAdmin: !!profile.operations_admin,
     },
     notifications: buildNotifications(wb, recs),
     dismissReasons: dismiss.items || FALLBACK_DISMISS_REASONS,

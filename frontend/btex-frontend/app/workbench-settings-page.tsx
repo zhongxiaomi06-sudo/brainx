@@ -65,8 +65,10 @@ function WorkbenchSettingsPage({
     void Promise.all([
       brainxFetch<TtcStatus>("/api/v1/ttc/connect").catch(() => emptyTtc),
       brainxFetch<TalentHealth>("/api/v1/talent/health").catch(() => emptyTalent),
-      brainxFetch<OperationsDashboardModel>("/api/v1/admin/operations/dashboard")
-        .then(normalizeOperationsDashboard).catch(() => null),
+      auth.operationsAdmin
+        ? brainxFetch<OperationsDashboardModel>("/api/v1/admin/operations/dashboard")
+          .then(normalizeOperationsDashboard).catch(() => null)
+        : Promise.resolve(null),
     ]).then(([nextTtc, nextTalent, nextOperations]) => {
       if (!active) return;
       setTtc(nextTtc);
@@ -74,7 +76,7 @@ function WorkbenchSettingsPage({
       setOperations(nextOperations);
     });
     return () => { active = false; };
-  }, []);
+  }, [auth.operationsAdmin]);
 
   const data = useMemo<SettingsCenterData>(() => ({
     profile: {

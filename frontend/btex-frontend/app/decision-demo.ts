@@ -6,7 +6,7 @@ export type EngagementState = "NEW"|"RECOMMENDED"|"VIEWED"|"WATCHED"|"ACCEPTED"|
 export type EngagementCommand = "WATCH"|"UNWATCH"|"ACCEPT"|"DISMISS"|"RELEASE"|"COMPLETE";
 export type SyncState = "READY"|"RUNNING"|"INCOMPLETE"|"AUTH_EXPIRED"|"ERROR"|"EMPTY";
 export type SyncStatus = {state:SyncState;updatedAt:string|null;rowsRead?:number;rowsExpected?:number;errors?:string[];warning?:{at:string;message:string;detail?:string}|null};
-export type AuthStatus = {consultant:string;authorized:boolean;needsReauth:boolean};
+export type AuthStatus = {consultant:string;authorized:boolean;needsReauth:boolean;operationsAdmin?:boolean};
 export type DecisionEvent = {id:string;type:string;at:string;reason?:string};
 export type Outcome = {id:string;stage:"推荐采纳"|"面试"|"Offer"|"入职"|"关闭"|"反馈";rating?:number;note?:string;at:string};
 export type CommitmentAction = {actionId:string;title:string;dueAt:string;status:"OPEN"|"BLOCKED"|"DONE"|"CANCELLED";source:"RULE"|"MANUAL";createdAt:string;completedAt?:string|null;completionNote?:string|null};
@@ -41,7 +41,7 @@ export const seedDecisionJobs:DecisionJob[]=[
 ];
 
 export const seedSync:SyncStatus={state:"READY",updatedAt:"11:28",rowsRead:37,rowsExpected:37};
-export const seedAuth:AuthStatus={consultant:"Felix",authorized:true,needsReauth:false};
+export const seedAuth:AuthStatus={consultant:"Felix",authorized:true,needsReauth:false,operationsAdmin:false};
 export const seedNotifications:Notification[]=[
  {id:"daily",kind:"DAILY_TOP3",title:"三方向 Top 3 已生成",detail:"投放、增长负责人、市场负责人等待判断",jobId:"JU87P01",read:false},
  {id:"commit",kind:"COMMITMENT",title:"2 个项目需要处理",detail:"39-AI 与科漫智能仍有下一动作",jobId:"JVS2PHH",read:false},

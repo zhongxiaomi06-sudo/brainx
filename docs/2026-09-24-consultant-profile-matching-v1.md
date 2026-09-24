@@ -1,38 +1,51 @@
 # 顾问画像 × 客户画像：第一版对应与评估（2026-09-24）
 
-> ⚠️ **v1 表格已被下方「v2 修正」证伪并覆盖**，v1 仅留作噪声分析样本。当前权威画像 = v2（已在库）。
+> ⚠️ **当前权威 = v3 通道归因版（已入库）**；v1 被 v2 证伪、v2 被 v3 精化，均留档作噪声分析样本。
 > 上级目录：[文档书总目录](README.md) ｜ 关联：[冷启动规则 v2 与客户画像](2026-09-24-cold-start-rules-v2-profiles.md)、[冷启动基线](2026-09-23-cold-start-baseline.md)
 
-## v2 修正（2026-09-24 11:50，咪指出「mia 没有进行发言」后承接客户验证的产物）
+## v3 敲定（2026-09-24 12:00，操作数据定制敲定 + 二次验证）
 
-**验证方法**：逐条核对 ACCEPTED 时间分布 + `job_memberships.source` 字段。两类噪声被揪出：
+**归因规则（数据敲定）**：`idempotency_key` 前缀即操作通道签名——
+- **本人操作 ×2**：`bot:accept:`（飞书卡片按钮）、`web:`（Web 页面接单）；
+- **代点脚本 ×0.5**：`accept_*/mia-accept/brainx-accept/mia-vision/cj_*/jptlm`（受委托运维操作，方向参考但非自主偏好）；
+- **不计入画像**：`project-launch:`（launch 流程自动写入，纯归属事实）、灰测/演示脚本（`e2e-*`/`find-candidate`/`demo-offer-seed`）、`ttc-owner` membership（同步所有权）。
 
-1. **批量 ACCEPTED**：同顾问 10 分钟内连续第 3 条起判批量。**shanon 14 条里 7 条是批量（一半是刷的）**、mia 剔 4 条（09-17 05:59-06:36 七分钟 8 连发）、felix 剔 2、wendy 剔 1；
-2. **membership 的 source 分层**：`ttc-owner`（TTC 同步所有权，**不是行为**，york 188 条）、`demo-offer-seed`（演示种子，frankie/miya 全部、wendy 3、shanon 0）不算画像信号；只认 `MANUAL_CONFIRMATION` / `job-extract-confirm`。
+### 通道矩阵（全员 ACCEPTED 84 条的真相）
 
-### v2 画像（已覆盖写入 consultant_profiles，7 位有真实信号者）
+| 顾问 | 本人卡片 | 本人 Web | 代点脚本 | launch 自动 | 灰测/其他 |
+|---|---|---|---|---|---|
+| mia | **5** | **4** | 4 | **11** | — |
+| felix | 0 | **12** | 5 | 8 | — |
+| shanon | 0 | **14** | 0 | 0 | — |
+| wendy | 0 | 3 | 0 | 5 | 2 |
+| york | 3 | 2 | 0 | 5 | 1 |
+| linda | 2 | 0 | 1 | 1 | — |
+| otto | 0 | 4 | 0 | 0 | — |
 
-| 顾问 | 真实 acc（批量剔除） | 手工在任 | 主族 | 画像可信度 |
-|---|---|---|---|---|
-| felix | 23 (-2) | 13 | 算法 19 / 运营 12 / 后端 11 | **高**（时间分散，双源一致）|
-| mia | 20 (-4) | 18 | 算法 35 / 产品 7 | **待本人确认**：分散在一个月，但咪自述未发言——若非本人操作则为系统代点，需甄别 |
-| york | 11 (0) | **2**（188 条 ttc-owner 已剔）| 算法 17 | 中（acc 真实但 BrainX 内主动承接极薄）|
-| wendy | 9 (-1) | 3 | 算法 8 / 后端 6 / 设计 3 | 中高 |
-| shanon | **7 (-7)** | 3 | 算法 8 | **低**（一半批量）|
-| linda | 4 | 3 | 运营/销售BD/管理岗 | 中（BD 型定位成立）|
-| otto | 4 | 0 | 算法 | 低（inactive）|
-| frankie / miya | 0 | 0 | **无画像**（v1 的「冷启动空壳」实为 demo 种子）| 无 |
+### v3 画像（本人操作为骨架）
 
-### v2 评估结论
+| 顾问 | 本人操作 | 画像（通道归因后） | 备注 |
+|---|---|---|---|
+| **shanon** | 14（全 Web）| 算法 16 / 未分类 6 / 产品 2 | v2 的「批量剔除」对他是误伤——连点但全是本人 Web 操作 |
+| **felix** | 12 | **运营 8 = 算法 8** / 市场 5 | **v1「算法主导」被证伪：真实是运营增长+算法双栖** |
+| **mia** | 9（卡片 5 + Web 4）| 算法 13.5 / 未分类 2 / 后端 2 | 咪质疑成立：24 条里仅 9 条是本人（37.5%）；11 条 launch 自动+4 条代点 |
+| york | 5 | 算法 6（弱）| BrainX 内主动决策极少，承接主体在 TTC 侧 |
+| otto | 4 | 算法 8 | inactive |
+| wendy | 3 | 后端 = 前端 = 算法 各 2 | 技术交付型更清晰 |
+| linda | 2 | 运营 2 / BD 2 | BD 型成立 |
+| frankie / miya | 0 | **无画像** | demo 种子，无任何本人操作 |
 
-1. **v1 的「承接王/负载不均」结论作废**：york 的 189 在任是 TTC 同步所有权，BrainX 内真实在任最多的是 mia 18、felix 13；
-2. **「算法全员一致」仍成立**且更干净：7 位有信号者 6 位主族算法——这是市场结构（客户全在招 AI 算法）而非个体偏好区分，**画像的区分度主要在次族**（felix 运营/市场、mia 产品、linda BD、wendy 前端设计）；
-3. **路由灰测范围收窄**：可信画像只有 felix/mia/wendy/york(部分)/linda 5 人；shanon 降权观察、frankie/miya 排除；
-4. **待咪确认**：mia 的 20 条分散 ACCEPTED（美年大健康/奇瑞墨甲/懂车帝/雷鸟/优艾智合等）是否本人行为——若否，则 decision_events 存在系统代点通道，需要查 dispatcher/automation 的 actor 归因。
+### 二次验证结论
+
+1. **84 条 ACCEPTED 中仅 49 条（58%）是本人操作**——launch 自动 30 条、代点 10 条被错误归因为顾问偏好，v1/v2 的画像失真主因即此；
+2. **画像区分度在次族**（v2 结论强化）：felix 运营/市场、mia 产品（样本薄）、linda BD、wendy 前端/后端；主族算法全员一致是市场结构；
+3. **工程债暴露**：`project-launch:` 把 30 条自动 ACCEPTED 记成顾问 actor——launch 归属与顾问决策必须分事件类型记，否则任何行为画像都会被污染（建议：`launch_auto_accepted` 单独事件类型，specs/019 账本事件设计时吸收）；
+4. **可信画像白名单（routed push 灰测）**：shanon(14)/felix(12)/mia(9)/york(5)/otto(4)/wendy(3)/linda(2)——样本量即置信度，mia/york/wendy/linda 只够次族级参考，不够主族级；
+5. **下次重算触发点**：顾问确认队列（1,644 条）产生 confirmed 后，`MANUAL_CONFIRMATION` 的草稿确认是比 ACCEPTED 更干净的本人信号。
 
 ---
 
-# 以下为 v1 原始内容（已被 v2 修正，留档）
+# 以下为 v1/v2 原始内容（已被 v3 取代，留档）
 
 **落库**：`consultant_profiles` 表（migrations/0055，9 位顾问，`bin/brainx-consultant-profiles.mjs` 幂等导入）。信号口径：ACCEPTED ×2 + 在任 membership ×1 + VIEWED ×0.3，按 job_facts 文本映射 13 组岗位族（与客户画像同表）。与 `client_profiles`（141 家客户）构成对应双方。
 

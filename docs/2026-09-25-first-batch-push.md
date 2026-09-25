@@ -17,6 +17,10 @@
 - `src/client-metrics.js`：只读取数 + `pushPolicyFor(stage)` 策略常量表 + `applyLifecyclePolicy`（dormant 剔除、cold_start 在卡片依据行注入「破冰优先」标注）+ `listFirstBatchConsultants`
 - `bin/brainx-first-batch-push.mjs`：第一批顾问的最新算法推荐 → 策略层过滤/标注 → `buildDailyCard` → `pushCard(kind='FIRST_BATCH_TOP3')` 幂等；默认预览，`--send` 真发且只推顾问本人私聊（与 autopush 同一安全边界：绝不推群）
 
+## 演进方向（2026-09-25 用户拍板）
+
+当前匹配链路是**关键词/规则驱动**：顾问画像靠 `profile_keywords` 手工维护，相似度靠分词与加权 scorer。方向要求：**从关键词过渡到 agent 算法**——顾问画像与客户/职位理解改由 agent 从行为与对话中习得（specs/016 判断抽取、specs/022 反馈信号是数据基础），匹配决策逐步交给模型层（LTR 影子评估 → 过门槛后替换线上，或 agent 直排）。第一批推送仍走现有关键词算法，是过渡期的对照基线；演进节奏以 specs/022 US4 的影子评估门槛为准，不跳步。
+
 ## 边界与红线
 
 - 不改动线上排序（策略层只做剔除/标注，不重排）；v2 客户特征进排序仍走 specs/022 US4 影子评估门槛

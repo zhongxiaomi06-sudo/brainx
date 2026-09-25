@@ -8,7 +8,8 @@
  *
  * 安全边界（与 autopush 同一约定）：只推顾问本人 open_id 私聊，绝不推群；
  * 默认预览，--send 才真发。
- * 用法：node bin/brainx-first-batch-push.mjs [--send] [--card <consultant_id>] [--db <path>]
+ * 用法：node bin/brainx-first-batch-push.mjs [--send] [--card <consultant_id>] [--jobs N] [--db <path>]
+ *   --jobs N：覆盖顾问偏好的卡片职位条数（1–10，缺省取 push_preferences，默认 3）。
  */
 import '../src/env.js';
 import { openDb } from '../src/db.js';
@@ -39,13 +40,17 @@ async function main() {
     const { items, dropped, tagged } = applyLifecyclePolicy(db, run.items);
     if (!items.length) { summary.push({ consultant: c.consultant_id, skipped: '策略后无职位', dropped }); continue; }
     const preferences = getPushPreferences(db, c.consultant_id) || DEFAULT_PUSH_PREFERENCES;
+    const jobsOverride = Number(arg('jobs'));
+    const jobCount = Number.isInteger(jobsOverride) && jobsOverride >= 1 && jobsOverride <= 10
+      ? jobsOverride : preferences.job_count;
     const card = buildDailyCard({
       consultant_name: c.display_name, consultant_id: c.consultant_id,
-      run: run.run, items: items.slice(0, preferences.job_count), item_limit: preferences.job_count,
+      run: run.run, items: items.slice(0, jobCount), item_limit: jobCount,
       commitments: commitmentSummary(db, c.consultant_id), sync,
     });
     const entry = { consultant: c.consultant_id, run_id: run.run.run_id,
-      pushed: items.length, dropped_dormant: dropped, tagged_cold_start: tagged };
+      kept_items: items.length, card_jobs: jobCount,
+      dropped_dormant: dropped, tagged_cold_start: tagged };
     if (arg('card') === c.consultant_id) console.log(JSON.stringify(card, null, 2));
     if (SEND) {
       if (!c.open_id) { entry.sent = false; entry.error = '无 open_id'; }

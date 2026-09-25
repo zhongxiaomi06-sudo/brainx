@@ -1,5 +1,19 @@
 # Agent Commit 记录
 
+## 2026-09-25｜feat(client-metrics): 客户健康报告落库 client_metrics + 生命周期分档的第一批算法推送（specs/022 US6 增量）
+
+- 起因（用户指令）：验证数据库接口/结构是否满足客户健康报告（200 家 × 90 天群消息）、第一批数据是否成立，然后建立第一批推送逻辑、要求算法驱动。
+- 前置验证（生产库实测）：160/200 客户群可 join `job_facts`（966 职位/434 活跃，覆盖 6 顾问 84 条群关联）→ 第一批成立；`c_dec` 决策效率 200 家全零（落库但特征层不引用）；缺口=`client_metrics` 表不存在（0054 `client_profiles` 是语义画像不是健康指标）。
+- 改动：
+  1. `migrations/0058_client_metrics.sql`（新）：`client_metrics`（8 指标+stage+badge+source/window，chat_id 主键）+ `client_metric_benchmarks`（p25/p50/p75 按 anchor_version 冻结，锚点漂移必须 bump 版本——022 红线）。
+  2. `bin/brainx-client-metrics-import.mjs`（新）：报告 HTML 内嵌 JSON 解析（括号配平+字符串感知，正则截断不可靠）→ 幂等 upsert；默认 dry-run，`--write` 落库。真实报告 dry-run 验证：200 家 + 6 项锚点，分档与报告一致。
+  3. `src/client-metrics.js`（新）：只读取数 + `pushPolicyFor` 策略常量表（dormant 完全静默=SC-6 红线、cold_start 标「破冰优先」、未知 stage 宁推勿漏）+ `applyLifecyclePolicy`（呈现层剔除/标注，不改冻结推荐）+ `listFirstBatchConsultants` + `getBenchmarks`。
+  4. `bin/brainx-first-batch-push.mjs`（新）：第一批顾问最新算法推荐 → 策略层 → buildDailyCard → `pushCard(kind='FIRST_BATCH_TOP3')` 幂等；默认预览，`--send` 只推本人私聊（autopush 同一安全边界，绝不推群）；不动线上排序。
+  5. `tests/client-metrics.test.mjs`（新，6 例）：解析/缺块报错/导入幂等/四档策略/生命周期过滤标注/第一批顾问 join；`tests/framework.test.mjs` 迁移清单 +0058（60→61）。
+  6. 文档：`docs/2026-09-25-first-batch-push.md`（验证结论+边界）、docs/README.md 路由、specs/022 施工记录。
+- 验证：新增 6 例全过；`npm run verify:quick` 16/16 通过。
+- 边界：生产导入（--write）与真发（--send）需部署后另行确认；US6 的 BD 移交清单、US1/US2/US4/US5/US7 未动。
+
 ## 2026-09-24｜fix(fact-agent): 审核二轮——群级行部分唯一索引堵 TOCTOU（原子防重，一行索引 + 竞态兜底）
 
 - 起因（用户/审核二轮）：319ae98 的 EXISTS 预检与 INSERT 非原子（TOCTOU）——单 timer 串行安全，但手工 CLI 与 timer 并行时群级行仍可能双插（职位级有 INSERT OR IGNORE 兜底，群级预检后无兜底）。

@@ -147,3 +147,7 @@ C 时机层：断档事件触发定向跑批 + 生命周期分档推送策略
 - 分位锚点与特征版本绑定冻结，锚点漂移必须 bump 版本，否则基线不可重放。
 - `recommendation_feedback` 通道不收任何业务结果（labeling-standard-v1）。
 - 触发器 bypass 必须限范围 + 留审计，绝不允许扩散成全量跑批（token 成本纪律）。
+
+## 施工记录
+
+- 2026-09-25（kimi-code-main）：US6 第一批增量落地——`client_metrics` 表（0058）+ 报告快照导入脚本 + 生命周期策略层 + `bin/brainx-first-batch-push.mjs`（dormant 剔除 / cold_start 标注，不改线上排序）。US6 的 BD 移交清单、US1/US2/US4/US5/US7 未动。详见 [docs/2026-09-25-first-batch-push.md](../../docs/2026-09-25-first-batch-push.md)。

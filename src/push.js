@@ -37,7 +37,10 @@ export function buildDailyCard({ consultant_name, consultant_id, run, items, ite
   const limit = Math.min(item_limit || items.length || 3, items.length);
   const els = [
     { tag: 'markdown', content: `**${consultant_name || '你好'}，今天建议优先处理 ${limit} 个职位**\n`
-        + `从 ${run?.candidate_count ?? items.length} 个职位中筛选 · ${state === 'READY' ? '数据完整' : '数据不完整'} · 每项含依据、风险和下一步` },
+        + (run?.alive_count != null
+          ? `从 ${run.alive_count} 个确认在招职位中筛选 · 评估池共 ${run.candidate_count} 个`
+          : `从 ${run?.candidate_count ?? items.length} 个职位中筛选`)
+        + ` · ${state === 'READY' ? '数据完整' : '数据不完整'} · 每项含依据、风险和下一步` },
   ];
   items.slice(0, limit).forEach((r, i) => {
     const j = r.job;

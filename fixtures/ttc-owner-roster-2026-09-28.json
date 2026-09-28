@@ -1,0 +1,1827 @@
+{
+ "generated_at": "2026-09-28",
+ "note": "GENERATED DATA (do not hand-edit): TTC owner 全量花名册快照，试点扩圈优先级依据。来源: 生产 job_facts owner_name 聚合",
+ "total_owners": 364,
+ "owners": [
+  {
+   "owner_name": "Grace 朱娟娟",
+   "jobs": 350,
+   "open_jobs": 155
+  },
+  {
+   "owner_name": "Mori 蒋小云",
+   "jobs": 440,
+   "open_jobs": 140
+  },
+  {
+   "owner_name": "Eva 郑晓玲",
+   "jobs": 367,
+   "open_jobs": 105
+  },
+  {
+   "owner_name": "Julia 摆悦",
+   "jobs": 267,
+   "open_jobs": 91
+  },
+  {
+   "owner_name": "May 雷玉洁",
+   "jobs": 202,
+   "open_jobs": 87
+  },
+  {
+   "owner_name": "Clarey 王雨晨",
+   "jobs": 345,
+   "open_jobs": 87
+  },
+  {
+   "owner_name": "Lina 冀晓敏",
+   "jobs": 402,
+   "open_jobs": 83
+  },
+  {
+   "owner_name": "Nancy 吴家欢",
+   "jobs": 198,
+   "open_jobs": 69
+  },
+  {
+   "owner_name": "Kevin 赵震南",
+   "jobs": 372,
+   "open_jobs": 65
+  },
+  {
+   "owner_name": "York 姚堃",
+   "jobs": 188,
+   "open_jobs": 64
+  },
+  {
+   "owner_name": "Chili 刘静宜",
+   "jobs": 129,
+   "open_jobs": 63
+  },
+  {
+   "owner_name": "Norah 郭馨怿",
+   "jobs": 167,
+   "open_jobs": 62
+  },
+  {
+   "owner_name": "Jade 郭子安",
+   "jobs": 197,
+   "open_jobs": 62
+  },
+  {
+   "owner_name": "Summer 侯亚菊",
+   "jobs": 230,
+   "open_jobs": 59
+  },
+  {
+   "owner_name": "Una 王晓琴",
+   "jobs": 343,
+   "open_jobs": 57
+  },
+  {
+   "owner_name": "Kitty 周玉婷",
+   "jobs": 151,
+   "open_jobs": 57
+  },
+  {
+   "owner_name": "Jasmine 何婧星",
+   "jobs": 166,
+   "open_jobs": 57
+  },
+  {
+   "owner_name": "Eisen 夏榆森",
+   "jobs": 131,
+   "open_jobs": 57
+  },
+  {
+   "owner_name": "Jim 林集",
+   "jobs": 336,
+   "open_jobs": 56
+  },
+  {
+   "owner_name": "Neal 陶奎",
+   "jobs": 189,
+   "open_jobs": 55
+  },
+  {
+   "owner_name": "Noah 邱超凡",
+   "jobs": 160,
+   "open_jobs": 54
+  },
+  {
+   "owner_name": "Andy 王慧",
+   "jobs": 163,
+   "open_jobs": 53
+  },
+  {
+   "owner_name": "Grace 候敏",
+   "jobs": 112,
+   "open_jobs": 52
+  },
+  {
+   "owner_name": "Julie 王嘉玲",
+   "jobs": 234,
+   "open_jobs": 51
+  },
+  {
+   "owner_name": "Kitty 王珂",
+   "jobs": 131,
+   "open_jobs": 50
+  },
+  {
+   "owner_name": "Rose 刘嘉慧",
+   "jobs": 93,
+   "open_jobs": 49
+  },
+  {
+   "owner_name": "Kathy 林可欣",
+   "jobs": 230,
+   "open_jobs": 48
+  },
+  {
+   "owner_name": "Oliver 郑海鹏",
+   "jobs": 125,
+   "open_jobs": 47
+  },
+  {
+   "owner_name": "Henry 肖登峰",
+   "jobs": 216,
+   "open_jobs": 45
+  },
+  {
+   "owner_name": "Cici 戚小菲",
+   "jobs": 214,
+   "open_jobs": 45
+  },
+  {
+   "owner_name": "Steven 刘弦",
+   "jobs": 79,
+   "open_jobs": 44
+  },
+  {
+   "owner_name": "Kris 刘连福",
+   "jobs": 177,
+   "open_jobs": 43
+  },
+  {
+   "owner_name": "Kevin 顾培坤",
+   "jobs": 130,
+   "open_jobs": 41
+  },
+  {
+   "owner_name": "Nina 张宁娜",
+   "jobs": 158,
+   "open_jobs": 40
+  },
+  {
+   "owner_name": "Celine 王清青",
+   "jobs": 360,
+   "open_jobs": 39
+  },
+  {
+   "owner_name": "Winkee 黄颖琦",
+   "jobs": 247,
+   "open_jobs": 38
+  },
+  {
+   "owner_name": "Judy 彭清云",
+   "jobs": 203,
+   "open_jobs": 38
+  },
+  {
+   "owner_name": "Zoey 黄中意",
+   "jobs": 131,
+   "open_jobs": 37
+  },
+  {
+   "owner_name": "Judy 陈敏",
+   "jobs": 208,
+   "open_jobs": 37
+  },
+  {
+   "owner_name": "Blithe 庞嘉晔",
+   "jobs": 70,
+   "open_jobs": 37
+  },
+  {
+   "owner_name": "Mace 马鹏鑫",
+   "jobs": 100,
+   "open_jobs": 36
+  },
+  {
+   "owner_name": "Lemon 孟子舜",
+   "jobs": 76,
+   "open_jobs": 36
+  },
+  {
+   "owner_name": "Jacky 李林",
+   "jobs": 267,
+   "open_jobs": 36
+  },
+  {
+   "owner_name": "Cassie 孙青青",
+   "jobs": 156,
+   "open_jobs": 34
+  },
+  {
+   "owner_name": "Allen 完浩然",
+   "jobs": 73,
+   "open_jobs": 34
+  },
+  {
+   "owner_name": "Hallie 宋海丽",
+   "jobs": 57,
+   "open_jobs": 33
+  },
+  {
+   "owner_name": "Suki 徐安琪",
+   "jobs": 93,
+   "open_jobs": 32
+  },
+  {
+   "owner_name": "Rachel 冯铖",
+   "jobs": 90,
+   "open_jobs": 32
+  },
+  {
+   "owner_name": "Peter 袁鹏",
+   "jobs": 114,
+   "open_jobs": 32
+  },
+  {
+   "owner_name": "Rose 黄园园",
+   "jobs": 67,
+   "open_jobs": 31
+  },
+  {
+   "owner_name": "Jessie 王梦瑶",
+   "jobs": 52,
+   "open_jobs": 30
+  },
+  {
+   "owner_name": "Summer 王宇佳",
+   "jobs": 86,
+   "open_jobs": 29
+  },
+  {
+   "owner_name": "Kay 强可心",
+   "jobs": 79,
+   "open_jobs": 29
+  },
+  {
+   "owner_name": "Cherry 綦钰婵",
+   "jobs": 91,
+   "open_jobs": 29
+  },
+  {
+   "owner_name": "Ashley 王鑫",
+   "jobs": 41,
+   "open_jobs": 29
+  },
+  {
+   "owner_name": "Alin 黄丽玲",
+   "jobs": 97,
+   "open_jobs": 29
+  },
+  {
+   "owner_name": "Sunny 冯晓燕",
+   "jobs": 93,
+   "open_jobs": 27
+  },
+  {
+   "owner_name": "Lillian 虞晓莉",
+   "jobs": 158,
+   "open_jobs": 27
+  },
+  {
+   "owner_name": "Herman 马林标",
+   "jobs": 87,
+   "open_jobs": 27
+  },
+  {
+   "owner_name": "Gavin 于顺",
+   "jobs": 43,
+   "open_jobs": 27
+  },
+  {
+   "owner_name": "Eric 陈贤生",
+   "jobs": 77,
+   "open_jobs": 27
+  },
+  {
+   "owner_name": "Enzo 赵振江",
+   "jobs": 205,
+   "open_jobs": 26
+  },
+  {
+   "owner_name": "Alessia 王一溢",
+   "jobs": 62,
+   "open_jobs": 26
+  },
+  {
+   "owner_name": "Lily 陈晓莉",
+   "jobs": 275,
+   "open_jobs": 25
+  },
+  {
+   "owner_name": "Ethan 都沛邦",
+   "jobs": 39,
+   "open_jobs": 25
+  },
+  {
+   "owner_name": "Ella 唐琳",
+   "jobs": 49,
+   "open_jobs": 25
+  },
+  {
+   "owner_name": "Xindy 解修鑫",
+   "jobs": 33,
+   "open_jobs": 24
+  },
+  {
+   "owner_name": "Nicole 徐旻雯",
+   "jobs": 114,
+   "open_jobs": 24
+  },
+  {
+   "owner_name": "Mae 梅咏琪",
+   "jobs": 42,
+   "open_jobs": 24
+  },
+  {
+   "owner_name": "Wendy 郭雯",
+   "jobs": 33,
+   "open_jobs": 23
+  },
+  {
+   "owner_name": "Wison 王欣",
+   "jobs": 66,
+   "open_jobs": 22
+  },
+  {
+   "owner_name": "Sammi 梁舒欣",
+   "jobs": 68,
+   "open_jobs": 22
+  },
+  {
+   "owner_name": "Monika 井智子",
+   "jobs": 130,
+   "open_jobs": 22
+  },
+  {
+   "owner_name": "Shiqi 姚诗麒",
+   "jobs": 54,
+   "open_jobs": 21
+  },
+  {
+   "owner_name": "Nancy 陈琳",
+   "jobs": 51,
+   "open_jobs": 21
+  },
+  {
+   "owner_name": "Maria 王明雅",
+   "jobs": 58,
+   "open_jobs": 21
+  },
+  {
+   "owner_name": "Sherry 申桂芬",
+   "jobs": 95,
+   "open_jobs": 20
+  },
+  {
+   "owner_name": "Kali 张嘉维",
+   "jobs": 147,
+   "open_jobs": 20
+  },
+  {
+   "owner_name": "Angus 陈晓斌",
+   "jobs": 49,
+   "open_jobs": 20
+  },
+  {
+   "owner_name": "Alley 林青",
+   "jobs": 35,
+   "open_jobs": 20
+  },
+  {
+   "owner_name": "Osborn 侯超凡",
+   "jobs": 109,
+   "open_jobs": 19
+  },
+  {
+   "owner_name": "Nina 倪慧",
+   "jobs": 93,
+   "open_jobs": 19
+  },
+  {
+   "owner_name": "Eric 陈洪明",
+   "jobs": 35,
+   "open_jobs": 18
+  },
+  {
+   "owner_name": "Tricia 周小妮",
+   "jobs": 341,
+   "open_jobs": 17
+  },
+  {
+   "owner_name": "Teresa 宋欣樾",
+   "jobs": 33,
+   "open_jobs": 17
+  },
+  {
+   "owner_name": "Jellina 谭琳",
+   "jobs": 53,
+   "open_jobs": 17
+  },
+  {
+   "owner_name": "Kevin 谢骏涛",
+   "jobs": 17,
+   "open_jobs": 16
+  },
+  {
+   "owner_name": "Ivy 朱群",
+   "jobs": 51,
+   "open_jobs": 16
+  },
+  {
+   "owner_name": "Flora 卢雪花",
+   "jobs": 71,
+   "open_jobs": 16
+  },
+  {
+   "owner_name": "Yun 赵云",
+   "jobs": 37,
+   "open_jobs": 15
+  },
+  {
+   "owner_name": "Wendy 李文杰",
+   "jobs": 49,
+   "open_jobs": 15
+  },
+  {
+   "owner_name": "Naomi 张瑞轩",
+   "jobs": 17,
+   "open_jobs": 15
+  },
+  {
+   "owner_name": "Delia 彭黎",
+   "jobs": 61,
+   "open_jobs": 15
+  },
+  {
+   "owner_name": "Angela 沈诗怡",
+   "jobs": 17,
+   "open_jobs": 15
+  },
+  {
+   "owner_name": "Mango 孙毅",
+   "jobs": 14,
+   "open_jobs": 14
+  },
+  {
+   "owner_name": "Jade 刘珈玮",
+   "jobs": 32,
+   "open_jobs": 14
+  },
+  {
+   "owner_name": "Jack 李智超",
+   "jobs": 116,
+   "open_jobs": 14
+  },
+  {
+   "owner_name": "Summer 花钰桐",
+   "jobs": 77,
+   "open_jobs": 13
+  },
+  {
+   "owner_name": "Iris 王艺儒",
+   "jobs": 38,
+   "open_jobs": 13
+  },
+  {
+   "owner_name": "Daniel 杨庆",
+   "jobs": 75,
+   "open_jobs": 13
+  },
+  {
+   "owner_name": "Candy 张昕怡",
+   "jobs": 32,
+   "open_jobs": 13
+  },
+  {
+   "owner_name": "Xavier 邢增裕",
+   "jobs": 17,
+   "open_jobs": 12
+  },
+  {
+   "owner_name": "Tara 李屠菱子",
+   "jobs": 20,
+   "open_jobs": 12
+  },
+  {
+   "owner_name": "Lisa 王思懿",
+   "jobs": 21,
+   "open_jobs": 12
+  },
+  {
+   "owner_name": "Leo 张嘉航",
+   "jobs": 24,
+   "open_jobs": 12
+  },
+  {
+   "owner_name": "Jason 张瑜",
+   "jobs": 205,
+   "open_jobs": 12
+  },
+  {
+   "owner_name": "Allen 王国锋",
+   "jobs": 116,
+   "open_jobs": 12
+  },
+  {
+   "owner_name": "Ada 陈佳倩",
+   "jobs": 15,
+   "open_jobs": 12
+  },
+  {
+   "owner_name": "Sylvia 朱唯一",
+   "jobs": 59,
+   "open_jobs": 11
+  },
+  {
+   "owner_name": "Simon 蔡华杰",
+   "jobs": 87,
+   "open_jobs": 11
+  },
+  {
+   "owner_name": "Leon 娄咏涛",
+   "jobs": 18,
+   "open_jobs": 11
+  },
+  {
+   "owner_name": "George 张瀚",
+   "jobs": 14,
+   "open_jobs": 11
+  },
+  {
+   "owner_name": "George 刘明",
+   "jobs": 37,
+   "open_jobs": 11
+  },
+  {
+   "owner_name": "Eudora 苗冠乾",
+   "jobs": 12,
+   "open_jobs": 11
+  },
+  {
+   "owner_name": "Coco 徐静雯",
+   "jobs": 35,
+   "open_jobs": 11
+  },
+  {
+   "owner_name": "Anson 李震",
+   "jobs": 17,
+   "open_jobs": 11
+  },
+  {
+   "owner_name": "Xiaoya 郭晓雅",
+   "jobs": 70,
+   "open_jobs": 10
+  },
+  {
+   "owner_name": "Susie 赵思雨",
+   "jobs": 20,
+   "open_jobs": 10
+  },
+  {
+   "owner_name": "Howard 刘嘉磊",
+   "jobs": 13,
+   "open_jobs": 10
+  },
+  {
+   "owner_name": "Peter 刘亚洲",
+   "jobs": 30,
+   "open_jobs": 9
+  },
+  {
+   "owner_name": "Francis 宋浩源",
+   "jobs": 66,
+   "open_jobs": 9
+  },
+  {
+   "owner_name": "Devin 郭昱然",
+   "jobs": 78,
+   "open_jobs": 9
+  },
+  {
+   "owner_name": "Candice 荆文杰",
+   "jobs": 75,
+   "open_jobs": 9
+  },
+  {
+   "owner_name": "Tom 吴泓锴",
+   "jobs": 15,
+   "open_jobs": 8
+  },
+  {
+   "owner_name": "Sunny 孙铭艺",
+   "jobs": 20,
+   "open_jobs": 8
+  },
+  {
+   "owner_name": "Lisa 雷鹏莉",
+   "jobs": 63,
+   "open_jobs": 8
+  },
+  {
+   "owner_name": "Kaya 沈婷婷",
+   "jobs": 87,
+   "open_jobs": 8
+  },
+  {
+   "owner_name": "Eminem 孙思道",
+   "jobs": 22,
+   "open_jobs": 8
+  },
+  {
+   "owner_name": "Christa 向天妤",
+   "jobs": 50,
+   "open_jobs": 8
+  },
+  {
+   "owner_name": "Ted 王贤民",
+   "jobs": 41,
+   "open_jobs": 7
+  },
+  {
+   "owner_name": "Shanon 申莎娜",
+   "jobs": 22,
+   "open_jobs": 7
+  },
+  {
+   "owner_name": "Rosemary 郏佳雯",
+   "jobs": 7,
+   "open_jobs": 7
+  },
+  {
+   "owner_name": "Mf 孟凡臣",
+   "jobs": 52,
+   "open_jobs": 7
+  },
+  {
+   "owner_name": "Marshall 仇实",
+   "jobs": 79,
+   "open_jobs": 7
+  },
+  {
+   "owner_name": "Leo 洪开欣",
+   "jobs": 32,
+   "open_jobs": 7
+  },
+  {
+   "owner_name": "Juncky 梁俊旗",
+   "jobs": 19,
+   "open_jobs": 7
+  },
+  {
+   "owner_name": "Felix 黄鑫",
+   "jobs": 14,
+   "open_jobs": 7
+  },
+  {
+   "owner_name": "Eason 邓子翔",
+   "jobs": 45,
+   "open_jobs": 7
+  },
+  {
+   "owner_name": "Coral 龙芊潼",
+   "jobs": 12,
+   "open_jobs": 7
+  },
+  {
+   "owner_name": "Arlen 武凯",
+   "jobs": 109,
+   "open_jobs": 7
+  },
+  {
+   "owner_name": "Ady 杜敌",
+   "jobs": 12,
+   "open_jobs": 7
+  },
+  {
+   "owner_name": "Zhuang 户传壮",
+   "jobs": 22,
+   "open_jobs": 6
+  },
+  {
+   "owner_name": "Spencer 郑影",
+   "jobs": 16,
+   "open_jobs": 6
+  },
+  {
+   "owner_name": "Simmons 赵明波",
+   "jobs": 8,
+   "open_jobs": 6
+  },
+  {
+   "owner_name": "Ray 吴睿妮乐",
+   "jobs": 25,
+   "open_jobs": 6
+  },
+  {
+   "owner_name": "Monica 谢昭",
+   "jobs": 61,
+   "open_jobs": 6
+  },
+  {
+   "owner_name": "Ivy 华豫榕",
+   "jobs": 75,
+   "open_jobs": 6
+  },
+  {
+   "owner_name": "Fraser 方雄",
+   "jobs": 10,
+   "open_jobs": 6
+  },
+  {
+   "owner_name": "Cole 王佳乐",
+   "jobs": 12,
+   "open_jobs": 6
+  },
+  {
+   "owner_name": "Clover 徐婷",
+   "jobs": 43,
+   "open_jobs": 6
+  },
+  {
+   "owner_name": "Zoe 曾思萍",
+   "jobs": 6,
+   "open_jobs": 5
+  },
+  {
+   "owner_name": "Will 王涵",
+   "jobs": 22,
+   "open_jobs": 5
+  },
+  {
+   "owner_name": "Tao 陶俊",
+   "jobs": 11,
+   "open_jobs": 5
+  },
+  {
+   "owner_name": "Shirley 张丹皓",
+   "jobs": 67,
+   "open_jobs": 5
+  },
+  {
+   "owner_name": "Norton 朱煜悦",
+   "jobs": 70,
+   "open_jobs": 5
+  },
+  {
+   "owner_name": "Melissa 李梅",
+   "jobs": 17,
+   "open_jobs": 5
+  },
+  {
+   "owner_name": "Jessica 潘泓希",
+   "jobs": 5,
+   "open_jobs": 5
+  },
+  {
+   "owner_name": "James 钟佳明",
+   "jobs": 9,
+   "open_jobs": 5
+  },
+  {
+   "owner_name": "Frank 陈震",
+   "jobs": 20,
+   "open_jobs": 5
+  },
+  {
+   "owner_name": "Rhett 马瑞景",
+   "jobs": 8,
+   "open_jobs": 4
+  },
+  {
+   "owner_name": "Rain 史泰隆",
+   "jobs": 61,
+   "open_jobs": 4
+  },
+  {
+   "owner_name": "Natalie 曾献庆",
+   "jobs": 8,
+   "open_jobs": 4
+  },
+  {
+   "owner_name": "Meng 唐小梦",
+   "jobs": 9,
+   "open_jobs": 4
+  },
+  {
+   "owner_name": "Krystal 井莹",
+   "jobs": 16,
+   "open_jobs": 4
+  },
+  {
+   "owner_name": "Jerry 李卓瑞",
+   "jobs": 10,
+   "open_jobs": 4
+  },
+  {
+   "owner_name": "Jeremy 刘继元",
+   "jobs": 4,
+   "open_jobs": 4
+  },
+  {
+   "owner_name": "Jeffrey 齐栓栓",
+   "jobs": 89,
+   "open_jobs": 4
+  },
+  {
+   "owner_name": "Jayda 代菁",
+   "jobs": 25,
+   "open_jobs": 4
+  },
+  {
+   "owner_name": "Ethan 卜浩南",
+   "jobs": 25,
+   "open_jobs": 4
+  },
+  {
+   "owner_name": "Eric 王彩龙",
+   "jobs": 12,
+   "open_jobs": 4
+  },
+  {
+   "owner_name": "Eleanor 赵君怡",
+   "jobs": 5,
+   "open_jobs": 4
+  },
+  {
+   "owner_name": "Dan 戴雅梅",
+   "jobs": 132,
+   "open_jobs": 4
+  },
+  {
+   "owner_name": "Cheney 李明灿",
+   "jobs": 8,
+   "open_jobs": 4
+  },
+  {
+   "owner_name": "Cassie 李婧怡",
+   "jobs": 4,
+   "open_jobs": 4
+  },
+  {
+   "owner_name": "Zachary 郑志勇",
+   "jobs": 4,
+   "open_jobs": 3
+  },
+  {
+   "owner_name": "Sunny 王培丽",
+   "jobs": 17,
+   "open_jobs": 3
+  },
+  {
+   "owner_name": "Steve 顾春粟",
+   "jobs": 118,
+   "open_jobs": 3
+  },
+  {
+   "owner_name": "Roy 童锴",
+   "jobs": 85,
+   "open_jobs": 3
+  },
+  {
+   "owner_name": "Penny 黄芃芃",
+   "jobs": 10,
+   "open_jobs": 3
+  },
+  {
+   "owner_name": "Nancy 邱琬晴",
+   "jobs": 3,
+   "open_jobs": 3
+  },
+  {
+   "owner_name": "Molly 朱倩颖",
+   "jobs": 104,
+   "open_jobs": 3
+  },
+  {
+   "owner_name": "Michael 张文灏",
+   "jobs": 49,
+   "open_jobs": 3
+  },
+  {
+   "owner_name": "Matt 吴宇鹏",
+   "jobs": 55,
+   "open_jobs": 3
+  },
+  {
+   "owner_name": "Mason 王国峰",
+   "jobs": 7,
+   "open_jobs": 3
+  },
+  {
+   "owner_name": "Mandy 陈于俏",
+   "jobs": 5,
+   "open_jobs": 3
+  },
+  {
+   "owner_name": "Loki 洪滔",
+   "jobs": 6,
+   "open_jobs": 3
+  },
+  {
+   "owner_name": "Justin 王星雨",
+   "jobs": 76,
+   "open_jobs": 3
+  },
+  {
+   "owner_name": "Hanliy 王菡",
+   "jobs": 21,
+   "open_jobs": 3
+  },
+  {
+   "owner_name": "Green 孟祥禹",
+   "jobs": 9,
+   "open_jobs": 3
+  },
+  {
+   "owner_name": "Glen 韦其像",
+   "jobs": 3,
+   "open_jobs": 3
+  },
+  {
+   "owner_name": "Emily 王馨莹",
+   "jobs": 63,
+   "open_jobs": 3
+  },
+  {
+   "owner_name": "Double 尉炎炎",
+   "jobs": 11,
+   "open_jobs": 3
+  },
+  {
+   "owner_name": "Claire 张璐璐",
+   "jobs": 21,
+   "open_jobs": 3
+  },
+  {
+   "owner_name": "Cindy 周喜娣",
+   "jobs": 29,
+   "open_jobs": 3
+  },
+  {
+   "owner_name": "Catherine 胡琪",
+   "jobs": 32,
+   "open_jobs": 3
+  },
+  {
+   "owner_name": "Amber 郭紫璇",
+   "jobs": 10,
+   "open_jobs": 3
+  },
+  {
+   "owner_name": "Aimee 王宇欣",
+   "jobs": 60,
+   "open_jobs": 3
+  },
+  {
+   "owner_name": "4ier 付洋",
+   "jobs": 8,
+   "open_jobs": 3
+  },
+  {
+   "owner_name": "Zoe 王祖英",
+   "jobs": 5,
+   "open_jobs": 2
+  },
+  {
+   "owner_name": "ZQ 赵琴",
+   "jobs": 2,
+   "open_jobs": 2
+  },
+  {
+   "owner_name": "Vivian 谢缘缘",
+   "jobs": 3,
+   "open_jobs": 2
+  },
+  {
+   "owner_name": "Tai 台效毓",
+   "jobs": 4,
+   "open_jobs": 2
+  },
+  {
+   "owner_name": "Sierra 徐思源",
+   "jobs": 2,
+   "open_jobs": 2
+  },
+  {
+   "owner_name": "Serena 王安琦",
+   "jobs": 6,
+   "open_jobs": 2
+  },
+  {
+   "owner_name": "Sara 乔冬雪",
+   "jobs": 4,
+   "open_jobs": 2
+  },
+  {
+   "owner_name": "Rory 魏荣睿",
+   "jobs": 12,
+   "open_jobs": 2
+  },
+  {
+   "owner_name": "Randi 包玉典",
+   "jobs": 5,
+   "open_jobs": 2
+  },
+  {
+   "owner_name": "Monica 陈家纶",
+   "jobs": 65,
+   "open_jobs": 2
+  },
+  {
+   "owner_name": "Molly 游朦莉",
+   "jobs": 4,
+   "open_jobs": 2
+  },
+  {
+   "owner_name": "Hua 杨华",
+   "jobs": 2,
+   "open_jobs": 2
+  },
+  {
+   "owner_name": "Felix 谢智雄",
+   "jobs": 2,
+   "open_jobs": 2
+  },
+  {
+   "owner_name": "Dannie 刘丹妮",
+   "jobs": 4,
+   "open_jobs": 2
+  },
+  {
+   "owner_name": "Cindy 狄欣雨",
+   "jobs": 2,
+   "open_jobs": 2
+  },
+  {
+   "owner_name": "Chris 殷辰霄",
+   "jobs": 14,
+   "open_jobs": 2
+  },
+  {
+   "owner_name": "Caroline 肖瑾",
+   "jobs": 28,
+   "open_jobs": 2
+  },
+  {
+   "owner_name": "Bettina 陈汶洪",
+   "jobs": 5,
+   "open_jobs": 2
+  },
+  {
+   "owner_name": "顾淼",
+   "jobs": 4,
+   "open_jobs": 1
+  },
+  {
+   "owner_name": "ddy 杜妲颐",
+   "jobs": 20,
+   "open_jobs": 1
+  },
+  {
+   "owner_name": "Zoe 杨淑丽",
+   "jobs": 7,
+   "open_jobs": 1
+  },
+  {
+   "owner_name": "Yuki 戚竣婷",
+   "jobs": 6,
+   "open_jobs": 1
+  },
+  {
+   "owner_name": "Willem 周博闻",
+   "jobs": 3,
+   "open_jobs": 1
+  },
+  {
+   "owner_name": "Violet 白恩钰",
+   "jobs": 1,
+   "open_jobs": 1
+  },
+  {
+   "owner_name": "Vincent 尹东岳",
+   "jobs": 7,
+   "open_jobs": 1
+  },
+  {
+   "owner_name": "Summer 秦行",
+   "jobs": 44,
+   "open_jobs": 1
+  },
+  {
+   "owner_name": "Sid 秦圣棣",
+   "jobs": 33,
+   "open_jobs": 1
+  },
+  {
+   "owner_name": "Rona 张溶溶",
+   "jobs": 5,
+   "open_jobs": 1
+  },
+  {
+   "owner_name": "Qi 黄琦",
+   "jobs": 2,
+   "open_jobs": 1
+  },
+  {
+   "owner_name": "Peng 林宇鹏",
+   "jobs": 5,
+   "open_jobs": 1
+  },
+  {
+   "owner_name": "Ocean 万洋",
+   "jobs": 2,
+   "open_jobs": 1
+  },
+  {
+   "owner_name": "Nina 吴明月",
+   "jobs": 5,
+   "open_jobs": 1
+  },
+  {
+   "owner_name": "Lucas 孙骐",
+   "jobs": 1,
+   "open_jobs": 1
+  },
+  {
+   "owner_name": "Larry 姜来",
+   "jobs": 29,
+   "open_jobs": 1
+  },
+  {
+   "owner_name": "Jeff 周维来",
+   "jobs": 6,
+   "open_jobs": 1
+  },
+  {
+   "owner_name": "Haluk 刘海浪",
+   "jobs": 8,
+   "open_jobs": 1
+  },
+  {
+   "owner_name": "Grace 许晟希",
+   "jobs": 1,
+   "open_jobs": 1
+  },
+  {
+   "owner_name": "Dva 周梦舒",
+   "jobs": 4,
+   "open_jobs": 1
+  },
+  {
+   "owner_name": "Charlotte 卢从维",
+   "jobs": 73,
+   "open_jobs": 1
+  },
+  {
+   "owner_name": "Bin 任智斌",
+   "jobs": 9,
+   "open_jobs": 1
+  },
+  {
+   "owner_name": "Ash 张恩阳",
+   "jobs": 2,
+   "open_jobs": 1
+  },
+  {
+   "owner_name": "Anne 杨菁",
+   "jobs": 1,
+   "open_jobs": 1
+  },
+  {
+   "owner_name": "Amy 王思雨",
+   "jobs": 2,
+   "open_jobs": 1
+  },
+  {
+   "owner_name": "Alizee 任婉怡",
+   "jobs": 8,
+   "open_jobs": 1
+  },
+  {
+   "owner_name": "Alex 徐泰彪",
+   "jobs": 3,
+   "open_jobs": 1
+  },
+  {
+   "owner_name": "Abel 钱涛",
+   "jobs": 6,
+   "open_jobs": 1
+  },
+  {
+   "owner_name": "Abby 朱昱潼",
+   "jobs": 1,
+   "open_jobs": 1
+  },
+  {
+   "owner_name": "小麦",
+   "jobs": 1,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Zoey 王子晗",
+   "jobs": 2,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Zoey 丁卓琳",
+   "jobs": 1,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Zizi 冯智秀",
+   "jobs": 2,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Ziyuan 赵子媛",
+   "jobs": 12,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Zeni 何雨昕",
+   "jobs": 5,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Yuki 友希",
+   "jobs": 1,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "YB 王彦博",
+   "jobs": 6,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "William 周宇鹏",
+   "jobs": 18,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Will 孙霖",
+   "jobs": 52,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Wendy 孙林溪",
+   "jobs": 10,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Violet 万佳",
+   "jobs": 1,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Viola 陈雨婷",
+   "jobs": 13,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Vex 陈吉思",
+   "jobs": 2,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Tears 罗家宽",
+   "jobs": 3,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Swann 王聪",
+   "jobs": 17,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Susu 王雨佳",
+   "jobs": 3,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Sunny 张秀英",
+   "jobs": 1,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Summer 潘钦",
+   "jobs": 7,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Stella 覃叶蕾",
+   "jobs": 1,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Stella 李欣",
+   "jobs": 9,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Stella 刘雨洁",
+   "jobs": 7,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Sky 孙天宇",
+   "jobs": 16,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Sherry 陈箫聿",
+   "jobs": 1,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Scarlett 何婷婷",
+   "jobs": 5,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Saturn 范东晓",
+   "jobs": 3,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Sandy 王秋红",
+   "jobs": 6,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Roger 李晟",
+   "jobs": 4,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Rocky 胡翔",
+   "jobs": 7,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Richard 李弈成",
+   "jobs": 1,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Rayna 张春",
+   "jobs": 13,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Pamela 包梦诗",
+   "jobs": 2,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Olivia 郭蒙蒙",
+   "jobs": 1,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Oasis 钱飞宇",
+   "jobs": 1,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Nico 冯明丽",
+   "jobs": 1,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Nemo 杨飞",
+   "jobs": 14,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Mya 马晶晶",
+   "jobs": 2,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Morning 罗晨",
+   "jobs": 1,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Molly 时怡梦",
+   "jobs": 1,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Moira 徐梦莹",
+   "jobs": 2,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Michael 赵世强",
+   "jobs": 1,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Mia 沈紫怡",
+   "jobs": 1,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Mia 李雪翾",
+   "jobs": 4,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Max 肖玛峰",
+   "jobs": 57,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Matthew 孙前程",
+   "jobs": 2,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Mark 郭宇",
+   "jobs": 88,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Mark 汪军",
+   "jobs": 12,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Mario 马靖奇",
+   "jobs": 1,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Lynn 宁辽原",
+   "jobs": 58,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Luna 李忻承",
+   "jobs": 2,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Luna 卢晓宇",
+   "jobs": 1,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Lu 师璐",
+   "jobs": 4,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Louise 骆玉洁",
+   "jobs": 15,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Louie 路云天",
+   "jobs": 1,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Li 徐文丽",
+   "jobs": 1,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Klaus 孙晓龙",
+   "jobs": 20,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Kathy 李曼莉",
+   "jobs": 45,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Jungo 简以宁",
+   "jobs": 3,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Johnny 梁弘进",
+   "jobs": 38,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Jiahao 李建鑫",
+   "jobs": 12,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Jennings黄浚宁",
+   "jobs": 3,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Jennifer 赵洪霞",
+   "jobs": 39,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Jeffrey  汪江稳",
+   "jobs": 60,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Jason 刘影",
+   "jobs": 8,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Jacob 文戴辉",
+   "jobs": 8,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Ivy 王惠婷",
+   "jobs": 1,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Ivy 吴迪",
+   "jobs": 3,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Hui 李思慧",
+   "jobs": 16,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Holly 欧佳丽",
+   "jobs": 106,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Herman 郭艺歆",
+   "jobs": 4,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Henry 韩永庆",
+   "jobs": 4,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Henry 孟炜",
+   "jobs": 18,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Helen 高海伦",
+   "jobs": 51,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Hebe 顾金显",
+   "jobs": 13,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Hazel 梁又慈",
+   "jobs": 9,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Hatcher 刘海琴",
+   "jobs": 30,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Hang 郑远航",
+   "jobs": 24,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Handy 赵航",
+   "jobs": 24,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Grace 王欣欣",
+   "jobs": 4,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Grace 刘雨欣",
+   "jobs": 5,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Gency 葛昌媛",
+   "jobs": 11,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Gavin 杨涛涛",
+   "jobs": 109,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Gabe 胡涛",
+   "jobs": 1,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Freya 王菲",
+   "jobs": 37,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Frena 冯倩",
+   "jobs": 4,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Flora 王馨仪",
+   "jobs": 33,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Fiona 崔睿思",
+   "jobs": 3,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Eva 王紫莹",
+   "jobs": 1,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Ethan 崔华锋",
+   "jobs": 4,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Esther 余靖旖",
+   "jobs": 2,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Enda 李焱达",
+   "jobs": 4,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Elsa 丁婷",
+   "jobs": 22,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Deanna 赵融",
+   "jobs": 2,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Dean 葛卉",
+   "jobs": 4,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "David 梁默予",
+   "jobs": 1,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Damon 李超",
+   "jobs": 1,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Chris 张津齐",
+   "jobs": 1,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Chipo 甘昕怡",
+   "jobs": 4,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Charming 刘磊",
+   "jobs": 47,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Cecilia 王绽凌",
+   "jobs": 1,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Casper 李荣华",
+   "jobs": 1,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Cain 曹牧",
+   "jobs": 2,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "CC 刘新鑫",
+   "jobs": 1,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Bella 杨水燕",
+   "jobs": 5,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Bella 孙伟",
+   "jobs": 3,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Azir 潘博文",
+   "jobs": 1,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Ariadne 顾诗书",
+   "jobs": 2,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Aria 吕涵",
+   "jobs": 7,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "April 邹雨欣",
+   "jobs": 2,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Angela 胡宁",
+   "jobs": 8,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Angela 王齐",
+   "jobs": 8,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Andy 孙鹏",
+   "jobs": 7,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Alisa 孙爱雯",
+   "jobs": 1,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Alice 李思娴",
+   "jobs": 1,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Aidan 张中原",
+   "jobs": 1,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Adam 温艾蓁",
+   "jobs": 1,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Adam 吴松辉",
+   "jobs": 5,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "Ace 孙悦铨",
+   "jobs": 3,
+   "open_jobs": 0
+  },
+  {
+   "owner_name": "AI Admin 智能助手",
+   "jobs": 1,
+   "open_jobs": 0
+  }
+ ]
+}

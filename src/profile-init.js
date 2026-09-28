@@ -75,11 +75,15 @@ ${ev.sample_messages.slice(0, 20).join('\n') || '（无）'}
   return { system, user };
 }
 
-/** LLM 输出 → 画像提案（zod 之外的轻校验：坏 JSON/超量/超长一律拒绝，宁缺勿错）。 */
+/** LLM 输出 → 画像提案。raw 接受对象（chatJson 已解析）或字符串（防御重解析）。
+ * 轻校验：坏 JSON/空关键词/超量/超长一律拒绝，宁缺勿错。 */
 export function parseProfileProposal(raw) {
-  let data;
-  try { data = JSON.parse(String(raw).replace(/```json|```/g, '').trim()); }
-  catch { return { ok: false, error: 'invalid_json' }; }
+  let data = raw;
+  if (typeof raw === 'string') {
+    try { data = JSON.parse(raw.replace(/```json|```/g, '').trim()); }
+    catch { return { ok: false, error: 'invalid_json' }; }
+  }
+  if (!data || typeof data !== 'object') return { ok: false, error: 'invalid_json' };
   const kws = [...new Set((Array.isArray(data.keywords) ? data.keywords : [])
     .map((k) => String(k).trim()).filter((k) => k.length >= 2 && k.length <= 10))];
   if (!kws.length) return { ok: false, error: 'empty_keywords' };

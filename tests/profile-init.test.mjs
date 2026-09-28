@@ -46,8 +46,11 @@ test('提案解析：合法 JSON 通过；坏 JSON/空关键词/超长一律拒�
   const ok = parseProfileProposal('{"keywords":["海外增长","AI产品"],"note":"做增长"}');
   assert.equal(ok.ok, true);
   assert.deepEqual(ok.profile_keywords, ['海外增长', 'AI产品']);
+  // chatJson（src/llm.js）返回的是已解析对象，不是字符串——对象直收
+  const fromObject = parseProfileProposal({ keywords: ['产品'], note: '' });
+  assert.equal(fromObject.ok, true);
   assert.equal(parseProfileProposal('not json').ok, false);
-  assert.equal(parseProfileProposal('{"keywords":[]}').ok, false);
+  assert.equal(parseProfileProposal({ keywords: [] }).ok, false);
   assert.equal(parseProfileProposal('{"keywords":["x"]}').ok, false, '单字关键词拒绝');
   const tooMany = JSON.stringify({ keywords: Array.from({ length: 25 }, (_, i) => `词${i}`) });
   assert.equal(parseProfileProposal(tooMany).ok, false, '超 20 个关键词拒绝');

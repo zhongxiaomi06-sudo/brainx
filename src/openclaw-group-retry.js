@@ -55,9 +55,15 @@ export async function healIntakeGroups(chatIds, access) {
       if (result?.added === true || Number(result?.added) > 0) healed += 1;
     } catch (error) {
       failures += 1;
-      // 2026-09-28：生产 1095 次失败只打 code 无法定位——补 cause 摘要（超时/CLI stderr/解析错误立辨）
-      const cause = error?.cause || error?.options?.cause;
-      const causeText = cause ? ` ← ${String(cause.stderr || cause.message || cause).slice(0, 160)}` : '';
+      // 2026-09-28：生产 1095 次失败只打 code 无法定位——挖出深层 cause
+      // （runner 的结构是 PersonalModelError(cause=PersonalModelError(cause={exitCode,stderr}))）
+      let deep = error?.cause || error?.options?.cause;
+      if (deep && typeof deep === 'object' && (deep.cause || deep.options?.cause)) {
+        deep = deep.cause || deep.options.cause;
+      }
+      const causeText = deep
+        ? ` ← ${typeof deep === 'object' ? JSON.stringify(deep).slice(0, 300) : String(deep).slice(0, 300)}`
+        : '';
       console.warn(`[openclaw-retry] intake 群 ${chatId} 白名单自愈失败：${
         String(error?.message || error?.code || error).slice(0, 200)}${causeText}`);
     }

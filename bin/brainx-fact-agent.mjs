@@ -55,9 +55,12 @@ function resolveLlm() {
   const model = process.env.GLM_MODEL || 'glm-4-flash';
   if (!apiKey) return { llm: null, model, reason: 'LLM_KEY_MISSING' };
   const llm = async ({ system, user }) => {
+    // 90s 硬超时（2026-09-28 生产实证：无超时时 StepFun 挂起的连接让整轮回填零产出卡死，
+    // 进程 0 CPU + ESTABLISHED 死连）。超时按批次失败计 llmFailures，下批继续（幂等可重跑）。
     const res = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(90_000),
       body: JSON.stringify({
         model, messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
         response_format: { type: 'json_object' }, temperature: 0,

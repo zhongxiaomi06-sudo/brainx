@@ -18,7 +18,10 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/opt/brainx/data
+# 2026-09-28 实证：worker 的 OpenClaw CLI 调用（群白名单 ensure/健康状态写入）需要写
+# /var/lib/brainx/.openclaw——ProtectSystem=strict 下不在白名单即只读，
+# 症状是子进程报 "attempt to write a readonly database"（1095 次自愈失败的根因）。
+ReadWritePaths=/opt/brainx/data /var/lib/brainx/.openclaw
 
 [Install]
 WantedBy=multi-user.target

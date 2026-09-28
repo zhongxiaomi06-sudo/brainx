@@ -80,6 +80,7 @@
 | 带宽监控与告警 | [带宽告警说明](guard-bandwidth-alert.md) |
 | 网站问题回溯 | [网站完整任务错误点审计](2026-08-17-网站完整任务错误点审计.md) |
 | **推荐池数据准确度、身份归属命中率、重复职位或 UNKNOWN 占比** | **[池子数据准确度诊断](audits/2026-09-28-pool-data-accuracy-diagnosis.md)**（2026-09-28 生产实测：状态分布/字段完备率/owner 映射 2.2% 结构性解读/596 组撞名/Felix 个案） |
+| **全池还是按身份裁剪、试点是否结束、顾问扩圈优先级** | **[试点结束与全池策略拍板](2026-09-28-pilot-graduation.md)**（全池=水面下情报资产 + 推送常态化证据 + 364 人扩圈花名册快照路径） |
 | 代码质量整改、门禁或前端测试 | [质量门禁与前端链路测试审计](audits/2026-08-26-quality-gate-frontend-test-audit.md)、[DeepSeek 审查规则提炼](audits/2026-08-24-deepseek-review-rule-extraction.md)、[上传前完整验证](standards/PRE_PUSH_VERIFICATION.md) |
 
 如果任务同时命中多个类型，必须阅读所有对应文档。找不到对应文档时，先检查代码和已有资料；若该主题会形成长期规则或决策，应先建立文档并把它加入本目录。

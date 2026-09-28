@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-28｜docs(audit): 池子数据准确度诊断——以已拉起数据为准的生产实测（不回填拍板后的基线）
+
+- 起因（用户指令）：「回填数据以已拉起的为准，不要求直接回填；对现在池子的数据判断准确度」。
+- 处置：停止 GLM 全量回填（进程与监控已停）；生产库只读诊断落 `docs/audits/2026-09-28-pool-data-accuracy-diagnosis.md`——状态分布（OPEN 4,655 较 9-25 翻倍）/OPEN 字段完备率 93-97%/owner 命中花名册 2.2%（结构性：负责人多为试点外同事，按设计落团队共享池）/596 组撞名重复/Felix 个案（17 个 MY_JOB 中 10 个 TTC 负责人为花名册外同事）。docs/README.md 路由登记。
+- 后续建议（另案）：撞名去重策略、归属提分走 ltr-feat-v2 影子评估、Felix 10 个职位归属人工确认。
+
 ## 2026-09-28｜fix(fact-agent): CLI 的 LLM fetch 补 90s 超时（生产实证：无超时挂起致全量回填零产出）+ 拍板 status 不回溯
 
 - 起因：全量回填在生产跑了 1 小时零新增落库，定位为 StepFun 连接挂起 + `resolveLlm` 的 fetch 无超时（0 CPU + ESTABLISHED 死连实证）。

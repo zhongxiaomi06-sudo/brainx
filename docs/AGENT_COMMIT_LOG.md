@@ -1,5 +1,16 @@
 # Agent Commit 记录
 
+## 2026-09-28｜docs(data): 数据地基体检报告——生产库三轮扫射，3🔴+4🟡+2⚪+6✅
+
+- 起因（用户指令）：「阅读数据的地基，进行一遍扫射检查，然后关键的点，可以进行补充的再次进行验证，当前的数据结构还是出现了很多的问题」。
+- 检查方法：按 09-24 错位诊断文档的四类根源设计三轮只读 SQL（结构层→数据层→关键点归因），生产库 `file:...?mode=ro` 打开零写入；脚本 /tmp/brainx-audit{,2,3}.sql。
+- 关键发现（🔴）：①**生产 migrations 与仓库分叉**——schema_migrations 记账 64 vs 仓库 62 文件，生产独有 0019_position_add_company/0020_workbench_preferences 且双 0019 并存（A1 类错位现行复发，旧库回填逻辑在文件集不同机器上会标错文件=重建地雷）；②T7/T8 三张新表（ttc_pipeline_rows/project_rows/task_rows）ad-hoc 建表无记账；③**双层状态不一致 1,277 项目**——ttc sync UPSERT 把 09-26 写回的 job_facts.active_state=OPEN 冲回 UNKNOWN（5,905→4,628 精确吻合），真值只在 overrides 层，直读表=错读。
+- 次级发现（🟡）：ttc_project_rows.created_at 3,290 行全非 UTC ISO（TTC 本地墙钟串直接入库）；DAILY_TOP3 的 push_log.run_id 596 条 JOIN 不上 decision_runs（D4 精确规模）；71 条 group 草稿原文锚定缺失（非 retention 所致，成因待归因）；弱后缀 company 480 条 pending 中 LLM 层（recovery 135+split 30）也在产生（C1 非规则层独有）；单字段草稿 870 条回潮。
+- 修正 09-26 口径：pipeline_rows 同职位多行是「一职位多候选人」正常语义非重复脏数据；无 job_name 8,010 为权限类读时过滤即可。
+- ✅ 通过项：时间格式/未来时间/倒挂全净、通道 origin 分层分明、UNIQUE 部分索引守卫完好、sync/decision 链健康（09-28 单日 193 COMPLETED）、T7 JOIN 率 89%。
+- 改动：docs/2026-09-28-data-foundation-audit.md（新，含修复排期：①migration 收编 ②T7 写回正式化 ③时间归一 ④S5 已在 specs/022 ⑤S6 归因 ⑥S7/S8 规则 v2 吸收）。README 路由+目录双登记。
+- 验证：三轮 SQL 全部只读模式；差集用 comm 对账；1,277 与 OPEN 降幅差值交叉验证吻合；工作区干净。
+
 ## 2026-09-28｜feat(push): 再推去重——--exclude-pushed-today 剔除当日已推职位
 
 - 起因（用户指令）：「顾问要求再次推送，要求不要有重复的」。

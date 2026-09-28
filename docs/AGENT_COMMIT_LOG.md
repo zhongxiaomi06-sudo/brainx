@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-28｜fix(recommend): 轮次级 alive_count 口径——卡片总量改为「确认在招 N · 评估池 M」
+
+- 起因（用户指令）：「验证数据准确度；felix 的推送数据不准确；每人身份对应的数据总量要正确」。生产实测（全顾问对照）：每顾问 candidate_count 均为全库 ~23,185（含 20,500 个 UNKNOWN 无信号职位）；自有职位进 Top5 比例极低（york 2/189、linda 0/3、frankie 0/2、felix 4/17、mia 3/19）——分母口径误导 + 身份相关性不进六维评分（策略缺口，非回归；归属提分走 specs/022 影子纪律另案）。
+- 改动：`migrations/0059_decision_runs_alive_count.sql`（decision_runs 加列，历史行 NULL）；`src/recommend.js` 落轮时记 alive_count（evaluated 中 active_state='OPEN' 数）；`src/push.js` 卡片首屏改「从 N 个确认在招职位中筛选 · 评估池共 M 个」（NULL 回退旧文案）。不改排序、不动权重。
+- 测试：`tests/alive-count.test.mjs`（新，2 例：落库+透传/卡片两口径）；framework 迁移清单 61→62。
+- 关联：PR #67 阶段映射修复已合并部署；生产 GLM 全量回填（8,472 候选）经 env 映射 BRAINX_LLM→FACT_AGENT 在服务器后台执行中。
+
 ## 2026-09-26｜fix(fact-agent): 阶段映射补「第 N 轮」说法——生产试点 40 条实证 invalid 主因
 
 - 起因（用户指令）：「UNKNOWN 职位全部信息录入一遍，CLI 第一遍 + 资源补充」。specs/023 管线已建成，跑生产试点（--limit=40）发现：GLM 常返回「第二轮/第一轮/第三轮」说法，STAGE_ENUM 不认 → invalid 占 10/25（value_unmappable 主因）；另服务器未配 FACT_AGENT_KEY，用既有 BRAINX_LLM（StepFun openai 兼容端点）经 env 映射（GLM_BASE_URL/GLM_MODEL/FACT_AGENT_KEY）验证可行，llmFailures=0，不改任何配置文件。

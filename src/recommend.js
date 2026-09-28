@@ -175,10 +175,13 @@ export function recommend(db, consultant_id, {
   evaluated.forEach((r, i) => { r.rank = i + 1; });
 
   const run_id = uuid();
+  // 确认在招计数（0059）：evaluated 中 active_state='OPEN' 的数量——卡片「总量」口径，
+  // 避免 88% UNKNOWN 状态职位撑大分母误导顾问（2026-09-28 felix 案例）。
+  const aliveCount = evaluated.reduce((n, r) => n + (r.job.active_state === 'OPEN' ? 1 : 0), 0);
   if (!dry_run) {
     const insRun = db.prepare(`INSERT INTO decision_runs
-      (run_id, consultant_id, snapshot_id, policy_version, candidate_count, status, created_at)
-      VALUES (?,?,?,?,?,?,?)`);
+      (run_id, consultant_id, snapshot_id, policy_version, candidate_count, alive_count, status, created_at)
+      VALUES (?,?,?,?,?,?,?,?)`);
     const insRec = db.prepare(`INSERT INTO recommendations
       (decision_id, run_id, project_id, consultant_id, action, score, confidence_band,
        evidence_coverage, reasons_json, risks_json, evidence_refs_json, breakdown_json,
@@ -186,7 +189,7 @@ export function recommend(db, consultant_id, {
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
     db.exec('BEGIN');
     try {
-      insRun.run(run_id, consultant_id, snapshot.sync_id, POLICY_VERSION, evaluated.length, 'COMPLETED', now());
+      insRun.run(run_id, consultant_id, snapshot.sync_id, POLICY_VERSION, evaluated.length, aliveCount, 'COMPLETED', now());
       // 精选盘需要 Top20 之后的替补，但不能把数千候选在每轮全部永久冻结。
       // 默认最多保留 200 条，足够十批替换；candidate_count 仍记录完整评估规模。
       const persisted = evaluated.slice(0, Math.max(top, Number(persistLimit) || PERSIST_LIMIT));

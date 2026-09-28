@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-28｜feat(profile): 顾问画像首初始化工具——证据汇总 + LLM 提案 + 覆盖率评估（4/9 空白画像补课）
+
+- 起因（用户指令）：「linda/frankie/hiroshi/miya 的画像先建立第一批动态画像，用他们和 AI 的对话 + 飞书群消息数据，然后使用 agent 算法评估」。前置验证：4 人 profile_keywords 空白；linda/frankie 群消息充足（5.6k/8.3k 条、群关联职位数百），miya 仅 2 个策展职位，hiroshi 无任何数据。
+- 改动：`src/profile-init.js`（新）：gatherProfileEvidence（群关联职位公司/职位/方向频次 + 策展/主做职位 ×3 加权 + 近期消息采样 40 条，postToPlainText 复用）；buildProfilePrompt（宁缺勿错，证据不足允许空数组）；parseProfileProposal（坏 JSON/超量/超长拒绝）；evaluateProposal（关键词对关联职位的命中率=覆盖率）。`bin/brainx-profile-init.mjs`（新 CLI）：--consultant/--all-empty，dry-run 默认，--write 经 updateProfile 落库（合并保留既有键），--force 才覆盖非空画像。
+- 测试：`tests/profile-init.test.mjs` 4 例（证据聚合/提案解析守门/覆盖率/prompt 构建）。
+- 已知边界：lark_messages 无 sender 列，消息证据是群环境级（不做个人归因）；hiroshi 无数据会落 no_evidence 跳过。
+
 ## 2026-09-28｜docs(decision): 试点结束与全池策略拍板 + TTC owner 全量花名册快照（364 人）
 
 - 起因（用户指令）：「就是要全部的职位；找到水面之下的信息，没有别人的职位不能确定；结束试点」。

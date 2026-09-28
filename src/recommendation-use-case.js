@@ -209,12 +209,15 @@ export function createRecommendationUseCase(db, {
     }
     evaluated.sort(sortRecs);
     evaluated.forEach((item, index) => { item.rank = index + 1; });
+    const aliveCount = evaluated.reduce(
+      (count, item) => count + (item.job.active_state === 'OPEN' ? 1 : 0), 0,
+    );
 
     const runId = idFn();
     if (!dry_run) {
       repository.persistRun({
         runId, consultantId, snapshotId: snapshot.sync_id,
-        policyVersion: POLICY_VERSION, evaluated, top,
+        policyVersion: POLICY_VERSION, evaluated, aliveCount, top,
         persistLimit: Math.max(top, Number(persistLimit) || config.persistLimit),
         createdAt: nowFn(),
       });

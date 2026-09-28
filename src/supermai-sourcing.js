@@ -1,6 +1,7 @@
 /** SuperMai 找人入口：创建云端任务，由顾问自己的桌面连接器出站领取并执行。 */
 import { createHash } from 'node:crypto';
 import { now, uuid } from './db.js';
+import { emitEvent } from './hub/emit.js';
 import { normalizeExcludedCandidateRefs } from './search-rounds.js';
 import { supermaiDeviceStatus } from './supermai-relay.js';
 
@@ -111,6 +112,14 @@ export function startSupermaiScoutTask(db, bus, consultantId, criteria, {
       resultKey, consultantId, taskId, startedAt, cleanCriteria || null,
       searchRound, JSON.stringify(exclusions),
     );
+    emitEvent(db, {
+      event_type: 'sourcing.search_started',
+      idem_key: `sourcing.started:${projectKey}:${taskId}`,
+      actor: 'agent:brainx_supermai_scout',
+      payload: { project_id: projectKey, channel: 'supermai', round: searchRound },
+      evidence_refs: [{ table: 'sourcing_tasks', id: taskId }],
+      occurred_at: startedAt,
+    });
     db.exec('COMMIT');
   } catch (error) {
     db.exec('ROLLBACK');

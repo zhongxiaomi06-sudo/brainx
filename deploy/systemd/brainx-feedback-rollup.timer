@@ -1,0 +1,10 @@
+[Unit]
+Description=BrainX feedback metrics rollup timer (daily 05:11)
+
+[Timer]
+OnCalendar=*-*-* 05:11:00
+Persistent=true
+Unit=brainx-feedback-rollup.service
+
+[Install]
+WantedBy=timers.target

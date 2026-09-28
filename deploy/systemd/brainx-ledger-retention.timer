@@ -1,0 +1,9 @@
+[Unit]
+Description=BrainX weekly retention/archive timer (specs/021 US2)
+
+[Timer]
+OnCalendar=Sun *-*-* 04:23:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,18 @@
+[Unit]
+Description=BrainX hot-table retention/archive (specs/021 US2)
+After=network-online.target brainx.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=brainx
+Group=brainx
+WorkingDirectory=/opt/brainx
+EnvironmentFile=/etc/brainx/worker.env
+ExecStartPre=/usr/bin/node /opt/brainx/bin/brainx-runtime-preflight.mjs
+ExecStart=/usr/bin/node /opt/brainx/bin/brainx-ledger-retention.mjs --apply
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/brainx/data /opt/brainx/backups

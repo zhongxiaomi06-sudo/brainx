@@ -150,3 +150,31 @@ if systemctl is-active --quiet openclaw-brainx; then
 else
   echo "installed; fill /etc/brainx/*.env, then validate and enable services per runbook"
 fi
+
+# 发布后验收（specs/019 US5）：插件文件清单与工具外露数必须到位，缺失即失败——
+# 历史事故形态（npm pack 丢文件、白名单漂移）在此兜底，不再靠人工发现。
+node - "$BRAINX_DEPLOY_ROOT/plugins/brainx-openclaw" \
+  "$BRAINX_OPENCLAW_STATE/extensions/brainx-openclaw" \
+  "$BRAINX_OPENCLAW_STATE/openclaw.json" <<'EOF'
+const fs = require('fs');
+const path = require('path');
+const [srcDir, extDir, liveConfigPath] = process.argv.slice(2);
+const pkg = JSON.parse(fs.readFileSync(path.join(srcDir, 'package.json'), 'utf8'));
+const manifest = JSON.parse(fs.readFileSync(path.join(srcDir, 'openclaw.plugin.json'), 'utf8'));
+if (!fs.existsSync(extDir)) {
+  console.error(`post-install verify failed: extension dir missing: ${extDir}`);
+  process.exit(71);
+}
+const missing = (pkg.files || []).filter((f) => f !== 'README.md' && !fs.existsSync(path.join(extDir, f)));
+if (missing.length) {
+  console.error(`post-install verify failed: missing plugin files: ${missing.join(', ')}`);
+  process.exit(71);
+}
+const allow = JSON.parse(fs.readFileSync(liveConfigPath, 'utf8'))?.tools?.allow || [];
+const missingTools = manifest.contracts.tools.filter((t) => !allow.includes(t));
+if (missingTools.length) {
+  console.error(`post-install verify failed: tools not exposed in live config: ${missingTools.join(', ')}`);
+  process.exit(72);
+}
+console.log(`post-install verify ok: ${pkg.files.length} plugin files present, ${manifest.contracts.tools.length} tools exposed`);
+EOF

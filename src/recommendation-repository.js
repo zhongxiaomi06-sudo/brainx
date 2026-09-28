@@ -89,11 +89,12 @@ export function createRecommendationRepository(db) {
         .run(runId, consultantId, snapshotId, policyVersion, createdAt);
     },
 
-    persistRun({ runId, consultantId, snapshotId, policyVersion, evaluated,
+    persistRun({ runId, consultantId, snapshotId, policyVersion, evaluated, aliveCount,
       top, persistLimit, createdAt }) {
       const insertRun = db.prepare(`INSERT INTO decision_runs
-        (run_id, consultant_id, snapshot_id, policy_version, candidate_count, status, created_at)
-        VALUES (?,?,?,?,?,'COMPLETED',?)`);
+        (run_id, consultant_id, snapshot_id, policy_version, candidate_count, alive_count,
+         status, created_at)
+        VALUES (?,?,?,?,?,?,'COMPLETED',?)`);
       const insertRecommendation = db.prepare(`INSERT INTO recommendations
         (decision_id, run_id, project_id, consultant_id, action, score, confidence_band,
          evidence_coverage, reasons_json, risks_json, evidence_refs_json, breakdown_json,
@@ -101,7 +102,8 @@ export function createRecommendationRepository(db) {
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
       db.exec('BEGIN');
       try {
-        insertRun.run(runId, consultantId, snapshotId, policyVersion, evaluated.length, createdAt);
+        insertRun.run(runId, consultantId, snapshotId, policyVersion, evaluated.length,
+          aliveCount, createdAt);
         for (const item of evaluated.slice(0, Math.max(top, persistLimit))) {
           insertRecommendation.run(item.decision_id, runId, item.project_id, consultantId,
             item.action, item.score, item.confidence_band, item.evidence_coverage,

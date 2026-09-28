@@ -5,6 +5,11 @@
  * consumeOnce('job-extract') 复用 Step 0 幂等模板（同事件不重复抽，LLM 调用也是钱），
  * 失败上抛走整体回滚（E2 LLM 层失败时由调用方决定进 event_dlq 重放）。
  * AI 开关：AI_JOB_EXTRACT_ENABLED（默认关）——E1 仅规则层；E2 在此挂 LLM 层（rules 保底）。
+ *
+ * specs/019 US2：新增 jobExtractConsumer 注册项（dispatcher 两段式）——
+ * LLM 预抽取从 bridge-producer 的 presetFields 注入挪回消费者内部 prepare
+ * （事务外异步 IO），apply 仍在 consumeOnce 事务内落库；schema 违规回退规则层
+ * 的补偿也收进 apply（单点，不再由生产者双写）。
  */
 import { uuid, now } from '../db.js';
 import { consumeOnce } from '../hub/consumer.js';
@@ -12,6 +17,46 @@ import { validateDraft } from './schema.js';
 import { extractRules, isJobRelevant } from './classify.js';
 
 export const CONSUMER_NAME = 'job-extract';
+
+/** dispatcher 注册项（契约 specs/019-hub-event-backbone/contracts/event-types.md）。 */
+export const jobExtractConsumer = {
+  name: CONSUMER_NAME,
+  eventTypes: ['lark.message_received'],
+  maxRetries: 3,
+  prepare: prepareJobExtract,
+  apply: applyJobExtract,
+};
+
+/** prepare（事务外）：规则相关性先行砍 LLM 调用（闲聊不烧额度），命中才走 LLM 预抽取。 */
+async function prepareJobExtract(event, { db } = {}) {
+  if (process.env.AI_JOB_EXTRACT_ENABLED !== '1') return null;
+  const msg = loadMessage(db, event);
+  if (!msg?.text || !isJobRelevant(msg.text)) return null;
+  try {
+    const { isLlmConfigured } = await import('../llm.js');
+    if (!isLlmConfigured()) return null;
+    const { extractLlm } = await import('./classify.js');
+    const fields = await extractLlm(msg.text);
+    return fields && Object.values(fields).some((f) => f && f.text) ? fields : null;
+  } catch { return null; } // LLM 不可用 → 规则层保底（降级由调度层可见性覆盖）
+}
+
+/** apply（consumeOnce 事务内）：LLM 预计算字段优先；schema 违规回退规则层。 */
+function applyJobExtract(db, event, presetFields) {
+  try {
+    return extractIntoDraft(db, event.event_id, { presetFields: presetFields || null });
+  } catch (e) {
+    if (!presetFields || !String(e?.message || '').includes('schema_invalid')) throw e;
+    return extractIntoDraft(db, event.event_id, { presetFields: null });
+  }
+}
+
+function loadMessage(db, event) {
+  // dispatcher 两段式传入的 event 已解析（evidence_refs 为数组）；直调路径为 JSON 串
+  const refs = Array.isArray(event?.evidence_refs) ? event.evidence_refs : JSON.parse(event?.evidence_refs ?? '[]');
+  const msgRef = refs.find((ref) => ref.table === 'lark_messages');
+  return msgRef ? db.prepare(SELECT_MSG_SQL).get(msgRef.id) : null;
+}
 
 const SELECT_EVENT_SQL = 'SELECT * FROM workflow_event_log WHERE event_id = ?';
 const SELECT_MSG_SQL = 'SELECT * FROM lark_messages WHERE message_id = ?';

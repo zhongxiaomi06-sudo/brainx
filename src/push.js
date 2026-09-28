@@ -37,7 +37,10 @@ export function buildDailyCard({ consultant_name, consultant_id, run, items, ite
   const limit = Math.min(item_limit || items.length || 3, items.length);
   const els = [
     { tag: 'markdown', content: `**${consultant_name || '你好'}，今天建议优先处理 ${limit} 个职位**\n`
-        + `从 ${run?.candidate_count ?? items.length} 个职位中筛选 · ${state === 'READY' ? '数据完整' : '数据不完整'} · 每项含依据、风险和下一步` },
+        + (run?.alive_count != null
+          ? `从 ${run.alive_count} 个确认在招职位中筛选 · 评估池共 ${run.candidate_count} 个`
+          : `从 ${run?.candidate_count ?? items.length} 个职位中筛选`)
+        + ` · ${state === 'READY' ? '数据完整' : '数据不完整'} · 每项含依据、风险和下一步` },
   ];
   items.slice(0, limit).forEach((r, i) => {
     const j = r.job;
@@ -156,9 +159,24 @@ export function buildSyncAlertCard(sync, { publicBaseUrl } = {}) {
     ] };
 }
 
+/** 顾问某日已推送过的 project_id 集合（从 push_log.card_json 提取深链里的职位引用）。
+ * 用途：顾问要求「再次推送」时去重（2026-09-28 指令），只推今日未出现过的职位。
+ * dayIso 为 CST 日期（YYYY-MM-DD）；卡片里的职位出现在 quickLink project= 与 opportunity: 深链。 */
+export function pushedProjectIdsOnDay(db, consultantId, dayIso) {
+  const dayStartUtc = new Date(`${dayIso}T00:00:00+08:00`).toISOString();
+  const rows = db.prepare(`SELECT card_json FROM push_log
+    WHERE consultant_id=? AND created_at >= ?`).all(consultantId, dayStartUtc);
+  const seen = new Set();
+  for (const r of rows) {
+    for (const m of String(r.card_json || '').matchAll(/project=([A-Za-z0-9_-]+)|opportunity(?:%3A|:)([A-Za-z0-9_-]+)/g)) {
+      seen.add(m[1] || m[2]);
+    }
+  }
+  return seen;
+}
+
 /** 重大变化提醒卡（P4）：Top1 易主 / ACCEPT 档新进 Top3。仅推顾问本人，绝不推群。 */
-export function buildHeatingAlertCard({ change_label, item, publicBaseUrl }) {
-  const baseUrl = productionBaseUrl(publicBaseUrl).href;
+export function buildHeatingAlertCard({ change_label, item, publicBaseUrl }) {  const baseUrl = productionBaseUrl(publicBaseUrl).href;
   const j = item.job;
   return { config: { wide_screen_mode: true },
     header: { template: 'red', title: { tag: 'plain_text',

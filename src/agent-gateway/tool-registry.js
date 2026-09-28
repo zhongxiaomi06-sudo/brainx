@@ -3,6 +3,7 @@ import { createTalentToolHandlers } from './tools-talent.js';
 import { createActionToolHandlers } from './tools-actions.js';
 import { createCandidateActionToolHandlers } from './tools-candidate-actions.js';
 import { createJobFactsToolHandlers } from './tools-job-facts.js';
+import { createJudgmentToolHandlers } from './tools-judgments.js';
 import { createJdSubmitToolHandlers } from './tools-jd-submit.js';
 import { sendInteractiveCard } from '../feishu-bot.js';
 import { createCandidateReportToolHandlers } from '../candidate-report.js';
@@ -63,6 +64,13 @@ export const AGENT_TOOL_ROWS = Object.freeze([
     jd_text: string({ minLength: 50, maxLength: 8000 }), confirm: boolean(),
     confirm_create: boolean(),
   }, ['jd_text', 'confirm']) },
+  // specs/016：顾问判断确认回路（复用 job_fact_review 授权域，避免新增 purpose 授权面）。
+  { name: 'brainx_pending_judgments', purpose: ['job_fact_review'], p2pOnly: true, parameters: object({
+    limit: integer(1, 20),
+  }) },
+  { name: 'brainx_review_judgment', purpose: ['job_fact_review'], p2pOnly: true, parameters: object({
+    draft_id: string(), action: string({ enum: ['confirm', 'reject'] }), job_id: string(), confirm: boolean(),
+  }, ['draft_id', 'action', 'confirm']) },
   { name: 'brainx_push_preferences', purpose: ['preferences'], p2pOnly: true, parameters: object({}) },
   { name: 'brainx_update_push_preferences', purpose: ['preferences'], p2pOnly: true, parameters: object({
     times: array(string({ pattern: '^(?:[01]\\d|2[0-3]):[0-5]\\d$' })), job_count: integer(1, 10),
@@ -198,6 +206,7 @@ export function createProductionToolRegistry({ db, talentDependencies = {}, acti
   const actions = createActionToolHandlers({ db, sendCardFn: sendInteractiveCard, ...actionDependencies });
   const candidateActions = createCandidateActionToolHandlers({ db, ...talentDependencies });
   const jobFacts = createJobFactsToolHandlers({ db });
+  const judgments = createJudgmentToolHandlers({ db });
   const jdSubmit = createJdSubmitToolHandlers({ db });
   const reports = createCandidateReportToolHandlers({ db, ...reportDependencies });
   const talent = createTalentToolHandlers({
@@ -207,6 +216,6 @@ export function createProductionToolRegistry({ db, talentDependencies = {}, acti
     jobGapHandler: jobs.brainx_gap_questions,
   });
   return createToolRegistry({ handlers: {
-    ...jobs, ...talent, ...actions, ...candidateActions, ...jobFacts, ...jdSubmit, ...reports,
+    ...jobs, ...talent, ...actions, ...candidateActions, ...jobFacts, ...judgments, ...jdSubmit, ...reports,
   } });
 }

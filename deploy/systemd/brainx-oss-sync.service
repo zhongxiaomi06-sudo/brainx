@@ -1,0 +1,20 @@
+[Unit]
+Description=BrainX OSS offsite sync of daily backups (specs/021 US1 延伸)
+After=network-online.target brainx-backup.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=brainx
+Group=brainx
+WorkingDirectory=/opt/brainx
+# 凭据走 ECS 实例 RAM 角色（profile ecs-oss，EcsRamRole），不落 AK；
+# BRAINX_OSS_BUCKET 在 /etc/brainx/worker.env 配置，缺失时脚本报错退出 1（不静默）。
+EnvironmentFile=/etc/brainx/worker.env
+ExecStartPre=/usr/bin/node /opt/brainx/bin/brainx-runtime-preflight.mjs
+ExecStart=/usr/bin/node /opt/brainx/bin/brainx-oss-sync.mjs --apply
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/brainx/data /opt/brainx/backups

@@ -21,6 +21,7 @@
 | BrainTex 飞书欢迎页、功能菜单、按钮卡片或新用户指引 | [BrainTex 飞书功能首页与新用户指引](2026-09-03-braintex-feishu-home.md)、[BrainTex 群聊工作流技术 PRD](prd-2026-09-01-braintex-group-workflow.md) |
 | OpenClaw 多顾问安装、上线、运维、故障或回滚 | [BrainTex 服务器部署与飞书接入 Agent 完整施工手册](2026-09-03-braintex-server-deployment-agent-manual.md)、[OpenClaw 多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md)、[部署编排](DEPLOYMENT.md) |
 | 新同事开通 BrainTex、飞书首次使用或将开通任务交给部署 Agent | [BrainTex 同事开通与首次使用实用手册](2026-09-10-braintex-coworker-onboarding-runbook.md)、[BrainTex 飞书功能首页与新用户指引](2026-09-03-braintex-feishu-home.md) |
+| **给顾问加私聊/群关键词确定性 hook（私聊接单、拉 Offer 群、群固定文案），或给新顾问开通此类动作** | **[Per-user Hook 配置](2026-09-22-user-hooks-config.md)**（user-hooks.json 触发条件+动作模板，写配置不写代码）、[OpenClaw 多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md) |
 | 顾问个人模型、自带 API Key、按飞书用户隔离 Agent 或模型切换 | [顾问个人模型配置规格](../specs/004-personal-model-config/spec.md)、[OpenClaw 多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md)、[安全操作手册](SECURITY.md) |
 | 服务器由同事或 Agent 维护、需要从空环境到异机可用的完整步骤与验收证据 | [BrainTex 服务器部署与飞书接入 Agent 完整施工手册](2026-09-03-braintex-server-deployment-agent-manual.md)、[BrainX × OpenClaw ECS 部署交接单](2026-09-03-openclaw-ecs-handoff.md) |
 | 候选人事实版本、人才 RDS 迁移、shortlist 数据契约或授权查询 | [候选人事实与 shortlist 数据契约](2026-09-03-candidate-data-contracts.md)、[BrainX × OpenClaw AI 猎头工作流产品需求文档](prd-2026-09-02-openclaw-ai-recruiting-workflow.md) |
@@ -45,6 +46,8 @@
 | **BrainX 下游交付、MCP server 工具契约、接口打包或部署** | **[BrainX 下游交付文档](2026-09-02-brainx-mcp-deliverable.md)**（用户职责边界内）、[OpenClaw 壳子架构 §6 接口挂载](2026-09-02-openclaw-shell-architecture.md) |
 | **后端侧有哪些模块、各自什么状态、下一步做什么（不负责 OpenClaw 接口）** | **[后端侧模块结构与下一步安排](2026-09-02-backend-module-structure.md)**（六层结构 + 已建成/待补对照 + 9/3 排期）、[下游交付文档](2026-09-02-brainx-mcp-deliverable.md) |
 | **群消息怎么提炼成 job_facts、信息抽取开源组件选型或抽取层排期** | **[群消息 → job_facts 提炼层研发路径](2026-09-02-job-facts-extraction-roadmap.md)**（开源调研综合 + 挂账本消费者的架构 + E0-E4 时间线）、[后端侧模块结构 §3 待补第 5 项](2026-09-02-backend-module-structure.md) |
+| **顾问群聊中的业务判断（客户偏好/硬性要求/否决原因）怎么抽取、确认或进权威表** | **[顾问判断抽取回路](2026-09-22-judgment-extraction.md)**（第二抽取域 + 四层模式复刻 + judgment_facts 契约）、[规格 016](../specs/016-judgment-extract-loop/spec.md) |
+| **客户健康度报告怎么落库、生命周期分档推送（休眠静默/冷启动破冰）怎么走** | **[第一批客户健康数据与算法驱动推送](2026-09-25-first-batch-push.md)**（client_metrics 表 + 快照导入 + 策略层 + 推送脚本）、[规格 022](../specs/022-client-feedback-signals/spec.md) |
 | **顾问私聊直接发 JD 建岗草稿、JD 提交幂等或 p2p 草稿可见性** | **[私聊 JD 直接提交建岗草稿规格](../specs/005-private-jd-job-draft/spec.md)**（brainx_submit_job_jd 工具 + sha256 幂等 + LLM/规则双层提炼 + 仅提交人可见）、[群消息 → job_facts 提炼层研发路径](2026-09-02-job-facts-extraction-roadmap.md) |
 | **给 OpenClaw 侧打包对接信息、MCP 接入配置、consultant_id 映射规则或 Skill 交付** | **[BrainX → OpenClaw 接口包](2026-09-02-openclaw-interface-pack.md)**（三接缝一屏 + 15 工具快照 + 交付包清单）、[下游交付文档](2026-09-02-brainx-mcp-deliverable.md) |
 | **群消息读取归谁（OpenClaw 还是后端）** | **[后端侧模块结构 §1 边界裁定](2026-09-02-backend-module-structure.md)**（**关键纠正：通道层 `src/gateway/ws-client.js` 已在后端仓库建成，不依赖 OpenClaw**）、[飞书权限清单 §6.1](2026-09-02-feishu-permission-scopes.md) |
@@ -81,6 +84,12 @@
 | 前端重构排期、施工范围或阶段验收 | [前端真实数据重构施工清单](frontend-refactor-construction-checklist.md)、[前端交互架构](frontend-interaction-architecture.md) |
 | TTC 职位字段、筛选能力或字段变化 | [TTC 职位字段库](ttc-field-catalog.md)、[BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md) |
 | Commit、协作记录 | [Agent Commit 记录](AGENT_COMMIT_LOG.md) |
+| **Hub 架构重整（业务事件进账本、dispatcher、反馈环、session 隔离下沉、接口面收敛）** | **[Hub 事件骨干重整规格](../specs/019-hub-event-backbone/spec.md)**（五用户故事 + 四重难点数据来源契约；**US1-US3 已建成**：五类业务事件契约见 [contracts/event-types.md](../specs/019-hub-event-backbone/contracts/event-types.md)、dispatcher=`src/hub/dispatcher.js`+`bin/brainx-dispatcher.mjs`、反馈指标=`src/feedback/rollup.js`+`bin/brainx-feedback-rollup.mjs`）、[Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) |
+| **生产库备份、高热表 retention/归档、磁盘增长失控** | **[数据结构与磁盘用途规范](2026-09-23-data-structure-and-disk-layout.md)**（数据域总表 + 磁盘铁律 + 草稿落库纪律）、[数据治理运维手册：备份与保留归档](2026-09-23-data-governance-ops.md)（恢复演练命令 + dry-run 审查流程 + 窗口 env 清单 + journalctl 告警面 + 服务器规格基线采集）、[数据治理规格](../specs/021-data-governance/spec.md)（自动备份 + 保留归档纪律 + 引用保护）、[Hub 事件骨干重整规格](../specs/019-hub-event-backbone/spec.md) |
+| **数据读取链路（怎么进来/怎么消费）、生产数据错位/字段错位/时间错位/主键冲突诊断** | **[数据读取链路与错位诊断规范](2026-09-24-data-reading-pipeline.md)**（入料 W1-W7 + 消费 R1-R7 总表 + 错位四类根源目录 A/B/C/D + 读取纪律六条红线）、[数据结构与磁盘用途规范](2026-09-23-data-structure-and-disk-layout.md)（存储归属） |
+| **数据渠道不够要扩渠道、TTC 顾问面板数据（pipeline/任务/名单/推荐报告）、jobwater 市场数据、LinkedIn/技能包怎么接** | **[数据渠道全景与接入路线规范](2026-09-24-data-channels-roadmap.md)**（四层渠道全景：飞书 F1-F4 / TTC JWT T1-T12 / 独立服务 J1 / GUI G1-G2，逐条带已接/未接状态与最佳读取方式 + 技能包 8 技能映射 + 接入优先级 P0=Pipeline 补 current_stage + 安全红线）、[数据读取链路与错位诊断规范](2026-09-24-data-reading-pipeline.md) |
+| **推荐全是 OBSERVE 没有可执行档、要用 agent 从群消息补 current_stage/active_state、或修卡片 served 埋点** | **[字段补全 Agent 与 served 埋点规格](../specs/023-fact-agent/spec.md)**（job_agent_facts 新表 + GLM 抽取 + 消歧三分叉 + 合成层插档 + 置信打折，agent 产字段不产决定）、[数据基线与验证方法论](../specs/023-fact-agent/data-baseline.md)（全部实测数字与影子对照口径）、[数据渠道全景与接入路线规范](2026-09-24-data-channels-roadmap.md)（T7 Pipeline = current_stage 第一供给线） |
+| **field-clean / 草稿字段清洗产出的质量审计、evidence 锚定率、file 消息假阳性** | **[field-clean 两批清洗数据审计](2026-09-24-field-clean-batch-audit.md)**（batch1/batch2 全量确定性校验 + LLM 双标注一致率 + 三个缺陷处置） |
 | 密钥、登录、权限、数据隔离 | [安全操作手册](SECURITY.md) |
 | 构建、发布、服务器、容器 | [部署编排](DEPLOYMENT.md)、[云端恢复清单](cloud-recovery-checklist.md)、[安全操作手册](SECURITY.md) |
 | 验证历史行为或已有能力 | [开发验证报告](VERIFICATION.md) |
@@ -88,6 +97,8 @@
 | CRM 批量导出设计 | [CRM 批量导出提案](crm-batch-export-proposal.md) |
 | 带宽监控与告警 | [带宽告警说明](guard-bandwidth-alert.md) |
 | 网站问题回溯 | [网站完整任务错误点审计](2026-08-17-网站完整任务错误点审计.md) |
+| **推荐池数据准确度、身份归属命中率、重复职位或 UNKNOWN 占比** | **[池子数据准确度诊断](audits/2026-09-28-pool-data-accuracy-diagnosis.md)**（2026-09-28 生产实测：状态分布/字段完备率/owner 映射 2.2% 结构性解读/596 组撞名/Felix 个案） |
+| **全池还是按身份裁剪、试点是否结束、顾问扩圈优先级** | **[试点结束与全池策略拍板](2026-09-28-pilot-graduation.md)**（全池=水面下情报资产 + 推送常态化证据 + 364 人扩圈花名册快照路径） |
 | 代码质量整改、门禁或前端测试 | [质量门禁与前端链路测试审计](audits/2026-08-26-quality-gate-frontend-test-audit.md)、[DeepSeek 审查规则提炼](audits/2026-08-24-deepseek-review-rule-extraction.md)、[上传前完整验证](standards/PRE_PUSH_VERIFICATION.md) |
 
 如果任务同时命中多个类型，必须阅读所有对应文档。找不到对应文档时，先检查代码和已有资料；若该主题会形成长期规则或决策，应先建立文档并把它加入本目录。
@@ -109,12 +120,24 @@
 - [部署编排](DEPLOYMENT.md)：生产 systemd、本地开发、隔离 Docker 测试和 CI。
 - [BrainTex 服务器部署与飞书接入 Agent 完整施工手册](2026-09-03-braintex-server-deployment-agent-manual.md)：交给部署 Agent 或服务器同事的权威端到端手册，覆盖飞书后台、OpenClaw 插件、三类环境文件、RDS 权限、身份绑定、启动、九步真实验收、故障与回滚。
 - [BrainTex 同事开通与首次使用实用手册](2026-09-10-braintex-coworker-onboarding-runbook.md)：可直接发给 Codex/部署 Agent 的单人开通任务文案，覆盖脱敏就绪计划、人工审批边界、身份与 TTC 授权、飞书首次使用及真机验收。
+- [Per-user Hook 配置](2026-09-22-user-hooks-config.md)：OpenClaw 插件 per-user hook（私聊接单、私聊拉 Offer 群、群固定文案）的配置化机制——trigger（会话/发送人/关键词）+ action 模板，开通新顾问只改 `user-hooks.json` 不写代码；含安全边界与验证方法。
 - [OpenClaw 多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md)：服务端安装、权限绑定、灰度验收、日常运维与可恢复回滚。
 - [顾问个人模型配置规格](../specs/004-personal-model-config/spec.md)：定义飞书私聊一人一 Agent、个人模型凭据隔离、自助配置、同意留痕、共享群模型边界和多人验收标准；StepFun 仅是可选个人供应商，不是全员默认模型。
 - [私聊 JD 直接提交建岗草稿规格](../specs/005-private-jd-job-draft/spec.md)：顾问私聊整段 JD → 带证据待确认草稿（brainx_submit_job_jd，sha256 幂等，LLM 提炼规则保底，origin='p2p_jd' 仅提交人可见，确认复用 confirmDraft 衔接接单/找人链路）。
 - [BrainX × OpenClaw ECS 部署交接单](2026-09-03-openclaw-ecs-handoff.md)：给服务器维护同事的无密钥执行清单，覆盖前置检查、安装、迁移、身份绑定、启动、验收与脱敏证据回传。
 - [云端恢复清单](cloud-recovery-checklist.md)：现网唯一入口、标准恢复步骤与历史事件。
 - [带宽告警说明](guard-bandwidth-alert.md)：带宽监控与告警规则。
+- [数据治理运维手册：备份与高热表保留/归档](2026-09-23-data-governance-ops.md)：specs/021 的操作口径——每日 VACUUM INTO 快照（自检 + 滚动保留 + 锁互斥）、恢复演练确切命令、retention dry-run 审查流程、保留窗口 env 清单、journalctl 告警面与服务器规格基线采集清单。
+- [数据结构与磁盘用途规范](2026-09-23-data-structure-and-disk-layout.md)：数据域总表（载体/结构权威/生命周期）+ 磁盘用途铁律（系统盘只放代码、数据盘放全部数据、一个活库、备份必须出盘出机）+ 草稿落库纪律与历史遗留归置记录。
+- [数据读取链路与错位诊断规范](2026-09-24-data-reading-pipeline.md)：数据入料通道（W1-W7）与消费链路（R1-R7）唯一权威总表 + 生产错位事故四类根源目录（A 位置映射 / B 时间语义 / C 字段语义 / D 键身份，逐条带根源代码与防复发规则）+ 读取纪律六条红线。
+- [数据渠道全景与接入路线规范](2026-09-24-data-channels-roadmap.md)：全部可用数据渠道盘点（飞书 F1-F4 / TTC JWT 面板 T1-T12 / 独立服务 J1 / GUI 浏览器 G1-G2，逐条带已接/未接与最佳读取方式）+ ttc-recruitment-skills 技能包 8 技能接入映射 + 接入优先级（P0=Pipeline 流程同步补 current_stage，档位塌缩的数据解法）+ 安全红线（JWT 到期 / key 不进 Git / 本人 token 拉本人面板）。
+- [字段补全 Agent 与 served 埋点规格（specs/023）](../specs/023-fact-agent/spec.md)：档位塌缩的 agent 侧解法——job_agent_facts 契约 + GLM 抽取管线（kill-switch 默认关）+ 消歧三分叉 + effectiveJob 四层优先级 + 置信打折（AGENT 上限 PARTIAL）+ served 埋点闭环 + 验收 AC-1~8 与施工依赖序 ①→⑥。附属 [数据基线与验证方法论](../specs/023-fact-agent/data-baseline.md)：2026-09-24 生产库只读实测（OBSERVE 90.1% / 双闸门 / 字段填充率 / 语料边界 / 六冷启动约束 / 推送侧基线）+ 跑动验证四层（抽样核对 / 幂等对账 / 影子对照 / 持续观测）+ 已知局限五条。
+- [云端数据安排](2026-09-23-cloud-data-arrangement.md)：阿里云账号全量资源盘点（ECS/RDS 七库五账号/OSS/RAM/密钥面）+ 每域一属主的目标安排 + 错乱点清单（hayden 超管、单实例七库、AK 散落）+ 治理顺序与调度纪律。
+- [第一批冷启动基线](2026-09-23-cold-start-baseline.md)：以 2026-09-23 回流清单为基准的第一批全链路激活记账口径——八环节基线/目标/动作映射（17:55 实测）、冷启动 DoD 六条、GLM 语义清洗纪律与进度钩子。
+- [冷启动规则 v2 与客户画像](2026-09-24-cold-start-rules-v2-profiles.md)：GLM 全量判定对账反推的规则 v2 清单（岗位词表 top40 + 通知类误报抑制 + 规则/LLM 分工边界）+ 客户画像（client_profiles 表 141 家/85 家活跃）及其匹配消费口径。
+- [顾问画像对应与第一版评估](2026-09-24-consultant-profile-matching-v1.md)：consultant_profiles 表（9 位顾问岗位族画像）× 85 家活跃客户的第一版对应——覆盖 61%（修正口径 93%）、结构性瓶颈（管理岗/市场增长承接厚度仅 1 人）、routed push 灰测范围与画像置信度声明。
+- [冷启动数据评判 v1](2026-09-24-cold-start-verdict-v1.md)：第一版数据评判交付——全量快照（回填后 18,694 条/196 会话）、画像 v3 渠道归因（84 ACCEPTED 仅 58% 真人）、13 家新公司第二批增量验证、14 个验收节点（✅6/⬜8）与数据可信度声明。
+- [field-clean 两批清洗数据审计](2026-09-24-field-clean-batch-audit.md)：pending 1,792 + backfill 922 字段清洗产出的实测审计——确定性全量（零解析错/零枚举违规/锚定率 93%/98%）+ LLM 双标注（batch1 全字段 83%~100%）+ 三个真实缺陷（file 消息假阳性 / 日报类 stage_hint 口径模糊 / evidence 7% 改写）与处置建议 + batch2 true 行复验未闭环（待 key）。
 - [0.9 冲刺交付清单](2026-09-12-sprint-delivery-checklist.md)：2026-09-12 排期的可交付施工条目、阻塞决策与完成度判定口径。
 - [D5 全链路灰测结论与演示脚本](2026-09-12-d5-e2e-greytest-and-demo-script.md)：接单→建群→找人→三按钮→RDS 入库的生产灰测证据、发现的问题与评审日演示纪律。
 - [0.9 冲刺核查处置方案（修正 + Reloop 变更）](2026-09-12-sprint-0.9-remediation-plan.md)：对核查报告的逐条复核修正、R1–R9 处置清单（含文件行号与验收）、Reloop 专项边界、原子 commit 切分与三项待拍板决策。

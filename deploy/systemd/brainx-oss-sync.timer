@@ -1,0 +1,10 @@
+[Unit]
+Description=BrainX daily OSS offsite sync timer (specs/021 US1 延伸)
+
+[Timer]
+# 落在 brainx-backup.timer（03:17）之后 30 分钟，正常情况下上一轮快照已完成自检
+OnCalendar=*-*-* 03:47:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

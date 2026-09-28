@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-28｜merge(主线): 同步远端最新代码并保留桌面找人链路
+
+- 获取远端后确认当前工作分支与其上游原本为 `0 ahead / 0 behind`，但相对最新 `origin/main` 已分叉为本分支独有 62 个提交、主线独有 82 个提交；本次把最新主线完整合入当前分支，不执行重置或覆盖。
+- 逐项合并推送去重、事件骨干、职位事实、推荐轮次和 SuperMai 冲突：保留当前分支的 Algorithm A、统一推荐用例和桌面 Relay，同时接入主线的 `alive_count`、开始/完成事件、职位终态事件和当日去重；并行迁移按完整文件名共同登记。
+- 更新 SuperMai 业务事件回归为真实的排队、设备配对、领取、候选回传和定稿链路；全量后端与共享逻辑测试 1004/1004 通过，差异与空白检查通过。本轮只同步并提交本地分支，不 push、不发布。
+
 ## 2026-09-24｜fix(连接): 统一设置入口与卡片基线
 
 - 设置中心点击“数据连接”时直接进入正式统一连接中心，避免仍停留在旧 TTC/飞书/人才库摘要页；独立设置组件在 Storybook 中仍保留原有审核场景。
@@ -463,6 +469,437 @@
 - 对照 0.99 会议纪要核查“荆华密算销售”搜索失败：真实库中公司与职位分别存为“荆华密算”和“销售”，前端字段拼接产生的空格导致连续中文查询无法命中。
 - “全部职位”搜索同时匹配原始字段串和去空格字段串，不改变职位事实、排序、权限或筛选；Storybook 增加跨公司/职位字段的连续搜索回归。
 - 验证：本地真实库确认 `JHTSEQJ / 荆华密算 / 销售` 存在；前端静态与适配测试 53/53；`npm run verify:quick` 16/16 通过；真实页面验证在启动本地服务后补录。
+## 2026-09-28｜feat(push): 再推去重——--exclude-pushed-today 剔除当日已推职位
+
+- 起因（用户指令）：「顾问要求再次推送，要求不要有重复的」。
+- 改动：`src/push.js` 新增 `pushedProjectIdsOnDay`（从当日 push_log 卡片深链提取已推 project_id，quickLink 与 opportunity 两种形态）；`bin/brainx-push.mjs` 新增 `--exclude-pushed-today`，剔除后为空则明确提示不发空卡。
+- 测试：`tests/push-dedup.test.mjs` 2 例（两种深链形态提取 / 昨日与他人记录不计入）。
+
+## 2026-09-28｜feat(profile): 顾问画像首初始化工具——证据汇总 + LLM 提案 + 覆盖率评估（4/9 空白画像补课）
+
+- 起因（用户指令）：「linda/frankie/hiroshi/miya 的画像先建立第一批动态画像，用他们和 AI 的对话 + 飞书群消息数据，然后使用 agent 算法评估」。前置验证：4 人 profile_keywords 空白；linda/frankie 群消息充足（5.6k/8.3k 条、群关联职位数百），miya 仅 2 个策展职位，hiroshi 无任何数据。
+- 改动：`src/profile-init.js`（新）：gatherProfileEvidence（群关联职位公司/职位/方向频次 + 策展/主做职位 ×3 加权 + 近期消息采样 40 条，postToPlainText 复用）；buildProfilePrompt（宁缺勿错，证据不足允许空数组）；parseProfileProposal（坏 JSON/超量/超长拒绝）；evaluateProposal（关键词对关联职位的命中率=覆盖率）。`bin/brainx-profile-init.mjs`（新 CLI）：--consultant/--all-empty，dry-run 默认，--write 经 updateProfile 落库（合并保留既有键），--force 才覆盖非空画像。
+- 测试：`tests/profile-init.test.mjs` 4 例（证据聚合/提案解析守门/覆盖率/prompt 构建）。
+- 已知边界：lark_messages 无 sender 列，消息证据是群环境级（不做个人归因）；hiroshi 无数据会落 no_evidence 跳过。
+
+## 2026-09-28｜docs(decision): 试点结束与全池策略拍板 + TTC owner 全量花名册快照（364 人）
+
+- 起因（用户指令）：「就是要全部的职位；找到水面之下的信息，没有别人的职位不能确定；结束试点」。
+- 落地：`docs/2026-09-28-pilot-graduation.md`（决策 1：全池保留、身份只做排序信号不做裁剪；决策 2：推送常态化已在 brainx-worker 运行，DAILY_TOP3 578 条实证；扩圈路径=快照+ttc-owner 自动回种）；`fixtures/ttc-owner-roster-2026-09-28.json`（生产 owner 聚合快照：364 人 / 245 人有在招职位，按在招数排序=接入优先级）；docs/README.md 路由登记。
+
+## 2026-09-28｜docs(audit): 池子数据准确度诊断——以已拉起数据为准的生产实测（不回填拍板后的基线）
+
+- 起因（用户指令）：「回填数据以已拉起的为准，不要求直接回填；对现在池子的数据判断准确度」。
+- 处置：停止 GLM 全量回填（进程与监控已停）；生产库只读诊断落 `docs/audits/2026-09-28-pool-data-accuracy-diagnosis.md`——状态分布（OPEN 4,655 较 9-25 翻倍）/OPEN 字段完备率 93-97%/owner 命中花名册 2.2%（结构性：负责人多为试点外同事，按设计落团队共享池）/596 组撞名重复/Felix 个案（17 个 MY_JOB 中 10 个 TTC 负责人为花名册外同事）。docs/README.md 路由登记。
+- 后续建议（另案）：撞名去重策略、归属提分走 ltr-feat-v2 影子评估、Felix 10 个职位归属人工确认。
+
+## 2026-09-28｜fix(fact-agent): CLI 的 LLM fetch 补 90s 超时（生产实证：无超时挂起致全量回填零产出）+ 拍板 status 不回溯
+
+- 起因：全量回填在生产跑了 1 小时零新增落库，定位为 StepFun 连接挂起 + `resolveLlm` 的 fetch 无超时（0 CPU + ESTABLISHED 死连实证）。
+- 改动：`bin/brainx-fact-agent.mjs` fetch 加 `AbortSignal.timeout(90s)`，超时按批次失败计 llmFailures、下批继续（幂等可重跑）。
+- 决策记录（用户拍板，已回填 specs/023 施工记录）：`active_state` 原始 status 不做历史回溯，以 TTC 实时信号为准，存量 UNKNOWN 不补。
+- 验证：`node --check` + fact-agent 测试 14/14。
+
+## 2026-09-28｜fix(recommend): 轮次级 alive_count 口径——卡片总量改为「确认在招 N · 评估池 M」
+
+- 起因（用户指令）：「验证数据准确度；felix 的推送数据不准确；每人身份对应的数据总量要正确」。生产实测（全顾问对照）：每顾问 candidate_count 均为全库 ~23,185（含 20,500 个 UNKNOWN 无信号职位）；自有职位进 Top5 比例极低（york 2/189、linda 0/3、frankie 0/2、felix 4/17、mia 3/19）——分母口径误导 + 身份相关性不进六维评分（策略缺口，非回归；归属提分走 specs/022 影子纪律另案）。
+- 改动：`migrations/0059_decision_runs_alive_count.sql`（decision_runs 加列，历史行 NULL）；`src/recommend.js` 落轮时记 alive_count（evaluated 中 active_state='OPEN' 数）；`src/push.js` 卡片首屏改「从 N 个确认在招职位中筛选 · 评估池共 M 个」（NULL 回退旧文案）。不改排序、不动权重。
+- 测试：`tests/alive-count.test.mjs`（新，2 例：落库+透传/卡片两口径）；framework 迁移清单 61→62。
+- 关联：PR #67 阶段映射修复已合并部署；生产 GLM 全量回填（8,472 候选）经 env 映射 BRAINX_LLM→FACT_AGENT 在服务器后台执行中。
+
+## 2026-09-26｜fix(fact-agent): 阶段映射补「第 N 轮」说法——生产试点 40 条实证 invalid 主因
+
+- 起因（用户指令）：「UNKNOWN 职位全部信息录入一遍，CLI 第一遍 + 资源补充」。specs/023 管线已建成，跑生产试点（--limit=40）发现：GLM 常返回「第二轮/第一轮/第三轮」说法，STAGE_ENUM 不认 → invalid 占 10/25（value_unmappable 主因）；另服务器未配 FACT_AGENT_KEY，用既有 BRAINX_LLM（StepFun openai 兼容端点）经 env 映射（GLM_BASE_URL/GLM_MODEL/FACT_AGENT_KEY）验证可行，llmFailures=0，不改任何配置文件。
+- 改动：`src/fact-agent-extract.js` STAGE_ENUM——一面补「第?一轮」、二面补「第?二轮」、终面补「第?三轮」；「面试」无轮次说法保持不可映射（宁缺勿错）。
+- 测试：`tests/fact-agent-extract.test.mjs` 归一化用例 +4（第二轮/第一轮/第三轮/裸「面试」丢弃），14/14 通过。
+
+## 2026-09-25｜feat(client-metrics): 客户健康报告落库 client_metrics + 生命周期分档的第一批算法推送（specs/022 US6 增量）
+
+- 起因（用户指令）：验证数据库接口/结构是否满足客户健康报告（200 家 × 90 天群消息）、第一批数据是否成立，然后建立第一批推送逻辑、要求算法驱动。
+- 前置验证（生产库实测）：160/200 客户群可 join `job_facts`（966 职位/434 活跃，覆盖 6 顾问 84 条群关联）→ 第一批成立；`c_dec` 决策效率 200 家全零（落库但特征层不引用）；缺口=`client_metrics` 表不存在（0054 `client_profiles` 是语义画像不是健康指标）。
+- 改动：
+  1. `migrations/0058_client_metrics.sql`（新）：`client_metrics`（8 指标+stage+badge+source/window，chat_id 主键）+ `client_metric_benchmarks`（p25/p50/p75 按 anchor_version 冻结，锚点漂移必须 bump 版本——022 红线）。
+  2. `bin/brainx-client-metrics-import.mjs`（新）：报告 HTML 内嵌 JSON 解析（括号配平+字符串感知，正则截断不可靠）→ 幂等 upsert；默认 dry-run，`--write` 落库。真实报告 dry-run 验证：200 家 + 6 项锚点，分档与报告一致。
+  3. `src/client-metrics.js`（新）：只读取数 + `pushPolicyFor` 策略常量表（dormant 完全静默=SC-6 红线、cold_start 标「破冰优先」、未知 stage 宁推勿漏）+ `applyLifecyclePolicy`（呈现层剔除/标注，不改冻结推荐）+ `listFirstBatchConsultants` + `getBenchmarks`。
+  4. `bin/brainx-first-batch-push.mjs`（新）：第一批顾问最新算法推荐 → 策略层 → buildDailyCard → `pushCard(kind='FIRST_BATCH_TOP3')` 幂等；默认预览，`--send` 只推本人私聊（autopush 同一安全边界，绝不推群）；不动线上排序。
+  5. `tests/client-metrics.test.mjs`（新，6 例）：解析/缺块报错/导入幂等/四档策略/生命周期过滤标注/第一批顾问 join；`tests/framework.test.mjs` 迁移清单 +0058（60→61）。
+  6. 文档：`docs/2026-09-25-first-batch-push.md`（验证结论+边界）、docs/README.md 路由、specs/022 施工记录。
+- 验证：新增 6 例全过；`npm run verify:quick` 16/16 通过。
+- 边界：生产导入（--write）与真发（--send）需部署后另行确认；US6 的 BD 移交清单、US1/US2/US4/US5/US7 未动。
+
+## 2026-09-24｜fix(fact-agent): 审核二轮——群级行部分唯一索引堵 TOCTOU（原子防重，一行索引 + 竞态兜底）
+
+- 起因（用户/审核二轮）：319ae98 的 EXISTS 预检与 INSERT 非原子（TOCTOU）——单 timer 串行安全，但手工 CLI 与 timer 并行时群级行仍可能双插（职位级有 INSERT OR IGNORE 兜底，群级预检后无兜底）。
+- 修复（采纳审核一行修法）：`migrations/0057_job_agent_facts.sql` 加部分唯一索引 `ux_agent_facts_group ON job_agent_facts(message_id, field) WHERE project_id IS NULL`——原子、不改 FR-1 表契约；`src/agent-facts.js` 补 changes=0 竞态兜底（预检只做 duplicates 计数与快路径，唯一性保证交给两层索引：职位级=主键、群级=部分唯一索引）；注释三处同步（migration/存储层/spec 红线区：预检非唯一性保证 + timer 单实例运维纪律）。
+- 0057 原地编辑安全性实证：本地 dev db `schema_migrations` 无 0057 记录（15:29 的 openDb 查询发生在 migration 写入前）、表不存在，0057 从未进任何真实库，原地编辑零分歧；生产未部署。
+- 测试：+1 TOCTOU 回归（绕过预检裸 INSERT OR IGNORE 重复群级行 → 索引拦截 changes=0、chat_id 不同也拦、总行数不翻倍）；25/25 全绿；verify:quick 16/16；文件行数红线内。
+- 未 push（本地 ahead 6）。
+
+## 2026-09-24｜fix(fact-agent): 审核修复——群级行幂等预检（P0）+ backfill 无上限 + CLI 改走 openDb（P1×2）
+
+- 起因（用户/另一窗口审核结论）：实测复现 P0——SQL 复合主键里 **NULL 与 NULL 互不相等**，`INSERT OR IGNORE` 对 (message_id, field, NULL) 永不触发冲突，群级行重跑必重复（in-memory 实验第二轮 inserted=1、总行数翻倍），AC-1 对群级行破防；且错误认知被固化进 migration 与存储层注释（「NULL 互不冲突→不塌缩」只对了 NULL≠X 半边）。P1×2：backfill 默认 limit=5000 静默截断存量语义；CLI 裸 DatabaseSync 无 busy_timeout，生产持库时 timer 写入会 SQLITE_BUSY。
+- 修复（采纳审核修法 A，不动 FR-1 表契约）：①`src/agent-facts.js` upsertAgentFacts 写前 NULL 安全存在性预检（EXISTS_SQL：`(project_id IS NULL AND ? IS NULL) OR project_id = ?`），命中计 duplicates；职位级/群级同路语义一致；②错误注释三处纠正（migration 0057 / 存储层 docstring / spec 023 红线区机制描述——契约不变，只改错误机制表述）；③`runFactAgentPipeline` limit 缺省 null=无上限（backfill 存量语义，显式 --limit 才截断；LLM 成本由预筛候选数决定与扫描数无关）；④CLI 改走 `openDb`（busy_timeout=5000 + migration 兜底）；⑤P2 顺手：`--limit=abc` 报错退出 1（不静默回落）。
+- 测试堵盲区：+3 例存储层（群级重放零新增 / 混合批次重放 / 不同 chat 同 message 群级行互不吞——幂等键不含 chat_id 语义钉死）+ 端到端场景补 om_g1 群无绑定落群级、重跑断言覆盖群级（原 21 例全绿但 NULL 重放是盲区——审核实证）；24/24 全绿。
+- 验证：审核者的复现实验修复后重跑 round2 inserted=0 duplicates=1 total=1；CLI 冒烟（无上限默认 / --limit=abc EXIT=1）；verify:quick 16/16；最大文件 322 行（≤500 内）。未 push。
+- 遗留（审核 P2，不阻断）：SIGNAL_RE 含泛词（面试/招聘/招人），dry-run candidates 会大于基线 2,237 口径，成本估算待首轮 dry-run 校准；evidence 前 12 字弱锚定沿用 job-extract 旧约定，首轮抽样核对时盯。
+
+## 2026-09-24｜feat(fact-agent): specs/023 施工序①②③——字段补全 Agent 框架（migration + 存储层 + 抽取管线 + CLI）
+
+- 起因（用户指令）：「按照这个字段进行数据的第一轮的验证和 MVP 的开发完整度；另一个窗口在跑数据的分析，你就做好框架的开发就可以」——按 spec 023 施工依赖序，只做 ①②③（不动现有运行行为、可先行合入的部分），不跑真实数据分析（留给另一窗口）。
+- 改动：`migrations/0057_job_agent_facts.sql`（新，幂等键 message_id+field+project_id，群级行 NULL 主键不塌缩）+ `src/agent-facts.js`（新，幂等 upsert 首写优先 / latestAgentFact 按职位取最新 / 群级只走展示通道 / FR-6 结构化统计）+ `src/fact-agent-extract.js`（新，纯逻辑：post 富文本拍平（防御式回落原文，003 管线缺的这块补上）→ 信号正则预筛（零 token）→ 受控枚举归一化（current_stage 五档 / active_state OPEN-CLOSED-COOLING，OPEN×矛盾词交叉校验）→ 消歧三分叉（1:1 直落 / GLM 指名相似度≥0.7 / 指不出落群级）→ GLM 批量契约（≤20 条/批、evidence 前 12 字原文锚定、单批失败不阻塞））+ `bin/brainx-fact-agent.mjs`（新，--dry-run/--backfill/--since=Nd/--limit/--json；BRAINX_FACT_AGENT kill-switch 默认关，未开时 --backfill/--since 显式降级 dry-run 并打印提示，禁止静默失败）+ 两套单测 21 例全绿。
+- 架构纪律：LLM 走注入（llm 异步函数），核心模块零网络 IO；GLM 端点在 CLI 解析（FACT_AGENT_KEY/ZHIPU_API_KEY + GLM_BASE_URL/GLM_MODEL，specs/004 体系，key 不进 Git）；宁缺勿错（无原文锚定丢弃、非法枚举丢弃、conf<0.7 落库但不进合成——合成层过滤在 ④ 接线）。
+- 同步改动：`tests/framework.test.mjs`（migration 记账测试硬编码清单补 0057、计数 59→60，0054-0056 先例同款）+ `specs/023-fact-agent/spec.md`（施工进度表：①②③ ✅，④⑤⑥ 待 dry-run 抽样 ≥80% 后施工）。
+- 验证：新单测 21/21 绿（幂等重跑零新增 AC-1、三分叉 US2、开关关闭零 token 零落库 US1-AC3、批次失败不阻塞 US4、增量窗口、FK 约束 seed 对齐 job_facts/sync_runs 真实 schema）；CLI 冒烟（临时库：post 拍平预筛命中 1、kill-switch 降级路径打印正确）；`npm run verify:quick` 16/16 通过；新文件最大 312 行（≤500 红线内）。未跑 full verify、未 push；未碰生产数据与另一窗口的数据分析现场。
+
+## 2026-09-24｜docs(specs): specs/023 字段补全 Agent 与 served 埋点立项——完整 MVP 边界 + 验收 AC-1~8 + 数据基线与跑动验证方法
+
+- 起因（用户指令）：档位塌缩诊断后续，用户拍板「②先行」（字段补全 agent + 卡片 served 埋点），要求「写入文档直接给开发：完整边界的框架、达成的验收效果、当前数据结论的不足、数据质量如何跑动验证」。
+- 改动：`specs/023-fact-agent/spec.md`（新）+ `specs/023-fact-agent/data-baseline.md`（新）+ `docs/README.md`（路由表 + 文档目录双登记）。纯文档，无代码改动。
+- spec.md 内容：①MVP 边界（做/不做对照表，与 T7 Pipeline 渠道划清两线关系——T7 结构化真值第一供给线、agent 群消息第二供给线，T7 落地后不退役）；②User Story 1-5 各带 acceptance（回填幂等 / 消歧三分叉 / 合成插档与打折 / 每日 timer / served 埋点）；③FR-1~6 数据契约（migration 0057 建表 job_agent_facts、GLM 抽取契约、合成层四层优先级 manual>AGENT>cockpit>sync、置信打折——AGENT 填补 band 上限压到 PARTIAL 不得洗成 SUFFICIENT、成本三重开关）；④模块结构施工清单（11 项，新文件全部 ≤500 行）与依赖序 ①→⑥（dry-run 抽样 ≥80% 才准 --write，④ 起影子对照随 commit）；⑤验收 AC-1~8（含量级锚点：linda 类 ACCEPT 8→20）；⑥数据质量跑动验证四层（回填前抽样人工核对 / 回填中幂等对账 / 回填后影子对照 / 上线后持续观测）+ 当前数据结论已知局限五条（模拟乐观假设、单轮快照、群活≠在招、served 4.3% 是断链读数、hc 缺失误判已纠正）；⑦红线八条（LLM 不打分不定档、群级永不进合成、人工 override 永远最高、kill-switch 默认关、幂等键不可削弱、未展示≠负反馈、版本必须 bump）。
+- data-baseline.md 内容：2026-09-24 生产库只读实测全量数字（OBSERVE 90.1% 十顾问分列、双闸门代码证据、york Top5 降档样本、linda 对照组、stale 结构性根源 captured_at 语义、字段填充率 hc 99.3%/current_stage 无列/active_state 12%、语料边界 18,763 条消息 147 绑定群信号 2,237 存量 75/天增量、六冷启动顾问 coverage<0.5 约束、推送侧 push_log 与 served 基线）+ 复现口径 SQL 骨架。
+- 与既有文档一致性：spec 与 [数据渠道全景](2026-09-24-data-channels-roadmap.md) T7（6b34535 已落）互链不打架；与 specs/003（解析复用）、specs/022（同为 lark_messages 消费者）、specs/004（模型配置体系）关系显式声明。
+- 验证：纯文档；README 两处登记 grep -E 复核落盘；spec 内全部数字与 data-baseline.md 交叉核对一致；无代码/迁移/配置改动，verify 不受影响（未 push，本地 commit）。
+
+## 2026-09-24｜docs(data): 数据渠道全景与接入路线规范——四层渠道盘点 + 技能包解读 + Pipeline 补 current_stage 优先级
+
+- 起因（用户指令）：「数据读取还有一个小机器人，当前的数据读取是不到位的，还有可以读取获取的数据 cli，大家的 token 能拿到的各自面板的数据，还有之前的 ttc-recruitment-skills.tar(1).gz 可以阅读的数据进行分类列出最佳的合适的方式阅读，数据的渠道不够」。
+- 盘点方法：解压阅读技能包（40 文件 8 技能：ttc-crm-pipeline/crm/talent/user/auth + talent-search + jobwater + linkedin-search-skill，逐 reference 提取接口清单）；对照 brainx 现有 `src/ttcsdk/`（仅封装 job/company/resume/user 四域）与 openmai/supermai 通道，逐条判定已接/未接。
+- 改动：`docs/2026-09-24-data-channels-roadmap.md`（新）——①四层渠道全景：飞书 F1-F4（bot 事件流/lark-cli 回填/Bitable/邮箱日历未接）、TTC JWT 面板 T1-T12（**T7 Pipeline 流程、T8 项目任务面板、T9 联系人备注、T10 人才直连、T11 名单与推荐报告均未接**——渠道不够的实锤）、独立服务 J1 jobwater（职位表查询+市场分析）、GUI G1 LinkedIn/G2 SuperMai；②每条渠道带最佳读取方式（定时同步/按需工具/事件驱动/人工分批）；③技能包 8 技能→brainx 接入映射；④接入优先级：P0=T7 Pipeline 同步（StepType 推荐面试 Offer 入职 = job_facts.current_stage 真值，档位塌缩 B6 的数据解法）、P0.5=T8 任务面板（顾问画像 v4 行为真值）、P1=T10/T11/J1；⑤安全红线（JWT 2026-10-13 到期、jobwater key 不进 Git、本人 token 拉本人面板）。README 路由+目录双登记。
+- 关键发现：档位塌缩缺的 current_stage 真值就在未接的 pipeline_service 里——不是没有数据源，是渠道没接。
+- 验证：纯文档；tar 解压于 /tmp 未入仓库；ttcsdk 导出清单逐文件 grep 核对；README 两处登记 grep -E 复核。
+
+## 2026-09-24｜docs(data): 数据读取链路与错位诊断规范——入料/消费双总表 + 错位四类根源目录
+
+- 起因（用户指令）：「当前的数据读取的结构，是什么样子的，生产机子的数据读取经常发生错位，你进行诊断阅读，写到权威的表格，不要以后都出现错误」。
+- 诊断方法：逐文件阅读读取链路代码（db.js/sync.js/bitable.js/facts.js/lark-backfill.js/bridge-producer.js/job-extract 全套/judgment-extract 全套/openmai-result.js），全部结论带文件级证据；结合 VERIFICATION.md、数据结构规范与 09-23/24 记忆日志中的生产实证。
+- 改动：`docs/2026-09-24-data-reading-pipeline.md`（新）——①入料通道总表 W1-W7（网关/回填/职位同步/消息提炼/找人/人工修正/GLM 清洗，各带入口代码+解析层+落表+触发方式）；②消费链路总表 R1-R7（推荐轮/有效事实四表合成/工作台/推送/LTR/MySQL/档位判定，各带关键约束）；③错位事故四类根源目录：A 位置映射（6 项，含 Bitable 职位列语义错位、Offer 群名位置切分风险）、B 时间语义（6 项，含 mysqlLocalDatetime 游标、backfill received_at 隔离）、C 字段语义（5 项，含弱后缀公司名=生产「项目名当公司名」根源、evidence 前 12 字弱锚定）、D 键身份（6 项，含部分唯一索引平反、通道归因）；每条带根源代码+状态+防复发规则；④读取纪律六条红线（时间三律/禁位置假设/键四律/置信度/通道分层/诊断顺序）。README.md 路由表+目录双登记。
+- 与既有文档分工：存储归属仍归 2026-09-23-data-structure-and-disk-layout.md，本文件只管「怎么读、为什么错位、怎么防」。
+- 验证：纯文档，不改代码；全仓 grep 复核「错位」关键词无遗漏事故形态；grep -E 复核 README 两处登记落盘。
+
+## 2026-09-24｜test(framework)+chore(ops): 迁移记账测试补齐 0054-0056 + 收录运维脚本 project-launch-no-jobcard
+
+- 起因：full verify 25 项挂 3，逐项定性——①migrations 记账测试硬编码列表停在 0053（0054/0055 加入时只跑了 quick 未发现，0056 又增一行），补齐 0054/0055/0056 三项 + 计数 56→59；②「浏览器前后端链路」失败为并发时序抖动（页面停在加载态断言落空），单独重跑通过，与本次改动无关；③Git 干净检查被 9-16 另一会话的 untracked 运维脚本阻塞，**用户拍板「提交入库」**。
+- 改动：tests/framework.test.mjs（列表补齐+计数）；bin/project-launch-no-jobcard.mjs 收录（跳过接单卡建群+找人发卡链路，引用现有 feishu-bot/openmai 模块的完整运维脚本）。
+- 验证：framework.test.mjs 21/21；e2e 单跑 EXIT=0；工作区干净后重跑 full verify。
+
+## 2026-09-24｜feat(sync): lark_messages 历史回填工具（migration 0056 origin 列）——第二批 24 群 922 条入生产库
+- 起因（用户指令）：「让使用 braintex 的机器人阅读最新的 cli 的数据，更新数据的来源……读飞书群的第二批的数据进行增加验证」。
+- 根因定位：`lark_messages` 由网关事件驱动写入（bot 在群才有事件流），bot 不在群的 69 个用户可见群（含 24 个客户/项目群、13 家第一批未覆盖公司）永远进不了库。
+- 改动：`migrations/0056_lark_messages_origin.sql`（origin 列，DEFAULT 'gateway' 兜底存量）+ `src/lark-backfill.js`（映射：飞书分钟精度本地时间→UTC ISO、mentions 归一、deleted 过滤、message_id 幂等）+ `bin/brainx-lark-backfill.mjs`（dry-run 默认，--apply 事务化，migration 前置校验）+ `tests/lark-backfill.test.mjs`（6/6）。
+- 生产执行：ECS 拉取 24 群 page-all 934 条 → 落库 922 条（12 条已撤回/非法过滤，0 重复，gateway 17,772 条未动）。库内 18,694 条/196 会话。
+- 第二批验证（规则口径，一次性脚本，不入仓库）：信号密度 24%（第一批 15%）；13 家新公司确认（思博威视/自然映射/智子芯元/Unipat/海马云/巨日禄/国投/物外智趣/普罗资本/穿越者/硅羽/优艾智合/懂车族）；硬件产品经理需求带为第一批画像盲区。
+- 已知偏差：docs 规则 v2 引用的 FAMILY_RULES 正则表实际在已删的服务器临时脚本里（文档-代码脱节），评判报告节点 9 登记待修复。
+- 验证：本地 6/6 测试；ECS dry-run 与本地一致（922/0 重复）后 --apply；origin 分组核对 gateway|17772 + backfill|922。
+
+## 2026-09-24｜docs(data): 冷启动第一版数据评判——全量数据 + 14 节点（specs/022 画像验收交付）
+
+- 起因（用户指令）：「按照这个画像给出第一版本的数据评判，数据都要给出，然后节点都明确」。
+- 改动：`docs/2026-09-24-cold-start-verdict-v1.md`（新）——回填后全量快照（pending 1,737 / served 5.4% / 画像 141 家+7 顾问）、顾问画像 v3 渠道归因表（84 ACCEPTED 仅 49 条真人操作，v1 三处证伪记录）、13 家新公司增量验证、14 个验收节点（✅6 已过 / ⬜8 未过，阻塞节点=顾问人工确认 1,737 pending）与数据可信度声明。docs/README.md 登记。
+- 验证：纯文档；全部数字取自 ECS 生产库 2026-09-24 快照与 v3 归因分析，逐节标注证据来源。
+
+## 2026-09-23｜fix(specs/003 延伸): 清洗 apply 两次落库修复 + 1,457 条复活/拆稿实写完成
+
+- 起因：apply 实写撞两个真实约束，逐一根因修复后成功落库（咪已批准「全部应用」）。
+- 修复：
+  1. extract SELECT 漏 event_id 列 → 复活稿绑定 undefined 被 SQLite 拒（事务已回滚无半写）；补列 + build 函数 `?? null` 容错。
+  2. **设计错误修正：复活从 INSERT 新行改为 UPDATE 原行**——`job_facts_drafts` 存在部分唯一索引 `idx_jfd_p2p_message (message_id) WHERE origin='p2p_jd'`，且复活语义本来就是「平反被冤枉的原行」；`recoveryUpdateOf` 替代 `buildRecoveryDraft`，幂等靠 `WHERE status='rejected'`（已复活行不再命中），通吃 group/p2p。B 批拆稿保留 INSERT（一稿多职位必须多行；group 来源不撞部分索引；p2p 原稿跳过转人工）。
+- 实写结果（生产库验证）：pending 1,644（llm-recovery 1,340 + llm-split 117 + rules 187）；rejected 6,877（含 85 条拆稿原稿留底，raw_json 记 llm_superseded_by）；1,459/1,644 pending 带 role 预填。13 条 B 批「无可拆职位」原稿保留 pending 转人工。
+- 凭据收尾：服务器 /etc/brainx/.cleanup-key.tmp 已删除。
+- 验证：本地测试 5/5；extract 重跑（B 批清单 272 条因 dispatcher 持续产新，apply 幂等只处理已判定 draft_id）。
+- 待 push；规则缺口清单 rule-gap-report.md 在服务器 data/draft-cleanup/，随 specs/003 迭代回灌。
+
+## 2026-09-23｜docs(data): 云端数据安排——阿里云账号全量盘点 + 错乱点清单 + 治理顺序
+
+- 起因（用户指令）：「当前的结构在云端其实很错乱，先给一个完整的数据安排，连接云端账号调度全部资源」。
+- 盘点（本机 aliyun CLI root AK，只读）：ECS 单实例（2C8G + 20G/40G 双盘 + RAM 角色已绑）；RDS rm-bp12ok9so2ma3i3j7（MySQL 8.0）**7 库 5 账号**——生产用 hayden（Super 超管）；OSS 2 bucket；RAM 1 用户 1 角色。
+- 错乱点（按严重度写入文档）：①hayden 超管连生产 RDS（违 constitution 1.0.1 三账号分离）；②单实例 7 库混居（reloop 之外 6 库归属未确权）；③AK 散落（root AK 日常调度、服务器两死 profile）；④app_bot 孤儿账号。
+- 改动：`docs/2026-09-23-cloud-data-arrangement.md`（新）——资源盘点表、每域一属主目标安排、治理顺序（RDS 三账号分离/库确权/AK 治理/app_bot 停用/命名收口，删改类全部标 ⚑ 待拍板）、AI 调度纪律（只读→方案→拍板→执行→留痕；root AK 不跨机复制）。docs/README.md 目录登记。
+- 验证：纯文档，verify:quick 16/16。
+- 待 push；治理执行待用户拍板 ⚑ 项。
+
+## 2026-09-23｜fix(specs/003 延伸): 清洗管线冒烟修复——classify --limit 开关 + extract 锁残留
+
+- 起因：咪指示直接开跑第一批清洗。无 GLM key，借财办项目 DeepSeek key 冒烟（stdin 临时传服务器、不落盘）。
+- 修复：① classify 加 `--limit N` 冒烟开关；② 入口 finally 释放锁（extract 同步阶段漏调 release()，实测残留锁阻塞后续阶段，退出码 75）。
+- 冒烟结果：DeepSeek key 本地直连 + 服务器调用均 401（尾号 b63b 已被服务端作废）——**无有效 LLM 凭据，classify 阻塞待咪提供 key**（GLM/DeepSeek 均可，管线 OpenAI 兼容，env 换 GLM_BASE_URL/GLM_MODEL 即切）。临时 key 文件已从服务器删除。
+- 验证：node --check 过；冒烟确认 401 为凭据问题非管线问题（请求已正确到达 API 并返回认证错误）。
+
+## 2026-09-23｜docs(data): 数据结构与磁盘用途规范——数据域总表 + 磁盘铁律 + 历史遗留归置
+
+- 起因（用户指令）：「先规范当前的数据的结构，正确的规范，不要磁盘误用」。
+- 双边盘点发现的误用与处置（全部归置不删除，可逆）：
+  1. `data/brainx.sqlite{,-shm,-wal}`：9/10 某进程误开的空 schema 库（55 表零行 + 漂移 WAL）→ `archive/legacy-20260923/`；
+  2. 仓库根 `/opt/brainx/backups/`（演示脚本备份+灰测产物，违「仓库根不落数据」）→ `archive/legacy-20260923/repo-root-backups/`；
+  3. 仓库根 `diag-fact.tmp.mjs`（直连 MySQL 临时诊断脚本）→ 同上。归置后五服务 active 无影响。
+  4. 未动并标注：`bin/ttc-multi-pull.mjs`、`deploy/openclaw/sandbox/`（他人未跟踪工具）、服务器删除态 demo-offer-seed.mjs（待属主）。
+- 改动：`docs/2026-09-23-data-structure-and-disk-layout.md`（新）——①数据域总表（决策主库/账本/原文/草稿/指标/RDS/快照/OSS/归档/本地副本，各带结构权威与生命周期）；②磁盘铁律 6 条（系统盘只放 OS+代码、数据盘放全部数据、一个活库、备份必须出盘出机、密钥与 PII 边界、RDS 专库账号）；③保留窗口表；④草稿落库纪律（第一批清洗教训转正：company/role 双缺即 skip、系统清洗置 rejected 不发事件）；⑤归置记录。docs/README.md 路由与目录登记。
+- 验证：纯文档改动，verify:quick 16/16。
+- 待 push。
+
+## 2026-09-23｜feat(specs/003 延伸): 草稿 GLM 语义清洗管线——extract 全量就绪（云端运行）
+
+- 起因（用户指令）：待确认队列从 8,185 瘦身到可确认规模后，用 GLM 5.3 对第一批做语义清洗、按语义理解找规则进度。拍板：**不抽样全量处理**；**全流程上云（ECS 直读生产库）**，本地零拷贝。
+- 改动：
+  1. `src/draft-cleanup.js`（新，纯逻辑）：A 批三分类解析（REAL_JOB/SUSPECTED/NOT_JOB，容忍围栏）、复活稿构造（source='llm-recovery'，raw_json 记 llm_recovery_of 留痕）、B 批拆稿构造（source='llm-split'，记 llm_split_of）、幂等键、规则缺口四类对账（role_missed_by_rules/company_missed_by_rules/rules_over_extracted/ambiguous）。
+  2. `bin/brainx-draft-cleanup.mjs`（新，四阶段 CLI）：extract（只读连接导出全量清单 join 消息原文）/ classify（GLM 5.3 批量，并发与断点续跑）/ apply（默认 dry-run，--apply 才写库，事务包裹，复活/拆稿一律 pending 等人工确认，绝不直接转正，不发评审事件）/ report（规则缺口清单 markdown）。
+  3. `tests/draft-cleanup.test.mjs`（新，5 用例）全过；kill-switch BRAINX_LLM_CLEANUP=1 才允许 classify/apply；key 走 ZHIPU_API_KEY（GLM_MODEL 缺省 glm-5.3）。
+- 云端执行（ECS，以 brainx 用户，工作文件在数据盘 data/draft-cleanup/）：extract 完成——A 批 8,132 条全量（16M，59 条缺原文对应已归档超龄消息）、B 批 99 条 pending（dispatcher 持续消费中，B 批为流动队列，apply 按快照处理可重跑）。
+- 数据事实：8,132 条 rejected 中 1,796 条带 company（22%，拒因是无 role）——GLM 复活的主要靶子；pending 里存在一稿多职位（一条 6 公司 5 岗）与字段错位（项目名当公司名），是拆稿/纠偏的对象。
+- 验证：本地测试 5/5；服务器 node --check 过；extract 云端跑通（EXIT=0，只读连接零写入）。
+- 待办：ZHIPU_API_KEY 就位后 → classify a + classify b → apply 先 dry-run 复核计划 → --apply → report 出规则缺口清单。
+
+## 2026-09-23｜ops(data): 第一批信息数据清洗——8,132 条死草稿拒绝 + retention 首次归档执行
+
+- 起因（用户指令）：完成第一批信息数据清洗。盘点发现：dispatcher 消费 1.7 万条积压后 job_facts_drafts 达 8,189 条，其中 8,132 条缺 company/role 且 project_id 恒空，按 confirmDraft 规则永远无法转正，且会淹没顾问的待确认队列（brainx_pending_job_facts）。
+- 执行（先留快照 brainx-20260923-170947.db）：
+  1. 草稿清洗：单事务 UPDATE 8,132 条 → rejected（confirmed_by='system:cleanup-20260923'）。pending 8,185 → 55（company+role 齐全留人工审）+ judgment 14。**刻意不发 job_fact.reviewed 事件**——系统清洗≠人工评审信号，保护 extract.field_confirm_rate 指标口径。
+  2. retention 首跑：dry-run 复核后 --apply，107+107 行（2026-06 超龄）归档 brainx-archive-20260923.db，主库同步减量，服务全 active。
+- 发现转规则：规则层「无证据不编造」纪律有效（无伪造字段），但缺字段草稿不应落 staging（judgment 域 statement=null 即 skip 已是此纪律）——extract 层「company/role 双缺即 skip」改进记入 specs/019 后续专项。
+- 改动：`docs/2026-09-23-data-governance-ops.md` 加 §6 第一批数据清洗记录。
+- 验证：清洗前后行数对照、归档库行数核验、五服务 active；verify:quick 16/16。
+- 待 push。
+
+## 2026-09-23｜feat(ops): OSS 出机同步接通上线——RAM 角色/console 三步 CLI 完成 + 脚本三处实测修复
+
+- 起因（用户指令）：授权用本机有效 AK 自主完成 OSS 出机同步全部剩余安排。
+- 控制台三步（本机 aliyun CLI，root 账号 1615281587880079 执行，全部 API 留痕）：
+  1. `ram CreateRole BrainXEcsOssBackup`（可信实体 ECS）；
+  2. bucket `brainx-backups-yorkteam-93f137`（cn-hangzhou，私有）创建；`ram CreatePolicy BrainXOssBackupRW`（最小权限：仅该 bucket 的 Put/Get/List/GetObjectMeta/HeadObject）+ AttachPolicyToRole；
+  3. `ecs AttachInstanceRamRole` 绑定 i-bp1dgg3rzmehc33fwpsn（200/success）。
+- 服务器接线：brainx 用户专属 `/var/lib/brainx/.aliyun/config.json`（EcsRamRole，0700/0600，**无密钥落盘**）——消除 systemd 沙箱下 CLI mkdir 崩溃；`BRAINX_OSS_BUCKET` 写入 /etc/brainx/worker.env；brainx-oss-sync.{service,timer} 安装并 enable（每日 03:47）。
+- 脚本三处实测修复（`bin/brainx-oss-sync.mjs`）：①`--profile` 为 aliyun CLI 全局 flag 必须置于 oss 子命令之前（后置报 Bad flag，云端实测）；②远端大小复核从 `oss stat` 改 `oss ls` 列举口径（最小策略下 stat 被 bucket ACL 拒，ls 在 ListObjects 授权下稳定）；③`--checkpoint-dir` 显式指到可写备份目录（ossutil 断点目录默认 CWD，ProtectSystem=strict 下只读）。另把 oss:GetObjectAcl 加入策略（CreatePolicyVersion v2）。
+- 验收证据（生产）：首跑 uploaded=[brainx-20260923-150346.db, brainx-20260923-152435.db] failed=[]；二跑幂等 skipped=2 uploaded=[]；bucket 远端两件 384MB/386MB 与本地一致；`oss:ListBuckets` 被拒（403）= 最小权限按设计生效；测试 `.write-test` 已清理。
+- 验证：oss-sync 测试 7/7；全量与门禁见 push 前记录。
+- 待 push。
+
+## 2026-09-23｜fix(feedback): latestMetrics 同毫秒并列抖动根治——ROW_NUMBER 决胜取唯一
+
+- 起因：收口完整门禁抓到 `feedback-rollup` append-only 用例偶发失败——两次 runRollup 的 computed_at 落在同一毫秒时，旧实现（MAX(computed_at) JOIN）在该 key+dimension 上返回 2 行，`latestMetrics` 唯一性断言抖动。单测两次通过、全量套件高负载下复现。
+- 改动：`src/feedback/rollup.js` latestMetrics 改用 `ROW_NUMBER() OVER (PARTITION BY metric_key, dimension ORDER BY computed_at DESC, snapshot_id DESC)`——同毫秒按 snapshot_id 决胜，任何时序下严格唯一。
+- 验证：强制同毫秒（UPDATE 刷平 computed_at）下 latest 仍唯一；全量 `npm test` 841/841；verify:quick 16/16。
+
+## 2026-09-23｜test(hub): specs/019 US4/US5 地基——多租户边界用例 + 接口漂移门禁 + 发布后验收
+
+- 起因：specs/019 tasks.md T024-T027（US4/US5 只落地基，完整形态立子规格）。
+- 改动：
+  1. `tests/agent-authorization.test.mjs`：补 US4 多租户并发用例——租户 A/B 各自解析到本人、跨租户 channel_account/群 scope/身份伪造全部 fail-closed（8/8 通过）。
+  2. `specs/020-session-isolation-principal/spec.md`（新，占位）：session 隔离从 OpenClaw Agent（maxAgents=20）下沉 gateway principal 的完整形态立项入口。
+  3. `tests/tool-contract-drift.test.mjs`（新，2 例）：五个接口面一致性门禁——对外四面（插件 runtime/manifest/生产配置/契约 fixture）精确相等 + 外露集是 registry 权威集子集 + 逐工具参数 schema 比对。首跑即抓到设计内超集 `brainx_send_candidate_resume`（registry 注册但刻意不外露，openclaw-plugin 测试有对应断言）——修正门禁口径为「超集合法但外延变化必须显式可见」，并锁定当前内部工具清单。
+  4. `deploy/openclaw/install.sh`：尾部加发布后验收——插件文件清单（package.json files）与 live 配置工具数（manifest contracts）缺失即非零退出，兜底历史 npm pack 丢文件/白名单漂移事故形态。本地冒烟通过（13 文件 29 工具）。
+- 验证：相关测试 8+2 例全过；install.sh `bash -n` 语法通过。
+
+## 2026-09-23｜docs(spec): specs/019 Phase 8 收口——路由/蓝图回填/quickstart 全场景验证
+
+- 改动：`docs/README.md` 019 路由行补「US1-US3 已建成」指引（事件契约/dispatcher/反馈环落点）；`docs/workflow-hub-architecture.md` 新增 §14 落地回填（事件骨干三段建成、DLQ depth 已可读、剩余项指向 specs/020）；`specs/019-hub-event-backbone/tasks.md` T024-T030 全勾选。
+- quickstart.md 五场景验证记录：①业务事件 8 例 ✔ ②dispatcher 10 例 ✔ ③bridge 瘦身 grep 判据 ✔（无 consume 残留）④反馈环 3 例 ✔ ⑤漂移门禁首跑即触发（抓到 brainx_send_candidate_resume 超集，证明可拦截）✔；合计 23/23。
+- 至此 specs/019 全部 30 个任务完成（US1-US5 + 收口）。完整门禁见 push 前记录。
+
+## 2026-09-23｜feat(feedback): specs/019 US3 反馈环——四项指标可测量、可重算、append-only 快照
+
+- 起因：specs/019-hub-event-backbone tasks.md T019-T023。前置 US1（业务事件）/US2（dispatcher）已让账本有原料——本故事把「推荐/判断/找人准不准」从感觉变成每周可看的数字。
+- 改动：
+  1. `migrations/0053_feedback_metrics.sql`（新）：append-only 指标快照表（窗口+metric_key+dimension+sample_size+value_num+inputs_json 口径追溯）；0 样本强制落行防静默漏数。
+  2. `src/feedback/rollup.js`（新，约 190 行）：四项指标——recommendation.accept_rate（job.accepted / 真实曝光 served_at 非空）、extract.field_confirm_rate（confirm/(confirm+reject) 按 domain 切片）、sourcing.channel_conversion（success/(success+error) 按 channel 切片）、job.terminal_cycle_days（接单→终局中位天数）。**形态修正（相对 research.md 决策 4）**：不做增量计数消费者——账本事件即唯一事实源，runRollup 按窗口直接重算，无第二份状态可漂移；latestMetrics 每 key+dimension 取最新。
+  3. `bin/brainx-feedback-rollup.mjs`（新）：默认汇总最近 7 天并打印最新指标（--days/--print-only/--db）；`deploy/systemd/brainx-feedback-rollup.{service,timer}`（每日 05:11，镜像既有单元纪律）。
+  4. 测试：`tests/feedback-rollup.test.mjs`（新，3 例，先红后绿——口径与人工计算一致/0 样本落行/同窗重算 append-only + latestMetrics 取最新）；`tests/framework.test.mjs` 迁移记账跟进（0053 入账、旧库兼容 55→56）。
+- 验证：新增 3 例 + 全量 `npm test` 838/838；`npm run verify:quick` 16/16；bin 冒烟（本地库写入 4 行快照并正确打印）。
+- 待部署：服务器 git pull + enable brainx-feedback-rollup.timer。未 push。
+
+## 2026-09-23｜feat(ops): OSS 出机同步就绪——specs/021 FR-002 对象存储面（脚本 + systemd 单元 + 启用手册）
+
+- 起因（用户指令）：磁盘红线解除后，出机同步（盘坏/机坏容灾）留待决定。服务器实测：aliyun CLI 两个 profile（dms/recruit_admin）对 OSS 均无效（recruit_admin 本地 Valid 但 oss ls 403 InvalidAccessKeyId）——拍板走 **ECS 实例 RAM 角色免 AK**，不新增长期凭据。
+- 改动：
+  1. `bin/brainx-oss-sync.mjs`（新）：默认 dry-run + `--apply`；幂等（远端同名同大小跳过 + 上传后大小复核）；上传前 PRAGMA quick_check 门禁（坏库拒出机）；远端永不删除（容量交 bucket 生命周期规则）；内网 endpoint 免公网流量；锁 `.oss-sync.lock` 退出码 75/1 与 backup 一致。
+  2. `tests/oss-sync.test.mjs`（新，7 用例）：目标解析/幂等计划/清单过滤/quick_check 门禁/锁互斥/入口报错。
+  3. `deploy/systemd/brainx-oss-sync.{service,timer}`（新）：03:47（backup 03:17 后 30 分钟），After=brainx-backup.service，hardening 对齐 backup 单元。
+  4. `specs/021-data-governance/spec.md`：FR-002 下补实现记录；`docs/2026-09-23-data-governance-ops.md`：新增 §5「OSS 出机同步」——纪律、服务器侧就绪状态、控制台启用清单（角色策略 JSON/绑实例/建 bucket/首跑/验收判据/失败面）。
+- 服务器侧（凭据无关部分已完成）：profile `ecs-oss` 已配置（EcsRamRole:BrainXEcsOssBackup）；角色未绑定时报 404 为预期。timer 诊断：`list-timers brainx-*` 首次为 0 系未加载单元误报，`--all` 核实 backup/retention timer 均 enabled 且下次触发正常（03:17 / 周日 04:23）。
+- 验证：oss-sync 测试 7/7；verify:quick 与全量门禁结果见下一条（push 前置）。
+- 待 push；enable 待用户控制台完成角色绑定 + bucket。
+
+## 2026-09-23｜ops(deploy): 40G 数据盘挂载与 /opt/brainx/data 迁移——快照/归档离开系统盘
+
+- 起因（用户指令）：数据盘与 RDS 已购置，核实并完成数据盘迁移。前置：规格采集发现系统盘 84% 红线。
+- 核实结果：① 40G ESSD 数据盘已挂到实例（lsblk /dev/vdb + 本机 aliyun CLI DescribeDisks 双重确认 In_use）；② RDS 生产走 reloop 库（hayden 账号连通正常）；③ AccessKey 本机 default profile 有效（cn-hangzhou），服务器侧 aliyun CLI dms profile 已失效（InvalidAccessKeyId.NotFound），OSS 同步前需先修。
+- 迁移执行：/dev/vdb ext4 整盘格式化 → 停四服务 → rsync /opt/brainx/data（1.0G）→ 副本行数核验一致（wel 17,185 / lark 17,202 / job_facts 23,294）→ 换挂载 + fstab（UUID 持久化）→ 起服。停机约 4 分钟；openclaw-brainx 被联动停止已单独恢复。
+- 验证：五服务全部 active + guard/gateway 健康；dispatcher 对迁移后库正常消费；新快照 brainx-20260923-152435.db（369M）落在 vdb；旧目录清理后系统盘 84%→78%、数据盘 4%（36G 可用）。14 天滚动快照在 40G 下成立，磁盘红线解除。
+- 改动：`docs/2026-09-23-data-governance-ops.md` 加「数据盘迁移记录」小节（含盘 ID、UUID、RDS/AK 核实结论）。
+- 验证：verify:quick 16/16（纯文档改动）。
+- 待 push。
+
+## 2026-09-23｜docs(specs): specs/022 客户反馈信号回流与推送精准度——规格起草 + 四项决策拍板
+
+- 起因（用户指令）：基于 2026-09-23 客户健康指标报告（200 家 × 90 天，规则版 v2，带 chat_id）讨论「BrainTex 推送更准」，先敲定方案细节。用户对四个分叉逐项拍板：①规则抽取先行 + LLM 带 kill-switch（默认关）②客户反馈事件进 workflow_event_log 账本（specs/019 同口径，不立第二事实源）③断档触发器绕过 2h 限流、范围严格限触发客户 ④休眠客户完全静默 + 移交 BD 清单。
+- 改动：`specs/022-client-feedback-signals/spec.md`（新，Draft）——三层拆解（A 信号层：16,993 条存量群消息规则抽取回填 + client_metrics 日常化；B 特征层：ltr-feat-v2 六个客户健康特征 + supply_issue 归因分层降权；C 时机层：断档定向跑批 + 生命周期分档推送 + served 4.3% 断点诊断），7 个 user story、7 项 SC、数据契约与成本开关（BRAINX_CLIENT_FEEDBACK_LLM / BRAINX_STALL_TRIGGER）。
+- 关键事实核对：specs/019 dispatcher 已于今日上线（首轮 dispatched=125，job-extract/judgment-extract 消费中），故规格直接注册消费者，不建独立管道；生产回流基线（drafts 确认 4/8,037、served 340/7,820=4.3%、feedback 72 全 NOT_INTERESTED、outcomes 11、LTR 203 行）写入立项依据。
+- 验证：纯文档改动，未跑 verify（无代码/契约变更）；锁 logs/agent-work.lock 已建，本 commit 后释放。
+
+## 2026-09-23｜ops(deploy): ECS 部署新代码 + 四单元 enable + 规格基线与磁盘红线回填手册
+
+- 起因（用户指令）：在 ECS 部署新代码并 enable brainx-dispatcher / brainx-backup / brainx-ledger-retention 单元，跑规格采集回填手册，观察首轮证据。
+- 过程与证据：
+  1. 服务器 /opt/brainx 本地 merge --ff-only 到 5844a75（git pull 因 ECS→GitHub 网络超时失败，fetch 已完成故本地 merge，未触碰服务器本地脏文件）；npm ci。插件目录与 live openclaw.json（tools.allow=29，judgments 已外露）经核对已是最新，无需同步。
+  2. 四单元安装：brainx-dispatcher.service enable --now（active）；brainx-backup.timer、brainx-ledger-retention.timer enable。重启 brainx/brainx-agent-gateway/brainx-worker/openclaw-brainx 全部 active；guard 端点正常；gateway `/internal/v1/agent/health` ready（7 账号 9 绑定）。
+  3. dispatcher 首轮证据：上线即消费生产积压，首轮 dispatched=125（job-extract 25 + judgment-extract 100）failed=0，后续按 100/轮吞吐 backlog，consumer_failures=0。
+  4. backup 首个快照：手动触发 brainx-backup.service 成功，brainx-20260923-150346.db 367M，quick_check ok，行数对照一致（wel 17,141 / lark 17,158 / job_facts 23,294）。
+  5. 规格采集：2 vCPU Xeon 8369B / 7.2GiB 内存 / 数据盘 20G 已用 84% 仅剩 3.2G——**发现磁盘红线**：14 天滚动快照 ~5.2G 装不下，手册已列三个处置选项（KEEP_DAYS=5 / 异盘 / 扩容），未改生产配置待拍板。
+- 改动：`docs/2026-09-23-data-governance-ops.md` 基线记录小节回填（含上述全部数字与证据位置）。
+- 验证：verify:quick 16/16（纯文档改动）；服务器侧证据见 journalctl 与 systemd status。
+- 待 push。
+
+## 2026-09-23｜docs(ops): specs/021 数据治理运维手册——备份恢复演练 + retention 审查流程 + 服务器规格基线采集
+
+- 起因：specs/021 交付物第 4 项；FR-003 要求按文档可执行的恢复路径，SC-003 磁盘增长预测缺硬件基线。
+- 改动：`docs/2026-09-23-data-governance-ops.md`（新）——备份/恢复演练步骤（含从快照恢复的确切命令：选定快照 → 只读 quick_check + 表计数 → 停服替换 + 清旧 WAL/SHM → 起服冒烟）、retention dry-run 审查与窗口调整流程（含 VACUUM 空间回收提醒）、失败告警面（journalctl 两个单元 + 退出码 75/1 判读口径）、env 清单（7 项）、「服务器规格基线」节（仓库未记录 ECS 硬件规格，给出 lscpu/free -h/df -h/sqlite3 表行数采集命令清单，回填位置为本节「基线记录」小节）。`docs/README.md`：安全与运维目录登记 + 任务路由表「生产库备份/retention」行更新为指向本手册 + specs/021。
+- 验证：纯文档（前置 c4d4950/a9f5f73 已全量 828/828 + 门禁 16/16）；手册中命令与脚本实际参数/env 逐项核对一致。
+- 未 push。
+
+## 2026-09-23｜feat(ops): specs/021 US2——高热表保留/归档 brainx-ledger-retention（dry-run 默认 + 归档不删除 + 引用保护）
+
+- 起因：specs/021-data-governance US2（FR-004/FR-005、SC-004 零误删）。recommendations 膨胀事故已演示无保留纪律的后果；lark_messages/workflow_event_log/openmai_results 此前无窗口与归档去向。
+- 改动：
+  1. `bin/brainx-ledger-retention.mjs`（新，约 200 行）：三表窗口 lark_messages 90 天（create_time）/ workflow_event_log 90 天（occurred_at）/ openmai_results 180 天（COALESCE(finished_at, started_at)），均可 env 调。默认 dry-run（只读连接，出 scanned/keep/archive 计数对照）；`--apply` 先复用 brainx-backup 的 runBackup 自动留 VACUUM INTO 安全快照，再把超龄行搬入归档库 `data/archive/brainx-archive-YYYYMMDD.db`（按需建同名表，列结构按源库 PRAGMA table_info 重建、主键保留、INSERT OR REPLACE 幂等），落盘后才从事务内删主库。引用保护：消息被 pending 的 job_facts_drafts/judgment_drafts（message_id）或被仍将留存事件的 evidence_refs 引用（LIKE 口径，_ % \ 已转义）则保留；事件被 pending 草稿（event_id）或 consumer_failures 未 resolved 行引用则保留。
+  2. `tests/ledger-retention.test.mjs`（新，4 例，真实 CLI 子进程 + 合成库全量真实迁移）：超龄未引用归档并删除 / 窗口内保留 / 三类引用保护（含 confirmed 草稿不保护、只被将归档事件引用的消息不保护、LIKE 转义精确性 om_look_alike vs omXlookXalike）/ dry-run 零写入且无产物 / --apply 幂等（第二轮 archive=0、归档不翻倍）/ 窗口 env 可调。
+  3. `deploy/systemd/brainx-ledger-retention.service` + `.timer`（新）：每周日 04:23，ExecStart 带 --apply，其余字段同备份单元。
+- 验证：新增 4 例全绿；全量 `npm test` 828/828 通过；`npm run verify:quick` 16/16 通过。
+- 偏差说明：①归档须搬走被 confirmed 草稿引用的事件行（草稿已含 *_evidence 原文锚点，血缘副本在归档库），retention 进程显式关闭逐连接 FK 强校验（enableForeignKeyConstraints:false），否则删除父行被误拦——这是维护连接的显式选择，不改 openDb 口径；②归档表 DDL 按 PRAGMA table_info 重建（覆盖 0015 之后的 ALTER 列），CHECK 约束不带入归档库。
+- 待部署：单元上 ECS 并 enable timer；未 push。
+
+## 2026-09-23｜feat(ops): specs/021 US1——生产库每日一致性快照 brainx-backup（VACUUM INTO + 自检 + 滚动保留 + 锁互斥）
+
+- 起因：specs/021-data-governance US1（FR-001~FR-003）。生产 SQLite 决策库此前无自动备份，唯一副本动作是手动拉训练副本，单点单库是最大数据丢失风险。
+- 改动：
+  1. `bin/brainx-backup.mjs`（新，约 150 行）：`VACUUM INTO` 生成 `brainx-YYYYMMDD-HHMMSS.db` 快照（WAL 安全，源库只读打开零写入，参照 pull-cloud-data 远端快照做法）；快照后只读自检——`PRAGMA quick_check` 全 ok 且 workflow_event_log/lark_messages/job_facts 行数与源库一致，否则删半成品判失败；滚动保留删除超 `BRAINX_BACKUP_KEEP_DAYS`（默认 14）天的旧快照（按文件名日期，不动其他文件）；`.backup.lock` O_EXCL 重叠保护，占用时退出码 75；同秒撞名等下一秒重取时间戳（绝不覆盖已有快照）；成功 stdout 打 JSON 摘要，失败 stderr + 非零退出。env：BRAINX_DB_PATH / BRAINX_BACKUP_DIR / BRAINX_BACKUP_KEEP_DAYS。
+  2. `tests/data-backup.test.mjs`（新，5 例，真实 CLI 子进程黑盒）：快照可只读打开 + quick_check + 行数一致；超龄清理与窗口内保留、非本脚本文件不动；锁文件互斥退出码 75；源库不存在非零退出；模块可加载冒烟。
+  3. `deploy/systemd/brainx-backup.service` + `.timer`（新）：每日 03:17 OnCalendar、Persistent=true；User/EnvironmentFile/沙箱字段镜像 brainx-dispatcher.service，Type=oneshot，ReadWritePaths 含 /opt/brainx/data 与 /opt/brainx/backups。
+- 验证：新增 5 例全绿；全量 `npm test` 828/828 通过；`npm run verify:quick` 16/16 通过。
+- 偏差说明：源库路径 env 采用任务书指定的 `BRAINX_DB_PATH`（既有代码里 `BRAINX_DB` 是 openDb 默认库路径的 env，二者职责不同，本脚本不改动既有约定）。
+- 待部署：单元上 ECS 并 `systemctl enable --now brainx-backup.timer`；未 push。
+
+## 2026-09-23｜feat(hub): specs/019 US2 dispatcher 调度层——消费移出 bridge 调用栈，错误可重试/死信/重放
+
+- 起因：specs/019-hub-event-backbone tasks.md T012-T018（本期最高风险段）。断点：账本只写不读、消费者靠 bridge 生产者手工同步调用、LLM 形状错配逼出 presetFields 注入 hack、错误散在 try/catch 里静默。
+- 改动：
+  1. `migrations/0052_consumer_failures.sql`（新）：「事件 × 消费者」失败台账——attempts < maxRetries 下轮重试，到限且未 resolved 即死信，replayConsumerFailure 置 resolved 后可重放。与 0027 event_dlq（upcast 失败）职责分离。
+  2. `src/hub/consumer.js`：新增 `consumeOnceAsync` 两段式——已消费快速短路（不调 prepare，省 LLM 钱）；prepare（异步 IO）在事务外；apply 仍由同步 consumeOnce 包裹进事务。消费者拿到的事件 payload/evidence_refs 已解析为对象。
+  3. `src/hub/dispatcher.js`（新，约 110 行）：`defaultConsumers()` 注册表（job-extract + judgment-extract）、`dispatchOnce` 按消费者扫未消费集合逐条派发（eventTypes 过滤、单消费者异常隔离）、`replayConsumerFailure` 死信重放。多实例并发底线由 consumeOnce BEGIN IMMEDIATE 兜底，但生产只跑一个实例（prepare 可能重复付费）。
+  4. `src/job-extract/index.js` / `src/judgment-extract/index.js`：新增注册项 jobExtractConsumer / judgmentExtractConsumer——LLM 预抽取从 bridge-producer 的 presetFromLlm 注入挪回 prepare（AI_*_ENABLED 开关不变），schema 违规回退规则层的补偿收进 apply（单点，删除生产者双份 try/catch）。consumeJobExtract/consumeJudgmentExtract 直调入口保留兼容。
+  5. `src/job-extract/bridge-producer.js` 瘦身：只生产（落原文表 + 追加账本），删除消费调用与 preset 函数；`src/bridge.js` 329/361 注释更新。架构红利：WS 网关（processLarkEvent）写入的事件也自动进入提炼——此前「WS 链路未接抽取消费者」的已知边界随 dispatcher 闭合。
+  6. `bin/brainx-dispatcher.mjs`（新，常驻循环，间隔可由 BRAINX_DISPATCHER_INTERVAL_MS 调，默认 2s）+ `deploy/systemd/brainx-dispatcher.service`（镜像 integration-worker 单元）。
+  7. 测试：`tests/hub-dispatcher.test.mjs`（新，10 例，先红后绿——派发/恰好一次/eventTypes 过滤/两段式/prepare 抛错零写入/重试死信/故障隔离/重放/backlog/默认注册表端到端双域草稿）；`tests/judgment-extract-consumer.test.mjs` 全链用例改走 dispatcher（架构形态变化，非弱化断言）；`tests/framework.test.mjs` 迁移记账跟进（0052 入账、旧库兼容 54→55）。
+- 验证：新增 10 例 + 全量 `npm test` 819/819 通过；`npm run verify:quick` 16/16；T017 grep 判据通过（bridge-producer/bridge.js 无 consume 调用残留）。
+- 偏差说明：event_dlq（0027）无 consumer_name/attempts 列，死信台账按事实新建 consumer_failures，plan 中「复用 event_dlq」的表述以本实现为准。
+- 待部署：`brainx-dispatcher.service` 上 ECS 并 enable；未 push。
+
+## 2026-09-23｜docs(spec): 立项 specs/021 数据治理——生产库自动备份 + 高热表保留归档纪律
+
+- 起因（用户指令）：「整个数据的方案是不稳定的」，核实后立项。现状：生产 SQLite 无自动备份（pull-cloud-data.mjs 是手动训练副本拉取，非备份）；retention 只管 recommendations 域（8/24 膨胀事故后的救急脚本）；lark_messages/workflow_event_log/openmai_results 无保留策略；云本地单向无回流。
+- 改动：`specs/021-data-governance/spec.md`（新，立项占位）——US1 每日自动备份可恢复（P1，滚动窗口+失败可见+异盘存放）、US2 高热表保留归档（P1，dry-run 默认 + evidence_refs 引用保护 + 账本只归档不删引用窗口内事件）；FR-001~006、SC-001~004；明确不做：换库/分库、异地容灾（后续项）。`docs/README.md` 路由登记。
+- 边界：与 specs/019 并行不阻塞（019 改链路形态，021 管数据底盘）；plan/tasks 待排期。
+- 验证：纯文档，无需门禁外测试。
+- 未 push。
+
+## 2026-09-23｜feat(hub): specs/019 US1——五类业务动作补发标准信封事件（接单/找人启动与终态/双域草稿确认/终局）
+
+- 起因：specs/019-hub-event-backbone tasks.md T004-T011（测试先行：先写 8 例全红，再实现转绿）。
+- 改动：
+  1. `tests/business-events.test.mjs`（新，8 例）：五类事件的产生 + 幂等回放 + 载荷契约（payload 只放锚点/计数，evidence_refs 引用制），逐字段按 contracts/event-types.md 断言。
+  2. 发射点（全部走 `src/hub/emit.js` emitEvent，与业务写入同事务/同调用栈）：`tools-actions.js` acceptJob 成功且非 already → `job.accepted`；`replay.js` recordOutcome → `job.terminal_recorded`（idem 复用 job_outcomes 键）；`job-extract/confirm.js` 与 `judgment-extract/confirm.js` 确认/拒绝 → `job_fact.reviewed`（domain=job/judgment，确认在事务内 COMMIT 前）；`openmai-task.js` 启动 INSERT 后 → `sourcing.search_started`、settleOpenmaiTask（changes=1）→ `sourcing.search_finished`（新增 channel/resultCount 参数，计数取自 assessOpenmaiCandidateBatch().count）、无凭证快速失败 → search_finished(error)；`supermai-sourcing.js` 同三点（channel=supermai）；`openmai-delivery.js` failStaleOpenmaiTasks 中断回收 → search_finished(error)。
+  3. `tests/helpers/event-ledger.js`：补 countEvents（增量；基座主体已在 c067cd9 入库）。
+- 偏差说明（相对 tasks.md 假设）：①T010 的「找人登记处」实际是 `openmai-task.js`/`supermai-sourcing.js` 的 start* 函数而非 integration-jobs/production-handlers.js（后者只管 TALENT_SYNC/PARSE_DOCUMENT/MATCH_EVAL），以代码事实为准；②search_finished 的发射点从 openmai-delivery 投递层移到 settle 结算层（结果就绪即留痕，投递另有重试队列）；③基线核对发现早前会话已提交 Phase 2 基座（c067cd9），本轮重写被回退，改用已入库的 emit.js/helper API。
+- 验证：新增 8 例先红后绿；全量 `npm test` 809/809 通过；`npm run verify:quick` 16/16 通过。
+- 未 push。
+
+## 2026-09-22｜feat(hub): specs/019 Phase 2 基座——账本测试基座 + 业务事件发射辅助
+
+- 起因：specs/019-hub-event-backbone tasks.md T002/T003，US1/US2/US3 共用的 Phase 2 基座。
+- 改动：
+  1. `tests/helpers/event-ledger.js`（新）：内存库测试基座。复用既有测试建库模式（`openDb(':memory:')` 跑全量迁移），workflow_event_log/processed_events/event_dlq 即为 0023/0024+0028/0027 生产真实结构，不手抄 DDL；另导出 `emitTestEvent`（快捷 appendEvent，缺省补 event_id/actor/occurred_at）与 `eventsByType`（payload/evidence_refs 已解析）。
+  2. `src/hub/emit.js`（新）：`emitEvent` 包装 appendEvent，统一 actor（缺省 `system:worker`）/occurred_at/schema_version=1 约定，返回 `{ok, deduplicated, event}`；`mustEmitEvent` 在信封无效时抛错（程序错误，让调用方事务回滚）。不开事务——业务写入点在自有 BEGIN/COMMIT 内调用，单条 INSERT 随调用方事务同生死。
+- 验证：`npm run verify:quick` 16/16 通过（基线 T001 同）；node 冒烟：emitTestEvent 落行、同 idem_key 重放 deduplicated=true。
+- 未 push。
+
+## 2026-09-22｜docs(spec): specs/019 任务拆解——30 个任务按五用户故事分阶段，测试先行
+
+- 起因：speckit-tasks 阶段，把 plan/research/contracts 落成可执行任务清单。
+- 改动：`specs/019-hub-event-backbone/tasks.md`（新，T001-T030）——Phase 1 基线确认；Phase 2 基座（tests/helpers/event-ledger.js 测试工具 + src/hub/emit.js 发射辅助）；US1 五路补事件（T005-T009 改不同文件可并行）；US2 dispatcher（consumeOnceAsync 两段式 + 注册表 + DLQ + T016 bridge 瘦身，标注为本期最高风险任务）；US3 反馈环（0052 迁移 + rollup 消费者）；US4/US5 只落地基（隔离原则测试 + 子规格占位、三方漂移门禁测试）；Phase 8 文档收口与 quickstart 全场景验收。
+- 关键约定写入清单：宪法 IV 测试先行（T004/T012/T020 先红后绿）；每个 Phase 末尾原子 commit 并同步本日志；US3 依赖 US1 事件原料，US2 未完成时 rollup 可由既有 worker 定时触发过渡。
+- 验证：纯文档改动，verify:quick 16/16 通过。下一步 speckit-implement 从 Phase 2 开工。
+- 未 push。
+
+## 2026-09-22｜docs(spec): specs/019 实施计划——两段式异步消费者 + 五类业务事件契约 + 反馈快照表
+
+- 起因：specs/019 立项后的 speckit-plan 阶段，把架构重整落到技术方案。
+- 改动（全部在 `specs/019-hub-event-backbone/`，不改代码）：
+  1. `plan.md`：技术上下文（Node 内置 + 既有 4 依赖，零新增）、宪法门禁全过、源码结构（新增 `src/hub/dispatcher.js`、`src/feedback/rollup.js`、`bin/brainx-dispatcher.mjs`、`migrations/0052_feedback_metrics.sql`；改造点列到文件级）。
+  2. `research.md` 六项决策：①dispatcher 自建拒框架（BullMQ/Temporal 论证）；②**prepare/apply 两段式**解决 consumeOnce 同步事务 vs 异步 LLM 的形状错配（presetFields hack 的正确替代）；③五类事件类型与幂等键（全部复用业务写入点既有键）；④反馈环=消费者+快照表；⑤session 隔离与接口收敛本期只落地基（原则契约 + 漂移门禁）；⑥LLM 降级可见化。
+  3. `data-model.md`：feedback_metrics 快照表（append-only、可重算、superseded_by）；五类事件载荷形状。
+  4. `contracts/event-types.md`：五类业务事件信封契约 + 消费者注册契约 + 四项指标口径——事件类型的唯一事实源。
+  5. `quickstart.md`：五个端到端验证场景（产事件幂等/派发与 DLQ/bridge 瘦身 grep 判据/指标可重算/漂移门禁）。
+- 事实核实：event_dlq 存在于 migrations/0027（dispatcher DLQ 直接复用）；下一个迁移号 0052；bridge.js:329/361 为待瘦身调用点。
+- 验证：纯文档改动，verify:quick 16/16 通过。下一步 speckit-tasks 拆任务。
+- 未 push。
+
+## 2026-09-22｜test(judgment-extract): 跟进修正工具数与迁移记账断言（gateway 28→30、0051 入账）
+
+- 起因：9482b2a 提交后首次跑完整门禁 `npm run verify`，后端 4 个既有断言因新增 2 个 gateway 工具与 1 个迁移文件而失败（verify:quick 不覆盖这几项）。
+- 改动：`tests/agent-gateway-http.test.mjs` 健康检查工具数 28→30；`tests/agent-golden-workflow.test.mjs` 生产工具接入数 28→30；`tests/framework.test.mjs` schema_migrations 记账清单补 `0051_judgment_facts.sql`、旧库兼容断言 53→54。纯断言跟随接口变化，无逻辑改动。
+- 验证：`node --test` 三个受影响文件 27/27 通过；完整门禁重跑结果见 push 前记录。
+- 另查明：首次 full 门禁的另 3 项失败中，前后端依赖 audit 为网络瞬断（重跑 0 漏洞通过），工作区不干净系他人未跟踪文件 `bin/project-launch-no-jobcard.mjs`（非本任务，不处理）。
+
+## 2026-09-22｜docs(spec): 立项 specs/019 Hub 事件骨干重整——业务事件进账本 + dispatcher + 反馈环
+
+- 起因（用户指令）：对架构不满意（演示规模撞 300 顾问生产规模），要求立项重整。前置：2026-09-22 架构核实报告确认骨架（账本/幂等消费/Case 状态机/多租户鉴权）真实可留，三处形态待改。
+- 改动：
+  1. `specs/019-hub-event-backbone/spec.md`（新）：五个用户故事按核实报告修正顺序排优先级——P1 业务事件进账本（接单/找人/确认/终局补发标准信封事件）、P1 dispatcher 调度层（消费移出 bridge 调用栈、注册表、异步、DLQ）、P2 反馈环（决策↔结果对齐出指标）、P2 session 隔离下沉 gateway principal（破 maxAgents=20）、P3 接口面收敛（registry 唯一契约 + 发布验收门禁）。FR-001~012，SC-001~008。
+  2. 四个重难点专项（职位判断与匹配 / SuperMai+OpenMai 调度 / reloop 搜索 / 上下文总结）只在本规格钉死数据来源契约（全部从账本+权威表+原文锚点出），各立子规格施工。
+  3. `specs/019-hub-event-backbone/checklists/requirements.md`（新）：质量校验全过，无 NEEDS CLARIFICATION。
+  4. `docs/README.md`：路由表加 019 条目。
+  5. `.specify/feature.json`：指向 specs/019-hub-event-backbone。
+- 过程记录：开工前发现另一 Agent（kimi-code-main，judgment-extract-loop）已完成工作但未提交未释放锁；经用户确认其已完成，复核其 35/35 测试 + verify:quick 16/16 后按工作内容单独提交（9482b2a），再释放陈旧锁开始本任务。
+- 验证：docs/spec 改动，verify:quick 16/16 通过。后续走 speckit plan → tasks → implement。
+- 未 push。
+
+## 2026-09-22｜feat(judgment-extract): 顾问判断抽取回路——第二个信息域复刻四层模式，判断草稿经确认进 judgment_facts
+
+- 起因（用户指令）：「系统内部的飞书对话当前没办法处理非标准字段，想用『原文留档+LLM 结构化投影』这个方法把信息打通」。确认第一个域 = 顾问对话中的判断（客户偏好/硬性要求/例外规则/否决原因/评价），落地 = staging + 人工确认进权威表。job-extract 已是该模式的完整骨架，本任务复刻之，原文层（lark_messages）与账本层（workflow_event_log）零改动。
+- 改动：
+  1. `migrations/0051_judgment_facts.sql`（新）：`judgment_drafts`（staging，subject/kind/statement 各带 evidence 锚点 + confidence + raw_json 存档）+ `judgment_facts`（权威表，draft_id+sync_id 双血缘，V1 只追加无 supersede）。
+  2. `src/judgment-extract/`（新，四文件镜像 job-extract）：schema.js（zod 契约：subject_type=CLIENT_COMPANY|PROJECT|CANDIDATE|GENERAL，kind=PREFERENCE|CONSTRAINT|EXCEPTION|REJECTION|EVALUATION，statement≤120字）；classify.js（isJudgmentRelevant 关键词砍成本 + 规则层只抓「客户说…不接受/只要…」显式句型 + extractJudgmentLlm + mapJudgmentLlmFields 带 evidence 原文重合校验，不在原文出现的字段一律丢弃）；index.js（consumeJudgmentExtract，consumeOnce('judgment-extract') 与 job-extract 同事件各自幂等；statement=null 时 skip 不落空草稿）；confirm.js（confirmJudgment/rejectJudgment，血缘 sync_runs source='lark_judgment_extract'，关联职位 jobVisibleTo fail-closed）。
+  3. `src/job-extract/bridge-producer.js`：produceOne 在 consumeJobExtract 后追加 consumeJudgmentExtract；LLM 预抽取独立开关 `AI_JUDGMENT_EXTRACT_ENABLED`（默认关），schema 违规回退规则层（同现有纪律）。
+  4. `src/agent-gateway/tools-judgments.js`（新）：brainx_pending_judgments / brainx_review_judgment，可见性与 evidence 脱敏镜像 tools-job-facts.js，复用 job_fact_review 授权域；tool-registry.js 注册两行工具定义。
+  5. OpenClaw 外露：runtime.js BRAINX_OPENCLAW_TOOLS +2、openclaw.plugin.json、deploy/openclaw/openclaw.production.json tools.allow、tests/fixtures/openclaw-production/plugin-contract.json 同步（白名单 27→29 项）。
+  6. 测试（新三文件 18 例）：judgment-extract-rules（规则句型/schema/LLM 映射防幻觉锚定）、judgment-extract-consumer（幂等/irrelevant/no_judgment skip/与 job-extract 互不干扰/bridge 全链双草稿）、judgment-extract-confirm（转正+血缘/重复确认 409/可见职位关联/不可见 404 fail-closed/reject 终态）。
+  7. 文档：`docs/2026-09-22-judgment-extraction.md`（schema 契约+纪律+已知边界）+ `specs/016-judgment-extract-loop/spec.md` + docs/README.md 路由登记。
+- 验证：新增 18 例 + 受影响契约测试共 38/38 通过；`npm run verify:quick` 16/16 门禁通过。修复过两处：EXPLICIT_RE 内容组补逗号终止符（原贪婪吞后半句）、测试夹具 sync_runs.consultant_id NOT NULL。
+- 已知边界：WS 网关链路未接任何抽取消费者（job-extract 同此现状，单独任务）；judgment_facts 下游消费（回流排序/画像）是后续任务；不外露旧 MCP 白名单文档管辖范围（该文档只管 src/agent/registry.js 工具集）。
+- 未 push（本地领先 origin/main 2 个提交，push 需单独获准）。
+
+## 2026-09-22｜refactor(hook): 硬编码 per-user hook 收编为配置——开通新顾问=写 user-hooks.json 不写代码
+
+- 起因（用户指令）：「先消灭硬编码 hook：把 linda/wendy/yang-* 这类 hook 表达为 per-user 配置（触发条件+动作模板），开通新顾问 = 写配置而不是写代码——这是复制的前提」。此前每个顾问级 hook 都是一个按人名硬编码的 JS 文件，加人要写代码改 index.js 发版。
+- 改动：
+  1. `plugins/brainx-openclaw/user-hooks.js`（新，约 340 行）：通用 per-user hook 引擎。`loadUserHooksConfig()` 读 `BRAINX_USER_HOOKS_FILE`（缺省插件自带 `user-hooks.json`），逐条校验、非法条目记 warn 跳过、文件缺失/损坏 fail-open；`createUserHookHandler(hook)` 按配置生成 handler，保持 mention-silence 模式（message_received 缓存入站文本，before_agent_reply 取，丢缓存 fail-open 交 LLM）。三种动作模板：`fixed_reply`（固定文案，text 支持按行数组避免超长行）、`accept_job`（直调 brainx_accept_job，replies 可覆盖默认文案）、`offer_group`（候选人映射建/找 Offer 群+幂等发报告卡，success_template 占位符）。
+  2. `plugins/brainx-openclaw/user-hooks.json`（新）：三条历史 hook 原样迁为配置——yang-offer-fixed-reply（priority 90）、wendy-private-group（95）、linda-private-launch（96），open_id/chat_id/幂等键/文案不变。
+  3. `plugins/brainx-openclaw/index.js`：删掉三个硬编码工厂 import，改为加载配置循环注册（priority 取配置值）。
+  4. 删除 `linda-private-launch.js`、`wendy-private-group.js`、`yang-offer-reply.js`（含 wendy 里从未被调用的 disbandGroup 死代码）。
+  5. `plugins/brainx-openclaw/package.json`：files[] 换 user-hooks.js/json，版本 1.4.21 → 1.5.0；`runtime.js` PLUGIN_VERSION 同步；`tests/openclaw-plugin.test.mjs` 版本断言同步。
+  6. 测试：删 `tests/{linda-private-launch,wendy-private-group,yang-offer-reply}.test.mjs`（21 例），新增 `tests/user-hooks.test.mjs`（18 例）——覆盖三种动作模板全部原有用例 + 配置加载/env 覆盖/损坏 fail-open + 「纯配置开通新顾问」验收例。
+  7. `bin/brainx-yang-offer-demo.mjs`：3 处注释更新为指向 user-hooks.json（该脚本本身是演示种子脚本，未动逻辑）。
+  8. 文档：新增 `docs/2026-09-22-user-hooks-config.md`（配置格式、安全边界、验证方法），登记 docs/README.md 路由+目录；插件 README 加 Per-user hook 章节。
+- 验证：`node --test tests/user-hooks.test.mjs tests/openclaw-plugin.test.mjs tests/openclaw-production-config.test.mjs` 35/35 通过；`npm run verify:quick` 首次 2 项失败（删除文件未入索引导致"完整检出"失败 + user-hooks.json 超长行 896 字符），修复（fixed_reply text 改按行数组，引擎 join）并暂存后复检通过。
+- 待部署：scp 插件副本（index.js + user-hooks.js + user-hooks.json + package.json + runtime.js）到 ECS `/var/lib/brainx/.openclaw/extensions/brainx-openclaw/` + chown brainx:brainx + 重启 openclaw-brainx；或走 install.sh 重装。重启后三个 hook 行为应与线上一致（配置逐值迁移）。
+
+## 2026-09-17｜feat(hook): linda 私聊接单 hook——直调 brainx_accept_job 接单+自动找人，省略接单卡
+
+- 起因（咪需求）：帮 linda 演练「私聊 @bot 说接单 → 接单 → 建群 → 找人 → 出第一批人」链路。JC3V82F（北京脑利科技 CEO助理）的 project_launches 已 READY+linda+message_id=NULL，launchProject 返回 already → 不发接单卡（"省略接单卡"由 READY 态自动达成）。hook 必须用 mention-silence 模式（lastDirectInbound 缓存 + onMessageReceived 存 + onBeforeAgentReply 读缓存），避免 before_agent_reply 的 event 不含入站文本的 bug。
+- 改动：
+  1. `plugins/brainx-openclaw/linda-private-launch.js`（新，118 行）：before_agent_reply hook，私聊 + linda open_id（`ou_4c810c0729050de5877347697aee2c29`）+ 含"接单"关键词 → 拦截 LLM，直调 `callBrainxGatewayTool('brainx_accept_job', {job_id:'JC3V82F', confirm:true, idempotency_key:'linda-private-launch-JC3V82F'}, principal)`。principal 构造参考 search-start-notice.js（account_id 默认 'mia'，chat_type='p2p'，chat_id=sender）。acceptJob line 67 `!already || state===ACCEPTED` 对 dup 路径永真 → 重复接单仍触发 startSearch。响应解析参考 envelopes.js：`result.error` 存在=失败，`result.data` 存在=成功。
+  2. `plugins/brainx-openclaw/index.js`：import + 注册 linda-private-launch hook（priority 96，在 wendy-private 95 之前；两者互斥于 senderId，不竞争）。同注册 message_received 缓存入站文本。
+  3. `tests/linda-private-launch.test.mjs`（新，116 行）：8 例——正常接单+找人触发/dup 路径仍找人/409 冲突 already=true/网关错误/群聊不触发/无关键词不触发/非 linda 不触发/丢缓存 fail-open。
+- 验证：`npm run verify:quick` 16/16 通过，53 测试全绿。新增 8 例 + 已有 21 例 openclaw 测试全过。
+- 待部署：scp 插件副本到 ECS `/var/lib/brainx/.openclaw/extensions/brainx-openclaw/` + chown brainx:brainx + 重启 openclaw-brainx。部署后让 linda 私聊 braintex 说"接单"验证端到端。
+
 ## 2026-09-16｜feat(prompt): 杨东旭 Offer 群端到端验证脚本 + 固定文案回复 hook
 
 - 起因（咪需求）：验证「拉群 → 生成报告 → @ 问顾虑 → braintex 回固定文案」端到端流程。braintex 的 LLM 对话在 docx scope 未开时 fail-open 降级答非所问，咪要 wendy @ braintex 问"总结顾虑"时直接输出她审定过的固定文案，不走 LLM。

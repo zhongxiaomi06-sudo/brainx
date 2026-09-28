@@ -1,6 +1,7 @@
 /** SuperMai 云端 relay 账本：设备配对、出站轮询、任务租约与候选人定稿。 */
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { now, uuid } from './db.js';
+import { emitEvent } from './hub/emit.js';
 
 const PLATFORMS = new Set(['boss', 'maimai', 'liepin']);
 const FINAL = new Set(['completed', 'partial', 'failed', 'cancelled']);
@@ -286,6 +287,8 @@ export function finishSupermaiTask(db, taskId, token, input = {}) {
   const at = now();
   const error = openmaiStatus === 'failed'
     ? short(input.errors?.map?.((item) => item?.message || item).join('；'), 500) || `SuperMai ${finalStatus}` : null;
+  const searchRound = Number(db.prepare(`SELECT search_round FROM openmai_results
+    WHERE consultant_id=? AND task_id=?`).get(task.consultant_id, taskId)?.search_round || 1);
   db.exec('BEGIN');
   try {
     db.prepare(`UPDATE sourcing_tasks SET status=?,finished_at=?,updated_at=?,error_code=?,error_message=?
@@ -297,6 +300,15 @@ export function finishSupermaiTask(db, taskId, token, input = {}) {
       task.consultant_id, taskId);
     event(db, taskId, 'finished', { status: finalStatus, result_count: rows.length,
       platform_counts: input.platform_counts || {} });
+    emitEvent(db, {
+      event_type: 'sourcing.search_finished',
+      idem_key: `sourcing.finished:${task.project_id}:${taskId}`,
+      actor: 'system:worker',
+      payload: { project_id: task.project_id, channel: 'supermai', round: searchRound,
+        status: openmaiStatus === 'done' ? 'success' : 'error', result_count: rows.length },
+      evidence_refs: [{ table: 'sourcing_tasks', id: taskId }],
+      occurred_at: at,
+    });
     db.exec('COMMIT');
   } catch (failure) { db.exec('ROLLBACK'); throw failure; }
   return { status: finalStatus, result_count: rows.length };
@@ -328,6 +340,8 @@ export function reportSupermaiRelay(db, device, input = {}) {
   }
   if (input.status !== 'failed' || FINAL.has(task.status)) return { ok: true };
   const message = short(input.error, 500) || '桌面连接器启动任务失败';
+  const searchRound = Number(db.prepare(`SELECT search_round FROM openmai_results
+    WHERE consultant_id=? AND task_id=?`).get(task.consultant_id, taskId)?.search_round || 1);
   db.exec('BEGIN');
   try {
     db.prepare(`UPDATE sourcing_tasks SET status='failed',error_code='SUPERMAI_DESKTOP_FAILED',
@@ -336,6 +350,15 @@ export function reportSupermaiRelay(db, device, input = {}) {
     db.prepare(`UPDATE openmai_results SET status='failed',error=?,finished_at=?
       WHERE task_id=? AND status='running'`).run(message, at, taskId);
     event(db, taskId, 'failed', { error_code: 'SUPERMAI_DESKTOP_FAILED' });
+    emitEvent(db, {
+      event_type: 'sourcing.search_finished',
+      idem_key: `sourcing.finished:${task.project_id}:${taskId}`,
+      actor: 'system:worker',
+      payload: { project_id: task.project_id, channel: 'supermai', round: searchRound,
+        status: 'error', result_count: 0 },
+      evidence_refs: [{ table: 'sourcing_tasks', id: taskId }],
+      occurred_at: at,
+    });
     db.exec('COMMIT');
   } catch (error) { db.exec('ROLLBACK'); throw error; }
   return { ok: true };

@@ -21,9 +21,9 @@ import { AGENT_FACT_FIELDS, upsertAgentFacts } from './agent-facts.js';
 
 /** current_stage 受控枚举：GLM 原始说法 → 归一值。匹配用小写包含。 */
 export const STAGE_ENUM = [
-  { value: '一面', re: /一面|初面|首面|初筛|first\s*round/i },
-  { value: '二面', re: /二面|复试|复面|second\s*round/i },
-  { value: '终面', re: /三面|终面|final|最后一轮/i },
+  { value: '一面', re: /一面|初面|首面|初筛|第?一轮|first\s*round/i },
+  { value: '二面', re: /二面|复试|复面|第?二轮|second\s*round/i },
+  { value: '终面', re: /三面|终面|第?三轮|final|最后一轮/i },
   { value: 'Offer', re: /offer|录用|发了.*(offer|聘书)/i },
   { value: '入职', re: /入职|到岗|onboard/i },
 ];

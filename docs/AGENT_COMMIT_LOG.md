@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-26｜fix(fact-agent): 阶段映射补「第 N 轮」说法——生产试点 40 条实证 invalid 主因
+
+- 起因（用户指令）：「UNKNOWN 职位全部信息录入一遍，CLI 第一遍 + 资源补充」。specs/023 管线已建成，跑生产试点（--limit=40）发现：GLM 常返回「第二轮/第一轮/第三轮」说法，STAGE_ENUM 不认 → invalid 占 10/25（value_unmappable 主因）；另服务器未配 FACT_AGENT_KEY，用既有 BRAINX_LLM（StepFun openai 兼容端点）经 env 映射（GLM_BASE_URL/GLM_MODEL/FACT_AGENT_KEY）验证可行，llmFailures=0，不改任何配置文件。
+- 改动：`src/fact-agent-extract.js` STAGE_ENUM——一面补「第?一轮」、二面补「第?二轮」、终面补「第?三轮」；「面试」无轮次说法保持不可映射（宁缺勿错）。
+- 测试：`tests/fact-agent-extract.test.mjs` 归一化用例 +4（第二轮/第一轮/第三轮/裸「面试」丢弃），14/14 通过。
+
 ## 2026-09-25｜feat(client-metrics): 客户健康报告落库 client_metrics + 生命周期分档的第一批算法推送（specs/022 US6 增量）
 
 - 起因（用户指令）：验证数据库接口/结构是否满足客户健康报告（200 家 × 90 天群消息）、第一批数据是否成立，然后建立第一批推送逻辑、要求算法驱动。

@@ -72,6 +72,11 @@ test('归一化：阶段说法映射受控枚举；不可映射丢弃（非法�
   assert.equal(normalizeValue('current_stage', '发了offer'), 'Offer');
   assert.equal(normalizeValue('current_stage', '下周到岗'), '入职');
   assert.equal(normalizeValue('current_stage', '聊得不错'), null);
+  // 2026-09-26 生产试点实证缺口：「第 N 轮」说法（40 条试点 invalid 10 条的主因之一）
+  assert.equal(normalizeValue('current_stage', '第二轮'), '二面');
+  assert.equal(normalizeValue('current_stage', '进入第一轮'), '一面');
+  assert.equal(normalizeValue('current_stage', '第三轮'), '终面');
+  assert.equal(normalizeValue('current_stage', '面试'), null, '无轮次的「面试」不可映射，保持丢弃');
 });
 
 test('归一化：active_state 只认 OPEN/CLOSED/COOLING；OPEN 与矛盾词并存 → 丢弃（规则校验）', () => {

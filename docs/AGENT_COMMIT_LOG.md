@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-09-28｜fix(fact-agent): CLI 的 LLM fetch 补 90s 超时（生产实证：无超时挂起致全量回填零产出）+ 拍板 status 不回溯
+
+- 起因：全量回填在生产跑了 1 小时零新增落库，定位为 StepFun 连接挂起 + `resolveLlm` 的 fetch 无超时（0 CPU + ESTABLISHED 死连实证）。
+- 改动：`bin/brainx-fact-agent.mjs` fetch 加 `AbortSignal.timeout(90s)`，超时按批次失败计 llmFailures、下批继续（幂等可重跑）。
+- 决策记录（用户拍板，已回填 specs/023 施工记录）：`active_state` 原始 status 不做历史回溯，以 TTC 实时信号为准，存量 UNKNOWN 不补。
+- 验证：`node --check` + fact-agent 测试 14/14。
+
 ## 2026-09-28｜fix(recommend): 轮次级 alive_count 口径——卡片总量改为「确认在招 N · 评估池 M」
 
 - 起因（用户指令）：「验证数据准确度；felix 的推送数据不准确；每人身份对应的数据总量要正确」。生产实测（全顾问对照）：每顾问 candidate_count 均为全库 ~23,185（含 20,500 个 UNKNOWN 无信号职位）；自有职位进 Top5 比例极低（york 2/189、linda 0/3、frankie 0/2、felix 4/17、mia 3/19）——分母口径误导 + 身份相关性不进六维评分（策略缺口，非回归；归属提分走 specs/022 影子纪律另案）。

@@ -229,3 +229,7 @@ CREATE INDEX idx_agent_facts_job ON job_agent_facts(project_id, field, extracted
 - [数据渠道全景与接入路线](../../docs/2026-09-24-data-channels-roadmap.md)（T7 Pipeline = current_stage 第一供给线）
 - [数据读取链路诊断](../../docs/2026-09-24-data-reading-pipeline.md)（读取纪律六条红线）
 - [岗位推荐算法与评分标准](../../docs/BrainX岗位推荐算法与评分标准.md)（评分与影子评估纪律）
+
+## 施工记录
+
+- 2026-09-28（kimi-code-main）：①用户拍板——`active_state` 原始 status 不做历史回溯补全，职位状态以 TTC 实时信号为准（「挂靠真实系统，不需要全部数据」）；存量 UNKNOWN 不补，由增量同步自然刷新。②生产实证修复：bin CLI 的 LLM fetch 补 90s AbortSignal 超时（此前无超时，StepFun 挂起连接导致全量回填 0 产出卡死）。

@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-09-28｜feat(push): 再推去重——--exclude-pushed-today 剔除当日已推职位
+
+- 起因（用户指令）：「顾问要求再次推送，要求不要有重复的」。
+- 改动：`src/push.js` 新增 `pushedProjectIdsOnDay`（从当日 push_log 卡片深链提取已推 project_id，quickLink 与 opportunity 两种形态）；`bin/brainx-push.mjs` 新增 `--exclude-pushed-today`，剔除后为空则明确提示不发空卡。
+- 测试：`tests/push-dedup.test.mjs` 2 例（两种深链形态提取 / 昨日与他人记录不计入）。
+
 ## 2026-09-28｜feat(profile): 顾问画像首初始化工具——证据汇总 + LLM 提案 + 覆盖率评估（4/9 空白画像补课）
 
 - 起因（用户指令）：「linda/frankie/hiroshi/miya 的画像先建立第一批动态画像，用他们和 AI 的对话 + 飞书群消息数据，然后使用 agent 算法评估」。前置验证：4 人 profile_keywords 空白；linda/frankie 群消息充足（5.6k/8.3k 条、群关联职位数百），miya 仅 2 个策展职位，hiroshi 无任何数据。

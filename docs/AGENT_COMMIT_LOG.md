@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-10-09｜fix(sourcing): needs_input 投递不再被 CHECK 静默吞掉——0060 重建表 + enqueue 反连接
+
+- 起因（用户指令）：sourcing 三链路审计后修第一刀断点。审计实证（09-23 内存库跑真实 0041 DDL）：`openmai_deliveries` 的 `CHECK(result_status IN ('done','failed'))` 与 enqueue 选出的 `needs_input` 冲突，`INSERT OR IGNORE` 静默跳过——OpenMai 澄清反问卡永远到不了项目群，`search_status` 卡 RUNNING 至超龄。
+- 改动：`migrations/0060_openmai_deliveries_needs_input.sql`（SQLite 不能改 CHECK，按官方推荐重建表，含全部约束/索引/存量数据搬迁）；`src/openmai-delivery.js` `enqueueOpenmaiDeliveries` 幂等改 LEFT JOIN 反连接 + 普通 INSERT——此后 CHECK/外键违例抛错暴露，不再静默。
+- 测试：`tests/openmai-delivery.test.mjs` 新增 1 例（needs_input 入台→橙卡「请补充职位信息」→`OPENMAI_SEARCH_BRIEF_REQUIRED`），18/18 通过。
+- 门禁：`npm run verify:quick` 两项失败均为存量前端问题（workbench.tsx 超长行/整文件 Lint 豁免到期），与本改动无关，未夹带。
+
 ## 2026-09-28｜docs(data): 数据地基体检报告——生产库三轮扫射，3🔴+4🟡+2⚪+6✅
 
 - 起因（用户指令）：「阅读数据的地基，进行一遍扫射检查，然后关键的点，可以进行补充的再次进行验证，当前的数据结构还是出现了很多的问题」。

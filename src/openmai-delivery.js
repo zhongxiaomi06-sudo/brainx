@@ -238,6 +238,10 @@ function backgroundText(candidate) {
 }
 
 export function enqueueOpenmaiDeliveries(db, at = now()) {
+  // 幂等用 LEFT JOIN 反连接表达（已入台的 task_id+chat_id 不再选出），剩余行用普通
+  // INSERT——CHECK/外键违例必须抛错暴露。0041 时代用 INSERT OR IGNORE，把 needs_input
+  // 的 CHECK 冲突静默吞掉，「请补充职位信息」卡永远到不了群（2026-10-09 审计实证，
+  // 0060 已放宽 CHECK）。
   const rows = db.prepare(`SELECT r.task_id, r.consultant_id, r.project_id, r.status, r.result_text,
       l.launch_id, l.chat_id
     FROM openmai_results r JOIN project_launches l
@@ -245,9 +249,10 @@ export function enqueueOpenmaiDeliveries(db, at = now()) {
         WHERE pl.project_id=r.project_id
         ORDER BY CASE pl.status WHEN 'READY' THEN 0 WHEN 'POSTING_JOB' THEN 1
           WHEN 'CREATING_CHAT' THEN 2 ELSE 3 END, pl.created_at, pl.launch_id LIMIT 1)
+    LEFT JOIN openmai_deliveries d ON d.task_id=r.task_id AND d.chat_id=l.chat_id
     WHERE l.status='READY' AND l.chat_id IS NOT NULL AND r.task_id IS NOT NULL
-      AND r.status IN ('done','needs_input','failed')`).all();
-  const insert = db.prepare(`INSERT OR IGNORE INTO openmai_deliveries
+      AND r.status IN ('done','needs_input','failed') AND d.delivery_id IS NULL`).all();
+  const insert = db.prepare(`INSERT INTO openmai_deliveries
     (delivery_id, task_id, consultant_id, project_id, chat_id, result_status,
      delivery_status, next_attempt_at, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, ?)`);

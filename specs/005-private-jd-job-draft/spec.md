@@ -90,3 +90,9 @@
 - 草稿 schema（migrations/0031 的字段集）不变；薪资/任职要求无权威列，仅存档于 raw_json，权威列扩展留待后续规格。
 - 生产部署（openclaw 插件重装、brainx 服务重启、环境变量 AI_JOB_EXTRACT_ENABLED）属于接入阶段，不在本规格代码范围内。
 - 一次只激活一个 feature；本功能不改变 003 群链路行为。
+
+## 2026-10-09 补记：群建岗接线（授权面补齐）
+
+- 群内建岗的引擎/handler（`brainx_submit_job_jd` 群场景 + `confirm_create` 一步转正）自本规格群内扩展起就绪并有测试，但群授权范围 `GROUP_PURPOSES`（`src/project-launch.js`）一直不含 `job_fact_review`，导致该工具在所有群场景被 `authorizeGroup` 拒绝——绑定卡「直接贴 JD 建岗」的承诺落空（2026-10-09 sourcing 链路审计发现）。
+- 修复：`GROUP_PURPOSES` 补 `job_fact_review`；`migrations/0061_group_scope_job_fact_review.sql` 按 0049 同法回填存量 ACTIVE 群；`plugins/brainx-openclaw/prompt.js` 补建岗剧本（先复述字段、确认后 `confirm_create=true` 一步建岗）。
+- 回归：`tests/agent-authorization.test.mjs`（含 job_fact_review 的群放行 / 未回填群仍 fail-closed）；`tests/project-launch.test.mjs` 新建群 scope 断言。

@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-10-09｜feat(sourcing): 群贴 JD 建岗接线——授权面补齐 + 存量群回填 + prompt 建岗剧本
+
+- 起因（用户指令）：「JD 建岗的断点是否能直接点击建立」。审计实证：群内建岗引擎/handler 早已就绪（19/19 测试在案），但 `GROUP_PURPOSES`（`src/project-launch.js`）不含 `job_fact_review`，`brainx_submit_job_jd` 在所有群场景被 `authorizeGroup` 拒绝；绑定卡（group-intake.js）却承诺「直接贴 JD 建岗」；prompt 全文无建岗剧本。
+- 改动：`GROUP_PURPOSES` 补 `job_fact_review`；`migrations/0061_group_scope_job_fact_review.sql` 按 0049 同法回填存量 ACTIVE 群；`plugins/brainx-openclaw/prompt.js` 补建岗剧本（群内被 @ 贴整段 JD → 复述字段 → 确认后 `confirm_create=true` 一步建岗；缺公司/职位名如实指出不编造；私聊走草稿复核）；`specs/005` 补记。
+- 测试：`tests/agent-authorization.test.mjs` 新增 1 例（含 job_fact_review 群放行 / 未回填群 fail-closed）；`tests/project-launch.test.mjs` 新建群 scope 断言；`tests/framework.test.mjs` 迁移记账 64 文件。全量 898/898 通过。
+- 边界：候选人 Offer 决策群（candidate-decision-group.js）不需要建岗用途，未加；草稿写回本群绑定职位（重复岗治理）属第二刀，不在本次范围。
+
 ## 2026-10-09｜fix(sourcing): 找人读回三断点修复——supermai 发卡接线 + 终态如实告知 + 僵尸 running 超龄
 
 - 起因（用户指令）：sourcing 三链路审计断点①③⑫。①`tools-sourcing.js`（原 tools-jobs.js:475）`supermaiScout` 接线丢 `sendCardFn/publicBaseUrl`，群读回发卡整链死亡，specs/018 卡片成死代码；③读回只认 running/done，needs_input/failed 穿透触发分支静默重跑扣费；⑫running 无超龄判断，进程重启后谎称「进行中」最长 1 小时。

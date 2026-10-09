@@ -77,6 +77,8 @@ test('项目启动：建群、投放职位、绑定项目并激活群 Agent 范�
   const scope = db.prepare('SELECT * FROM agent_group_scopes WHERE chat_id=?').get('oc_launch');
   assert.deepEqual(JSON.parse(scope.project_refs_json), [PID]);
   assert.ok(JSON.parse(scope.allowed_purposes_json).includes('candidate_action'));
+  assert.ok(JSON.parse(scope.allowed_purposes_json).includes('job_fact_review'),
+    '2026-10-09 群建岗接线：新建项目群必须放行 brainx_submit_job_jd');
   assert.equal(JSON.parse(scope.allowed_senders_json).length, 1);
 
   const duplicate = await launchProject(db, 'felix', PID, { idempotency_key: 'another-click' }, deps);

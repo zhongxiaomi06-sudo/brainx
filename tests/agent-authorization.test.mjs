@@ -198,3 +198,24 @@ test('specs/019 US4：多租户并发会话——各自解析到本人，跨租�
     feishuAppKeyHash: APP_HASH, projectRef: 'job-a',
   }), /NOT_FOUND_OR_FORBIDDEN|UNBOUND_IDENTITY/);
 });
+
+test('群建岗接线（2026-10-09）：scope 含 job_fact_review 时 brainx_submit_job_jd 群内放行，未回填群仍拒绝', () => {
+  const db = openDb(':memory:');
+  seedBinding(db);
+  seedGroup(db, { allowed_purposes_json: JSON.stringify(['candidate_review', 'job_fact_review']) });
+  const ok = authorizePrincipal(db, payload({
+    chat_type: 'group', chat_id: 'oc_project_a',
+    purpose: 'job_fact_review', tool_name: 'brainx_submit_job_jd',
+  }), { feishuAppKeyHash: APP_HASH });
+  assert.equal(ok.consultantId, 'mia');
+  assert.equal(ok.chatType, 'group');
+
+  // 0061 回填前的存量群（无 job_fact_review）依旧 fail-closed，证明授权检查真实生效
+  const legacy = openDb(':memory:');
+  seedBinding(legacy);
+  seedGroup(legacy);
+  assert.throws(() => authorizePrincipal(legacy, payload({
+    chat_type: 'group', chat_id: 'oc_project_a',
+    purpose: 'job_fact_review', tool_name: 'brainx_submit_job_jd',
+  }), { feishuAppKeyHash: APP_HASH }), /NOT_FOUND_OR_FORBIDDEN/);
+});

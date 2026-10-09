@@ -1,5 +1,14 @@
 # Agent Commit 记录
 
+## 2026-10-09｜refactor(frontend): workbench.tsx 拆分清理——摘除两项到期门禁豁免（Lint 豁免 + 超长行）
+
+- 起因（用户指令）：「处理这个前端例外」。`workbench.tsx` 的整文件 Lint 豁免与超长行例外均于 2026-09-30 到期，门禁失败阻断 push；baseline 备注本就要求「只能减少、拆分清理」，故真修不续期。
+- 改动：493 行半压缩主文件按 prettier（printWidth 110）格式化并拆为 13 个新模块（panel/drawer/side-panels/talent-supply/chatbot/toast 六个组件文件 + actions/engagement/connection/persistence/navigation/assistant/panel 七个 hook 文件），主文件降至 489 行，全部文件 ≤500 行且无 >200 字符行；`eslint.config.mjs` 摘除 globalIgnores 豁免；`.quality-gate/baseline.json` 删除两个到期条目。
+- Lint 真修（无 disable 压制）：3 个 `react-hooks/set-state-in-effect` error 改为派生态/事件处理器/宏任务首帧后方案（verify 跳转、replay loading、TalentSupply 拉取），拆分后新暴露的 4 个同类 error 一并真修；29 个未使用变量清理。保留 6 个 warning（5 个 exhaustive-deps 依赖数组逐字不动、1 个被测试钉住的传参链）。
+- 测试适配：`tests/rendered-html.test.mjs` 的源码文本断言改空白宽容（拼接清单纳入 13 个新文件），删除 2 条钉死无调用方死代码的断言。
+- 验证：`npx eslint` 0 error；`npm run build`/`tsc --noEmit` exit 0；前端测试 53/53 + storybook 86/86；根目录 `npm run verify:quick` 16/16 通过（两项失败清零，无新增）。
+- 已知微差（有意、等价）：demo 模式连接态首帧即 offline（原 connecting 闪一帧）；settings/verify 跳转从 effect 同步改宏任务（首帧绘制后，无可见差异）。
+
 ## 2026-10-09｜feat(sourcing): 群贴 JD 建岗接线——授权面补齐 + 存量群回填 + prompt 建岗剧本
 
 - 起因（用户指令）：「JD 建岗的断点是否能直接点击建立」。审计实证：群内建岗引擎/handler 早已就绪（19/19 测试在案），但 `GROUP_PURPOSES`（`src/project-launch.js`）不含 `job_fact_review`，`brainx_submit_job_jd` 在所有群场景被 `authorizeGroup` 拒绝；绑定卡（group-intake.js）却承诺「直接贴 JD 建岗」；prompt 全文无建岗剧本。

@@ -69,14 +69,6 @@
       "owner": "frontend",
       "reason": "存量展示样式待格式化；只能减少，不能恶化",
       "expiresOn": "2026-10-31"
-    },
-    {
-      "path": "frontend/btex-frontend/app/workbench.tsx",
-      "maxLongLines": 21,
-      "maxLength": 3023,
-      "owner": "frontend",
-      "reason": "存量工作台组件待拆分和格式化；只能减少，不能恶化（d1d24c60 视觉统一后 23→21，按门禁要求同步收紧）",
-      "expiresOn": "2026-09-30"
     }
   ],
   "oversizedFiles": [
@@ -102,12 +94,5 @@
       "expiresOn": "2026-10-31"
     }
   ],
-  "lintFileExemptions": [
-    {
-      "path": "app/workbench.tsx",
-      "owner": "frontend",
-      "reason": "历史工作台文件存在遗留 Lint 债务；禁止新增豁免，并要求拆分清理",
-      "expiresOn": "2026-09-30"
-    }
-  ]
+  "lintFileExemptions": []
 }

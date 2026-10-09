@@ -212,16 +212,18 @@ test('offer_group：候选人映射来自配置（"为杨东旭拉群"）', asyn
 
 const lindaDeps = (fetchImpl) => ({ fetchImpl, gatewayToken: 'test-token', assertionSecret: 'a'.repeat(32) });
 
-test('accept_job：私聊 + "接单" → 调 brainx_accept_job + 返回成功', async () => {
+test('accept_job：私聊 + "接单" → 调 brainx_accept_job + 提示选择渠道', async () => {
   const { fetchImpl, calls } = mockJsonFetch({
     schema_version: 'agent_tool_response.v1',
-    data: { job_ref: 'JC3V82F', state: 'ACCEPTED', search: { status: 'triggered' } },
+    data: { job_ref: 'JC3V82F', state: 'ACCEPTED', search: { status: 'awaiting_method' } },
     facts: [], unknowns: [],
   });
   const result = await fireDirect({ hook: LINDA_HOOK, dependencies: lindaDeps(fetchImpl), text: '帮我接单' });
   assert.equal(result.handled, true);
   assert.ok(result.reply.text.includes('已接单'));
   assert.ok(result.reply.text.includes('找人'));
+  assert.ok(result.reply.text.includes('OpenMai'));
+  assert.ok(result.reply.text.includes('SuperMai'));
   assert.ok(result.reply.text.includes('JC3V82F'));
   const gatewayCall = calls.find((c) => c.url.includes('/brainx_accept_job'));
   assert.ok(gatewayCall, '应调 agent-gateway brainx_accept_job');

@@ -27,7 +27,7 @@ function emptyShortlistGuidance(db, consultantId, jobId) {
         ? `该岗位的候选人结果已由 OpenMai 找人完成（openmai_results 有 done 记录），请调用 brainx_openmai_search(job_id) 获取完整候选人列表并呈现给顾问；本内部短名单（RDS）只覆盖部分合作岗位，为空不代表没有候选人，更不是数据源故障。`
         : `该岗位已进入 OpenMai 找人流程（状态：${openmai?.status || '进行中'}），请调用 brainx_openmai_search(job_id) 查询/刷新结果并呈现给顾问；本内部短名单（RDS）只覆盖部分合作岗位，为空不代表没有候选人。`;
     }
-    return '当前岗位暂无授权的人才短名单数据（内部短名单仅覆盖部分合作岗位）。如需找候选人：先接单触发 OpenMai 找人，完成后用 brainx_openmai_search(job_id) 获取结果。';
+    return '当前岗位暂无授权的人才短名单数据（内部短名单仅覆盖部分合作岗位）。如需找候选人：先接单并进入项目群，再由顾问明确选择 OpenMai 或 SuperMai；完成后从对应渠道获取结果。';
   } catch { return null; }
 }
 

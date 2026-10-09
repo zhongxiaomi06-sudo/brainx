@@ -48,7 +48,7 @@
 ### action（动作模板）
 
 - `fixed_reply`：直接回固定文案，拦截 LLM。字段：`text`（字符串或按行数组，数组由引擎以 `\n` 连接——长文案必须用数组写法，避免单行超过门禁长度限制）。
-- `accept_job`：私聊直调 `brainx_accept_job`（接单 + 自动找人），按 already / search.status 分支回复。字段：`job_id`、`job_label`（回复里展示的职位名）、`idempotency_key`（缺省自动生成 `<id>-<job_id>`）、`account_id`（缺省 `mia`）、`replies`（可选，覆盖引擎默认文案，支持 `{{job_label}}` 占位符）。
+- `accept_job`：私聊直调 `brainx_accept_job`（只接单，不自动找人），按 already / search.status 分支回复；当前成功态为 `awaiting_method`，提示顾问进入项目群明确选择 OpenMai 或 SuperMai。字段：`job_id`、`job_label`（回复里展示的职位名）、`idempotency_key`（缺省自动生成 `<id>-<job_id>`）、`account_id`（缺省 `mia`）、`replies`（可选，覆盖引擎默认文案，支持 `{{job_label}}` 占位符）。
 - `offer_group`：私聊按候选人映射建/找 Offer 决策群并幂等发报告卡。字段：`candidates`（候选人姓名 → `{ group_name, report_doc_id, report_url, members }`）、`success_template`（可选，占位符 `{{name}}` `{{action}}` `{{group_name}}` `{{report_url}}`）、`no_match_reply`（可选）。
 
 ### priority

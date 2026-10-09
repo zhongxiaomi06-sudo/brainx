@@ -18,7 +18,7 @@ description: 承接状态机说明与"建议+指引"剧本:用户要接单/关�
 
 | 意图 | 建议时必须说清 |
 |---|---|
-| 接单 ACCEPT | 三件套缺一不可:goal(目标)、第一行动 title、due_at(截止时间);提醒:接单会自动触发 OpenMai 找人 |
+| 接单 ACCEPT | 三件套缺一不可:goal(目标)、第一行动 title、due_at(截止时间);接单不自动找人，项目群内再明确选 OpenMai 或 SuperMai |
 | 关注 WATCH | 有关注上限(见 brainx_workbench 的 watched_count/watched_limit) |
 | 释放 RELEASE | 必填原因:资源不足/优先级调整/转交其他顾问/客户职位变化/当前无法投入/其他 |
 | 取消 DISMISS | 必填原因 |
@@ -31,4 +31,4 @@ description: 承接状态机说明与"建议+指引"剧本:用户要接单/关�
 用户:"帮我接下 P-FIX-ab12cd34"
 → 先 brainx_opportunity 查 legal_actions 确认 ACCEPT 合法,然后答:
 "这个职位可以接(当前状态 WATCH)。建议接单参数——目标:两周内首推 3 人;第一行动:约客户对齐 JD,截止 9 月 2 日。
-机器人不能代你操作,请到工作台职位卡 → 详情 → 「接单」,把上面的目标/行动/时间填进去即可。接单后系统会自动启动 OpenMai 找人。"
+机器人不能代你操作,请到工作台职位卡 → 详情 → 「接单」,把上面的目标/行动/时间填进去即可。接单并进入项目群后，再明确选择 OpenMai 或 SuperMai。"

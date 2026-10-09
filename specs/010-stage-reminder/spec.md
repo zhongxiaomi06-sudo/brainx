@@ -15,7 +15,7 @@
 | 阶段 | 判定（对每个活跃顾问） | 卡片 |
 |---|---|---|
 | A 没接单 | `current_engagement` 中该顾问**没有任何 ACCEPTED** 项目 | 「今天想看什么岗位吗？」→ 打开工作台按钮。每人每天最多 1 张 |
-| B 接单未找人 | 项目 ACCEPTED 且 `openmai_results` 无该项目任何行（接单自动启动找人失败/未触发的兜底提醒） | 「现在想找人吗？」→ 打开职位按钮。按项目逐条 |
+| B 接单未找人 | 项目 ACCEPTED 且尚无 OpenMai / SuperMai 任务或结果（包括等待顾问选择渠道） | 「现在想找人吗？」→ 打开职位按钮。按项目逐条 |
 | C 找人未推进 | 项目 ACCEPTED 且 `openmai_results` 有行，但 `job_outcomes` 与 `candidate_decision_groups`（position_id=项目）均无行 | 「要找新的人吗？」→ 打开职位按钮。按项目逐条 |
 
 防打扰阈值（两类都要求）：

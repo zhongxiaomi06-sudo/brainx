@@ -91,6 +91,7 @@ test('BrainTex prompt routes natural-language job recommendations to authorized 
   assert.match(prompt, /岗位理解[\s\S]*?确认接【公司·职位】这个岗位吗/);
   assert.match(prompt, /立即调用 brainx_accept_job，不要再问第二遍/);
   assert.match(prompt, /参数只有 \{ job_id, confirm: true \}/);
+  assert.match(prompt, /接单只建立承接关系，不得自动启动找人/);
   assert.match(prompt, /职位无法唯一定位或用户未确认时，不得调用接单工具/);
   assert.equal(createBraintexPromptContext({ messageProvider: 'telegram' }), undefined);
 });
@@ -177,7 +178,7 @@ test('tool request is fixed to loopback and produces a BrainX-verifiable asserti
   const body = JSON.parse(calls[0].options.body);
   assert.equal(body.schema_version, 'agent_tool_request.v1');
   assert.deepEqual(body.client, {
-    plugin_version: '1.5.0', openclaw_version: '2026.7.1-2', model_ref: 'openai/gpt-5',
+    plugin_version: '1.5.1', openclaw_version: '2026.7.1-2', model_ref: 'openai/gpt-5',
   });
   const payload = verifyPrincipalAssertion(body.principal_assertion, {
     secret,

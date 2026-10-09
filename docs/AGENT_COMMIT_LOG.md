@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-10-09｜fix(寻访): 接单后等待选择 OpenMai 或 SuperMai
+
+- 获取远端后确认 `origin/main` 已完整包含在当前本地分支中，本轮不重复合并、不覆盖本地 63 个主线外提交；重新审计 OpenMai、SuperMai、项目群卡片、OpenClaw 工具和桌面 Relay 的真实调用链。
+- 修复 web 接单与 `brainx_accept_job` 仍暗中默认启动 OpenMai 的入口分叉：现在统一建立承接关系与项目群，返回 `awaiting_method`，由顾问明确选择 OpenMai 或 SuperMai；同步插件 1.5.1、系统提示、用户 hook、生产 Skills、PRD 与历史规格修订说明。
+- 新增 `specs/036-dual-sourcing-daily-workflow`，把后续目标重新定位为“先跑通两条真实日常闭环，再统一任务账本和运营验收”，并明确真实账号/异机/结果回群的完成条件。
+- 专项回归覆盖接单、项目群、OpenMai、SuperMai Relay、结果投递、OpenClaw 插件与用户 hook，均通过；`npm run verify:quick` 的格式、安全、类型、Lint 和前端 56/56 通过，但完整 quick 结论仍被存量 `frontend/btex-frontend/app/workbench.tsx` 的 21 条超长行及整文件 Lint 豁免到期阻断，本轮未修改该前端文件。
+
 ## 2026-09-28｜merge(主线): 同步远端最新代码并保留桌面找人链路
 
 - 获取远端后确认当前工作分支与其上游原本为 `0 ahead / 0 behind`，但相对最新 `origin/main` 已分叉为本分支独有 62 个提交、主线独有 82 个提交；本次把最新主线完整合入当前分支，不执行重置或覆盖。

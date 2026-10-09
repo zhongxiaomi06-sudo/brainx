@@ -179,7 +179,7 @@ export function createServer(db = openDb(), deps = {}) {
         ORDER BY created_at DESC LIMIT 1`).get(id, cid);
       const outs = db.prepare(`SELECT stage, value_json, observed_at, action_id, kind FROM job_outcomes
         WHERE project_id=? AND consultant_id=? ORDER BY observed_at`).all(id, cid);
-      // 接单自动找人（0015）：本人接单过才带出状态/结果，其余 null（fail-closed，不泄露存在性）
+      // 找人状态只对本人已承接项目可见；接单本身不自动启动渠道（fail-closed，不泄露存在性）。
       const openmai = ['ACCEPTED', 'COMPLETED'].includes(eng.state) ? getOpenmaiResult(db, cid, id) : null;
       json(res, 200, {
         job: { ...effective, raw_json: undefined, relation: rel },
@@ -232,7 +232,7 @@ export function createServer(db = openDb(), deps = {}) {
       const out = b.action === 'ACCEPT' ? acceptCommitment(db, cid, id, b)
         : b.action === 'RELEASE' ? releaseCommitment(db, cid, id, b)
         : engage(db, cid, id, b.action, b);
-      // 接单成功后副作用编排（触发找人 + 接单直接拉群，specs/011）见 accept-launch.js
+      // 接单成功后直接拉群，但等待顾问明确选择 OpenMai / SuperMai，见 accept-launch.js。
       await postAcceptSideEffects(db, bus, deps, cid, id, b, out);
       json(res, out.ok ? 200 : (out.status || 409), out);
     },

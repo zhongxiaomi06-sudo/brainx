@@ -67,6 +67,7 @@ test('HTTP：web 接单成功后自动拉项目群（specs/011）', async () => 
     assert.equal(response.status, 200);
     const result = await response.json();
     assert.equal(result.state, 'ACCEPTED');
+    assert.equal(result.search?.status, 'awaiting_method');
     assert.equal(result.project_launch?.ok, true, '拉群应随接单成功');
     assert.equal(result.project_launch.launch.status, 'READY');
     assert.equal(result.project_launch.launch.chat_id, 'oc_launch_test');
@@ -77,6 +78,8 @@ test('HTTP：web 接单成功后自动拉项目群（specs/011）', async () => 
     assert.equal(launchRow.chat_id, 'oc_launch_test');
     const chat = db.prepare('SELECT chat_id FROM job_facts WHERE project_id=?').get(PID);
     assert.equal(chat.chat_id, 'oc_launch_test', '职位应挂载项目群');
+    assert.equal(db.prepare('SELECT COUNT(*) n FROM openmai_results WHERE project_id=?').get(PID).n, 0,
+      '接单不得暗中启动 OpenMai');
   } finally { await new Promise((resolve) => server2.close(resolve)); }
 });
 

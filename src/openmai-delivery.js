@@ -90,9 +90,10 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
     elements: [
       { tag: 'markdown', content },
       // 说明收成一行小灰字 note：按钮与候选人随行后不再需要长段教学。
-      ...(candidates.length ? [focusIntroNote()] : []),
+      ...(candidates.length ? [focusIntroNote(freeform)] : []),
       ...rows,
-      ...candidateQualityNotes(candidates),
+      // freeform 操作列统一「暂不支持」，不再逐条提示编号/链接问题（2026-10-09）。
+      ...(freeform ? [] : candidateQualityNotes(candidates)),
       ...(candidates.length ? [continueSearchActions(job)] : []),
       // 失败 / 空结果卡只有这一个动作 → 右对齐收口（F4）。
       // freeform 无真实职位 → target 为 null → 不渲染「打开工作台」按钮，避免伪造链接（2026-09-16）。
@@ -148,10 +149,12 @@ function candidateLinkButton(url, no, name) {
   return btn;
 }
 
-/** 一句话说明三个入口，避免用户先点开二次卡片才找到人才链接。 */
-function focusIntroNote() {
+/** 一句话说明入口；freeform（自由找人）候选人无项目上下文，如实说明暂不支持一键操作。 */
+function focusIntroNote(freeform = false) {
   return { tag: 'note', elements: [{ tag: 'plain_text',
-    content: '点姓名直接查看 TTC；初筛通过后发送人才链接；加入 reloop 为独立操作。' }] };
+    content: freeform
+      ? '自由找人结果来自外部渠道，候选人暂不支持一键初筛 / 加入 reloop。'
+      : '点姓名直接查看 TTC；初筛通过后发送人才链接；加入 reloop 为独立操作。' }] };
 }
 
 /** 表格原来的「操作」列兼作「链接待核实」提示，该列移除后信号改在这里披露，避免静默丢失。 */

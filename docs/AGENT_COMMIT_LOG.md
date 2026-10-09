@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-10-09｜fix(gate): 完整门禁收尾——前端依赖漏洞修复 + freeform 卡文案收口与基线重建
+
+- 起因（用户指令）：「然后测试」。`npm run verify` 首轮 23/25：①前端生产依赖漏洞（next 16.x critical RCE + sharp/source-map-js high，均 `npm audit fix` 范围内修复，package-lock 223+/163-，build 复跑通过）；②`supermai-freeform` 卡片渲染回归（29a422a 改卡后的预期差异）。
+- 顺带收口：freeform 卡引导说明原为「点姓名直接查看 TTC；初筛通过后发送人才链接」——对无 TTC 链接、无一键操作的自由找人是误导，改为「自由找人结果来自外部渠道，候选人暂不支持一键初筛 / 加入 reloop」；逐条「编号无效」提示在 freeform 下不再展示（操作列已统一标注）。
+- 基线：新截图已人眼确认（无截断/无溢出/按钮收口正确），`--update` 重建 `supermai-freeform.darwin.png`，并在卡片渲染门禁文档登记变更。
+- 验证：openmai-delivery + agent-job-tools 38/38；卡片渲染回归 18/18。
+
 ## 2026-10-09｜docs(audit): SuperMai 链路完全解析（09-28）收编入库 + README 路由登记
 
 - 起因（用户指令）：「提交进仓库」。该文档与 README 路由行为用户此前审计工作的未提交产物（非本 Agent 所写），内容核对：SuperMai 四层链路解析 + specs/007 契约逐条验证 + 生产实证（sm_ 47 条 89.4% 成功率），格式符合文档书规则（有上级链接、验证方法、权威边界声明）。

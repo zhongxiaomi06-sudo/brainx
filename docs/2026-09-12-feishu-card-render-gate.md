@@ -121,3 +121,9 @@ node scripts/quality-gate/card-render/run.mjs --list-defects
 - 新增或修改任何卡片构建函数后，必须跑 `--update` 看新截图，确认无误再提交基线；只改基线不看图等于把门禁关掉。
 - 新增卡片必须在 `scenarios.mjs` 里登记，否则不会被覆盖。
 - 渲染器遇到新元素类型会抛错 —— 这是刻意的：先补渲染器，再谈基线。
+
+2026-10-09：`supermai-freeform` 基线重建——sourcing 断点修复（commit 29a422a）摘除 freeform 卡必败的
+「初筛通过/加入 reloop」按钮（合成 project_id 必然 404），操作列改如实标注「暂不支持」，引导说明改为
+「自由找人结果来自外部渠道，候选人暂不支持一键初筛 / 加入 reloop」，「SuperMai 重新找人」指令改传
+continue_search=true 并去掉「自动发到本群」假承诺。新截图已人眼确认（无截断、无溢出、按钮收口正确），
+本轮 18/18 通过。

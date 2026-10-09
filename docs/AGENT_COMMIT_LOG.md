@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-10-09｜fix(sourcing): 找人读回三断点修复——supermai 发卡接线 + 终态如实告知 + 僵尸 running 超龄
+
+- 起因（用户指令）：sourcing 三链路审计断点①③⑫。①`tools-sourcing.js`（原 tools-jobs.js:475）`supermaiScout` 接线丢 `sendCardFn/publicBaseUrl`，群读回发卡整链死亡，specs/018 卡片成死代码；③读回只认 running/done，needs_input/failed 穿透触发分支静默重跑扣费；⑫running 无超龄判断，进程重启后谎称「进行中」最长 1 小时。
+- 改动：`tools-sourcing.js` 接线补参；新增 `terminalSearchEnvelope`（needs_input→collect_brief 引导补判据 / failed、僵尸 running→confirm_retry 如实告知，均不触发新任务；continue_search=true 显式重跑跳过该分支直达触发）；新增 `continuingGate`（仅上一轮 done 才要求排除名单，failed/needs_input 轮次不再卡 cannot_continue）；supermai 自由找人放行 continue_search（排除名单按合成键取）；`supermai-sourcing.js` settle 保留 needs_input 语义（与 job 模式一致，此前恒 done）；`openmai-delivery.js` freeform 卡不再渲染必败的初筛/入 reloop 按钮（合成键必然 404），「SuperMai 重新找人」指令改传 continue_search=true 并去掉「自动发到本群」假承诺（freeform 无投递通道）。
+- 测试：`tests/agent-job-tools.test.mjs` 新增 5 例（群发卡含卡内容断言、needs_input/failed 读回不重跑、僵尸 running 披露且不改库、自由找人显式重跑可达）；`tests/framework.test.mjs` 迁移记账计数补 0060（属上一 commit 的迟更）。全量 `node --test tests/` 897/897 通过。
+- 已知边界：freeform 候选的初筛/入 reloop 标「暂不支持」，待有真实承接再恢复；僵尸 running 的库回收仍是 worker `failStaleOpenmaiTasks` 职责（读回只改话术不改库）。
+
 ## 2026-10-09｜refactor(agent): 找人工具拆出 tools-sourcing.js（纯搬家，为读回修复腾 500 行空间）
 
 - 起因：tools-jobs.js 477 行，断点①③⑫ 的读回分支修复会突破 500 行硬约束（AGENTS.md §4.8），先拆分再改行为。

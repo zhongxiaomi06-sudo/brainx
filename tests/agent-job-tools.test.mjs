@@ -306,3 +306,115 @@ test('找人任务 running/触发响应内嵌守候纪律（2026-09-09 事故：
   assert.ok(triggered.data.note.includes('每隔约 1 分钟'), '触发响应写明轮询节奏');
   assert.ok(!triggered.data.note.includes('自动回到'), '触发响应不再承诺结果自动回群（bot 路径无通知）');
 });
+
+// ── 2026-10-09 sourcing 断点修复回归（tools-sourcing.js）────────────────────
+const groupContext = (consultantId = 'felix') => ({
+  principal: { tenantId: 'tenant-a', consultantId, chatType: 'group', chatId: 'oc_group1',
+    purpose: 'candidate_review' },
+  runId: 'run-current', requestId: 'req-current',
+});
+
+function acceptJob(db, projectId, consultantId = 'felix') {
+  const action = createActionToolHandlers({ db, startSearchFn: () => ({ status: 'triggered', task_id: 'stub' }) });
+  action.brainx_accept_job({ job_id: projectId, goal: '找到候选人', action_title: '找人',
+    due_at: new Date(Date.now() + 2 * 86400000).toISOString(),
+    idempotency_key: `agent:accept:${consultantId}:${projectId}`, confirm: true },
+    context(consultantId, 'job_review'));
+}
+
+test('断点①：SuperMai 群上下文 done 读回确定性发卡（此前接线丢 sendCardFn，整链死亡）', async () => {
+  const { db } = fixture();
+  const sent = [];
+  const handlers = createJobToolHandlers({ db, publicBaseUrl: 'https://base.yorkteam.cn/',
+    sendCardFn: async (input) => { sent.push(input); return { message_id: 'm_card' }; } });
+  const criteria = '北京 5年 React 资深前端工程师';
+  const key = supermaiCriteriaKey(criteria);
+  const at = new Date().toISOString();
+  const resultText = [
+    '1. 王五｜Acme｜高级前端',
+    '<!-- BRAINX_CANDIDATES_V1',
+    '{"candidates":[{"candidate_ref":"c1","name":"王五","evaluation":"5年React","resume_url":null}]}',
+    '-->',
+  ].join('\n');
+  db.prepare(`INSERT INTO openmai_results (project_id, consultant_id, status, result_text, task_id, started_at, finished_at)
+    VALUES (?,?,?,?,?,?,?)`).run(key, 'felix', 'done', resultText, 'sm_card', at, at);
+
+  const out = await handlers.brainx_supermai_scout({ criteria }, groupContext());
+  assert.equal(out.data.card_delivered, true, '群读回 done 必须确定性发卡');
+  assert.equal(out.data.result_text, null, '已发卡时 envelope 不再带名单');
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].target, 'oc_group1');
+  const cardJson = JSON.stringify(sent[0].card);
+  assert.ok(cardJson.includes('SuperMai 自由找人'), '自由找人卡品牌正确');
+  assert.ok(!cardJson.includes('BRAINTEX_CANDIDATE_KEEP'), 'freeform 卡不再渲染必败的初筛按钮');
+  assert.ok(cardJson.includes('暂不支持'), 'freeform 候选操作列如实标注暂不支持');
+  assert.ok(!cardJson.includes('会自动发到本群'), 'freeform 重新找人不再承诺自动投递');
+  db.close();
+});
+
+test('断点③：needs_input 读回如实告知并引导补判据，不静默重跑付费任务', () => {
+  const { db, projectId, handlers } = fixture();
+  acceptJob(db, projectId);
+  const at = new Date().toISOString();
+  db.prepare(`INSERT INTO openmai_results (project_id, consultant_id, status, result_text, task_id, started_at, finished_at)
+    VALUES (?,?,?,?,?,?,?)`).run(projectId, 'felix', 'needs_input', '请补充职位方向与关键经验要求', 'om_ni', at, at);
+  const out = handlers.brainx_openmai_search({ job_id: projectId }, context('felix', 'candidate_review'));
+  assert.equal(out.data.status, 'needs_input');
+  assert.equal(out.data.result_text, '请补充职位方向与关键经验要求');
+  assert.equal(out.recommendations[0].action, 'collect_brief');
+  assert.equal(db.prepare(`SELECT task_id FROM openmai_results
+    WHERE project_id=? AND consultant_id='felix'`).get(projectId).task_id, 'om_ni',
+    '读回不得覆盖既有任务、不得发起新付费调用');
+  db.close();
+});
+
+test('断点③：failed 读回如实告知不重跑；顾问明确重新找人（continue_search）才触发', () => {
+  const { db, projectId, handlers } = fixture();
+  acceptJob(db, projectId);
+  const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+  db.prepare(`INSERT INTO openmai_results (project_id, consultant_id, status, error, task_id, started_at, finished_at)
+    VALUES (?,?,?,?,?,?,?)`).run(projectId, 'felix', 'failed', '上游暂时不可用', 'om_fail', tenMinAgo, tenMinAgo);
+  const ask = handlers.brainx_openmai_search({ job_id: projectId }, context('felix', 'candidate_review'));
+  assert.equal(ask.data.status, 'failed');
+  assert.equal(ask.data.error, '上游暂时不可用');
+  assert.equal(ask.recommendations[0].action, 'confirm_retry');
+  assert.equal(db.prepare(`SELECT task_id FROM openmai_results
+    WHERE project_id=? AND consultant_id='felix'`).get(projectId).task_id, 'om_fail', '问进度不得静默重跑');
+  // 显式重新找人：failed 轮次无可排除候选人，不得卡 cannot_continue（无凭证 error 即证明已到达触发路径）
+  const retry = handlers.brainx_openmai_search({ job_id: projectId, continue_search: true },
+    context('felix', 'candidate_review'));
+  assert.equal(retry.data.status, 'error');
+  assert.match(retry.data.message, /TTC 寻访凭证/);
+  db.close();
+});
+
+test('断点⑫：僵尸 running（进程重启超 1 小时）读回按中断如实告知，不再谎称进行中', () => {
+  const { db, projectId, handlers } = fixture();
+  acceptJob(db, projectId);
+  const twoHoursAgo = new Date(Date.now() - 2 * 3600 * 1000).toISOString();
+  db.prepare(`INSERT INTO openmai_results (project_id, consultant_id, status, task_id, started_at)
+    VALUES (?,?,?,?,?)`).run(projectId, 'felix', 'running', 'om_zombie', twoHoursAgo);
+  const out = handlers.brainx_openmai_search({ job_id: projectId }, context('felix', 'candidate_review'));
+  assert.equal(out.data.status, 'failed');
+  assert.ok(out.unknowns.some((u) => u.includes('中断')), '超龄 running 要按中断披露');
+  assert.equal(db.prepare(`SELECT status FROM openmai_results
+    WHERE project_id=? AND consultant_id='felix'`).get(projectId).status, 'running',
+    '读回不改库——回收仍是 worker 的 failStaleOpenmaiTasks 职责');
+  db.close();
+});
+
+test('断点③：SuperMai 自由找人 failed 后允许 continue_search 显式重跑（此前 INVALID_ARGUMENT 死路）', () => {
+  const { db, handlers } = fixture();
+  const criteria = '上海 3年 Java 后端工程师';
+  const key = supermaiCriteriaKey(criteria);
+  const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+  db.prepare(`INSERT INTO openmai_results (project_id, consultant_id, status, error, task_id, started_at, finished_at)
+    VALUES (?,?,?,?,?,?,?)`).run(key, 'felix', 'failed', '网络超时', 'sm_fail', tenMinAgo, tenMinAgo);
+  const out = handlers.brainx_supermai_scout({ criteria, continue_search: true },
+    context('felix', 'candidate_review'));
+  // fixture 无 TTC 凭证：到达触发路径即 error（证明不再被 INVALID_ARGUMENT 拦死）
+  assert.equal(out.data.status, 'error');
+  assert.match(out.data.message, /TTC 凭证/);
+  db.close();
+});

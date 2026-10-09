@@ -127,11 +127,15 @@ function candidateFocusRows(job, candidates) {
               : { tag: 'div', text: { tag: 'plain_text', content: `${index + 1}. ${name}` } }] },
           { tag: 'column', width: 'weighted', weight: 5, vertical_align: 'top',
             elements: [{ tag: 'markdown', content: info }] },
-          // freeform：无 PL 编号也做操作按钮占位（功能后续补，2026-09-16 specs/018 修订）
+          // freeform：合成 project_id（supermai:<hash>）在 job_facts 无行，初筛/入 reloop
+          // 按钮必然 NOT_FOUND_OR_FORBIDDEN——发卡接线修复后卡真实上会，不再渲染必败按钮
+          // （2026-10-09；待 freeform 候选动作有真实承接后再恢复）。
           { tag: 'column', width: 'weighted', weight: 3, vertical_align: 'center',
             elements: (candidate.candidateRefValid === false && !freeform)
               ? [{ tag: 'div', text: { tag: 'plain_text', content: '不可操作' } }]
-              : [screenCandidateAction(job, candidate), addToReloopAction(job, candidate)] },
+              : freeform
+                ? [{ tag: 'div', text: { tag: 'plain_text', content: '暂不支持' } }]
+                : [screenCandidateAction(job, candidate), addToReloopAction(job, candidate)] },
         ] };
     }),
   ];
@@ -164,11 +168,12 @@ function candidateQualityNotes(candidates) {
 }
 
 function continueSearchActions(job) {
-  // freeform：无 job_id，不放 OpenMai 继续找人（需 job_id）；放 SuperMai 重新找人按钮，
-  // 引导用同判据重新触发。按钮先做占位对齐项目卡格式（2026-09-16 specs/018 修订）。
+  // freeform：无 job_id，不放 OpenMai 继续找人（需 job_id）；放 SuperMai 重新找人按钮。
+  // 2026-10-09 修订：自由找人已支持 continue_search=true（排除名单按合成键从历史结果生成），
+  // 按钮指令改为显式新一轮；自由找人群里没有自动投递通道，话术不得承诺「自动发到本群」。
   if (job?.freeform === true) {
     const criteria = String(job.criteria || '').slice(0, 2000);
-    const command = `[BRAINTEX_SEARCH_START] 自由找人继续：用本轮判据重新触发 brainx_supermai_scout。现在调用 brainx_supermai_scout，传 criteria（见下）。任务返回 running/triggered 后立即回复"正在重新找人，完成后候选人会自动发到本群"并结束本轮，不要原地轮询；如返回 already_done，提示顾问换判据措辞后重试。\ncriteria=${criteria}`;
+    const command = `[BRAINTEX_SEARCH_START] 自由找人继续：用本轮判据发起新一轮 brainx_supermai_scout。现在调用 brainx_supermai_scout，传 criteria（见下）和 continue_search=true；排除名单由 BrainX 从历史结果生成，不要自行编造。任务返回 running/triggered 后立即回复"正在重新找人，完成后请再 @ 我查看结果"并结束本轮，不要原地轮询；如返回 cannot_continue，提示顾问换判据措辞后重新找人。\ncriteria=${criteria}`;
     // 单按钮行用 alignSoloAction 右对齐收口（卡片排版规范，2026-09-16 specs/018 修订）
     return alignSoloAction({ tag: 'action', actions: [
       { tag: 'button', type: 'primary', text: { tag: 'plain_text', content: 'SuperMai 重新找人' },

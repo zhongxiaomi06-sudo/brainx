@@ -1,5 +1,9 @@
 /** tools-sourcing.js — 找人工具 handler（brainx_openmai_search / brainx_supermai_scout）。
- *  2026-10-09 从 tools-jobs.js 拆出（500 行硬约束，为读回分支修复腾空间），纯搬家无行为变化。 */
+ *  2026-10-09 从 tools-jobs.js 拆出（500 行硬约束，为读回分支修复腾空间）。
+ *  2026-10-09 断点修复（sourcing 三链路审计）：
+ *  ① supermaiScout 接线补传 sendCardFn/publicBaseUrl——群读回发卡此前因丢参整链死亡；
+ *  ③ 读回补 needs_input/failed 终态分支——此前穿透到触发分支，顾问问进度=静默重跑扣费；
+ *  ⑫ running 读回补超龄判断——进程重启后的僵尸 running 不再谎称「进行中」。 */
 import { jobVisibleTo, jobAccessibleFromGroup } from '../visibility.js';
 import { currentState } from '../engagement.js';
 import { startOpenmaiTask, getOpenmaiResult } from '../openmai-task.js';
@@ -81,6 +85,41 @@ function missingExclusions(projectId, entry) {
   };
 }
 
+/** 找人读回的终态分支（断点③⑫）：needs_input / failed / 超龄 running（进程重启僵尸）
+ *  统一如实告知，绝不穿透到触发分支静默重跑付费任务；重新发起必须由顾问明确表达
+ *  （continue_search=true 通道），失败 60s 冷却仍由 start*Task 兜底。 */
+function terminalSearchEnvelope({ entry, jobRef, criteria = null, cur, stale }) {
+  const needsInput = cur.status === 'needs_input';
+  return {
+    data: { entry, job_ref: jobRef, ...(criteria != null ? { criteria } : {}),
+      status: needsInput ? 'needs_input' : 'failed',
+      result_text: needsInput ? cur.result_text || null : null,
+      error: needsInput ? null : cur.error || null,
+      started_at: cur.started_at || null, finished_at: cur.finished_at || null },
+    facts: [], inferences: [],
+    recommendations: [needsInput
+      ? { action: 'collect_brief',
+        note: 'OpenMai 要求补充职位信息——把 data.result_text 的原文如实转达顾问，请其补充'
+          + '（方向/职责/目标公司/关键经验/薪资范围），补齐后把补充内容放进 criteria 重新调用本工具。' }
+      : { action: 'confirm_retry',
+        note: '上一轮找人未完成，本次没有重新发起（避免未经确认重复扣费）——如实告知顾问失败/中断原因；'
+          + '顾问明确说「重新找人」后，用 continue_search=true 重新调用本工具。' }],
+    unknowns: [needsInput
+      ? 'OpenMai 认为职位信息不足，本轮没有产生候选人。'
+      : stale
+        ? '上一轮找人任务因服务中断或超时未正常完成（任务进程已不在运行）。'
+        : `上一轮找人失败：${String(cur.error || '原因未知').slice(0, 200)}`],
+    evidence_refs: [`${entry}:${cur.task_id || jobRef}`],
+  };
+}
+
+/** 续搜排除名单闸门：只有上一轮成功交付过候选人（done）时才要求可确认的排除名单——
+ *  failed/needs_input/零命中轮次没有可重复推荐的人，不得把顾问卡在 cannot_continue。 */
+function continuingGate(cur, exclusions, projectId, entry) {
+  return exclusions.length === 0 && cur.status === 'done'
+    ? missingExclusions(projectId, entry) : null;
+}
+
 /** 找人轮询守候纪律（2026-09-10 晚 wendy 会话教训）：模型曾以 1-2 秒间隔连打约 40 次
  * 后放弃守候并虚假承诺「设提醒」，导致结果躺库 31 分钟无人交付。修复：
  * ①响应带已运行时长（给模型耐心锚点）②硬性规定查询间隔 ≥60 秒
@@ -103,6 +142,11 @@ function pollDiscipline(startedAt, entry, autoDeliver = false) {
   };
 }
 
+function runningStale(cur) {
+  return cur.status === 'running'
+    && Date.now() - Date.parse(cur.started_at || 0) >= STALE_SEARCH_MS;
+}
+
 /** 群上下文 done 读回：把标准候选人卡确定性发到本群（best-effort，失败不阻断）。
  *  幂等键按 职位×群×轮次×日 去重防刷屏；只有发卡调用成功才返回 true。 */
 function trySendOpenmaiResultCard(sendCardFn, publicBaseUrl, args, principal, row, cur) {
@@ -122,7 +166,7 @@ function trySendOpenmaiResultCard(sendCardFn, publicBaseUrl, args, principal, ro
 
 /** OpenMai 找人（第 11 工具，2026-09-03）：纪律与承接路由一致——
  * 仅本人 ACCEPTED/COMPLETED 的职位可触发/读取（fail-closed，不泄露存在性）。
- * 费用门控：done 读缓存、running 报状态、其他才触发新任务（防重复费用）。 */
+ * 费用门控：done 读缓存、running 报状态、终态如实告知，其他才触发新任务（防重复费用）。 */
 function openmaiSearch(db, args, principal, sendCardFn, publicBaseUrl) {
   const row = db.prepare('SELECT * FROM job_facts WHERE project_id=?').get(args.job_id);
   if (!row || (!jobVisibleTo(db, principal.consultantId, args.job_id)
@@ -134,7 +178,8 @@ function openmaiSearch(db, args, principal, sendCardFn, publicBaseUrl) {
   const criteria = cleanSearchCriteria(args.criteria);
   const continuing = args.continue_search === true;
   const cur = getOpenmaiResult(db, principal.consultantId, args.job_id) || {};
-  if (cur.status === 'running' || (cur.status === 'done' && !continuing)) {
+  const stale = runningStale(cur);
+  if ((cur.status === 'running' && !stale) || (cur.status === 'done' && !continuing)) {
     const disc = cur.status === 'running' ? pollDiscipline(cur.started_at, 'openmai', true) : null;
     // 群上下文 done 读回：候选人名单由标准卡片承担（代码渲染），envelope 只留引导语；
     // 私聊 / 缺 sendCardFn / 发卡失败维持原样（result_text 原样带出）。
@@ -166,12 +211,18 @@ function openmaiSearch(db, args, principal, sendCardFn, publicBaseUrl) {
       evidence_refs: [`openmai:${cur.task_id || args.job_id}`],
     };
   }
+  // 终态如实告知（needs_input/failed/僵尸 running），不静默重跑；
+  // 顾问明确重新找人（continue_search=true）时跳过本分支直达触发。
+  if (!continuing && (['needs_input', 'failed'].includes(cur.status) || stale)) {
+    return terminalSearchEnvelope({ entry: 'openmai', jobRef: args.job_id, cur, stale });
+  }
   const shared = activeProjectSearch(db, args.job_id);
   if (shared?.search_status === 'RUNNING' || (shared && !continuing)) {
     return sharedProjectSearch(args.job_id, shared, 'openmai');
   }
   const exclusions = continuing ? nextSearchExclusions(db, args.job_id) : [];
-  if (continuing && !exclusions.length) return missingExclusions(args.job_id, 'openmai');
+  const blocked = continuing && continuingGate(cur, exclusions, args.job_id, 'openmai');
+  if (blocked) return blocked;
   const out = startOpenmaiTask(db, null, principal.consultantId, args.job_id, {
     force: continuing, searchBrief: criteria, excludeCandidateRefs: exclusions,
   });
@@ -197,7 +248,6 @@ function openmaiSearch(db, args, principal, sendCardFn, publicBaseUrl) {
 function supermaiScout(db, args, principal, sendCardFn, publicBaseUrl) {
   const jobId = String(args.job_id || '').trim();
   const continuing = args.continue_search === true;
-  if (continuing && !jobId) fail('INVALID_ARGUMENT');
   const extra = cleanSearchCriteria(args.criteria);
   const job = jobId ? db.prepare('SELECT * FROM job_facts WHERE project_id=?').get(jobId) : null;
   if (jobId && (!job || (!jobVisibleTo(db, principal.consultantId, jobId)
@@ -211,7 +261,8 @@ function supermaiScout(db, args, principal, sendCardFn, publicBaseUrl) {
   if (criteria.length < 5) fail('INVALID_ARGUMENT');
   const project_id = jobId || supermaiCriteriaKey(criteria);
   const cur = getOpenmaiResult(db, principal.consultantId, project_id) || {};
-  if (cur.status === 'running' || (cur.status === 'done' && !continuing)) {
+  const stale = runningStale(cur);
+  if ((cur.status === 'running' && !stale) || (cur.status === 'done' && !continuing)) {
     const candidates = cur.status === 'done' ? extractOpenmaiCandidates(cur.result_text) : [];
     const disc = cur.status === 'running' ? pollDiscipline(cur.started_at, 'supermai', Boolean(jobId)) : null;
     // NO_REPLY/空结果：OpenMai 对极窄判据可能零命中（返回占位符）——语义化为「未搜到」而非当成成功交付。
@@ -246,12 +297,19 @@ function supermaiScout(db, args, principal, sendCardFn, publicBaseUrl) {
       evidence_refs: [`supermai:${cur.task_id || project_id}`],
     };
   }
+  // 终态如实告知（needs_input/failed/僵尸 running），不静默重跑；
+  // 顾问明确重新找人（continue_search=true）时跳过本分支直达触发。
+  if (!continuing && (['needs_input', 'failed'].includes(cur.status) || stale)) {
+    return terminalSearchEnvelope({ entry: 'supermai', jobRef: jobId || null, criteria, cur, stale });
+  }
   const shared = jobId ? activeProjectSearch(db, jobId) : null;
   if (shared?.search_status === 'RUNNING' || (shared && !continuing)) {
     return sharedProjectSearch(jobId, shared, 'supermai');
   }
-  const exclusions = continuing ? nextSearchExclusions(db, jobId) : [];
-  if (continuing && !exclusions.length) return missingExclusions(jobId, 'supermai');
+  // 续搜排除名单按落库主键取（自由找人=合成键），不再限 job 模式——自由找人也可续搜。
+  const exclusions = continuing ? nextSearchExclusions(db, project_id) : [];
+  const blocked = continuing && continuingGate(cur, exclusions, project_id, 'supermai');
+  if (blocked) return blocked;
   const out = startSupermaiScoutTask(db, null, principal.consultantId, criteria, {
     force: continuing, projectId: jobId || null, excludeCandidateRefs: exclusions,
   });
@@ -277,6 +335,6 @@ function supermaiScout(db, args, principal, sendCardFn, publicBaseUrl) {
 export function createSourcingToolHandlers({ db, sendCardFn = null, publicBaseUrl = process.env.BRAINX_BASE_URL } = {}) {
   return {
     brainx_openmai_search: (args, context) => openmaiSearch(db, args, context.principal, sendCardFn, publicBaseUrl),
-    brainx_supermai_scout: (args, context) => supermaiScout(db, args, context.principal),
+    brainx_supermai_scout: (args, context) => supermaiScout(db, args, context.principal, sendCardFn, publicBaseUrl),
   };
 }

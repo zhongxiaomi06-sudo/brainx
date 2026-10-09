@@ -132,10 +132,14 @@ export function startSupermaiScoutTask(db, bus, consultant_id, criteria, {
           throw new Error('OpenMai 会话上下文污染：两次均返回与找人无关的元回复，请稍后重试');
         }
       }
+      const batchQuality = assessOpenmaiCandidateBatch(result);
+      // 与 job 模式一致保留 needs_input 语义（2026-10-09）：澄清反问不能记成 done，
+      // 否则同判据读回永远复用这条反问、且投递链路得不到「请补充信息」卡。
+      const resultStatus = batchQuality.needsInput ? 'needs_input' : 'done';
       settled = settleSupermaiTask(db, { projectId: project_id, consultantId: consultant_id,
-        taskId: task_id, status: 'done', resultText: result,
-        channel: 'supermai', resultCount: assessOpenmaiCandidateBatch(result).count });
-      status = 'done';
+        taskId: task_id, status: resultStatus, resultText: result,
+        channel: 'supermai', resultCount: batchQuality.count });
+      status = resultStatus;
     } catch (e) {
       settled = settleSupermaiTask(db, { projectId: project_id, consultantId: consultant_id,
         taskId: task_id, status: 'failed', error: e.message, channel: 'supermai' });

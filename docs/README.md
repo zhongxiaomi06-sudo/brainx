@@ -72,6 +72,7 @@
 | **数据渠道不够要扩渠道、TTC 顾问面板数据（pipeline/任务/名单/推荐报告）、jobwater 市场数据、LinkedIn/技能包怎么接** | **[数据渠道全景与接入路线规范](2026-09-24-data-channels-roadmap.md)**（四层渠道全景：飞书 F1-F4 / TTC JWT T1-T12 / 独立服务 J1 / GUI G1-G2，逐条带已接/未接状态与最佳读取方式 + 技能包 8 技能映射 + 接入优先级 P0=Pipeline 补 current_stage + 安全红线）、[数据读取链路与错位诊断规范](2026-09-24-data-reading-pipeline.md) |
 | **数据地基体检、生产库结构扫射检查、迁移记账对账、双层状态不一致、孤儿引用** | **[数据地基体检报告（09-28）](2026-09-28-data-foundation-audit.md)**（🔴S1 生产/仓库 migration 文件集分叉 + S2 新表无记账 + S4 双层状态不一致 1,277 项目；🟡S3 时间未归一/S5 断链 596/S6 孤儿草稿 71/S7-S8 草稿结构回潮；✅6 项扫射通过 + 修复排期）、[数据读取链路与错位诊断规范](2026-09-24-data-reading-pipeline.md)（根源分类对照） |
 | **SuperMai 找人链路怎么走、supermai 合成键、双入口差异、续搜排除名单、找人凭证状态** | **[SuperMai 链路完全解析（09-28）](2026-09-28-supermai-pipeline-analysis.md)**（四层全景：入口/凭证/引擎/落库交付；specs/007 契约逐条验证 ✅；生产实证 sm_ 47 条 89.4% 成功率、09-10 起零失败；🟡3 处两入口不对齐（D1 凭证降级/D2 needs_input/D3 判据合成）；🔴york 凭证 10-13 到期、otto 失效；续搜覆盖前轮 result_text 的主键语义） |
+| **找人链路的交互形态、渠道分工、群卡片逐步动作设定、Sourcing.app 对接路线** | **[找人链路产品形态设定（10-09）](2026-10-09-sourcing-product-form.md)**（元决策：群卡片=即时交付面/工作台=沉淀回溯面；四通道分工；逐步动作→效果表；Sourcing 路线 B 只消费成果；judgment-extract 主导群诉求提炼；隐私纪律） |
 | **推荐全是 OBSERVE 没有可执行档、要用 agent 从群消息补 current_stage/active_state、或修卡片 served 埋点** | **[字段补全 Agent 与 served 埋点规格](../specs/023-fact-agent/spec.md)**（job_agent_facts 新表 + GLM 抽取 + 消歧三分叉 + 合成层插档 + 置信打折，agent 产字段不产决定）、[数据基线与验证方法论](../specs/023-fact-agent/data-baseline.md)（全部实测数字与影子对照口径）、[数据渠道全景与接入路线规范](2026-09-24-data-channels-roadmap.md)（T7 Pipeline = current_stage 第一供给线） |
 | **field-clean / 草稿字段清洗产出的质量审计、evidence 锚定率、file 消息假阳性** | **[field-clean 两批清洗数据审计](2026-09-24-field-clean-batch-audit.md)**（batch1/batch2 全量确定性校验 + LLM 双标注一致率 + 三个缺陷处置） |
 | 密钥、登录、权限、数据隔离 | [安全操作手册](SECURITY.md) |
@@ -131,6 +132,7 @@
 
 ### 设计与数据
 
+- [找人链路产品形态设定（2026-10-09）](2026-10-09-sourcing-product-form.md)：找人链路的唯一权威形态设定——群卡片=即时交付面/工作台=沉淀回溯面、四通道分工、逐步「动作→效果」交互表、Sourcing.app 路线 B（只消费成果）、隐私纪律与验收口径。
 - [BrainTex 飞书功能首页与新用户指引](2026-09-03-braintex-feishu-home.md)：定义 `/brainx` 确定性卡片、六个顾问任务入口、权限边界、首次出现时机和真实验收流程。
 - [候选人事实与 shortlist 数据契约](2026-09-03-candidate-data-contracts.md)：`candidate_fact_v1`、`candidate_match_bundle_v1`、reloop 真实数据转换、人才/职位双授权、固定飞书文案、MCP PoC 暴露条件及当前未完成项的唯一施工说明。
 - [候选人保留与项目共享上下文复核](frontend-reviews/2026-09-09-candidate-focus-context.md)：飞书候选行“保留”、项目级重点名单、后续群问答读取与安全边界。

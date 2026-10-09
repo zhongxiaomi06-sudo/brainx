@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-10-09｜docs(product): 找人链路产品形态设定——群卡片=即时交付面、Sourcing 路线 B、judgment-extract 主导
+
+- 起因（用户指令）：「B（先只消费成果），倾向 BrainX 的 judgment-extract 主导，Sourcing 消费；进行产品的形态设定，给一个完整的文档，简洁，只需要动作加产生的效果」。
+- 拍板收编：①元决策——群卡片=找人动作即时交付面，工作台=资产沉淀回溯面；②Sourcing.app（本地软件，v0.3.6/OTA 0.3.9，console+harness 本机 CDP 采集 Boss/脉脉/猎聘+撞库拿电话）走路线 B 只消费成果，不直连本机 harness；③群消息客户诉求提炼由 BrainX judgment-extract 主导、Sourcing 消费；④撞库手机号只私发发起人。
+- 改动：`docs/2026-10-09-sourcing-product-form.md`（新：四通道分工 + 逐步「动作→效果」交互表 + 验收口径 + 实施顺序）；docs/README.md 路由与目录双登记。
+- 验证：纯文档；形态表中「已完成」项与今日 5fbe8c7/29a422a/b5a1416 三个 commit 逐条对账一致。
+
 ## 2026-10-09｜fix(gate): 完整门禁收尾——前端依赖漏洞修复 + freeform 卡文案收口与基线重建
 
 - 起因（用户指令）：「然后测试」。`npm run verify` 首轮 23/25：①前端生产依赖漏洞（next 16.x critical RCE + sharp/source-map-js high，均 `npm audit fix` 范围内修复，package-lock 223+/163-，build 复跑通过）；②`supermai-freeform` 卡片渲染回归（29a422a 改卡后的预期差异）。

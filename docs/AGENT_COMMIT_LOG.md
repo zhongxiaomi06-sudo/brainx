@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-10-09｜refactor(agent): 找人工具拆出 tools-sourcing.js（纯搬家，为读回修复腾 500 行空间）
+
+- 起因：tools-jobs.js 477 行，断点①③⑫ 的读回分支修复会突破 500 行硬约束（AGENTS.md §4.8），先拆分再改行为。
+- 改动：`src/agent-gateway/tools-sourcing.js`（新）承接 openmaiSearch/supermaiScout 及其全部辅助函数（projectCriteria/activeProjectSearch/markProjectSearch/sharedProjectSearch/missingExclusions/pollDiscipline/trySendOpenmaiResultCard/cleanSearchCriteria）+ 新出口 `createSourcingToolHandlers`；tools-jobs.js 214 行，createJobToolHandlers 展开合并，对外契约不变。
+- 验证：`node --check` 双文件通过；agent-job-tools/agent-tools/supermai-sourcing/openmai-task 四组测试 53/53 通过，零行为变化。
+
 ## 2026-10-09｜fix(sourcing): needs_input 投递不再被 CHECK 静默吞掉——0060 重建表 + enqueue 反连接
 
 - 起因（用户指令）：sourcing 三链路审计后修第一刀断点。审计实证（09-23 内存库跑真实 0041 DDL）：`openmai_deliveries` 的 `CHECK(result_status IN ('done','failed'))` 与 enqueue 选出的 `needs_input` 冲突，`INSERT OR IGNORE` 静默跳过——OpenMai 澄清反问卡永远到不了项目群，`search_status` 卡 RUNNING 至超龄。

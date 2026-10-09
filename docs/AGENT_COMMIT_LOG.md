@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-10-09｜docs(audit): SuperMai 链路完全解析（09-28）收编入库 + README 路由登记
+
+- 起因（用户指令）：「提交进仓库」。该文档与 README 路由行为用户此前审计工作的未提交产物（非本 Agent 所写），内容核对：SuperMai 四层链路解析 + specs/007 契约逐条验证 + 生产实证（sm_ 47 条 89.4% 成功率），格式符合文档书规则（有上级链接、验证方法、权威边界声明）。
+- 改动：`docs/2026-09-28-supermai-pipeline-analysis.md`（新，收编）；`docs/README.md` 路由表补 SuperMai 链路一行。
+- 说明：文中登记的三处两入口不对齐里，D2（needs_input 语义）已由 29a422a 修复；D1 凭证降级（supermai 只认个人凭证）仍在 backlog。
+
 ## 2026-10-09｜refactor(frontend): workbench.tsx 拆分清理——摘除两项到期门禁豁免（Lint 豁免 + 超长行）
 
 - 起因（用户指令）：「处理这个前端例外」。`workbench.tsx` 的整文件 Lint 豁免与超长行例外均于 2026-09-30 到期，门禁失败阻断 push；baseline 备注本就要求「只能减少、拆分清理」，故真修不续期。

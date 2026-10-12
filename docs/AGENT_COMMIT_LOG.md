@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-10-12｜docs(ops): 白名单自愈修复定稿——env 全量同步纪律 + sudoers 放行 + 生产实证
+
+- 接上一条的最终轮：逐槽位补 env 会逐层踩雷（8/9→6→CHAT_ID），定稿为把 openclaw.json 全部 `${VAR}` 引用（3 CHAT_ID + 9 OPEN_ID + APP_ID/SECRET）整体同步进 worker.env（备份 worker.env.bak2-20261012）；另发现 brainx 无任何 sudo 权限，补白后的 gateway 重启从未成功过——新增 `/etc/sudoers.d/brainx-openclaw-restart`（仅放行 `systemctl restart openclaw-brainx`，visudo 校验通过）。
+- 实证：以 brainx 身份 + worker.env 跑 `openclaw config get groupAllowFrom` 正常返回群列表；修复后日志 ALLOWLIST_FAILED 归零。
+- 改动：仅运行手册文档（纪律条款定稿）。
+
 ## 2026-10-12｜ops(deploy): 生产部署 12 个 commit + 白名单自愈最终层根因修复（worker.env 补槽位）
 
 - 起因（用户指令）：「检验 GitHub 与云端结构是否稳定、代码是否漂移、统一代码、检验分支合并、部署到云端、检测真实场景」。

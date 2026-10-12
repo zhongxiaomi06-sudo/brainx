@@ -12,7 +12,9 @@
 2. 安装并锁定 OpenClaw `2026.7.1-2`，执行 `sudo deploy/openclaw/install.sh --check`。`--apply` 会锁定安装官方飞书插件 `@openclaw/feishu@2026.7.1` 和仓库内 BrainX 插件。
 3. 执行 `--apply`，然后在 `/etc/brainx/agent.env`、`worker.env` 与 `openclaw.env` 替换全部占位值；文件保持 `0640 root:brainx`。启动服务前必须执行 `sudo deploy/openclaw/install.sh --validate` 并得到 `ok=true`。Gateway 使用人才库只读账号，确定性 worker 使用独立最小 DML 账号。
 
-   **环境变量跨文件纪律（2026-10-12 生产实证）**：`openclaw.json` 里以 `${VAR}` 引用的每个变量（如群白名单 `BRAINX_FEISHU_ALLOWED_OPEN_ID_N`），在**每个会调用 OpenClaw CLI 的服务的 env 文件**里都要存在——worker 的自愈/准入会 spawn `openclaw config set`，只继承 `worker.env`；变量只在 `openclaw.env` 时 CLI 写配置会以「missing env var」失败（白名单自愈 1095 次失败的最终层根因）。新增槽位时 openclaw.env 与 worker.env 必须同步加。
+   **环境变量跨文件纪律（2026-10-12 生产实证）**：`openclaw.json` 里以 `${VAR}` 引用的每个变量（如群白名单 `BRAINX_FEISHU_ALLOWED_OPEN_ID_N`），在**每个会调用 OpenClaw CLI 的服务的 env 文件**里都要存在——worker 的自愈/准入会 spawn `openclaw config set`，只继承 `worker.env`；变量只在 `openclaw.env` 时 CLI 写配置会以「missing env var」失败（白名单自愈 1095 次失败的最终层根因）。正确做法（2026-10-12 定稿）：把 `openclaw.json` 里全部 `${VAR}` 引用（群/人白名单槽位 + APP_ID/APP_SECRET）整体同步进 worker.env——只同步新增槽位会逐层踩雷（先 8/9、再 6、再 CHAT_ID 的实测教训）。同步脚本口径：`grep -oE '\${[A-Z_0-9]+}' openclaw.json | 去重 | 逐变量从 openclaw.env 拷贝`。
+
+   **gateway 重启权限（2026-10-12 生产实证）**：worker 以 `brainx` 身份运行，白名单补白后要重启 `openclaw-brainx` 才生效（白名单不热加载），必须有 `/etc/sudoers.d/brainx-openclaw-restart`（`brainx ALL=(root) NOPASSWD: /usr/bin/systemctl restart openclaw-brainx`，0440）。缺失时补偿链最后一环静默失败——白名单写进去了但群里机器人仍不响应。
 4. 运行 SQLite/RDS additive migration；先做 RDS 备份和只读健康检查，再执行写迁移。
 5. 先用 `brainx-agent-admin readiness --account mia` 查看逐人就绪层；单人新增或故障时先运行 `onboarding-plan --account mia --consultant <id>`，再用 `bind-roster` 从已核验花名册建立 Gateway 身份。群、sender、purpose 与项目范围仍需显式登记。Otto 已离职：保留历史审计，但 `consultants.active=0` 且不得存在 ACTIVE 身份绑定。
 6. 当前生产主链必须启用 `brainx-worker`，由它承担 bridge、简历、推送和 OpenMai 结果回群；`brainx-integration-worker` 只消费带租约的 `integration_jobs`，没有启用相应异步集成任务时保持 disabled。两者职责不同，不得用后者替代前者。依次启动 `brainx-agent-gateway`、`brainx-worker`、`openclaw-brainx`，最后重启现有 `brainx.service`。

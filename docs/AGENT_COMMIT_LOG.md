@@ -1,5 +1,16 @@
 # Agent Commit 记录
 
+## 2026-10-12｜test(e2e): 项目群 CLI 端到端实测——今日三个断点修复全部生产验证通过
+
+- 起因（用户指令）：「cli测试，在项目群中进行测试」。
+- 方法：在服务器上按插件同款签名协议（principal assertion + gateway token）直调 agent gateway（127.0.0.1:3102），场景群=TTC · BrainTex 项目组（oc_cd57…），身份=mia。临时脚本 /tmp 用完即删。
+- 结果 3/3 + 投递实证：
+  ① 群贴 JD 建岗——修复前授权层必 404，现在 200 产草稿（draft 39ab6d09），随后私聊 review reject 闭环，职位池零污染（脑途科技 0 行）；
+  ② needs_input 投递——种测试行后 worker 5 秒内入台并 SENT 橙色「请补充职位信息」卡到群（0041 CHECK 吞卡断点根治实证）；
+  ③ needs_input 读回——status=needs_input + collect_brief 引导，不静默重跑（任务行未被覆盖）。
+- 清理：openmai_results/openmai_deliveries 测试行删除，project_launches.search_status 复原 NULL，投递卡片留群（测试痕迹：群里有一张橙卡，内容即 E2E 测试文案）。
+- 排障记录：gateway 请求体校验要求 client.openclaw_version 为 string；account_id 是顾问级飞书应用账号（mia），不是 brainx-prod。
+
 ## 2026-10-12｜ops(cleanup): 服务器工作区残留清理 + 系统盘 80%→70%
 
 - 起因（用户指令）：「确认后处理，清理检查磁盘」。

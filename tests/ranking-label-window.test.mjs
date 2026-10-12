@@ -173,6 +173,8 @@ test('评估 CLI 缺窗口参数时在打开数据库前失败关闭', () => {
     });
     assert.equal(run.status, 2, run.stderr || run.stdout);
     assert.match(run.stderr, /--cutoff-at/);
-    assert.doesNotMatch(run.stderr, /SQLITE|database|ENOENT/i);
+    // Node 22 在导入 node:sqlite 时提示实验性，与打开数据库无关。
+    const errors = run.stderr.replace(/^.*ExperimentalWarning: SQLite is an experimental feature.*$/gm, '');
+    assert.doesNotMatch(errors, /SQLITE|database|ENOENT/i);
   }
 });

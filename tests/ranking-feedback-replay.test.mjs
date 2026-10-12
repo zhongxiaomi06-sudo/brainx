@@ -15,6 +15,22 @@ import { exportDataset } from '../bin/brainx-ltr-export.mjs';
 const CID = 'felix';
 const SERVED = '2026-09-01T00:00:00.000Z';
 
+test('没有 isTransaction 属性时，忽略操作不会提交外层事务', () => {
+  const { db, item } = fixture();
+  const compatibleDb = { exec: db.exec.bind(db), prepare: db.prepare.bind(db) };
+  try {
+    db.exec('BEGIN');
+    const result = recordOpportunityIgnore(compatibleDb, CID, item.job.project_id, 'nested-ignore', {
+      decision_id: item.decision_id, reason: '不符合方向',
+    });
+    assert.equal(result.ok, true);
+    assert.equal(db.prepare('SELECT COUNT(*) n FROM opportunity_ignores').get().n, 1);
+    db.exec('ROLLBACK');
+    assert.equal(db.prepare('SELECT COUNT(*) n FROM opportunity_ignores').get().n, 0);
+    assert.equal(db.prepare('SELECT COUNT(*) n FROM recommendation_feedback_events').get().n, 0);
+  } finally { db.close(); }
+});
+
 function fixture() {
   const db = openDb(':memory:');
   runSync(db, { source: 'fixture', consultant_id: CID });

@@ -4,17 +4,16 @@ import { decisionReferenceIsValid } from './event-time.js';
 import { appendFeedbackEvent } from './ranking-feedback.js';
 
 function inTransaction(db, operation) {
-  const ownsTransaction = !db.isTransaction;
-  if (ownsTransaction) db.exec('BEGIN');
+  // Node 22.13 没有 isTransaction；SAVEPOINT 同时支持独立与嵌套调用。
+  db.exec('SAVEPOINT opportunity_ignore');
   try {
     const result = operation();
-    if (ownsTransaction) {
-      if (result?.ok === false) db.exec('ROLLBACK');
-      else db.exec('COMMIT');
-    }
+    if (result?.ok === false) db.exec('ROLLBACK TO opportunity_ignore');
+    db.exec('RELEASE opportunity_ignore');
     return result;
   } catch (error) {
-    if (ownsTransaction) db.exec('ROLLBACK');
+    db.exec('ROLLBACK TO opportunity_ignore');
+    db.exec('RELEASE opportunity_ignore');
     throw error;
   }
 }

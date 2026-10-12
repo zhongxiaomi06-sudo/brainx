@@ -1,5 +1,15 @@
 # Agent Commit 记录
 
+## 2026-10-12｜ops(deploy): 生产部署 12 个 commit + 白名单自愈最终层根因修复（worker.env 补槽位）
+
+- 起因（用户指令）：「检验 GitHub 与云端结构是否稳定、代码是否漂移、统一代码、检验分支合并、部署到云端、检测真实场景」。
+- GitHub 对账：无漂移（origin 无本地缺失 commit，无未并 PR）；本地 10 个 commit 在完整门禁 25/25 后推送（09633ac..4363279）。
+- 云端对账：ECS 停在 46eae67（9/28），落后 12；工作区有他人临时文件（demo 脚本/.bak/diag），与传入 41 文件零交集，未动。
+- 部署：第一次 `git pull` 因服务器到 GitHub 网络超时失败且被管道掩码（`set -e` 未配 pipefail 的教训），实际跑了旧码重启；第二次用已 fetch 的对象离线 ff 合并成功 → npm ci → 前端构建 → 四服务重启 → `install.sh --apply` 插件重装（13 文件、29 工具外露校验通过）+ openclaw-brainx 重启。
+- 生产验证：五服务 active；0060/0061 迁移落库；**0061 回填生效——68/68 ACTIVE 群 scope 已含 job_fact_review**；openmai_results 96 done / 18 failed / 僵尸 running 0；nginx vhost API+前端 200（本机 curl 的 TLS 失败查明为 Mac 本地代理 127.0.0.1:7897 问题，非生产故障）。
+- 顺带修复（运维层）：白名单自愈仍报 `missing env var BRAINX_FEISHU_ALLOWED_OPEN_ID_8`——配置 8/9 槽位是 `${VAR}` 引用，值只在 openclaw.env，而 worker spawn CLI 只继承 worker.env（1095 次失败链的最终层）。修复：两槽位补进 `/etc/brainx/worker.env` 并重启 worker。运行手册补「环境变量跨文件纪律」。
+- 遗留：服务器工作区的他人临时文件未清理（不属本次范围）；服务器磁盘 80% 建议关注。
+
 ## 2026-10-09｜docs(product): 找人链路产品形态设定——群卡片=即时交付面、Sourcing 路线 B、judgment-extract 主导
 
 - 起因（用户指令）：「B（先只消费成果），倾向 BrainX 的 judgment-extract 主导，Sourcing 消费；进行产品的形态设定，给一个完整的文档，简洁，只需要动作加产生的效果」。

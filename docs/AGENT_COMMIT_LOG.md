@@ -1,5 +1,13 @@
 # Agent Commit 记录
 
+## 2026-10-12｜ops(cleanup): 服务器工作区残留清理 + 系统盘 80%→70%
+
+- 起因（用户指令）：「确认后处理，清理检查磁盘」。
+- 残留清理：/opt/brainx 工作区 15 项他人临时文件（demo/diag 脚本、.bak、临时 backup、sandbox 目录）打包归档至 `/root/brainx-stray-backup-20261012.tar.gz` 后移除；被删的跟踪文件 `scripts/demo-offer-seed.mjs` 从 git 恢复；工作区回到 clean。
+- 磁盘：系统盘 /dev/vda3 80%→70%（释放 1.9G：root+brainx 的 npm 缓存 1.2G、syslog.1 压缩 650M）。数据盘 /dev/vdb 32% 健康；备份保留策略（14 天滚动）运行正常，未动。syslog 日增 ~700M 的主因是 sshd 爆破噪声（137.185 段等）——本次只压缩历史，若持续增长建议加 fail2ban 或收紧 sshd（另行立项）。
+- 验证：清理后五服务全 active、生产 API 200。
+- 未动：/www（宝塔面板）、/usr、数据盘 backups（保留期内）。
+
 ## 2026-10-12｜docs(ops): 白名单自愈修复定稿——env 全量同步纪律 + sudoers 放行 + 生产实证
 
 - 接上一条的最终轮：逐槽位补 env 会逐层踩雷（8/9→6→CHAT_ID），定稿为把 openclaw.json 全部 `${VAR}` 引用（3 CHAT_ID + 9 OPEN_ID + APP_ID/SECRET）整体同步进 worker.env（备份 worker.env.bak2-20261012）；另发现 brainx 无任何 sudo 权限，补白后的 gateway 重启从未成功过——新增 `/etc/sudoers.d/brainx-openclaw-restart`（仅放行 `systemctl restart openclaw-brainx`，visudo 校验通过）。

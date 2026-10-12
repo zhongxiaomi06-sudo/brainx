@@ -1,4 +1,5 @@
 # SuperMai 桌面 Relay 运行手册
+> 2026-10-13 修订：本文仅保留历史设备与任务维护说明，不再是正式 Agent 找人入口。当前路线以[云端产品设定](2026-10-09-sourcing-product-form.md)为准。
 
 > 上级入口：[BrainX 文档书](README.md)
 >

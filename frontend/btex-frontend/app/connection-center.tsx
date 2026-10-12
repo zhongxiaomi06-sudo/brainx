@@ -19,8 +19,8 @@ const providers = {
   },
   supermai: {
     name: "SuperMai",
-    role: "桌面找人",
-    description: "复用本机已安装的 SuperMai，在招聘平台官方页面完成登录。",
+    role: "云端按条件找人",
+    description: "通过服务端授权按条件找人，与 OpenMai 共用云端引擎；Sourcing 仅同步成果。",
     icon: Cable,
   },
   reloop: {
@@ -146,10 +146,10 @@ export function ConnectionCenter({ items, loading = false, error = "", busyPlatf
           <div className="connection-card-footer">
             <CheckedAt value={item.last_checked_at} />
             {item.provider === "feishu" && item.needs_user_action && <button type="button" onClick={onReauthorizeFeishu}>前往飞书授权 <ExternalLink /></button>}
-            {item.provider === "openmai" && item.needs_user_action && <span className="connection-guidance">请联系管理员开通</span>}
+            {(item.provider === "openmai" || item.provider === "supermai") && item.needs_user_action && item.managed_by !== "device" && <span className="connection-guidance">请联系管理员开通</span>}
             {item.provider === "reloop" && <span className="connection-guidance">组织统一管理</span>}
           </div>
-          {item.provider === "supermai" && <SupermaiActions item={item} busyPlatform={busyPlatform}
+          {item.provider === "supermai" && item.managed_by === "device" && <SupermaiActions item={item} busyPlatform={busyPlatform}
             pairingCode={pairingCode} pairingBusy={pairingBusy} onStart={onStartSupermai}
             onCreatePairing={onCreatePairing} />}
         </article>;

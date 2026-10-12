@@ -3,7 +3,6 @@ import { tokenStatus } from './feishu.js';
 import { oauthConfigured } from './oauth.js';
 import { talentHealth } from './talent.js';
 import { ttcOpenmaiAuthStatus } from './ttcsdk/auth.js';
-import { supermaiDeviceStatus } from './supermai-relay.js';
 
 export const CONNECTION_SCHEMA_VERSION = 'brainx-connections-v1';
 
@@ -53,38 +52,12 @@ function openmaiConnection(db, consultantId) {
   };
 }
 
-function supermaiConnection(status) {
-  const active = status?.active || status || {};
-  const platforms = active.platforms || {};
-  const connected = (active.desktop_available === true || active.available === true)
-    && Object.values(platforms).some((item) => item.logged_in === true);
-  const available = active.desktop_available === true || active.available === true;
-  const registered = status?.registered ?? available;
-  const online = status?.online ?? available;
+function supermaiConnection(db, consultantId) {
+  const shared = openmaiConnection(db, consultantId);
   return {
-    provider: 'supermai', kind: 'sourcing', managed_by: 'device',
-    state: connected ? 'connected' : registered ? 'action_required' : 'unavailable',
-    capabilities: ['candidate.search'], needs_user_action: !connected,
-    action: connected ? null : action(registered ? 'open_desktop' : 'install_connector',
-      registered ? 'brainx://connections/supermai' : '/api/v1/supermai/connector/install'),
-    last_checked_at: active.last_seen_at || checkedAt(),
-    error_code: connected ? null
-      : available ? 'SUPERMAI_PLATFORM_LOGIN_REQUIRED'
-        : registered && !online ? 'SUPERMAI_DEVICE_OFFLINE'
-          : registered ? 'SUPERMAI_DESKTOP_UNAVAILABLE'
-            : (status?.error_code || 'SUPERMAI_PAIRING_REQUIRED'),
-    details: {
-      desktop_available: available,
-      desktop_busy: active.desktop_busy === true || active.busy === true,
-      version: active.version || null,
-      platforms,
-      registered,
-      online,
-      devices: Array.isArray(status?.devices) ? status.devices.map((device) => ({
-        device_id: device.device_id, name: device.name, online: device.online,
-        last_seen_at: device.last_seen_at,
-      })) : [],
-    },
+    ...shared,
+    provider: 'supermai',
+    error_code: shared.error_code?.replace('OPENMAI_', 'SUPERMAI_') || null,
   };
 }
 
@@ -104,19 +77,16 @@ function reloopConnection(status) {
 }
 
 export async function connectionStatuses(db, consultantId, {
-  readSupermaiStatus = (database, cid) => supermaiDeviceStatus(database, cid),
   readReloopHealth = talentHealth,
 } = {}) {
-  const [supermai, reloop] = await Promise.allSettled([
-    readSupermaiStatus(db, consultantId), readReloopHealth(),
-  ]);
+  const [reloop] = await Promise.allSettled([readReloopHealth()]);
   return {
     schema_version: CONNECTION_SCHEMA_VERSION,
     identity_provider: 'feishu',
     items: [
       feishuConnection(db, consultantId),
       openmaiConnection(db, consultantId),
-      supermaiConnection(supermai.status === 'fulfilled' ? supermai.value : null),
+      supermaiConnection(db, consultantId),
       reloopConnection(reloop.status === 'fulfilled' ? reloop.value : null),
     ],
   };

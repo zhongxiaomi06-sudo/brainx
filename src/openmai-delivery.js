@@ -92,10 +92,11 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
     elements: [
       { tag: 'markdown', content },
       // 说明收成一行小灰字 note：按钮与候选人随行后不再需要长段教学。
-      ...(candidates.length ? [focusIntroNote(source)] : []),
+      ...(candidates.length ? [focusIntroNote(freeform, source)] : []),
       ...rows,
-      ...candidateQualityNotes(candidates, source),
-      ...(candidates.length ? [continueSearchActions(job), continueSearchHint()] : []),
+      // freeform 操作列统一「暂不支持」，不再逐条提示编号/链接问题（2026-10-09）。
+      ...(freeform ? [] : candidateQualityNotes(candidates)),
+      ...(candidates.length ? [continueSearchActions(job), ...(!freeform ? [continueSearchHint()] : [])] : []),
       // 失败 / 空结果卡只有这一个动作 → 右对齐收口（F4）。
       // freeform 无真实职位 → target 为 null → 不渲染「打开工作台」按钮，避免伪造链接（2026-09-16）。
       ...(!success || !candidates.length ? (target ? [alignSoloAction({ tag: 'action', actions: [{ tag: 'button', type: 'primary',
@@ -129,11 +130,15 @@ function candidateFocusRows(job, candidates, source) {
               : { tag: 'div', text: { tag: 'plain_text', content: `${index + 1}. ${name}` } }] },
           { tag: 'column', width: 'weighted', weight: 5, vertical_align: 'top',
             elements: [{ tag: 'markdown', content: info }] },
-          // freeform：无 PL 编号也做操作按钮占位（功能后续补，2026-09-16 specs/018 修订）
+          // freeform：合成 project_id（supermai:<hash>）在 job_facts 无行，初筛/入 reloop
+          // 按钮必然 NOT_FOUND_OR_FORBIDDEN——发卡接线修复后卡真实上会，不再渲染必败按钮
+          // （2026-10-09；待 freeform 候选动作有真实承接后再恢复）。
           { tag: 'column', width: 'weighted', weight: 3, vertical_align: 'center',
             elements: (candidate.candidateRefValid === false && !freeform)
               ? [{ tag: 'div', text: { tag: 'plain_text', content: '不可操作' } }]
-              : [screenCandidateAction(job, candidate), addToReloopAction(job, candidate)] },
+              : freeform
+                ? [{ tag: 'div', text: { tag: 'plain_text', content: '暂不支持' } }]
+                : [screenCandidateAction(job, candidate), addToReloopAction(job, candidate)] },
         ] };
     }),
   ];
@@ -146,33 +151,36 @@ function candidateLinkButton(url, no, name) {
   return btn;
 }
 
-/** 一句话说明三个入口，避免用户先点开二次卡片才找到人才链接。 */
-function focusIntroNote(source) {
+/** 一句话说明入口；freeform（自由找人）候选人无项目上下文，如实说明暂不支持一键操作。 */
+function focusIntroNote(freeform = false, source = 'openmai') {
   return { tag: 'note', elements: [{ tag: 'plain_text',
-    content: source === 'supermai'
-      ? '有来源链接时可点姓名查看官方资料；初筛通过与加入 reloop 是独立操作。'
-      : '点姓名直接查看 TTC；初筛通过后发送人才链接；加入 reloop 为独立操作。' }] };
+    content: freeform
+      ? '自由找人结果来自外部渠道，候选人暂不支持一键初筛 / 加入 reloop。'
+      : source === 'supermai'
+        ? '有来源链接时可点姓名查看官方资料；初筛通过与加入 reloop 是独立操作。'
+        : '点姓名直接查看 TTC；初筛通过后发送人才链接；加入 reloop 为独立操作。' }] };
 }
 
 /** 表格原来的「操作」列兼作「链接待核实」提示，该列移除后信号改在这里披露，避免静默丢失。 */
-function candidateQualityNotes(candidates, source) {
+function candidateQualityNotes(candidates) {
   const numbered = candidates.map((candidate, index) => ({ candidate, no: index + 1 }));
   const invalid = numbered.filter(({ candidate }) => candidate.candidateRefValid === false);
   const unverified = numbered.filter(({ candidate }) => candidate.candidateRefValid !== false
-    && !ttcTalentUrl(candidate) && !(source === 'supermai' && candidate.profileUrl));
+    && !ttcTalentUrl(candidate));
   const notes = [];
   if (invalid.length) notes.push(`${invalid.map(({ no }) => no).join('、')} 号候选人编号无效，未生成关注按钮`);
-  if (unverified.length) notes.push(`${unverified.map(({ no }) => no).join('、')} 号 ${source === 'supermai' ? '来源资料' : 'TTC'} 链接待核实`);
+  if (unverified.length) notes.push(`${unverified.map(({ no }) => no).join('、')} 号 TTC 链接待核实`);
   return notes.length
     ? [{ tag: 'note', elements: [{ tag: 'plain_text', content: notes.join('；') }] }] : [];
 }
 
 function continueSearchActions(job) {
-  // freeform：无 job_id，不放 OpenMai 继续找人（需 job_id）；放 SuperMai 重新找人按钮，
-  // 引导用同判据重新触发。按钮先做占位对齐项目卡格式（2026-09-16 specs/018 修订）。
+  // freeform：无 job_id，不放 OpenMai 继续找人（需 job_id）；放 SuperMai 重新找人按钮。
+  // 2026-10-09 修订：自由找人已支持 continue_search=true（排除名单按合成键从历史结果生成），
+  // 按钮指令改为显式新一轮；自由找人群里没有自动投递通道，话术不得承诺「自动发到本群」。
   if (job?.freeform === true) {
     const criteria = String(job.criteria || '').slice(0, 2000);
-    const command = `[BRAINTEX_SEARCH_START] 自由找人继续：用本轮判据重新触发 brainx_supermai_scout。现在调用 brainx_supermai_scout，传 criteria（见下）。任务返回 running/triggered 后立即回复"正在重新找人，完成后候选人会自动发到本群"并结束本轮，不要原地轮询；如返回 already_done，提示顾问换判据措辞后重试。\ncriteria=${criteria}`;
+    const command = `[BRAINTEX_SEARCH_START] 自由找人继续：用本轮判据发起新一轮 brainx_supermai_scout。现在调用 brainx_supermai_scout，传 criteria（见下）和 continue_search=true；排除名单由 BrainX 从历史结果生成，不要自行编造。任务返回 running/triggered 后立即回复"正在重新找人，完成后请再 @ 我查看结果"并结束本轮，不要原地轮询；如返回 cannot_continue，提示顾问换判据措辞后重新找人。\ncriteria=${criteria}`;
     // 单按钮行用 alignSoloAction 右对齐收口（卡片排版规范，2026-09-16 specs/018 修订）
     return alignSoloAction({ tag: 'action', actions: [
       { tag: 'button', type: 'primary', text: { tag: 'plain_text', content: 'SuperMai 重新找人' },
@@ -189,7 +197,6 @@ function continueSearchActions(job) {
   ] };
 }
 
-/** 飞书 note 使用弱化灰字展示，不与候选事实或操作按钮争夺视觉层级。 */
 function continueSearchHint() {
   return { tag: 'note', elements: [{ tag: 'plain_text',
     content: '继续找人时，先在群里发送“找人条件：……”，再点击上方继续找人；不发条件则按职位事实继续，并自动排除已推荐人选。' }] };
@@ -248,6 +255,10 @@ function backgroundText(candidate) {
 }
 
 export function enqueueOpenmaiDeliveries(db, at = now()) {
+  // 幂等用 LEFT JOIN 反连接表达（已入台的 task_id+chat_id 不再选出），剩余行用普通
+  // INSERT——CHECK/外键违例必须抛错暴露。0041 时代用 INSERT OR IGNORE，把 needs_input
+  // 的 CHECK 冲突静默吞掉，「请补充职位信息」卡永远到不了群（2026-10-09 审计实证，
+  // 0060 已放宽 CHECK）。
   const rows = db.prepare(`SELECT r.task_id, r.consultant_id,
       COALESCE(st.project_id,r.project_id) project_id, r.status, r.result_text,
       l.launch_id, l.chat_id
@@ -258,9 +269,10 @@ export function enqueueOpenmaiDeliveries(db, at = now()) {
         WHERE pl.project_id=COALESCE(st.project_id,r.project_id)
         ORDER BY CASE pl.status WHEN 'READY' THEN 0 WHEN 'POSTING_JOB' THEN 1
           WHEN 'CREATING_CHAT' THEN 2 ELSE 3 END, pl.created_at, pl.launch_id LIMIT 1)
+    LEFT JOIN openmai_deliveries d ON d.task_id=r.task_id AND d.chat_id=l.chat_id
     WHERE l.status='READY' AND l.chat_id IS NOT NULL AND r.task_id IS NOT NULL
-      AND r.status IN ('done','needs_input','failed')`).all();
-  const insert = db.prepare(`INSERT OR IGNORE INTO openmai_deliveries
+      AND r.status IN ('done','needs_input','failed') AND d.delivery_id IS NULL`).all();
+  const insert = db.prepare(`INSERT INTO openmai_deliveries
     (delivery_id, task_id, consultant_id, project_id, chat_id, result_status,
      delivery_status, next_attempt_at, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, ?)`);
@@ -290,15 +302,14 @@ function finishProjectDelivery(db, row, at) {
     ? assessOpenmaiCandidateBatch(row.result_text) : null;
   const incomplete = quality && !quality.complete;
   const failed = row.result_status === 'failed';
-  const source = String(row.task_id || '').startsWith('sm_') ? 'SUPERMAI' : 'OPENMAI';
   db.prepare(`UPDATE project_launches SET search_status=?, search_task_id=?, error_code=?,
     error_message=?, updated_at=? WHERE launch_id=(SELECT launch_id FROM project_launches
       WHERE project_id=? ORDER BY CASE status WHEN 'READY' THEN 0 WHEN 'POSTING_JOB' THEN 1
         WHEN 'CREATING_CHAT' THEN 2 ELSE 3 END, created_at, launch_id LIMIT 1)`).run(
     failed || incomplete ? 'FAILED' : 'DONE', row.task_id,
-    failed ? `${source}_SEARCH_FAILED` : quality?.needsInput ? `${source}_SEARCH_BRIEF_REQUIRED`
-      : incomplete ? `${source}_CANDIDATES_INCOMPLETE` : null,
-    failed ? String(row.error || `${source === 'SUPERMAI' ? 'SuperMai' : 'OpenMai'} 搜索失败`).slice(0, 240)
+    failed ? 'OPENMAI_SEARCH_FAILED' : quality?.needsInput ? 'OPENMAI_SEARCH_BRIEF_REQUIRED'
+      : incomplete ? 'OPENMAI_CANDIDATES_INCOMPLETE' : null,
+    failed ? String(row.error || 'OpenMai 搜索失败').slice(0, 240)
       : incomplete ? quality.message : null,
     at, row.project_id,
   );
@@ -317,7 +328,7 @@ export function retryOpenmaiDelivery(db, consultantId, projectId, at = now()) {
 export function failStaleOpenmaiTasks(db, at = now(), maxAgeMs = STALE_SEARCH_MS) {
   const cutoff = new Date(Date.parse(at) - maxAgeMs).toISOString();
   const rows = db.prepare(`SELECT project_id,consultant_id,task_id FROM openmai_results
-    WHERE status='running' AND task_id LIKE 'om_%' AND started_at<=?`).all(cutoff);
+    WHERE status='running' AND started_at<=?`).all(cutoff);
   const update = db.prepare(`UPDATE openmai_results SET status='failed',
     error='OpenMai 任务因服务中断或超时未完成；为避免重复费用，请由顾问明确重试。',finished_at=?
     WHERE project_id=? AND consultant_id=? AND task_id=? AND status='running'`);

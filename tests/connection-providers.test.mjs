@@ -47,7 +47,7 @@ test('SuperMai 本地连接器只允许 loopback，且只输出窄状态', async
   assert.doesNotMatch(JSON.stringify(output), /never-return/);
 });
 
-test('统一连接状态区分用户登录、设备连接和组织连接', async () => {
+test('云端 SuperMai 与 OpenMai 共用授权，桌面登录不代表云端已授权', async () => {
   const db = openDb(':memory:');
   const output = await connectionStatuses(db, 'mia', {
     readSupermaiStatus: async () => ({
@@ -61,7 +61,10 @@ test('统一连接状态区分用户登录、设备连接和组织连接', async
     ['feishu', 'openmai', 'supermai', 'reloop']);
   assert.equal(output.items[0].state, 'action_required');
   assert.equal(output.items[1].error_code, 'OPENMAI_GRANT_REQUIRED');
-  assert.equal(output.items[2].error_code, 'SUPERMAI_PLATFORM_LOGIN_REQUIRED');
+  assert.equal(output.items[2].error_code, 'SUPERMAI_GRANT_REQUIRED');
+  assert.equal(output.items[2].managed_by, output.items[1].managed_by);
+  assert.equal(output.items[2].state, output.items[1].state);
+  assert.equal(output.items[2].details, undefined);
   assert.equal(output.items[3].state, 'organization_managed');
   assert.equal(output.items[3].needs_user_action, false);
 });

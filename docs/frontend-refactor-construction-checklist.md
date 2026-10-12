@@ -1,4 +1,5 @@
 # 前端真实数据重构施工清单
+2026-10-13：云端连接中心与远端工作台拆分合并，发布和真实验证待执行；状态以[本轮复核](frontend-reviews/2026-10-13-cloud-sourcing-merge.md)为准。
 
 > 上级入口：[BrainX 文档书](README.md)
 > 相关依据：[前端审核台账](frontend-reviews/README.md) · [前端交互架构](frontend-interaction-architecture.md) · [推荐队列与职位决策产品架构](recommendation-queue-product-architecture.md) · [TTC 职位字段库](ttc-field-catalog.md) · [内部 Storybook 组件库](storybook-component-library.md) · [BrainX v2.0 产品需求](prd-2026-08-24-brainx-v2.md)

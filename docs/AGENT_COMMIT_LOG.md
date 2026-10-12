@@ -1,5 +1,13 @@
 # Agent Commit 记录
 
+## 2026-10-13｜merge(寻访): 合并远端云端方案并保留本地工作台能力
+
+- 用户选择远端路线：SuperMai 使用云端 criteria 引擎，Sourcing 只消费成果；接入主线 needs_input 投递、终态读回、群权限迁移及工作台拆分，移除过期 Lint 豁免。
+- 保留本地 Algorithm A 分页引擎、决策反馈幂等、连接入口及历史桌面任务结果回群兼容；正式 Agent 不再创建桌面任务。
+- 修正连接中心和运行说明；云端状态与执行共用显式 OPENMAI 授权，新增授权/撤权回归；旧设备任务测试独立保留。
+- 验证：后端 1021/1021 通过；前端静态与适配 56/56、Lint 和 TypeScript 通过。quick 唯一失败为进行中的 MERGE_HEAD，须本提交完成后重跑完整门禁；尚未 push 或发布。
+- 审核和发布边界见 [云端寻访复核](frontend-reviews/2026-10-13-cloud-sourcing-merge.md)。
+
 ## 2026-10-09｜fix(寻访): 接单后等待选择 OpenMai 或 SuperMai
 
 - 获取远端后确认 `origin/main` 已完整包含在当前本地分支中，本轮不重复合并、不覆盖本地 63 个主线外提交；重新审计 OpenMai、SuperMai、项目群卡片、OpenClaw 工具和桌面 Relay 的真实调用链。
@@ -476,6 +484,107 @@
 - 对照 0.99 会议纪要核查“荆华密算销售”搜索失败：真实库中公司与职位分别存为“荆华密算”和“销售”，前端字段拼接产生的空格导致连续中文查询无法命中。
 - “全部职位”搜索同时匹配原始字段串和去空格字段串，不改变职位事实、排序、权限或筛选；Storybook 增加跨公司/职位字段的连续搜索回归。
 - 验证：本地真实库确认 `JHTSEQJ / 荆华密算 / 销售` 存在；前端静态与适配测试 53/53；`npm run verify:quick` 16/16 通过；真实页面验证在启动本地服务后补录。
+## 2026-10-12｜test(e2e): 项目群 CLI 端到端实测——今日三个断点修复全部生产验证通过
+
+- 起因（用户指令）：「cli测试，在项目群中进行测试」。
+- 方法：在服务器上按插件同款签名协议（principal assertion + gateway token）直调 agent gateway（127.0.0.1:3102），场景群=TTC · BrainTex 项目组（oc_cd57…），身份=mia。临时脚本 /tmp 用完即删。
+- 结果 3/3 + 投递实证：
+  ① 群贴 JD 建岗——修复前授权层必 404，现在 200 产草稿（draft 39ab6d09），随后私聊 review reject 闭环，职位池零污染（脑途科技 0 行）；
+  ② needs_input 投递——种测试行后 worker 5 秒内入台并 SENT 橙色「请补充职位信息」卡到群（0041 CHECK 吞卡断点根治实证）；
+  ③ needs_input 读回——status=needs_input + collect_brief 引导，不静默重跑（任务行未被覆盖）。
+- 清理：openmai_results/openmai_deliveries 测试行删除，project_launches.search_status 复原 NULL，投递卡片留群（测试痕迹：群里有一张橙卡，内容即 E2E 测试文案）。
+- 排障记录：gateway 请求体校验要求 client.openclaw_version 为 string；account_id 是顾问级飞书应用账号（mia），不是 brainx-prod。
+
+## 2026-10-12｜ops(cleanup): 服务器工作区残留清理 + 系统盘 80%→70%
+
+- 起因（用户指令）：「确认后处理，清理检查磁盘」。
+- 残留清理：/opt/brainx 工作区 15 项他人临时文件（demo/diag 脚本、.bak、临时 backup、sandbox 目录）打包归档至 `/root/brainx-stray-backup-20261012.tar.gz` 后移除；被删的跟踪文件 `scripts/demo-offer-seed.mjs` 从 git 恢复；工作区回到 clean。
+- 磁盘：系统盘 /dev/vda3 80%→70%（释放 1.9G：root+brainx 的 npm 缓存 1.2G、syslog.1 压缩 650M）。数据盘 /dev/vdb 32% 健康；备份保留策略（14 天滚动）运行正常，未动。syslog 日增 ~700M 的主因是 sshd 爆破噪声（137.185 段等）——本次只压缩历史，若持续增长建议加 fail2ban 或收紧 sshd（另行立项）。
+- 验证：清理后五服务全 active、生产 API 200。
+- 未动：/www（宝塔面板）、/usr、数据盘 backups（保留期内）。
+
+## 2026-10-12｜docs(ops): 白名单自愈修复定稿——env 全量同步纪律 + sudoers 放行 + 生产实证
+
+- 接上一条的最终轮：逐槽位补 env 会逐层踩雷（8/9→6→CHAT_ID），定稿为把 openclaw.json 全部 `${VAR}` 引用（3 CHAT_ID + 9 OPEN_ID + APP_ID/SECRET）整体同步进 worker.env（备份 worker.env.bak2-20261012）；另发现 brainx 无任何 sudo 权限，补白后的 gateway 重启从未成功过——新增 `/etc/sudoers.d/brainx-openclaw-restart`（仅放行 `systemctl restart openclaw-brainx`，visudo 校验通过）。
+- 实证：以 brainx 身份 + worker.env 跑 `openclaw config get groupAllowFrom` 正常返回群列表；修复后日志 ALLOWLIST_FAILED 归零。
+- 改动：仅运行手册文档（纪律条款定稿）。
+
+## 2026-10-12｜ops(deploy): 生产部署 12 个 commit + 白名单自愈最终层根因修复（worker.env 补槽位）
+
+- 起因（用户指令）：「检验 GitHub 与云端结构是否稳定、代码是否漂移、统一代码、检验分支合并、部署到云端、检测真实场景」。
+- GitHub 对账：无漂移（origin 无本地缺失 commit，无未并 PR）；本地 10 个 commit 在完整门禁 25/25 后推送（09633ac..4363279）。
+- 云端对账：ECS 停在 46eae67（9/28），落后 12；工作区有他人临时文件（demo 脚本/.bak/diag），与传入 41 文件零交集，未动。
+- 部署：第一次 `git pull` 因服务器到 GitHub 网络超时失败且被管道掩码（`set -e` 未配 pipefail 的教训），实际跑了旧码重启；第二次用已 fetch 的对象离线 ff 合并成功 → npm ci → 前端构建 → 四服务重启 → `install.sh --apply` 插件重装（13 文件、29 工具外露校验通过）+ openclaw-brainx 重启。
+- 生产验证：五服务 active；0060/0061 迁移落库；**0061 回填生效——68/68 ACTIVE 群 scope 已含 job_fact_review**；openmai_results 96 done / 18 failed / 僵尸 running 0；nginx vhost API+前端 200（本机 curl 的 TLS 失败查明为 Mac 本地代理 127.0.0.1:7897 问题，非生产故障）。
+- 顺带修复（运维层）：白名单自愈仍报 `missing env var BRAINX_FEISHU_ALLOWED_OPEN_ID_8`——配置 8/9 槽位是 `${VAR}` 引用，值只在 openclaw.env，而 worker spawn CLI 只继承 worker.env（1095 次失败链的最终层）。修复：两槽位补进 `/etc/brainx/worker.env` 并重启 worker。运行手册补「环境变量跨文件纪律」。
+- 遗留：服务器工作区的他人临时文件未清理（不属本次范围）；服务器磁盘 80% 建议关注。
+
+## 2026-10-09｜docs(product): 找人链路产品形态设定——群卡片=即时交付面、Sourcing 路线 B、judgment-extract 主导
+
+- 起因（用户指令）：「B（先只消费成果），倾向 BrainX 的 judgment-extract 主导，Sourcing 消费；进行产品的形态设定，给一个完整的文档，简洁，只需要动作加产生的效果」。
+- 拍板收编：①元决策——群卡片=找人动作即时交付面，工作台=资产沉淀回溯面；②Sourcing.app（本地软件，v0.3.6/OTA 0.3.9，console+harness 本机 CDP 采集 Boss/脉脉/猎聘+撞库拿电话）走路线 B 只消费成果，不直连本机 harness；③群消息客户诉求提炼由 BrainX judgment-extract 主导、Sourcing 消费；④撞库手机号只私发发起人。
+- 改动：`docs/2026-10-09-sourcing-product-form.md`（新：四通道分工 + 逐步「动作→效果」交互表 + 验收口径 + 实施顺序）；docs/README.md 路由与目录双登记。
+- 验证：纯文档；形态表中「已完成」项与今日 5fbe8c7/29a422a/b5a1416 三个 commit 逐条对账一致。
+
+## 2026-10-09｜fix(gate): 完整门禁收尾——前端依赖漏洞修复 + freeform 卡文案收口与基线重建
+
+- 起因（用户指令）：「然后测试」。`npm run verify` 首轮 23/25：①前端生产依赖漏洞（next 16.x critical RCE + sharp/source-map-js high，均 `npm audit fix` 范围内修复，package-lock 223+/163-，build 复跑通过）；②`supermai-freeform` 卡片渲染回归（29a422a 改卡后的预期差异）。
+- 顺带收口：freeform 卡引导说明原为「点姓名直接查看 TTC；初筛通过后发送人才链接」——对无 TTC 链接、无一键操作的自由找人是误导，改为「自由找人结果来自外部渠道，候选人暂不支持一键初筛 / 加入 reloop」；逐条「编号无效」提示在 freeform 下不再展示（操作列已统一标注）。
+- 基线：新截图已人眼确认（无截断/无溢出/按钮收口正确），`--update` 重建 `supermai-freeform.darwin.png`，并在卡片渲染门禁文档登记变更。
+- 验证：openmai-delivery + agent-job-tools 38/38；卡片渲染回归 18/18。
+
+## 2026-10-09｜docs(audit): SuperMai 链路完全解析（09-28）收编入库 + README 路由登记
+
+- 起因（用户指令）：「提交进仓库」。该文档与 README 路由行为用户此前审计工作的未提交产物（非本 Agent 所写），内容核对：SuperMai 四层链路解析 + specs/007 契约逐条验证 + 生产实证（sm_ 47 条 89.4% 成功率），格式符合文档书规则（有上级链接、验证方法、权威边界声明）。
+- 改动：`docs/2026-09-28-supermai-pipeline-analysis.md`（新，收编）；`docs/README.md` 路由表补 SuperMai 链路一行。
+- 说明：文中登记的三处两入口不对齐里，D2（needs_input 语义）已由 29a422a 修复；D1 凭证降级（supermai 只认个人凭证）仍在 backlog。
+
+## 2026-10-09｜refactor(frontend): workbench.tsx 拆分清理——摘除两项到期门禁豁免（Lint 豁免 + 超长行）
+
+- 起因（用户指令）：「处理这个前端例外」。`workbench.tsx` 的整文件 Lint 豁免与超长行例外均于 2026-09-30 到期，门禁失败阻断 push；baseline 备注本就要求「只能减少、拆分清理」，故真修不续期。
+- 改动：493 行半压缩主文件按 prettier（printWidth 110）格式化并拆为 13 个新模块（panel/drawer/side-panels/talent-supply/chatbot/toast 六个组件文件 + actions/engagement/connection/persistence/navigation/assistant/panel 七个 hook 文件），主文件降至 489 行，全部文件 ≤500 行且无 >200 字符行；`eslint.config.mjs` 摘除 globalIgnores 豁免；`.quality-gate/baseline.json` 删除两个到期条目。
+- Lint 真修（无 disable 压制）：3 个 `react-hooks/set-state-in-effect` error 改为派生态/事件处理器/宏任务首帧后方案（verify 跳转、replay loading、TalentSupply 拉取），拆分后新暴露的 4 个同类 error 一并真修；29 个未使用变量清理。保留 6 个 warning（5 个 exhaustive-deps 依赖数组逐字不动、1 个被测试钉住的传参链）。
+- 测试适配：`tests/rendered-html.test.mjs` 的源码文本断言改空白宽容（拼接清单纳入 13 个新文件），删除 2 条钉死无调用方死代码的断言。
+- 验证：`npx eslint` 0 error；`npm run build`/`tsc --noEmit` exit 0；前端测试 53/53 + storybook 86/86；根目录 `npm run verify:quick` 16/16 通过（两项失败清零，无新增）。
+- 已知微差（有意、等价）：demo 模式连接态首帧即 offline（原 connecting 闪一帧）；settings/verify 跳转从 effect 同步改宏任务（首帧绘制后，无可见差异）。
+
+## 2026-10-09｜feat(sourcing): 群贴 JD 建岗接线——授权面补齐 + 存量群回填 + prompt 建岗剧本
+
+- 起因（用户指令）：「JD 建岗的断点是否能直接点击建立」。审计实证：群内建岗引擎/handler 早已就绪（19/19 测试在案），但 `GROUP_PURPOSES`（`src/project-launch.js`）不含 `job_fact_review`，`brainx_submit_job_jd` 在所有群场景被 `authorizeGroup` 拒绝；绑定卡（group-intake.js）却承诺「直接贴 JD 建岗」；prompt 全文无建岗剧本。
+- 改动：`GROUP_PURPOSES` 补 `job_fact_review`；`migrations/0061_group_scope_job_fact_review.sql` 按 0049 同法回填存量 ACTIVE 群；`plugins/brainx-openclaw/prompt.js` 补建岗剧本（群内被 @ 贴整段 JD → 复述字段 → 确认后 `confirm_create=true` 一步建岗；缺公司/职位名如实指出不编造；私聊走草稿复核）；`specs/005` 补记。
+- 测试：`tests/agent-authorization.test.mjs` 新增 1 例（含 job_fact_review 群放行 / 未回填群 fail-closed）；`tests/project-launch.test.mjs` 新建群 scope 断言；`tests/framework.test.mjs` 迁移记账 64 文件。全量 898/898 通过。
+- 边界：候选人 Offer 决策群（candidate-decision-group.js）不需要建岗用途，未加；草稿写回本群绑定职位（重复岗治理）属第二刀，不在本次范围。
+
+## 2026-10-09｜fix(sourcing): 找人读回三断点修复——supermai 发卡接线 + 终态如实告知 + 僵尸 running 超龄
+
+- 起因（用户指令）：sourcing 三链路审计断点①③⑫。①`tools-sourcing.js`（原 tools-jobs.js:475）`supermaiScout` 接线丢 `sendCardFn/publicBaseUrl`，群读回发卡整链死亡，specs/018 卡片成死代码；③读回只认 running/done，needs_input/failed 穿透触发分支静默重跑扣费；⑫running 无超龄判断，进程重启后谎称「进行中」最长 1 小时。
+- 改动：`tools-sourcing.js` 接线补参；新增 `terminalSearchEnvelope`（needs_input→collect_brief 引导补判据 / failed、僵尸 running→confirm_retry 如实告知，均不触发新任务；continue_search=true 显式重跑跳过该分支直达触发）；新增 `continuingGate`（仅上一轮 done 才要求排除名单，failed/needs_input 轮次不再卡 cannot_continue）；supermai 自由找人放行 continue_search（排除名单按合成键取）；`supermai-sourcing.js` settle 保留 needs_input 语义（与 job 模式一致，此前恒 done）；`openmai-delivery.js` freeform 卡不再渲染必败的初筛/入 reloop 按钮（合成键必然 404），「SuperMai 重新找人」指令改传 continue_search=true 并去掉「自动发到本群」假承诺（freeform 无投递通道）。
+- 测试：`tests/agent-job-tools.test.mjs` 新增 5 例（群发卡含卡内容断言、needs_input/failed 读回不重跑、僵尸 running 披露且不改库、自由找人显式重跑可达）；`tests/framework.test.mjs` 迁移记账计数补 0060（属上一 commit 的迟更）。全量 `node --test tests/` 897/897 通过。
+- 已知边界：freeform 候选的初筛/入 reloop 标「暂不支持」，待有真实承接再恢复；僵尸 running 的库回收仍是 worker `failStaleOpenmaiTasks` 职责（读回只改话术不改库）。
+
+## 2026-10-09｜refactor(agent): 找人工具拆出 tools-sourcing.js（纯搬家，为读回修复腾 500 行空间）
+
+- 起因：tools-jobs.js 477 行，断点①③⑫ 的读回分支修复会突破 500 行硬约束（AGENTS.md §4.8），先拆分再改行为。
+- 改动：`src/agent-gateway/tools-sourcing.js`（新）承接 openmaiSearch/supermaiScout 及其全部辅助函数（projectCriteria/activeProjectSearch/markProjectSearch/sharedProjectSearch/missingExclusions/pollDiscipline/trySendOpenmaiResultCard/cleanSearchCriteria）+ 新出口 `createSourcingToolHandlers`；tools-jobs.js 214 行，createJobToolHandlers 展开合并，对外契约不变。
+- 验证：`node --check` 双文件通过；agent-job-tools/agent-tools/supermai-sourcing/openmai-task 四组测试 53/53 通过，零行为变化。
+
+## 2026-10-09｜fix(sourcing): needs_input 投递不再被 CHECK 静默吞掉——0060 重建表 + enqueue 反连接
+
+- 起因（用户指令）：sourcing 三链路审计后修第一刀断点。审计实证（09-23 内存库跑真实 0041 DDL）：`openmai_deliveries` 的 `CHECK(result_status IN ('done','failed'))` 与 enqueue 选出的 `needs_input` 冲突，`INSERT OR IGNORE` 静默跳过——OpenMai 澄清反问卡永远到不了项目群，`search_status` 卡 RUNNING 至超龄。
+- 改动：`migrations/0060_openmai_deliveries_needs_input.sql`（SQLite 不能改 CHECK，按官方推荐重建表，含全部约束/索引/存量数据搬迁）；`src/openmai-delivery.js` `enqueueOpenmaiDeliveries` 幂等改 LEFT JOIN 反连接 + 普通 INSERT——此后 CHECK/外键违例抛错暴露，不再静默。
+- 测试：`tests/openmai-delivery.test.mjs` 新增 1 例（needs_input 入台→橙卡「请补充职位信息」→`OPENMAI_SEARCH_BRIEF_REQUIRED`），18/18 通过。
+- 门禁：`npm run verify:quick` 两项失败均为存量前端问题（workbench.tsx 超长行/整文件 Lint 豁免到期），与本改动无关，未夹带。
+
+## 2026-09-28｜docs(data): 数据地基体检报告——生产库三轮扫射，3🔴+4🟡+2⚪+6✅
+
+- 起因（用户指令）：「阅读数据的地基，进行一遍扫射检查，然后关键的点，可以进行补充的再次进行验证，当前的数据结构还是出现了很多的问题」。
+- 检查方法：按 09-24 错位诊断文档的四类根源设计三轮只读 SQL（结构层→数据层→关键点归因），生产库 `file:...?mode=ro` 打开零写入；脚本 /tmp/brainx-audit{,2,3}.sql。
+- 关键发现（🔴）：①**生产 migrations 与仓库分叉**——schema_migrations 记账 64 vs 仓库 62 文件，生产独有 0019_position_add_company/0020_workbench_preferences 且双 0019 并存（A1 类错位现行复发，旧库回填逻辑在文件集不同机器上会标错文件=重建地雷）；②T7/T8 三张新表（ttc_pipeline_rows/project_rows/task_rows）ad-hoc 建表无记账；③**双层状态不一致 1,277 项目**——ttc sync UPSERT 把 09-26 写回的 job_facts.active_state=OPEN 冲回 UNKNOWN（5,905→4,628 精确吻合），真值只在 overrides 层，直读表=错读。
+- 次级发现（🟡）：ttc_project_rows.created_at 3,290 行全非 UTC ISO（TTC 本地墙钟串直接入库）；DAILY_TOP3 的 push_log.run_id 596 条 JOIN 不上 decision_runs（D4 精确规模）；71 条 group 草稿原文锚定缺失（非 retention 所致，成因待归因）；弱后缀 company 480 条 pending 中 LLM 层（recovery 135+split 30）也在产生（C1 非规则层独有）；单字段草稿 870 条回潮。
+- 修正 09-26 口径：pipeline_rows 同职位多行是「一职位多候选人」正常语义非重复脏数据；无 job_name 8,010 为权限类读时过滤即可。
+- ✅ 通过项：时间格式/未来时间/倒挂全净、通道 origin 分层分明、UNIQUE 部分索引守卫完好、sync/decision 链健康（09-28 单日 193 COMPLETED）、T7 JOIN 率 89%。
+- 改动：docs/2026-09-28-data-foundation-audit.md（新，含修复排期：①migration 收编 ②T7 写回正式化 ③时间归一 ④S5 已在 specs/022 ⑤S6 归因 ⑥S7/S8 规则 v2 吸收）。README 路由+目录双登记。
+- 验证：三轮 SQL 全部只读模式；差集用 comm 对账；1,277 与 OPEN 降幅差值交叉验证吻合；工作区干净。
 ## 2026-09-28｜feat(push): 再推去重——--exclude-pushed-today 剔除当日已推职位
 
 - 起因（用户指令）：「顾问要求再次推送，要求不要有重复的」。

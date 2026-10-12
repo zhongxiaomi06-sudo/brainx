@@ -60,7 +60,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const RealConnectionStates: Story = {
+export const LegacyDesktopConnectionStates: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByRole("heading", { name: "连接中心" })).toBeInTheDocument();
@@ -97,6 +97,21 @@ export const PairingCodeReady: Story = {
   },
 };
 
+export const RealConnectionStates: Story = {
+  args: {
+    items: items.map(item => item.provider === "supermai" ? {
+      ...base, provider: "supermai", state: "connected",
+    } : item),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText("4/4")).toBeInTheDocument();
+    await expect(canvas.getByText("云端按条件找人")).toBeInTheDocument();
+    await expect(canvas.queryByRole("button", { name: /BOSS/ })).not.toBeInTheDocument();
+    await expect(canvas.queryByRole("button", { name: /生成配对码/ })).not.toBeInTheDocument();
+  },
+};
+
 export const Loading: Story = { args: { items: [], loading: true } };
 
-export const Narrow: Story = { parameters: { viewport: { defaultViewport: "mobile1" } } };
+export const Narrow: Story = { args: RealConnectionStates.args, parameters: { viewport: { defaultViewport: "mobile1" } } };

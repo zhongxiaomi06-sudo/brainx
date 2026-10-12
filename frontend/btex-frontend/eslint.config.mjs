@@ -13,9 +13,6 @@ const eslintConfig = defineConfig([
     "build/**",
     "storybook-static/**",
     "next-env.d.ts",
-    // The supplied archive keeps its original monolithic workbench and legacy `any` props.
-    // Build and behavior are covered by the focused tests while the backend adapter is split out.
-    "app/workbench.tsx",
   ]),
 ]);
 

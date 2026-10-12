@@ -1,137 +1,153 @@
-/** SuperMai 找人入口：创建云端任务，由顾问自己的桌面连接器出站领取并执行。 */
+/** supermai-sourcing.js — SuperMai 找人入口（按判据自由找人，猎聘/脉脉渠道）。
+ *
+ * 2026-09-08 纠正（用户拍板）：SuperMai 找人的真实形态 = 在猎聘、脉脉上找人，
+ * 不在 TTC。09-07 按前端 chunk 接的 app.ttcadvisory.com/app/sourcing/api/sourcing/v1
+ * web 检索后端是错误对象（实测 /auth/* 200 在线、/sessions 与 /chat/* 持续 404），
+ * 全部移除（specs/007）。
+ *
+ * 两入口统一走 OpenMai 引擎（specs/007-dual-sourcing-entries）：
+ *   入口 1 brainx_openmai_search（按职位，openmai-task.js，带 CRM job_id）
+ *   入口 2 brainx_supermai_scout（按判据，本模块，completions 无 job_id 模式——
+ *          2026-09-08 18:12 最小付费实测 200 可用）
+ *
+ * 任务落库复用 openmai_results。自由搜索使用
+ * project_id = supermai:<sha256(criteria) 前 12 位>，不会命中项目群投递；项目群按钮则使用
+ * 真实 project_id，完成后复用既有 worker 投递回原群。防重纪律与 job 模式一致：running
+ * 集合 + DB 主键防并发重入；done 复用（already_done）；失败 60s 冷却；无凭证快速失败。
+ */
 import { createHash } from 'node:crypto';
 import { now, uuid } from './db.js';
-import { emitEvent } from './hub/emit.js';
+import { getAuthorizedTtcJwt } from './ttcsdk/auth.js';
+import { callOpenmaiContent, settleOpenmaiTask as settleSupermaiTask } from './openmai-task.js';
+import { assessOpenmaiCandidateBatch, looksLikeSessionPollution } from './openmai-result.js';
 import { normalizeExcludedCandidateRefs } from './search-rounds.js';
-import { supermaiDeviceStatus } from './supermai-relay.js';
+import { emitEvent } from './hub/emit.js';
 
-/** 同一自由判据得到稳定项目键，项目群模式继续使用真实 project_id。 */
+const running = new Set(); // `${key}|${consultant_id}`
+
+/** 判据 → openmai_results 合成主键（同判据复用结果，改判据即新任务）。 */
 export function supermaiCriteriaKey(criteria) {
   const text = String(criteria || '').trim();
   return `supermai:${createHash('sha256').update(text).digest('hex').slice(0, 12)}`;
 }
 
-/** 旧投递表按 (project_id, consultant_id) 唯一；使用来源命名空间避免复用 OpenMai 结果。 */
-export function supermaiResultKey(projectId) {
-  return `supermai-result:${String(projectId || '').trim()}`;
-}
-
-/** 保留为可读判据构造器；真正搜索由桌面 SuperMai 完成，不再发送给 OpenMai。 */
+/** criteria 模式提示词：与 job 模式（openmai-task.js#buildPrompt）同一产物格式，
+ * 渠道表述为猎聘、脉脉（SuperMai 找人的真实承载）。 */
 export function buildScoutPrompt(criteria, excludedCandidateRefs = []) {
   const exclusions = normalizeExcludedCandidateRefs(excludedCandidateRefs);
   return [
-    String(criteria || '').trim(),
-    exclusions.length ? `排除已推荐候选人：${exclusions.join('、')}` : '',
-  ].filter(Boolean).join('\n');
+    '请使用 SuperMai 找人能力在猎聘、脉脉等候选人渠道，搜索以下判据的 6-10 名匹配候选人：',
+    `[找人判据] ${String(criteria || '').trim()}`,
+    `[排除 TTC 编号] ${exclusions.length ? exclusions.join('、') : '无'}`,
+    exclusions.length ? '排除名单中的候选人此前已经推荐过，本轮严禁再次返回。' : '',
+    '每人必须给出姓名、当前公司/职位、匹配判断、推荐理由、风险或待核实项；没有证据的字段写“待核实”。',
+    '如候选人来自 TTC 人才库，必须给出 https://app.ttcadvisory.com/app/talent/<candidate_ref> 详情链接；不得发送或索取简历附件。',
+    '在面向人的结果末尾追加下面格式的机器块，JSON 必须合法，且不要把电话或邮箱放入机器块：',
+    '<!-- BRAINX_CANDIDATES_V1',
+    '{"candidates":[{"candidate_ref":"稳定候选编号","name":"姓名","role":"当前公司 / 职位","experience":"经验年限","city":"城市","education":"学历 / 院校","evaluation":"核心匹配点","score":"匹配度","talent_url":"https://app.ttcadvisory.com/app/talent/稳定候选编号或null"}]}',
+    '-->',
+  ].join('\n');
 }
 
-function taskStatus(db, taskId) {
-  if (!taskId) return null;
-  return db.prepare(`SELECT task_id,status,device_id,created_at,started_at,finished_at,error_code,error_message
-    FROM sourcing_tasks WHERE task_id=? AND provider='supermai'`).get(taskId) || null;
-}
-
-export function getSupermaiTask(db, consultantId, projectId) {
-  return db.prepare(`SELECT * FROM sourcing_tasks WHERE consultant_id=? AND project_id=?
-    AND provider='supermai' ORDER BY created_at DESC LIMIT 1`).get(consultantId, projectId) || null;
-}
-
-export function getSupermaiResult(db, consultantId, projectId) {
-  return db.prepare(`SELECT status,result_text,error,task_id,started_at,finished_at,
-    search_brief,search_round,excluded_candidate_refs_json FROM openmai_results
-    WHERE project_id=? AND consultant_id=?`).get(supermaiResultKey(projectId), consultantId) || null;
-}
-
-function mappedStatus(task) {
-  if (!task) return 'running';
-  if (task.status === 'completed') return 'done';
-  if (['failed', 'cancelled'].includes(task.status)) return 'failed';
-  return task.status;
-}
-
-/** 创建可恢复、可幂等的 SuperMai 桌面任务；不读取 TTC 凭证，不调用 OpenMai。 */
-export function startSupermaiScoutTask(db, bus, consultantId, criteria, {
+/** 启动 SuperMai 按判据找人任务（触发/读取两段式的触发侧）。
+ * 返回 { status: triggered|running|already_done|error, ... }，语义与 startOpenmaiTask 一致。 */
+export function startSupermaiScoutTask(db, bus, consultant_id, criteria, {
   force = false, projectId = null, excludeCandidateRefs = [],
 } = {}) {
-  const cleanCriteria = String(criteria || '').trim().slice(0, 2000);
-  const projectKey = String(projectId || '').trim() || supermaiCriteriaKey(cleanCriteria);
-  const resultKey = supermaiResultKey(projectKey);
+  const project_id = String(projectId || '').trim() || supermaiCriteriaKey(criteria);
+  const key = `${project_id}|${consultant_id}`;
   const exclusions = normalizeExcludedCandidateRefs(excludeCandidateRefs);
-  const existing = db.prepare(`SELECT status,task_id,started_at,finished_at,search_round
-    FROM openmai_results WHERE project_id=? AND consultant_id=?`).get(resultKey, consultantId);
-  const currentTask = taskStatus(db, existing?.task_id);
-  if (!force && existing?.status === 'done') {
-    return { status: 'already_done', task_status: 'completed', task_id: existing.task_id,
-      finished_at: existing.finished_at };
-  }
-  if (!force && existing?.status === 'running' && currentTask
-      && !['failed', 'cancelled', 'completed', 'partial'].includes(currentTask.status)) {
-    return { status: 'running', task_status: currentTask.status, task_id: currentTask.task_id,
-      started_at: existing.started_at };
-  }
-  if (!force && existing?.status === 'failed'
-      && Date.now() - Date.parse(existing.started_at || 0) < 60_000) {
-    return { status: 'error', task_status: 'failed', task_id: existing.task_id,
-      message: '最近一次失败未超过 1 分钟，请处理连接问题后再试' };
-  }
-
+  const existing = db.prepare(`SELECT status,started_at,finished_at,search_round
+    FROM openmai_results WHERE project_id=? AND consultant_id=?`)
+    .get(project_id, consultant_id);
   const projectRound = Number(db.prepare(`SELECT COALESCE(MAX(search_round),0) value
-    FROM openmai_results WHERE project_id=?`).get(resultKey).value);
+    FROM openmai_results WHERE project_id=?`).get(project_id).value);
   const searchRound = force ? Math.max(1, projectRound + 1) : Number(existing?.search_round || 1);
-  const taskId = `sm_${uuid()}`;
-  const startedAt = now();
-  const device = supermaiDeviceStatus(db, consultantId).active;
-  const queuedStatus = device ? 'queued' : 'waiting_for_device';
-  const idempotencyKey = createHash('sha256').update([
-    consultantId, projectKey, String(searchRound), cleanCriteria, exclusions.join(','),
-  ].join('\n')).digest('hex');
-  const effectiveCriteria = buildScoutPrompt(cleanCriteria, exclusions);
+  if (running.has(key)) return { status: 'running', started_at: existing?.started_at };
+  if (!force && existing?.status === 'done')
+    return { status: 'already_done', finished_at: existing.finished_at };
+  if (!force && existing?.status === 'failed' && Date.now() - Date.parse(existing.started_at || 0) < 60_000)
+    return { status: 'error', message: '最近一次失败未超过 1 分钟，稍后再试或调整判据重试' };
 
-  db.exec('BEGIN');
-  try {
-    db.prepare(`INSERT INTO sourcing_tasks
-      (task_id,consultant_id,project_id,provider,criteria,platforms_json,status,
-       idempotency_key,created_at,updated_at)
-      VALUES (?,?,?,'supermai',?,?,?, ?,?,?)`).run(
-      taskId, consultantId, projectKey, effectiveCriteria,
-      JSON.stringify(['boss', 'maimai', 'liepin']), queuedStatus,
-      idempotencyKey, startedAt, startedAt,
-    );
-    db.prepare(`INSERT INTO sourcing_task_events
-      (task_id,event_type,payload_json,created_at) VALUES (?,?,?,?)`).run(
-      taskId, 'created', JSON.stringify({ status: queuedStatus }), startedAt,
-    );
+  const jwt = getAuthorizedTtcJwt(db, consultant_id, 'OPENMAI');
+  if (!jwt) {
+    const t = now();
     db.prepare(`INSERT INTO openmai_results
-      (project_id,consultant_id,status,task_id,started_at,search_brief,search_round,
-       excluded_candidate_refs_json)
-      VALUES (?,?,'running',?,?,?,?,?)
-      ON CONFLICT(project_id,consultant_id) DO UPDATE SET status='running',error=NULL,result_text=NULL,
-        task_id=excluded.task_id,started_at=excluded.started_at,finished_at=NULL,
+      (project_id,consultant_id,status,error,started_at,finished_at,search_brief,
+       search_round,excluded_candidate_refs_json)
+      VALUES (?,?,?,?,?,?,?,?,?)
+      ON CONFLICT(project_id, consultant_id) DO UPDATE SET status='failed', error=excluded.error,
+        started_at=excluded.started_at, finished_at=excluded.finished_at,
         search_brief=excluded.search_brief,search_round=excluded.search_round,
-        excluded_candidate_refs_json=excluded.excluded_candidate_refs_json`).run(
-      resultKey, consultantId, taskId, startedAt, cleanCriteria || null,
-      searchRound, JSON.stringify(exclusions),
-    );
+        excluded_candidate_refs_json=excluded.excluded_candidate_refs_json`)
+      .run(project_id, consultant_id, 'failed', '没有有效 TTC 凭证——请用浏览器扩展扫码同步',
+        t, t, String(criteria || '').trim().slice(0, 2000) || null,
+        searchRound, JSON.stringify(exclusions));
+    bus?.emit?.({ type: 'supermai_result', consultant_id, project_id, status: 'failed' });
+    // specs/019 US1：凭证快速失败也留痕（错误可调度），不产 search_started（任务未启动）
     emitEvent(db, {
-      event_type: 'sourcing.search_started',
-      idem_key: `sourcing.started:${projectKey}:${taskId}`,
+      event_type: 'sourcing.search_finished',
+      idem_key: `sourcing.finished:${project_id}:cred-r${searchRound}`,
       actor: 'agent:brainx_supermai_scout',
-      payload: { project_id: projectKey, channel: 'supermai', round: searchRound },
-      evidence_refs: [{ table: 'sourcing_tasks', id: taskId }],
-      occurred_at: startedAt,
+      payload: { project_id, channel: 'supermai', round: searchRound, status: 'error', result_count: 0 },
+      evidence_refs: [{ table: 'openmai_results', id: `${project_id}|${consultant_id}` }],
     });
-    db.exec('COMMIT');
-  } catch (error) {
-    db.exec('ROLLBACK');
-    if (String(error.message).includes('UNIQUE constraint failed: sourcing_tasks.idempotency_key')) {
-      const duplicate = db.prepare(`SELECT task_id,status,started_at,finished_at
-        FROM sourcing_tasks WHERE idempotency_key=?`).get(idempotencyKey);
-      return { ...duplicate, status: 'running', task_status: mappedStatus(duplicate) };
-    }
-    throw error;
+    return { status: 'error', message: '没有有效 TTC 凭证——请用浏览器扩展扫码同步' };
   }
-  bus?.emit?.({ type: 'supermai_task', consultant_id: consultantId,
-    project_id: projectKey, task_id: taskId, status: queuedStatus });
-  return { status: 'triggered', task_status: queuedStatus, task_id: taskId,
-    started_at: startedAt, device_id: device?.device_id || null };
+
+  const task_id = `sm_${uuid().slice(0, 8)}`;
+  const started_at = now();
+  running.add(key);
+  db.prepare(`INSERT INTO openmai_results
+    (project_id,consultant_id,status,task_id,started_at,search_brief,search_round,
+     excluded_candidate_refs_json)
+    VALUES (?,?, 'running', ?, ?, ?, ?, ?)
+    ON CONFLICT(project_id, consultant_id) DO UPDATE SET status='running', error=NULL, result_text=NULL,
+      task_id=excluded.task_id, started_at=excluded.started_at, finished_at=NULL,
+      search_brief=excluded.search_brief,search_round=excluded.search_round,
+      excluded_candidate_refs_json=excluded.excluded_candidate_refs_json`)
+    .run(project_id, consultant_id, task_id, started_at,
+      String(criteria || '').trim().slice(0, 2000) || null,
+      searchRound, JSON.stringify(exclusions));
+
+  // specs/019 US1：找人启动补发 search_started（契约 specs/019 contracts/event-types.md）
+  emitEvent(db, {
+    event_type: 'sourcing.search_started',
+    idem_key: `sourcing.started:${project_id}:${task_id}`,
+    actor: 'agent:brainx_supermai_scout',
+    payload: { project_id, channel: 'supermai', round: searchRound },
+    evidence_refs: [{ table: 'openmai_results', id: `${project_id}|${consultant_id}` }],
+  });
+
+  (async () => {
+    let status = 'failed';
+    let settled = false;
+    try {
+      let result = await callOpenmaiContent(jwt, buildScoutPrompt(criteria, exclusions));
+      // 会话污染防护（2026-09-09）：拿到元回复自动重试一次，仍污染则失败关闭
+      if (looksLikeSessionPollution(result)) {
+        console.warn('[supermai] session pollution detected, retrying once:', task_id);
+        result = await callOpenmaiContent(jwt, buildScoutPrompt(criteria, exclusions));
+        if (looksLikeSessionPollution(result)) {
+          throw new Error('OpenMai 会话上下文污染：两次均返回与找人无关的元回复，请稍后重试');
+        }
+      }
+      const batchQuality = assessOpenmaiCandidateBatch(result);
+      // 与 job 模式一致保留 needs_input 语义（2026-10-09）：澄清反问不能记成 done，
+      // 否则同判据读回永远复用这条反问、且投递链路得不到「请补充信息」卡。
+      const resultStatus = batchQuality.needsInput ? 'needs_input' : 'done';
+      settled = settleSupermaiTask(db, { projectId: project_id, consultantId: consultant_id,
+        taskId: task_id, status: resultStatus, resultText: result,
+        channel: 'supermai', resultCount: batchQuality.count });
+      status = resultStatus;
+    } catch (e) {
+      settled = settleSupermaiTask(db, { projectId: project_id, consultantId: consultant_id,
+        taskId: task_id, status: 'failed', error: e.message, channel: 'supermai' });
+    } finally {
+      running.delete(key);
+      if (settled) bus?.emit?.({ type: 'supermai_result', consultant_id, project_id, status });
+    }
+  })();
+
+  return { status: 'triggered', task_id, started_at };
 }

@@ -12,7 +12,9 @@ import { ensureOpenClawProjectGroup } from './openclaw-group-access.js';
 import { ensureAccessWithStatus } from './openclaw-group-status.js';
 
 // specs/014：群内放行接单（job_action）——未接单时找人被拒，卡片又让人在群里接单，必须自洽。
-const GROUP_PURPOSES = ['job_review', 'job_action', 'candidate_review', 'candidate_action', 'interview_prep'];
+// 2026-10-09：补 job_fact_review——群贴 JD 建岗（brainx_submit_job_jd）引擎/handler 早已就绪，
+// 唯独授权面没跟上，绑定卡承诺「直接贴 JD 建岗」落空；存量群由 0061 回填。
+const GROUP_PURPOSES = ['job_review', 'job_action', 'job_fact_review', 'candidate_review', 'candidate_action', 'interview_prep'];
 
 export class ProjectLaunchError extends Error {
   constructor(status, code, message) {

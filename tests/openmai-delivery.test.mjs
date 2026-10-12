@@ -53,6 +53,26 @@ test('OpenMai 群投递：候选结果脱敏后只发送一次并更新项目状
   db.close();
 });
 
+test('OpenMai 群投递：needs_input 澄清结果真实入台投递橙卡（0041 CHECK 曾静默吞掉）', async () => {
+  const db = seededDb('needs_input');
+  db.prepare(`UPDATE openmai_results SET result_text='请补充职位方向与关键经验要求'
+    WHERE task_id='om_delivery'`).run();
+  const calls = [];
+  const result = await deliverOpenmaiResultsOnce(db, {
+    at: now(), publicBaseUrl: 'https://base.yorkteam.cn/',
+    sendInteractiveCard: async (input) => { calls.push(input); return { message_id: 'om_needs_input' }; },
+  });
+  assert.deepEqual(result, { enqueued: 1, attempted: 1, sent: 1, failed: 0 },
+    'needs_input 必须入台并投递（0060 放宽 CHECK + enqueue 改反连接）');
+  assert.equal(calls[0].card.header.title.content, 'OpenMai 候选人推荐 · 请补充职位信息');
+  assert.match(calls[0].card.elements[0].content, /请补充职位方向/);
+  assert.equal(db.prepare('SELECT result_status FROM openmai_deliveries').get().result_status, 'needs_input');
+  const launch = db.prepare('SELECT search_status, error_code FROM project_launches').get();
+  assert.equal(launch.search_status, 'FAILED');
+  assert.equal(launch.error_code, 'OPENMAI_SEARCH_BRIEF_REQUIRED');
+  db.close();
+});
+
 test('OpenMai 群投递：搜索执行人不是建群人时仍回到职位唯一项目群', async () => {
   const db = seededDb();
   db.prepare("UPDATE openmai_results SET consultant_id='mia' WHERE task_id='om_delivery'").run();

@@ -6,6 +6,19 @@ const root = new URL("../", import.meta.url);
 const source = (name) => readFile(new URL(name, root), "utf8");
 const workbenchSource = async () => (await Promise.all([
   source("app/workbench.tsx"),
+  source("app/workbench-panel.tsx"),
+  source("app/workbench-drawer.tsx"),
+  source("app/workbench-side-panels.tsx"),
+  source("app/workbench-talent-supply.tsx"),
+  source("app/workbench-chatbot.tsx"),
+  source("app/workbench-toast.tsx"),
+  source("app/use-workbench-actions.ts"),
+  source("app/use-workbench-assistant.ts"),
+  source("app/use-workbench-connection.ts"),
+  source("app/use-workbench-engagement.ts"),
+  source("app/use-workbench-navigation.ts"),
+  source("app/use-workbench-panel.ts"),
+  source("app/use-workbench-persistence.ts"),
   source("app/brainx-projects-api.ts"),
   source("app/projects-view.tsx"),
   source("app/workbench-controls.tsx"),
@@ -42,12 +55,13 @@ const cssSource = async () => (await Promise.all([
 
 test("keeps demo datasets behind the explicit demo mode", async () => {
   const workbench = await source("app/workbench.tsx");
+  const navigation = await source("app/use-workbench-navigation.ts");
 
-  assert.match(workbench, /brainxJobs\?\?\(demo\?decisionJobs:\[\]\)/);
-  assert.match(workbench, /items=\{brainxRadar\?\.items\?\?\[\]\}/);
-  assert.match(workbench, /items=\{brainxClients\?\?\[\]\}/);
-  assert.doesNotMatch(workbench, /brainxJobs\|\|decisionJobs/);
-  assert.doesNotMatch(workbench, /demoRadarJobs|brainxClients\?brainxClients:clients/);
+  assert.match(navigation, /brainxJobs\s*\?\?\s*\(demo\s*\?\s*decisionJobs\s*:\s*\[\]\)/);
+  assert.match(workbench, /items=\{brainxRadar\?\.\s*items\s*\?\?\s*\[\]\}/);
+  assert.match(workbench, /items=\{brainxClients\s*\?\?\s*\[\]\}/);
+  assert.doesNotMatch(navigation, /brainxJobs\s*\|\|\s*decisionJobs/);
+  assert.doesNotMatch(workbench, /demoRadarJobs|brainxClients\s*\?\s*brainxClients\s*:\s*clients/);
 });
 
 test("uses the reference three-column shell and a single-column opportunity workspace", async () => {
@@ -60,9 +74,9 @@ test("uses the reference three-column shell and a single-column opportunity work
   assert.match(page, /import DecisionWorkbench from "\.\/workbench"/);
   assert.match(workbench, /type DecisionDirection = "paid"\s*\|\s*"growth"\s*\|\s*"marketing"/);
   assert.match(workbench, /id: "today", label: "精选盘", icon: Sparkles/);
-  assert.match(workbench, /<WorkspaceShell activePage=\{shellPage\}/);
-  assert.match(workbench, /page==="settings"\?<WorkbenchSettingsPage/);
-  assert.doesNotMatch(workbench, /page==="settings"&&<WorkbenchSettingsPage/);
+  assert.match(workbench, /<WorkspaceShell\s+activePage=\{shellPage\}/);
+  assert.match(workbench, /page\s*===\s*"settings"\s*\?\s*\(?\s*<WorkbenchSettingsPage/);
+  assert.doesNotMatch(workbench, /page\s*===\s*"settings"\s*&&\s*\(?\s*<WorkbenchSettingsPage/);
   assert.match(workbench, /精选盘/);
   assert.match(workbench, /function PickTray/);
   assert.match(workbench, /function DecisionZone/);
@@ -113,7 +127,7 @@ test("keeps joined candidates visible in the recommendation queue and verificati
   assert.match(workbench, /className=\{`formal-recommendation-v2\$\{isContext \? " is-context" : ""\}`\}/);
   assert.match(workbench, /title="我的项目"/);
   assert.match(workbench, /getProjects\(\)/);
-  assert.match(workbench, /onAddToProjects=\{job=>addToMyProjects\(job\.id,job\.company\)\}/);
+  assert.match(workbench, /onAddToProjects=\{\s*\(job\)\s*=>\s*addToMyProjects\(job\.id,\s*job\.company\)\s*\}/);
   assert.match(workbench, /if \(action === "ADD"\) return onAddToProjects\(job\);/);
   assert.match(workbench, /接单中…/);
   assert.match(workbench, /一键接单/);
@@ -156,10 +170,8 @@ test("preserves engagement, result recording, replay, sync and notifications", a
 
   assert.match(workbench, /function WorkbenchPanel/);
   assert.match(workbench, /function EngagementPanel/);
-  assert.match(workbench, /function engagementStateMessage/);
   assert.match(workbench, /if \(state === "RELEASED"\) return \["WATCH", "DISMISS"\]/);
   assert.match(workbench, /if \(state === "DISMISSED"\) return \["WATCH"\]/);
-  assert.match(workbench, /已从当前工作区释放；如需继续推进，可重新关注后再开始跟进。/);
   assert.match(workbench, /CommitmentLoopPanel/);
   assert.match(workbench, /updateOpportunityMembership/);
   assert.match(workbench, /membershipRelations/);
@@ -169,17 +181,17 @@ test("preserves engagement, result recording, replay, sync and notifications", a
   assert.match(loop, /progress\/suggestion/);
   assert.doesNotMatch(loop, /<h2>项目跟进<\/h2>/);
   assert.match(loop, /commitment-timeline[\s\S]*commitment-idle-actions/);
-  assert.match(workbench, /panel&&!pendingCommand&&<WorkbenchPanel/);
+  assert.match(workbench, /panel\s*&&\s*!pendingCommand\s*&&\s*\(?\s*<WorkbenchPanel/);
   assert.match(workbench, /onDismiss=\{legal\.includes\("DISMISS"\)/);
-  assert.match(workbench, /onAddToProjects=\{\(\)=>onAcceptAndLaunch\(job\)\}/);
+  assert.match(workbench, /onAddToProjects=\{\s*\(\)\s*=>\s*onAcceptAndLaunch\(job\)\s*\}/);
   assert.match(workbench, /onIgnore=\{removableProject/);
   assert.doesNotMatch(workbench, /panel\.tab!=="engagement"/);
   assert.match(globalCss, /command-modal \.filter-select-menu\{[^}]*max-height:[^}]*overflow-y:auto/);
   assert.match(workbench, /function ReplayPanel/);
   assert.match(workbench, /function NotificationPanel/);
-  assert.match(workbench, /const runSync=\(\)=>/);
-  assert.match(workbench, /const recordOutcome=/);
-  assert.match(workbench, /localStorage\.setItem\("decision-workbench"/);
+  assert.match(workbench, /const runSync\s*=\s*\(\)\s*=>/);
+  assert.match(workbench, /const recordOutcome\s*=/);
+  assert.match(workbench, /localStorage\.setItem\(\s*"decision-workbench"/);
   assert.match(demo, /export type EngagementState = "NEW"\|"RECOMMENDED"\|"VIEWED"\|"WATCHED"\|"ACCEPTED"/);
 });
 
@@ -192,7 +204,7 @@ test("searches the complete frozen recommendation queue instead of only the visi
   assert.match(today, /usesQueueSearch \? pendingShown/);
   assert.match(today, /jobs\.length === 0 && !\(usesQueueSearch && query\.trim\(\)\)/);
   assert.doesNotMatch(today, /Object\.values\(job\.facts\)/);
-  assert.match(workbench, /searchQuery:recommendationQueue\.searchQuery,onSearch:recommendationQueue\.search,sort:recommendationQueue\.sort,onSort:recommendationQueue\.changeSort/);
+  assert.match(workbench, /searchQuery:\s*recommendationQueue\.searchQuery,\s*onSearch:\s*recommendationQueue\.search,\s*sort:\s*recommendationQueue\.sort,\s*onSort:\s*recommendationQueue\.changeSort/);
   assert.match(pagesApi, /params\.set\("q", search\.trim\(\)\)/);
   assert.match(pagesApi, /params\.set\("sort", sort\)/);
   assert.match(pageHook, /getRecommendationPage\(current\.nextCursor, searchQuery, sort, controller\.signal\)/);
@@ -280,8 +292,8 @@ test("OpenMai 需要画像时提供原地输入并把画像提交给重跑接口
   assert.match(panel, /用此画像开始找人/);
   assert.match(panel, /onRerun\(jobId,brief\.trim\(\)\)/);
   assert.match(api, /body:\s*\{\s*search_brief:\s*searchBrief\s*\}/);
-  const workbench = await source("app/workbench.tsx");
-  assert.match(workbench, /void refreshBrainxJob\(job\.id\)/,
+  const navigation = await source("app/use-workbench-navigation.ts");
+  assert.match(navigation, /void refreshBrainxJob\(job\.id\)/,
     "从我的项目重开职位时也必须恢复持久化 OpenMai 结果");
 });
 
@@ -329,7 +341,7 @@ test("uses TTC facts and field capabilities without restoring fake job filters",
   assert.match(workbench, /备注与职位描述/);
   assert.match(workbench, /activeTab=\{panelTab\}/);
   assert.match(workbench, /onFollow=\{onAddToProjects\}/);
-  assert.match(workbench, /updateOpportunityMembership\(jobId,"MY_JOB"/);
+  assert.match(workbench, /updateOpportunityMembership\(\s*jobId,\s*"MY_JOB"/);
   assert.doesNotMatch(workbench, /function JobFactDetail|aria-label=\{`\$\{row\.role\} 职位事实`\}/);
   assert.match(workbench, /Promise\.allSettled\(\[\s*getRadar\(\)\.then/);
   assert.match(workbench, /filteredRows\.slice\(0, rowLimit\)/);

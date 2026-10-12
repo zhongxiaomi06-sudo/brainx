@@ -1,6 +1,6 @@
 ---
 name: brainx-sourcing-supermai
-description: 外部找人（SuperMai）桌面通道：按职位或人才画像在 BOSS、脉脉、猎聘搜索；任务由顾问本人已配对设备执行并回传。
+description: 外部找人（SuperMai）云端通道：按职位或人才画像调用 OpenMai criteria 引擎；Sourcing 桌面软件仅同步成果。
 ---
 
 # 通道 3：外部找人·按判据（SuperMai）
@@ -23,21 +23,21 @@ description: 外部找人（SuperMai）桌面通道：按职位或人才画像�
 
 ## 调用契约（触发/读取两段式）
 
-`brainx_supermai_scout` 支持两种参数：项目群入口用 `{ job_id, criteria? }`，无职位自由找人用 `{ criteria }`。项目群里顾问可先发送一条以“找人条件：”开头的消息；按钮命令要求使用本群最近一条此类顾问消息正文作为 `criteria`，没有时只传 `job_id`，由后端根据职位事实生成判据。自由找人的 `criteria` 为 5-2000 字，一句话画像（城市+年限+技能+软性要求）。渠道为 BOSS、脉脉、猎聘；实际执行平台取当前桌面已登录平台，用户不需要提供 Cookie、token 或验证码。
+`brainx_supermai_scout` 支持两种参数：项目群入口用 `{ job_id, criteria? }`，无职位自由找人用 `{ criteria }`。项目群里顾问可先发送“找人条件：”消息；没有时只传 `job_id`，后端根据职位事实生成判据。自由判据为 5-2000 字。正式入口走云端 OpenMai criteria 引擎，不调用本机 harness、不要求桌面配对；实际渠道和候选来源以返回证据为准。
 
-项目候选名单后的继续按钮使用 `{ job_id, criteria?, continue_search: true }`。BrainX 自动累计历史结果中可确认的 TTC 编号并作为下一轮排除名单；Agent 不得自行拼接编号。自由找人模式不接受 `continue_search`。
+继续找人使用 `continue_search: true`，项目模式携带 job_id，自由模式携带 criteria。BrainX 自动累计可确认的历史候选编号，Agent 不得编造排除名单；cannot_continue 时如实说明，禁止静默付费重试。
 
-1. **首次调用 = 触发**：返回 `triggered/running` + task_id（`sm_` 前缀）和 `task_status`。`waiting_for_device` 表示任务已安全排队但本人桌面连接器未在线；只引导打开连接中心完成配对或启动 SuperMai，不得改用 OpenMai 冒充结果。
-2. **守候纪律（严格遵守，不许提前放弃）**：真实找人通常 **3-10 分钟**完成，窄方向可能更久。触发后**至少守候 10 分钟**：每隔 2-3 分钟以同参数再调一次读取状态，**至少轮询 3-4 次**。期间对顾问说「正在搜索中，一般几分钟内出结果」，不要只等 1-2 分钟就宣布失败。
-3. **10 分钟后仍 running**：如实告知「任务仍在执行中（task_id）」，并区分 `waiting_for_device`、`queued`、`running`；这些都不是失败。设备任务有租约，连接器中断后可由同一顾问设备重新领取。
-4. **failed 才是失败**：读到的 status=failed 时如实转告 error 内容，并建议调整判据重试（失败有 60s 冷却）。
+1. **首次调用 = 触发**：返回 triggered/running 和 task_id 后，立即告知已受理并结束本轮。
+2. **项目任务**由 worker 回到原群；禁止原地轮询、重复触发或切换渠道。顾问明确询问进度时读取一次。
+3. **自由找人**没有项目群自动投递，不承诺自动回群；提醒顾问稍后询问，按工具返回的状态纪律读取。
+4. **failed / needs_input / 中断**如实告知失败或缺失条件；只有顾问明确要求重试或补全判据后才重新启动，不静默重复扣费。
 5. **done 但 zero 命中**（`empty_reason: NO_MATCHES_FOUND` 或 result_text 为 NO_REPLY）：如实说「本轮没搜到匹配的人」，**建议放宽判据重试**——去掉具体公司名、把窄方向拆成 2-3 个宽方向（如「海外产品 UI 设计」拆成「海外产品经理」+「UI 设计师」分别搜）。不得把空结果说成成功，也不得编造候选人。
 
 ## 费用与防重纪律
 
 - 同判据 done 后复用结果（不重复扣费）；想换搜索范围就调整 criteria 措辞再调。
 - 失败 60s 冷却内不会重试，force 重试需顾问明确要求。
-- SuperMai 不依赖 TTC/OpenMai 凭证；缺少已配对设备或招聘平台登录态时给出连接中心动作，不得索要密码、Cookie、短信验证码或 TTC JWT。
+- SuperMai 与 OpenMai 使用相同的个人授权或显式团队授权；缺失时引导管理员按正式流程授权，不在聊天索要密码、Cookie、验证码或 JWT。浏览器登录不等于服务器授权已同步。
 
 ## 结果纪律
 

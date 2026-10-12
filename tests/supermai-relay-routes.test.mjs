@@ -4,7 +4,7 @@ import { openDb } from '../src/db.js';
 import { createServer } from '../src/server.js';
 import { signSession } from '../src/session.js';
 import { getSupermaiResult, startSupermaiScoutTask,
-  supermaiCriteriaKey } from '../src/supermai-sourcing.js';
+  supermaiCriteriaKey } from '../src/supermai-desktop-sourcing.js';
 
 const cookie = (consultant = 'felix') => ({
   Cookie: `brainx_session=${encodeURIComponent(signSession(consultant, `ou_${consultant}`))}`,

@@ -1,4 +1,5 @@
 # BrainX 内部 Storybook 组件库
+2026-10-13：连接中心 RealConnectionStates 改为云端授权场景；桌面场景仅作历史兼容测试。验收见[本轮复核](frontend-reviews/2026-10-13-cloud-sourcing-merge.md)。
 
 > 上级目录：[BrainX 文档书](README.md)
 >

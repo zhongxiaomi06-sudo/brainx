@@ -16,7 +16,7 @@ import { confirmDraft, rejectDraft } from '../src/job-extract/confirm.js';
 import { consumeJudgmentExtract } from '../src/judgment-extract/index.js';
 import { confirmJudgment, rejectJudgment } from '../src/judgment-extract/confirm.js';
 import { settleOpenmaiTask } from '../src/openmai-task.js';
-import { startSupermaiScoutTask, supermaiCriteriaKey } from '../src/supermai-sourcing.js';
+import { startSupermaiScoutTask, supermaiCriteriaKey } from '../src/supermai-desktop-sourcing.js';
 import { claimSupermaiPairCode, createSupermaiPairCode, finishSupermaiTask,
   ingestSupermaiResults, pollSupermaiRelay } from '../src/supermai-relay.js';
 

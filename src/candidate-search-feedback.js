@@ -27,6 +27,10 @@ export function setCandidateSearchFeedback(db, principal, args, sourceTaskId) {
 export function rejectedCandidateRefs(db, projectId, principal = {}) {
   const { tenantId, consultantId } = principal;
   if (!db || !tenantId || !consultantId) return [];
+  if (String(projectId).startsWith('supermai:')) return db.prepare(`SELECT candidate_ref
+    FROM freeform_candidate_decisions WHERE tenant_id=? AND consultant_id=? AND search_key=?
+    AND status='REJECTED' ORDER BY updated_at DESC,candidate_ref`).all(tenantId, consultantId, projectId)
+    .map(row => row.candidate_ref);
   return db.prepare(`SELECT candidate_ref FROM candidate_search_feedback
     WHERE tenant_id=? AND consultant_id=? AND project_id=? AND status='REJECTED'
     ORDER BY updated_at DESC,candidate_ref`).all(tenantId, consultantId, projectId)

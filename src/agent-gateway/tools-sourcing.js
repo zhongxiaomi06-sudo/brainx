@@ -269,8 +269,7 @@ async function supermaiScout(db, args, principal, sendCardFn, publicBaseUrl) {
   const stale = runningStale(cur);
   if ((cur.status === 'running' && !stale) || (cur.status === 'done' && !continuing)) {
     const candidates = cur.status === 'done' ? extractOpenmaiCandidates(cur.result_text) : [];
-    const autoDeliver = Boolean(jobId) || (cur.status === 'running'
-      && registerFreeformDelivery(db, principal, project_id));
+    const autoDeliver = Boolean(jobId) || registerFreeformDelivery(db, principal, project_id);
     const disc = cur.status === 'running' ? pollDiscipline(cur.started_at, 'supermai', autoDeliver) : null;
     // NO_REPLY/空结果：OpenMai 对极窄判据可能零命中（返回占位符）——语义化为「未搜到」而非当成成功交付。
     const noReply = cur.status === 'done' && !candidates.length

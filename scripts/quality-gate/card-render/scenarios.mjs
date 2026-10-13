@@ -147,10 +147,17 @@ export function buildScenarios() {
         publicBaseUrl: BASE })],
     ['supermai-freeform', 'SuperMai 自由找人卡（首轮 6 人无 PL 编号，链接放空）',
       buildOpenmaiDeliveryCard({
-        job: { project_id: 'supermai:freeform00', company: '自由找人',
+        job: { project_id: 'supermai:0123456789ab', company: '自由找人',
           role: '北京 AI 战略 1-5 年', search_round: 1, freeform: true,
           criteria: '北京 AI 战略分析师 1-5 年经验' },
         status: 'done', resultText: supermaiFreeformResultText(), publicBaseUrl: BASE })],
+    ['supermai-freeform-actions', 'SuperMai 自由候选四动作（稳定来源编号）',
+      buildOpenmaiDeliveryCard({ job: { project_id: 'supermai:0123456789ab', freeform: true,
+        criteria: '北京 AI 战略分析师', search_round: 1 }, status: 'done',
+      resultText: `<!-- BRAINX_CANDIDATES_V1\n${JSON.stringify({ candidates: [{
+        candidate_ref: 'PT123456789012', name: '测试候选', role: '算法工程师',
+        experience: '5 年', city: '北京', education: '硕士', evaluation: '技能待核实', score: '待评估',
+      }] })}\n-->`, source: 'supermai', publicBaseUrl: BASE })],
     ['openmai-delivery-failed', '找人失败卡',
       buildOpenmaiDeliveryCard({ job: JOB, status: 'failed',
         error: 'OpenMai 连接超时：TTC 登录状态可能已失效，请在工作台重新授权后重试。',

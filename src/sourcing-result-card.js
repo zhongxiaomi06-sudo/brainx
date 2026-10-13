@@ -3,7 +3,7 @@ import { buildBrainxDeepLink, productionBaseUrl } from './brainx-deep-links.js';
 import { alignSoloAction } from './card-layout.js';
 import { assessOpenmaiCandidateBatch, extractOpenmaiCandidates } from './openmai-result.js';
 import { normalizeExcludedCandidateRefs } from './search-rounds.js';
-import { rejectCandidateAction, contactCandidateAction } from './candidate-card-actions.js';
+import { rejectCandidateAction, contactCandidateAction, freeformCandidateActions } from './candidate-card-actions.js';
 const PHONE = /(?<!\d)(?:\+?86[-\s]?)?1[3-9]\d{9}(?!\d)/g;
 const EMAIL = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
 
@@ -108,10 +108,10 @@ function candidateFocusRows(job, candidates, source) {
           // 按钮必然 NOT_FOUND_OR_FORBIDDEN——发卡接线修复后卡真实上会，不再渲染必败按钮
           // （2026-10-09；待 freeform 候选动作有真实承接后再恢复）。
           { tag: 'column', width: 'weighted', weight: 3, vertical_align: 'center',
-            elements: (candidate.candidateRefValid === false && !freeform)
+            elements: candidate.candidateRefValid === false
               ? [{ tag: 'div', text: { tag: 'plain_text', content: '不可操作' } }]
               : freeform
-                ? [{ tag: 'div', text: { tag: 'plain_text', content: '暂不支持' } }]
+                ? freeformCandidateActions(job, candidate)
                 : [screenCandidateAction(job, candidate), addToReloopAction(job, candidate),
                   rejectCandidateAction(job, candidate), contactCandidateAction(job, candidate)] },
         ] };
@@ -130,7 +130,7 @@ function candidateLinkButton(url, no, name) {
 function focusIntroNote(freeform = false, source = 'openmai') {
   return { tag: 'note', elements: [{ tag: 'plain_text',
     content: freeform
-      ? '自由找人结果来自外部渠道，候选人暂不支持一键初筛 / 加入 reloop。'
+      ? '自由找人：原搜索发起人可操作；初筛记录在本次搜索重点名单，尚未关联职位；联系方式只私发。'
       : source === 'supermai'
         ? '有来源链接时可点姓名查看官方资料；初筛通过与加入 reloop 是独立操作。'
         : '点姓名直接查看 TTC；初筛通过后发送人才链接；加入 reloop 为独立操作。' }] };

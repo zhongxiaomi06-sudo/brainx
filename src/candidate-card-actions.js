@@ -1,4 +1,15 @@
 /** 共享候选动作；取消二次确认时飞书不发送按钮回调。 */
+export function freeformCandidateActions(job, candidate) {
+  const searchKey = job.search_key || job.project_id;
+  if (!/^supermai:[a-f0-9]{12}$/.test(searchKey || '')) return [];
+  return [['SCREEN', '初筛通过'], ['ADD_TO_RELOOP', '加入reloop'], ['REJECT', '不合适'], ['CONTACT', '查联系方式']]
+    .map(([action, label]) => ({ tag: 'button', type: action === 'SCREEN' ? 'primary' : 'default',
+      text: { tag: 'plain_text', content: label },
+      ...(action === 'REJECT' ? { confirm: { title: { tag: 'plain_text', content: '确认不合适？' },
+        text: { tag: 'plain_text', content: '只在你这份搜索条件的后续轮次排除，不影响其他顾问，可撤销。' } } } : {}),
+      value: { text: `调用 brainx_freeform_candidate_action，search_key=${searchKey}、candidate_ref=${candidate.candidateRef}、action=${action}、confirm=true。只按工具回执报告结果；联系方式只能私发我本人。` } }));
+}
+
 export function rejectCandidateAction(job, candidate) {
   return { tag: 'button', type: 'danger', text: { tag: 'plain_text', content: '不合适' },
     confirm: { title: { tag: 'plain_text', content: '确认不合适？' },

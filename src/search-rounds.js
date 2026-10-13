@@ -36,21 +36,27 @@ function allResultRefs(row) {
     .map((candidate) => candidate.candidateRef);
 }
 
-function projectRows(db, projectId) {
+function projectRows(db, projectId, principal) {
+  if (String(projectId).startsWith('supermai:')) {
+    if (!principal?.consultantId) return [];
+    return db.prepare(`SELECT task_id,result_text,excluded_candidate_refs_json
+      FROM openmai_results WHERE project_id=? AND consultant_id=?
+      ORDER BY finished_at DESC,started_at DESC`).all(projectId, principal.consultantId);
+  }
   return db.prepare(`SELECT task_id,result_text,excluded_candidate_refs_json
     FROM openmai_results WHERE project_id IN (?,?)
     ORDER BY finished_at DESC,started_at DESC`).all(projectId, `supermai-result:${projectId}`);
 }
 
 export function nextSearchExclusions(db, projectId, principal) {
-  const rows = projectRows(db, projectId);
+  const rows = projectRows(db, projectId, principal);
   return normalizeExcludedCandidateRefs([...rejectedCandidateRefs(db, projectId, principal), ...rows.flatMap((row) => [
     ...storedRefs(row.excluded_candidate_refs_json), ...resultRefs(row),
   ])]);
 }
 
 export function nextSupermaiSearchExclusions(db, projectId, principal) {
-  const rows = projectRows(db, projectId);
+  const rows = projectRows(db, projectId, principal);
   return normalizeExcludedCandidateRefs([...rejectedCandidateRefs(db, projectId, principal), ...rows.flatMap((row) => [
     ...storedRefs(row.excluded_candidate_refs_json), ...allResultRefs(row),
   ])]);

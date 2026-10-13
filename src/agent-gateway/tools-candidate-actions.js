@@ -118,7 +118,7 @@ function openmaiResume(db, jobId, candidateRef) {
  * 冲刺 T12：候选人一键加入 RDS 人才库。幂等口径 = 姓名 + summary 里的 [ref:xxx] 来源标记；
  * talent 表不加迁移、不改结构。RDS 不可写时由调用方降级，不在此处吞错。
  */
-async function defaultAddTalent({ name, summary, sourceRef }) {
+export async function defaultAddTalent({ name, summary, sourceRef }) {
   const existingId = await withMysql(async (conn) => {
     const [rows] = await conn.execute(
       'SELECT id FROM talent WHERE name=? AND summary LIKE ? LIMIT 1',

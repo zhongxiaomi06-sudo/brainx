@@ -388,7 +388,7 @@ test('断点①：SuperMai 群上下文 done 读回确定性发卡（此前接�
   const cardJson = JSON.stringify(sent[0].card);
   assert.ok(cardJson.includes('SuperMai 自由找人'), '自由找人卡品牌正确');
   assert.ok(!cardJson.includes('BRAINTEX_CANDIDATE_KEEP'), 'freeform 卡不再渲染必败的初筛按钮');
-  assert.ok(cardJson.includes('暂不支持'), 'freeform 候选操作列如实标注暂不支持');
+  assert.ok(cardJson.includes('brainx_freeform_candidate_action'), 'freeform 候选使用独立搜索作用域动作');
   assert.ok(!cardJson.includes('会自动发到本群'), 'freeform 重新找人不再承诺自动投递');
   db.close();
 });

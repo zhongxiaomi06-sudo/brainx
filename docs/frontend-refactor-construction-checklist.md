@@ -1,5 +1,7 @@
 # 前端真实数据重构施工清单
 
+自由找人四动作改用搜索作用域；无稳定编号仍不可操作，不伪造人才链接。状态见[本轮复核](frontend-reviews/2026-10-13-sourcing-result-context.md)。
+
 权威找人条件：独立保存与显式启动已本地接入，版本冲突拦截；五项状态见[本轮复核](frontend-reviews/2026-10-13-sourcing-result-context.md)。
 
 候选四动作已本地接入；状态见[本轮复核](frontend-reviews/2026-10-13-sourcing-result-context.md)，真实回调与私信待验收。

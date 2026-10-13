@@ -1,5 +1,7 @@
 # 寻访结果卡上下文复核
 
+自由候选追加：有稳定编号时正式卡调用 brainx_freeform_candidate_action。仅原搜索发起人、原群或本人私聊可处理已授权快照；初筛落搜索重点名单而非项目，拒绝可撤销并用于续搜。两张截图已查看；原生卡不适用 Storybook；用户未审核、未发布、真实数据未验证。
+
 追加权威编辑器：正式 workbench 抽屉复用 OpenmaiPanel → search-brief-api → GET/PUT search-brief，保存带版本，不启动任务。Storybook NeedsInput 1/1、后端专项 47/47；用户未审核，未发布，真实账号未验证。独立存储 project_search_briefs，不将历史群补充迁成权威条件。
 
 > 上级：[前端审核台账](README.md) · [施工清单](../2026-10-13-sourcing-delivery-plan.md)

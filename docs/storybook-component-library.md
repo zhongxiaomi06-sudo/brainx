@@ -1,5 +1,7 @@
 # BrainX 内部 Storybook 组件库
 
+自由找人新增原生卡 supermai-freeform-actions 渲染场景，四动作按钮无截断；无编号原场景保留作为不可操作的真实边界。状态见[本轮复核](frontend-reviews/2026-10-13-sourcing-result-context.md)。
+
 OpenMai 职位信息输入 / NeedsInput 使用明确标注的接口夹具验证保存不启动、再次点击才启动；真实保存接口需已接单。状态见[本轮复核](frontend-reviews/2026-10-13-sourcing-result-context.md)。
 
 2026-10-13 发布追加：dcce3d2 已上线，云端连接画面产物与服务健康已核验；付费搜索未验证，工作台人才库凭据接入待批准。详见本轮云端寻访复核记录，以下较早状态保留历史。

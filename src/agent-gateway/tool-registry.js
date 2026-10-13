@@ -5,6 +5,7 @@ import { createCandidateActionToolHandlers } from './tools-candidate-actions.js'
 import { createJobFactsToolHandlers } from './tools-job-facts.js';
 import { createJudgmentToolHandlers } from './tools-judgments.js';
 import { createJdSubmitToolHandlers } from './tools-jd-submit.js';
+import { createFreeformCandidateHandlers } from './tools-freeform-candidates.js';
 import { sendInteractiveCard } from '../feishu-bot.js';
 import { createCandidateReportToolHandlers } from '../candidate-report.js';
 
@@ -21,6 +22,10 @@ const object = (properties, required = []) => ({
 });
 
 export const AGENT_TOOL_ROWS = Object.freeze([
+  { name: 'brainx_freeform_candidate_action', purpose: ['candidate_action'], parameters: object({
+    search_key: string({ pattern: '^supermai:[a-f0-9]{12}$' }), candidate_ref: string(),
+    action: string({ enum: ['SCREEN', 'ADD_TO_RELOOP', 'REJECT', 'RESTORE', 'CONTACT'] }), confirm: boolean(),
+  }, ['search_key', 'candidate_ref', 'action', 'confirm']) },
   { name: 'brainx_me_context', purpose: ['self_context'], p2pOnly: true, parameters: object({}) },
   { name: 'brainx_daily_brief', purpose: ['daily_brief'], parameters: object({
     date: string({ pattern: '^\\d{4}-\\d{2}-\\d{2}$' }), limit: integer(1, 10),
@@ -206,6 +211,7 @@ export function createProductionToolRegistry({ db, talentDependencies = {}, acti
   // 未配置飞书凭证时 sendInteractiveCard 抛错，已由 sendAcceptedCard 兜底吞掉。
   const actions = createActionToolHandlers({ db, sendCardFn: sendInteractiveCard, ...actionDependencies });
   const candidateActions = createCandidateActionToolHandlers({ db, ...talentDependencies });
+  const freeformActions = createFreeformCandidateHandlers({ db, ...talentDependencies });
   const jobFacts = createJobFactsToolHandlers({ db });
   const judgments = createJudgmentToolHandlers({ db });
   const jdSubmit = createJdSubmitToolHandlers({ db });
@@ -217,6 +223,6 @@ export function createProductionToolRegistry({ db, talentDependencies = {}, acti
     jobGapHandler: jobs.brainx_gap_questions,
   });
   return createToolRegistry({ handlers: {
-    ...jobs, ...talent, ...actions, ...candidateActions, ...jobFacts, ...judgments, ...jdSubmit, ...reports,
+    ...jobs, ...talent, ...actions, ...candidateActions, ...freeformActions, ...jobFacts, ...judgments, ...jdSubmit, ...reports,
   } });
 }

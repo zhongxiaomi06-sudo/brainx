@@ -52,7 +52,7 @@ test('30 个生产工具全部接入，黄金读取工作流连续完成', async
       data_scope: { ...bundle.data_scope, purpose: input.purpose } }),
     loadCandidateFactFn: async () => fact,
   } });
-  assert.equal(registry.names().length, 30);
+  assert.equal(registry.names().length, 31);
   const before = db.prepare('SELECT COUNT(*) n FROM decision_events').get().n;
 
   const me = await registry.execute('brainx_me_context', {}, context('felix', 'self_context'));

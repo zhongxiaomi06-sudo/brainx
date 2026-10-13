@@ -12,6 +12,11 @@ const object = (properties, required = []) => ({
 });
 
 export const BRAINX_OPENCLAW_TOOLS = Object.freeze([
+  { name: 'brainx_freeform_candidate_action', purpose: () => 'candidate_action', parameters: object({
+    search_key: string({ pattern: '^supermai:[a-f0-9]{12}$' }), candidate_ref: string(),
+    action: string({ enum: ['SCREEN', 'ADD_TO_RELOOP', 'REJECT', 'RESTORE', 'CONTACT'] }), confirm: boolean(),
+  }, ['search_key', 'candidate_ref', 'action', 'confirm']),
+  description: '自由找人结果四动作：初筛留在搜索重点名单、加入人才库、确认不合适、撤销、私发已授权联系方式；不伪造职位或项目归属。' },
   { name: 'brainx_me_context', purpose: () => 'self_context', parameters: object({}), description: '读取当前顾问本人脱敏工作上下文和开工就绪状态；可用于首次使用自检。' },
   { name: 'brainx_daily_brief', purpose: () => 'daily_brief', parameters: object({ date: string({ pattern: '^\\d{4}-\\d{2}-\\d{2}$' }), limit: integer(1, 10) }), description: '读取当前顾问今日优先事项与依据。' },
   { name: 'brainx_job_assessment', purpose: () => 'job_review', parameters: object({ job_id: string() }, ['job_id']), description: '判断授权职位是否值得投入并返回证据。' },

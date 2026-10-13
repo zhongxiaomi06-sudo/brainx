@@ -204,7 +204,8 @@ test('migrations：schema_migrations 逐文件记账，重开不重跑', () => {
                           '0060_supermai_desktop_relay.sql',
                           '0061_group_scope_job_fact_review.sql',
                           '0062_freeform_sourcing_delivery.sql',
-                          '0063_candidate_search_feedback.sql']);
+                          '0063_candidate_search_feedback.sql',
+                          '0064_project_search_briefs.sql']);
 });
 
 const TMPDB = join(tmpdir(), `brainx-fw-${process.pid}.db`);
@@ -240,7 +241,7 @@ test('migrations：旧库 user_version=2 兼容——前 2 个文件标记已应
   legacy.close();
   const reopened = openDb(TMPDB);
   const rows = reopened.prepare('SELECT name FROM schema_migrations ORDER BY name').all().map((r) => r.name);
-  assert.equal(rows.length, 76); // 全部迁移文件记账（0001...0063，含并行编号）
+  assert.equal(rows.length, 77); // 全部迁移文件记账（0001...0064，含并行编号）
   assert.ok(reopened.prepare("SELECT name FROM sqlite_master WHERE name='sourcing_group_deliveries'").get());
   assert.equal(reopened.prepare(`SELECT COUNT(*) n FROM decision_events
     WHERE event_type='RECOMMENDED'`).get().n, 0, '历史机器推荐轨迹已清理');

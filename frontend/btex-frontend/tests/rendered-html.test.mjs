@@ -290,7 +290,8 @@ test("OpenMai 需要画像时提供原地输入并把画像提交给重跑接口
   ]);
   assert.match(panel, /aria-label="补充职位信息"/);
   assert.match(panel, /用此画像开始找人/);
-  assert.match(panel, /onRerun\(jobId,brief\.trim\(\)\)/);
+  assert.match(panel, /onRerun\(jobId, ""\)/);
+  assert.match(panel, /briefApi\.save\(jobId, brief\.trim\(\), stored\.version\)/);
   assert.match(api, /body:\s*\{\s*search_brief:\s*searchBrief\s*\}/);
   const navigation = await source("app/use-workbench-navigation.ts");
   assert.match(navigation, /void refreshBrainxJob\(job\.id\)/,

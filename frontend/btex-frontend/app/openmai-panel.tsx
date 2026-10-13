@@ -1,28 +1,63 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { OpenmaiResult } from "./brainx-api";
 import { OpenmaiMarkdown } from "./openmai-markdown";
 import { DrawerSection } from "./workbench-controls";
+import { searchBriefApi, type SearchBrief } from "./search-brief-api";
 
-export function OpenmaiPanel({jobId,openmai,mode,onRerun}:{jobId:string;openmai:OpenmaiResult|null;mode:"connecting"|"connected"|"offline";onRerun:(jobId:string,searchBrief?:string)=>void}){
- const [brief,setBrief]=useState(openmai?.search_brief||"");
- if(mode!=="connected"||!openmai||openmai.status==="none")return null;
- const running=openmai.status==="running";
- const needsInput=openmai.status==="needs_input";
- // T6：推荐字段按「、」切分，输入上限 20 字；切分结果实时可见。
- const tags=brief.split("、").map(item=>item.trim()).filter(Boolean);
- return <DrawerSection title="OpenMai 自动找人（开始跟进后触发）">
-   {running&&<p className="muted" style={{margin:"0 0 10px"}}>找人中…约 1-2 分钟，完成后自动更新（也可关闭页面稍后回来看）。</p>}
-   {openmai.status==="failed"&&<p className="muted" style={{margin:"0 0 10px",color:"#c64b59"}}>找人失败：{openmai.error||"未知错误"}</p>}
-   {needsInput&&<p className="muted" style={{margin:"0 0 10px",color:"#9a6518"}}>现有职位信息不足，请补充职位信息后重新找人。</p>}
-   {openmai.status==="done"&&<OpenmaiMarkdown text={openmai.result_text||""}/>}
-   <label style={{display:"grid",gap:"8px",margin:"12px 0"}}>
-    <span style={{fontWeight:600}}>补充职位信息</span>
-    <input aria-label="补充职位信息" value={brief} disabled={running} maxLength={20}
-      placeholder="顿号分隔，≤ 20 字，例如：北京、半导体、总监"
-      onChange={event=>setBrief(event.target.value)} style={{border:"1px solid rgba(23,107,88,.25)",borderRadius:"14px",padding:"12px",font:"inherit"}}/>
-   </label>
-   {tags.length>0&&<div aria-label="推荐字段" style={{display:"flex",flexWrap:"wrap",gap:"6px",margin:"0 0 10px"}}>{tags.map(tag=><span key={tag} style={{padding:"4px 10px",borderRadius:"999px",background:"rgba(23,107,88,.08)",color:"#215a4c",fontSize:"12px"}}>{tag}</span>)}</div>}
-   <button onClick={()=>onRerun(jobId,brief.trim())} disabled={running||!tags.length} style={{border:"1px solid rgba(23,107,88,.3)",background:"#fff",color:"#215a4c",borderRadius:"999px",padding:"6px 14px",fontSize:"12px",cursor:running||!tags.length?"not-allowed":"pointer"}}>{running?"找人中…":needsInput?"用此画像开始找人":"用此画像重新找人"}</button>
- </DrawerSection>
+type Props = { jobId: string; openmai: OpenmaiResult | null; mode: "connecting" | "connected" | "offline";
+  onRerun: (jobId: string, searchBrief?: string) => void; briefApi?: typeof searchBriefApi };
+
+export function OpenmaiPanel(props: Props) {
+  if (props.mode !== "connected" || !props.openmai) return null;
+  return <SearchEditor key={props.jobId} {...props} />;
+}
+
+function SearchEditor({ jobId, openmai, onRerun, briefApi = searchBriefApi }: Props) {
+  const [stored, setStored] = useState<SearchBrief | null>(null);
+  const [brief, setBrief] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  useEffect(() => {
+    let active = true;
+    briefApi.load(jobId).then(value => {
+      if (active) { setStored(value); setBrief(value.search_brief); }
+    }).catch(() => { if (active) setError("找人条件加载失败，请重新打开职位重试。"); });
+    return () => { active = false; };
+  }, [jobId, briefApi]);
+  const dirty = stored !== null && brief.trim() !== stored.search_brief;
+  const running = openmai?.status === "running";
+  const needsInput = openmai?.status === "needs_input";
+  const save = async () => {
+    if (!stored || saving) return;
+    setSaving(true); setError(""); setNotice("");
+    try {
+      const value = await briefApi.save(jobId, brief.trim(), stored.version);
+      setStored(value); setBrief(value.search_brief); setNotice("条件已保存，下次找人生效；本次没有启动搜索。");
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "保存失败，请重试；若版本冲突，请重新打开职位。"); }
+    finally { setSaving(false); }
+  };
+  return <DrawerSection title="找人条件与结果">
+    {running && <p className="muted">找人中，本轮条件已冻结。现在修改只影响下一轮。</p>}
+    {openmai?.status === "failed" && <p role="status">找人失败：{openmai.error || "原因待确认"}</p>}
+    {needsInput && <p>现有信息不足，请补充并保存条件，再明确启动找人。</p>}
+    {openmai?.status === "done" && <OpenmaiMarkdown text={openmai.result_text || ""} />}
+    <label style={{ display: "grid", gap: 8, margin: "12px 0" }}>
+      <span>权威找人条件</span>
+      <textarea aria-label="补充职位信息" value={brief} maxLength={2000} rows={5}
+        disabled={!stored || saving} placeholder="填写职责、必备经验、城市、目标公司等；最多 2000 字"
+        onChange={event => { setBrief(event.target.value); setNotice(""); }}
+        style={{ border: "1px solid rgba(23,107,88,.25)", borderRadius: 12, padding: 12, font: "inherit", resize: "vertical" }} />
+    </label>
+    <p className="muted">OpenMai 与 SuperMai 下次按这份条件找人；群内补充只作用于当轮，不覆盖这里。</p>
+    {error && <p role="alert">{error}</p>}
+    {notice && <p role="status">{notice}</p>}
+    <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+      <button className="btn" onClick={() => void save()} disabled={!dirty || saving}>{saving ? "保存中…" : "保存条件"}</button>
+      <button className="btn primary" onClick={() => onRerun(jobId, "")} disabled={!stored || dirty || saving || running}>
+        {running ? "找人中…" : needsInput ? "用此画像开始找人" : "按已保存条件找人"}
+      </button>
+    </div>
+  </DrawerSection>;
 }

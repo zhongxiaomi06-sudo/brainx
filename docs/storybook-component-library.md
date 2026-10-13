@@ -1,5 +1,7 @@
 # BrainX 内部 Storybook 组件库
 
+OpenMai 职位信息输入 / NeedsInput 使用明确标注的接口夹具验证保存不启动、再次点击才启动；真实保存接口需已接单。状态见[本轮复核](frontend-reviews/2026-10-13-sourcing-result-context.md)。
+
 2026-10-13 发布追加：dcce3d2 已上线，云端连接画面产物与服务健康已核验；付费搜索未验证，工作台人才库凭据接入待批准。详见本轮云端寻访复核记录，以下较早状态保留历史。
 2026-10-13：连接中心 RealConnectionStates 改为云端授权场景；桌面场景仅作历史兼容测试。验收见[本轮复核](frontend-reviews/2026-10-13-cloud-sourcing-merge.md)。
 

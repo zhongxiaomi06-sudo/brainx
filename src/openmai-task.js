@@ -15,6 +15,7 @@ import { assessOpenmaiCandidateBatch, looksLikeSessionPollution } from './openma
 import { normalizeExcludedCandidateRefs } from './search-rounds.js';
 import { emitEvent } from './hub/emit.js';
 import { snapshotFreeformResult } from './sourcing-group-delivery.js';
+import { effectiveSearchBrief } from './project-search-brief.js';
 
 /** specs/019 US1：找人结算补发 search_finished 事件（契约 specs/019 contracts/event-types.md）。
  *  与结算 UPDATE 同调用栈；重复结算（非 running）changes=0 不发事件。 */
@@ -211,7 +212,7 @@ export function startOpenmaiTask(db, bus, consultant_id, project_id, {
   force = false, searchBrief = '', excludeCandidateRefs = [],
 } = {}) {
   const key = `${project_id}|${consultant_id}`;
-  const brief = String(searchBrief || '').trim().slice(0, 2000);
+  const brief = effectiveSearchBrief(db, project_id, searchBrief);
   const exclusions = normalizeExcludedCandidateRefs(excludeCandidateRefs);
   const existing = db.prepare(`SELECT status,started_at,finished_at,search_round
     FROM openmai_results WHERE project_id=? AND consultant_id=?`)

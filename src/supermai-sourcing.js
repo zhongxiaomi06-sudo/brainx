@@ -16,6 +16,7 @@
  * 集合 + DB 主键防并发重入；done 复用（already_done）；失败 60s 冷却；无凭证快速失败。
  */
 import { createHash } from 'node:crypto';
+import { effectiveSearchBrief } from './project-search-brief.js';
 import { now, uuid } from './db.js';
 import { getAuthorizedTtcJwt } from './ttcsdk/auth.js';
 import { callOpenmaiContent, settleOpenmaiTask as settleSupermaiTask } from './openmai-task.js';
@@ -55,6 +56,7 @@ export function startSupermaiScoutTask(db, bus, consultant_id, criteria, {
   force = false, projectId = null, excludeCandidateRefs = [],
 } = {}) {
   const project_id = String(projectId || '').trim() || supermaiCriteriaKey(criteria);
+  if (projectId) criteria = effectiveSearchBrief(db, project_id, criteria);
   const key = `${project_id}|${consultant_id}`;
   const exclusions = normalizeExcludedCandidateRefs(excludeCandidateRefs);
   const existing = db.prepare(`SELECT status,started_at,finished_at,search_round

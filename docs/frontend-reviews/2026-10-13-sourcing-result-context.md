@@ -1,5 +1,7 @@
 # 寻访结果卡上下文复核
 
+追加权威编辑器：正式 workbench 抽屉复用 OpenmaiPanel → search-brief-api → GET/PUT search-brief，保存带版本，不启动任务。Storybook NeedsInput 1/1、后端专项 47/47；用户未审核，未发布，真实账号未验证。独立存储 project_search_briefs，不将历史群补充迁成权威条件。
+
 > 上级：[前端审核台账](README.md) · [施工清单](../2026-10-13-sourcing-delivery-plan.md)
 
 ## 审核范围

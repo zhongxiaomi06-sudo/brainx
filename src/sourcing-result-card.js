@@ -155,7 +155,7 @@ function continueSearchActions(job) {
   // 按钮指令改为显式新一轮；自由找人群里没有自动投递通道，话术不得承诺「自动发到本群」。
   if (job?.freeform === true) {
     const criteria = String(job.criteria || '').slice(0, 2000);
-    const command = `[BRAINTEX_SEARCH_START] 自由找人继续：用本轮判据发起新一轮 brainx_supermai_scout。现在调用 brainx_supermai_scout，传 criteria（见下）和 continue_search=true；排除名单由 BrainX 从历史结果生成，不要自行编造。任务返回 running/triggered 后立即回复"正在重新找人，完成后请再 @ 我查看结果"并结束本轮，不要原地轮询；如返回 cannot_continue，提示顾问换判据措辞后重新找人。\ncriteria=${criteria}`;
+    const command = `[BRAINTEX_FREEFORM_START] ${JSON.stringify({ criteria, continue_search: true })}`;
     // 单按钮行用 alignSoloAction 右对齐收口（卡片排版规范，2026-09-16 specs/018 修订）
     return alignSoloAction({ tag: 'action', actions: [
       { tag: 'button', type: 'primary', text: { tag: 'plain_text', content: 'SuperMai 重新找人' },

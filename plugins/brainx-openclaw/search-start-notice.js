@@ -5,6 +5,17 @@ const SEARCH_TOOL_BY_ENTRY = { OpenMai: 'brainx_openmai_search', SuperMai: 'brai
 const CONDITION_LINE = /^找人条件[：:]\s*([\s\S]{1,500})$/;
 
 export function parseSearchStartNotice(content) {
+  const raw = String(content || '').trim();
+  if (raw.startsWith('[BRAINTEX_FREEFORM_START] ')) {
+    try {
+      const value = JSON.parse(raw.slice('[BRAINTEX_FREEFORM_START] '.length));
+      if (typeof value.criteria !== 'string' || value.criteria.trim().length < 5
+          || value.criteria.length > 2000 || typeof value.continue_search !== 'boolean') return null;
+      return { projectRef: null, entry: 'SuperMai', continuing: value.continue_search,
+        criteria: value.criteria.trim(),
+        text: '🔎 正在处理 SuperMai 找人请求，通常需要 3–5 分钟；完成后候选人会自动发到本群。' };
+    } catch { return null; }
+  }
   const match = String(content || '').trim().match(SEARCH_COMMAND);
   if (!match) return null;
   const continuing = Boolean(match[3]);
@@ -87,9 +98,9 @@ export function createSearchStartNoticeHandler(api, dependencies = {}) {
     if (sender) {
       try {
         // 本群最近一次「找人条件：…」作为 criteria 注入（没有则不传）。
-        const criteria = selected?.text || null;
+        const criteria = notice.criteria || selected?.text || null;
         const result = await callBrainxGatewayTool(SEARCH_TOOL_BY_ENTRY[notice.entry], {
-          job_id: notice.projectRef, continue_search: notice.continuing,
+          ...(notice.projectRef ? { job_id: notice.projectRef } : {}), continue_search: notice.continuing,
           ...(criteria ? { criteria } : {}),
         }, {
           channel: 'feishu',
@@ -99,7 +110,7 @@ export function createSearchStartNoticeHandler(api, dependencies = {}) {
           chat_id: to,
           thread_id: String(event?.metadata?.threadId || '').trim() || null,
         }, dependencies);
-        if (result?.ok !== false && result?.data?.status === 'triggered'
+        if (notice.projectRef && result?.ok !== false && result?.data?.status === 'triggered'
             && latestConditions.get(scope) === selected) latestConditions.delete(scope);
         if (result?.ok === false) {
           api.logger?.warn?.(`[brainx-search-notice] direct search start refused: ${String(result?.error?.code || 'UNKNOWN').slice(0, 80)}`);

@@ -1,5 +1,7 @@
 # 寻访结果卡上下文复核
 
+需求卡追加：openmai delivery worker 接 deliverJudgmentNoticesOnce（开关默认关），judgment-notice 160px 截图已查看；结构化按钮由 search-start-notice 直调。专项 40/40；原生卡不适用 Storybook、用户未审核、未发布、真实数据未验证。
+
 JD 卡追加：tools-jd-submit 调用 buildJdConfirmationCard；工具回调只放行本人原群 group_jd 草稿，缺公司/职位不出确认按钮。专项 25/25，220px 截图已查看无截断。原生卡不适用 Storybook；用户未审核、未发布、真实数据未验证。
 
 自由候选追加：有稳定编号时正式卡调用 brainx_freeform_candidate_action。仅原搜索发起人、原群或本人私聊可处理已授权快照；初筛落搜索重点名单而非项目，拒绝可撤销并用于续搜。两张截图已查看；原生卡不适用 Storybook；用户未审核、未发布、真实数据未验证。

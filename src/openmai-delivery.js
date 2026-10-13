@@ -6,6 +6,7 @@ import { assessOpenmaiCandidateBatch, extractOpenmaiCandidates } from './openmai
 import { emitEvent } from './hub/emit.js';
 import { buildOpenmaiDeliveryCard } from './sourcing-result-card.js';
 import { deliverFreeformResultsOnce } from './sourcing-group-delivery.js';
+import { deliverJudgmentNoticesOnce } from './judgment-extract/notices.js';
 export { buildOpenmaiDeliveryCard, groupSafeOpenmaiText, screenCandidateAction,
   addToReloopAction } from './sourcing-result-card.js';
 
@@ -252,6 +253,7 @@ export function startOpenmaiDeliveryWorker(db, dependencies = {}) {
     try {
       await deliverOpenmaiResultsOnce(db, dependencies);
       await deliverFreeformResultsOnce(db, dependencies);
+      await deliverJudgmentNoticesOnce(db, dependencies);
     }
     catch (error) { console.error(`[worker] OpenMai 群投递异常: ${String(error?.message || error).slice(0, 120)}`); }
     finally { running = false; }

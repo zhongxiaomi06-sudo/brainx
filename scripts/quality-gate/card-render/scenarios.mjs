@@ -18,6 +18,7 @@ import { buildProjectReminderCard } from '../../../src/project-reminder.js';
 import { contextCard } from '../../../src/candidate-decision-group.js';
 import { readyCard } from '../../../src/candidate-report.js';
 import { buildJdConfirmationCard } from '../../../src/jd-confirmation-card.js';
+import { buildJudgmentNoticeCard } from '../../../src/judgment-extract/notices.js';
 
 const BASE = 'https://base.yorkteam.cn';
 
@@ -152,6 +153,8 @@ export function buildScenarios() {
           role: '北京 AI 战略 1-5 年', search_round: 1, freeform: true,
           criteria: '北京 AI 战略分析师 1-5 年经验' },
         status: 'done', resultText: supermaiFreeformResultText(), publicBaseUrl: BASE })],
+    ['judgment-notice', '待确认需求线索', buildJudgmentNoticeCard({ draft_id: 'draft-test',
+      message_id: 'message-test', subject_ref: '示例公司', statement: '只要算法工程师' })],
     ['jd-confirmation', 'JD 字段确认与建岗', buildJdConfirmationCard({ draft_ref: 'draft-test',
       fields: { company: '示例公司', role: '算法工程师', city: '上海', hc: 3 } })],
     ['supermai-freeform-actions', 'SuperMai 自由候选四动作（稳定来源编号）',

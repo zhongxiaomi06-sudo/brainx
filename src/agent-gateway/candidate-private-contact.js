@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { configuredFeishuAppId } from '../feishu-bot.js';
+import { configuredFeishuAppKeyHash } from '../feishu-bot.js';
 import { loadAuthorizedCandidateContact } from './tools-talent.js';
 
 /** 联系方式只进可信发起人的私聊，工具结果不含号码，禁止模型代为转述。 */
@@ -11,8 +11,9 @@ export async function sendCandidatePrivateContact(db, principal, candidateRef, d
     WHERE tenant_id=? AND consultant_id=? AND channel_account_id=? AND open_id=?
     AND binding_status='ACTIVE'`).get(principal.tenantId, principal.consultantId,
     principal.accountId || '', principal.senderId || '');
-  const appId = deps.appId ?? configuredFeishuAppId();
-  if (!binding || !appId || binding.feishu_app_key_hash !== createHash('sha256').update(appId).digest('hex')) {
+  // 指纹与 binding 同源：sha256(应用密钥)，不是 appId（2026-10-13 群测实证 appId 恒不匹配）。
+  const appKeyHash = deps.appKeyHash ?? configuredFeishuAppKeyHash();
+  if (!binding || !appKeyHash || binding.feishu_app_key_hash !== appKeyHash) {
     return envelope('unavailable', '当前应用或本人身份未验证，未读取、未发送联系方式。');
   }
   let contact;

@@ -31,12 +31,12 @@ function authorizedCandidate(db, p, args) {
 }
 
 export function createFreeformCandidateHandlers({ db, addTalentFn = defaultAddTalent,
-  loadCandidateContactFn, sendTextMessageFn = sendTextMessage, contactAppId } = {}) {
+  loadCandidateContactFn, sendTextMessageFn = sendTextMessage } = {}) {
   return { brainx_freeform_candidate_action: async (args, { principal: p }) => {
     if (args.confirm !== true) fail('INVALID_ARGUMENT');
     const { candidate, taskId } = authorizedCandidate(db, p, args);
     if (args.action === 'CONTACT') return sendCandidatePrivateContact(db, p, args.candidate_ref,
-      { loadCandidateContactFn, sendTextMessageFn, appId: contactAppId });
+      { loadCandidateContactFn, sendTextMessageFn });
     if (args.action === 'ADD_TO_RELOOP') {
       try {
         const result = await addTalentFn({ name: safe(candidate.name).slice(0, 80),

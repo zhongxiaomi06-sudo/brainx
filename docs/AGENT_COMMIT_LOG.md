@@ -1,5 +1,13 @@
 # Agent Commit 记录
 
+## 2026-10-13｜fix(寻访): 自由找人群投递与联系方式私发的应用指纹校验改为与 binding 同源
+
+- 起因（用户指令）：「重点检查 sourcing 的效果，在群里直接进行测试」。群内自由找人实测发现搜索 done 但结果卡 5 连败 `DELIVERY_APP_MISMATCH`。
+- 根因：`sourcing-group-delivery.js` 与 `candidate-private-contact.js` 用 `sha256(appId)` 对比 `feishu_identity_bindings.feishu_app_key_hash`，而 binding 存的是 `sha256(应用密钥)`（与 agent-gateway `appHashesFromEnv` 同源）——两边哈希对象不同，恒不匹配。CONTACT 私发联系方式链路同样中招（恒 `unavailable`）。
+- 修复：`feishu-bot.js` 新增 `configuredFeishuAppKeyHash()`（sha256(应用密钥)，不返回凭据本体）；两处校验改用它；删除从未被外部赋值的 `contactAppId` 传递链（`tools-freeform-candidates.js`、`tools-candidate-actions.js`）。
+- 测试对齐：`tests/sourcing-group-delivery.test.mjs`、`tests/candidate-feedback-contact.test.mjs` 的注入从 `appId`（哈希字符串）改为 `appKeyHash`，与生产 binding 语义一致。
+- 验证：专项测试 27/27 过（sourcing-delivery 10 + candidate-actions/freeform/talent 17）；verify:quick 16/16 过；全量后端测试本地 1056/1057，唯一失败 `tests/worker.test.mjs`（独立 worker 就绪）为 1057 个测试并行压满本机的资源竞争环境态——单独复跑通过（3.2s），非本次改动引起（改动不含 worker 启动逻辑）。全量本地耗时 470s 超门禁 300s 亦为负载所致，CI 环境为权威复核。
+
 ## 2026-10-13｜test(e2e): 真实飞书 CLI 云端实测——BrainTex 机器人身份 profile + 读写回流全通
 
 - 起因（用户指令）：「云端进行使用真实的飞书 cli 进行测试」。

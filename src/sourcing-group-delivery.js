@@ -1,7 +1,7 @@
 /** 自由条件搜索的原群可靠交付：冻结每轮结果、重启恢复、投递前重新鉴权。 */
 import { createHash, randomUUID } from 'node:crypto';
 import { now } from './db.js';
-import { configuredFeishuAppId, sendInteractiveCard } from './feishu-bot.js';
+import { configuredFeishuAppKeyHash, sendInteractiveCard } from './feishu-bot.js';
 import { buildOpenmaiDeliveryCard } from './sourcing-result-card.js';
 
 function allowsReview(raw) {
@@ -67,8 +67,8 @@ export async function deliverFreeformResultsOnce(db, deps = {}) {
     JOIN agent_group_scopes s ON s.group_scope_id=d.group_scope_id
     WHERE d.delivery_status IN ('PENDING','FAILED') AND d.attempts<5 AND d.next_attempt_at<=?
     ORDER BY d.created_at LIMIT 10`).all(at);
-  const appId = deps.appId ?? configuredFeishuAppId();
-  const appHash = appId ? createHash('sha256').update(appId).digest('hex') : null;
+  // 复核指纹与 feishu_identity_bindings 同源：sha256(应用密钥)，不是 appId（2026-10-13 群测实证 appId 恒不匹配）。
+  const appKeyHash = deps.appKeyHash ?? configuredFeishuAppKeyHash();
   const send = deps.sendInteractiveCard || sendInteractiveCard;
   const counts = { sent: 0, failed: 0, cancelled: 0 };
   for (const row of rows) {
@@ -85,7 +85,7 @@ export async function deliverFreeformResultsOnce(db, deps = {}) {
       .run(at, row.delivery_id).changes;
     if (!claimed) continue;
     try {
-      if (!appHash || row.feishu_app_key_hash !== appHash) throw new Error('DELIVERY_APP_MISMATCH');
+      if (!appKeyHash || row.feishu_app_key_hash !== appKeyHash) throw new Error('DELIVERY_APP_MISMATCH');
       const out = await send({ target: row.chat_id, idempotencyKey: row.delivery_id,
         card: buildOpenmaiDeliveryCard({ job: { ...row, freeform: true, criteria: row.search_brief },
           source: 'supermai', status: row.result_status, resultText: row.result_text,

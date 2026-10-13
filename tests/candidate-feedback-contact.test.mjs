@@ -46,19 +46,21 @@ test('不合适按钮声明二次确认，取消不会携带写操作', () => {
   assert.match(button.value.text, /REJECT_CANDIDATE/);
 });
 
+const keyHash = createHash('sha256').update('test_app_key').digest('hex');
+const wrongKeyHash = createHash('sha256').update('wrong_app_key').digest('hex');
 function binding(db) {
   const at = now();
   db.prepare(`INSERT INTO feishu_identity_bindings
     (binding_id,tenant_id,channel_account_id,feishu_app_key_hash,open_id,consultant_id,
     binding_status,verified_at,verified_by,created_at,updated_at)
     VALUES ('b','t1','a1',?,'ou_me','felix','ACTIVE',?,'test',?,?)`)
-    .run(createHash('sha256').update('cli_app').digest('hex'), at, at, at);
+    .run(keyHash, at, at, at);
 }
 test('联系方式只私发可信发起人，不回群或工具返回；发送失败不假称送达', async t => {
   const { db } = fixture(t);
   binding(db);
   const sent = [];
-  const deps = { appId: 'cli_app', loadCandidateContactFn: async input => {
+  const deps = { appKeyHash: keyHash, loadCandidateContactFn: async input => {
     assert.equal(input.tenantId, 't1'); assert.equal(input.consultantId, 'felix');
     return { phone: '13812345678', email: 'example@example.com' };
   }, sendTextMessageFn: async input => { sent.push(input); } };
@@ -76,21 +78,21 @@ test('联系方式只私发可信发起人，不回群或工具返回；发送�
 test('撤权或应用不匹配时不读取；无电话与无授权区分', async t => {
   const { db } = fixture(t);
   binding(db);
-  const deps = { appId: 'wrong', loadCandidateContactFn: async () => assert.fail('不能读取'),
+  const deps = { appKeyHash: wrongKeyHash, loadCandidateContactFn: async () => assert.fail('不能读取'),
     sendTextMessageFn: async () => assert.fail('不能发送') };
   assert.equal((await sendCandidatePrivateContact(db, principal, 'PL1234567890', deps)).data.contact_delivery, 'unavailable');
   const pending = await sendCandidatePrivateContact(db, principal, 'PL1234567890', {
-    ...deps, appId: 'cli_app', loadCandidateContactFn: async () => ({ phone: null, email: null }),
+    ...deps, appKeyHash: keyHash, loadCandidateContactFn: async () => ({ phone: null, email: null }),
   });
   assert.equal(pending.data.contact_delivery, 'pending');
   const denied = await sendCandidatePrivateContact(db, principal, 'PL1234567890', {
-    ...deps, appId: 'cli_app', loadCandidateContactFn: async () => {
+    ...deps, appKeyHash: keyHash, loadCandidateContactFn: async () => {
       throw Object.assign(new Error('NOT_FOUND_OR_FORBIDDEN'), { code: 'NOT_FOUND_OR_FORBIDDEN' });
     },
   });
   assert.equal(denied.data.contact_delivery, 'not_authorized');
   db.exec("UPDATE feishu_identity_bindings SET binding_status='REVOKED'");
   assert.equal((await sendCandidatePrivateContact(db, principal, 'PL1234567890', {
-    ...deps, appId: 'cli_app',
+    ...deps, appKeyHash: keyHash,
   })).data.contact_delivery, 'unavailable');
 });

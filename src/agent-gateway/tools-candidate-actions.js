@@ -138,7 +138,7 @@ export function createCandidateActionToolHandlers({
   createCandidateDecisionGroupFn = createCandidateDecisionGroup,
   sendTextMessageFn = sendTextMessage,
   addTalentFn = defaultAddTalent,
-  loadCandidateContactFn, contactAppId,
+  loadCandidateContactFn,
 } = {}) {
   return {
     brainx_candidate_workflow: async (args, context) => {
@@ -161,7 +161,7 @@ export function createCandidateActionToolHandlers({
       }
       if (args.action === 'SEND_CONTACT_PRIVATE') {
         return sendCandidatePrivateContact(db, context.principal, args.candidate_ref,
-          { loadCandidateContactFn, sendTextMessageFn, appId: contactAppId });
+          { loadCandidateContactFn, sendTextMessageFn });
       }
       if (['REJECT_CANDIDATE', 'RESTORE_CANDIDATE'].includes(args.action)) {
         const row = setCandidateSearchFeedback(db, context.principal, args, discovered?.sourceTaskId);

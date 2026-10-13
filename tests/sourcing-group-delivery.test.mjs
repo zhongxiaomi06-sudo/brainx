@@ -7,7 +7,7 @@ import { registerFreeformDelivery, deliverFreeformResultsOnce } from '../src/sou
 
 const principal = { tenantId: 'tenant', consultantId: 'felix', accountId: 'app',
   senderId: 'ou_user', chatType: 'group', chatId: 'oc_group' };
-const appId = 'cli_test';
+const appKeyHash = createHash('sha256').update('test_app_secret').digest('hex');
 function fixture(t) {
   const db = openDb(':memory:');
   t.after(() => db.close());
@@ -16,7 +16,7 @@ function fixture(t) {
     (binding_id,tenant_id,channel_account_id,feishu_app_key_hash,open_id,consultant_id,
      binding_status,verified_at,verified_by,created_at,updated_at)
     VALUES ('binding','tenant','app',?,'ou_user','felix','ACTIVE',?,'test',?,?)`)
-    .run(createHash('sha256').update(appId).digest('hex'), at, at, at);
+    .run(appKeyHash, at, at, at);
   db.prepare(`INSERT INTO agent_group_scopes
     (group_scope_id,tenant_id,channel_account_id,chat_id,scope_status,allowed_purposes_json,created_at,updated_at)
     VALUES ('scope','tenant','app','oc_group','ACTIVE','["candidate_review"]',?,?)`).run(at, at);
@@ -39,7 +39,7 @@ test('冻结每轮终态，下一轮覆盖后仍送原群；重复运行不会�
   assert.equal(settle(db), true);
   db.prepare("UPDATE openmai_results SET task_id='sm_next',search_brief='北京产品',status='running'").run();
   const sent = [];
-  const deps = { appId, sendInteractiveCard: async input => { sent.push(input); return { message_id: 'm1' }; } };
+  const deps = { appKeyHash, sendInteractiveCard: async input => { sent.push(input); return { message_id: 'm1' }; } };
   assert.equal((await deliverFreeformResultsOnce(db, deps)).sent, 1);
   assert.equal(sent[0].target, 'oc_group');
   assert.match(JSON.stringify(sent[0].card), /上海算法工程师/);
@@ -54,7 +54,7 @@ for (const status of ['needs_input', 'failed', 'done']) {
     registerFreeformDelivery(db, principal, 'supermai:test');
     settle(db, status, status === 'done' ? 'NO_REPLY' : '请补充条件，电话 13812345678');
     let card;
-    await deliverFreeformResultsOnce(db, { appId, sendInteractiveCard: async input => {
+    await deliverFreeformResultsOnce(db, { appKeyHash, sendInteractiveCard: async input => {
       card = input.card; return { message_id: 'm' };
     } });
     assert.equal(row(db).delivery_status, 'SENT');
@@ -69,7 +69,7 @@ test('发送失败只重试卡片且稳定幂等键，最多五次', async t => 
   const ids = [];
   const sendInteractiveCard = async input => { ids.push(input.idempotencyKey); throw new Error('secret'); };
   for (let i = 0; i < 7; i++) {
-    await deliverFreeformResultsOnce(db, { appId, sendInteractiveCard,
+    await deliverFreeformResultsOnce(db, { appKeyHash, sendInteractiveCard,
       at: new Date(Date.now() + i * 600_000).toISOString() });
   }
   assert.equal(ids.length, 5);
@@ -86,7 +86,7 @@ for (const revoke of ["UPDATE feishu_identity_bindings SET binding_status='REVOK
     registerFreeformDelivery(db, principal, 'supermai:test');
     settle(db);
     db.exec(revoke);
-    const result = await deliverFreeformResultsOnce(db, { appId,
+    const result = await deliverFreeformResultsOnce(db, { appKeyHash,
       sendInteractiveCard: async () => assert.fail('不能向已撤权群发送') });
     assert.equal(result.cancelled, 1);
   });
@@ -97,7 +97,7 @@ test('跨租户不登记；默认应用不匹配不发送', async t => {
   assert.equal(registerFreeformDelivery(db, { ...principal, tenantId: 'other' }, 'supermai:test'), false);
   registerFreeformDelivery(db, principal, 'supermai:test');
   settle(db);
-  await deliverFreeformResultsOnce(db, { appId: 'wrong',
+  await deliverFreeformResultsOnce(db, { appKeyHash: createHash('sha256').update('wrong').digest('hex'),
     sendInteractiveCard: async () => assert.fail('不能使用错误应用') });
   assert.equal(row(db).last_error, 'DELIVERY_APP_MISMATCH');
 });
@@ -107,7 +107,7 @@ test('重启后的超时任务诚实报失败；中断发送恢复原幂等键',
   registerFreeformDelivery(db, principal, 'supermai:test');
   const at = new Date(Date.now() + 2 * 3600_000).toISOString();
   const sent = [];
-  const deps = { appId, at, sendInteractiveCard: async input => { sent.push(input); return {}; } };
+  const deps = { appKeyHash, at, sendInteractiveCard: async input => { sent.push(input); return {}; } };
   await deliverFreeformResultsOnce(db, deps);
   assert.equal(row(db).result_status, 'failed');
   assert.match(JSON.stringify(sent[0].card), /中断或超时/);

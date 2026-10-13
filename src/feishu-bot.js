@@ -1,6 +1,7 @@
 /** feishu-bot.js — 使用企业自建应用身份发送飞书互动卡片。 */
 
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 
 const FEISHU_BASE = 'https://open.feishu.cn';
 
@@ -45,6 +46,14 @@ async function readJson(response, fallback) {
 /** 非敏感应用标识，用于异步投递前复核是否仍是原应用，绝不返回凭据。 */
 export function configuredFeishuAppId() {
   return feishuCredentials().appId || null;
+}
+
+/** 应用密钥指纹：与 feishu_identity_bindings.feishu_app_key_hash 同源（均为 sha256(应用密钥)），
+ * 供投递前复核「登记身份的应用」与「发卡片的应用」是否同一个。绝不返回凭钥本体。 */
+export function configuredFeishuAppKeyHash() {
+  const appSecret = feishuCredentials().appSecret;
+  if (!appSecret) return null;
+  return createHash('sha256').update(appSecret, 'utf8').digest('hex');
 }
 
 export async function getTenantAccessToken({

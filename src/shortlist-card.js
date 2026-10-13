@@ -16,6 +16,7 @@
  *     角色=最近一段经历 title、背景=城市/学历、评价=strength.summary。
  */
 import { groupSafeOpenmaiText, screenCandidateAction, addToReloopAction } from './openmai-delivery.js';
+import { rejectCandidateAction, contactCandidateAction } from './candidate-card-actions.js';
 
 function tableCell(content, weight, elements) {
   return {
@@ -69,7 +70,8 @@ function shortlistRows(job, items) {
           { tag: 'column', width: 'weighted', weight: 5, vertical_align: 'top',
             elements: [{ tag: 'markdown', content: infoOf(item) }] },
           { tag: 'column', width: 'weighted', weight: 3, vertical_align: 'center',
-            elements: [screenCandidateAction(job, candidate), addToReloopAction(job, candidate)] },
+            elements: [screenCandidateAction(job, candidate), addToReloopAction(job, candidate),
+              rejectCandidateAction(job, candidate), contactCandidateAction(job, candidate)] },
         ] };
     }),
   ];

@@ -3,6 +3,7 @@ import { buildBrainxDeepLink, productionBaseUrl } from './brainx-deep-links.js';
 import { alignSoloAction } from './card-layout.js';
 import { assessOpenmaiCandidateBatch, extractOpenmaiCandidates } from './openmai-result.js';
 import { normalizeExcludedCandidateRefs } from './search-rounds.js';
+import { rejectCandidateAction, contactCandidateAction } from './candidate-card-actions.js';
 const PHONE = /(?<!\d)(?:\+?86[-\s]?)?1[3-9]\d{9}(?!\d)/g;
 const EMAIL = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
 
@@ -111,7 +112,8 @@ function candidateFocusRows(job, candidates, source) {
               ? [{ tag: 'div', text: { tag: 'plain_text', content: '不可操作' } }]
               : freeform
                 ? [{ tag: 'div', text: { tag: 'plain_text', content: '暂不支持' } }]
-                : [screenCandidateAction(job, candidate), addToReloopAction(job, candidate)] },
+                : [screenCandidateAction(job, candidate), addToReloopAction(job, candidate),
+                  rejectCandidateAction(job, candidate), contactCandidateAction(job, candidate)] },
         ] };
     }),
   ];

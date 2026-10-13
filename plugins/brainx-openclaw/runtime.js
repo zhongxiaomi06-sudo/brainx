@@ -47,6 +47,7 @@ export const BRAINX_OPENCLAW_TOOLS = Object.freeze([
       'ADD_TO_PROJECT', 'MARK_PREPARING', 'RECORD_OUTREACH_SENT',
       'RECORD_REPLIED', 'SUBMIT_TO_CLIENT', 'MOVE_TO_INTERVIEW',
       'KEEP_FOR_REVIEW', 'REMOVE_FROM_REVIEW', 'CREATE_DECISION_GROUP', 'SEND_TALENT_CARD',
+      'REJECT_CANDIDATE', 'RESTORE_CANDIDATE', 'SEND_CONTACT_PRIVATE',
     ] }), note: string({ maxLength: 1000 }), confirm: boolean(),
   }, ['job_id', 'candidate_ref', 'action', 'confirm']),
   description: '经用户确认后把授权候选人加入项目、发送 TTC 人才链接、管理共享重点名单、创建候选人决策群，并记录后续阶段。' },

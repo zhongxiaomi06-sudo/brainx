@@ -111,7 +111,8 @@ test('发卡失败（同步抛错/异步拒绝）不阻断，envelope 维持原�
   assert.equal(syncThrow.data.items.length, 1, '同步失败时模型仍能拿到名单交付');
   const asyncReject = await talentHandlers([], () => Promise.reject(new Error('FEISHU_DOWN')))
     .brainx_candidate_shortlist({ job_id: 'job-a' }, groupPrincipal);
-  assert.equal(asyncReject.data.card_delivered, true, '异步失败按已受理处理（best-effort）');
+  assert.equal(asyncReject.data.card_delivered, undefined, '异步发送失败不得宣称卡片已送达');
+  assert.ok(asyncReject.data.items.length > 0, '失败保留结果供读取');
 });
 
 // —— openmai_search done 群读回 ——

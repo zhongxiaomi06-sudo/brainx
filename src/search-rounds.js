@@ -1,5 +1,6 @@
 /** 项目找人轮次：从已交付结果提取 TTC 编号，作为下一轮累计排除名单。 */
 import { extractOpenmaiCandidates } from './openmai-result.js';
+import { rejectedCandidateRefs } from './candidate-search-feedback.js';
 
 const SAFE_REF = /^[A-Za-z0-9:_-]{1,100}$/;
 
@@ -41,16 +42,16 @@ function projectRows(db, projectId) {
     ORDER BY finished_at DESC,started_at DESC`).all(projectId, `supermai-result:${projectId}`);
 }
 
-export function nextSearchExclusions(db, projectId) {
+export function nextSearchExclusions(db, projectId, principal) {
   const rows = projectRows(db, projectId);
-  return normalizeExcludedCandidateRefs(rows.flatMap((row) => [
+  return normalizeExcludedCandidateRefs([...rejectedCandidateRefs(db, projectId, principal), ...rows.flatMap((row) => [
     ...storedRefs(row.excluded_candidate_refs_json), ...resultRefs(row),
-  ]));
+  ])]);
 }
 
-export function nextSupermaiSearchExclusions(db, projectId) {
+export function nextSupermaiSearchExclusions(db, projectId, principal) {
   const rows = projectRows(db, projectId);
-  return normalizeExcludedCandidateRefs(rows.flatMap((row) => [
+  return normalizeExcludedCandidateRefs([...rejectedCandidateRefs(db, projectId, principal), ...rows.flatMap((row) => [
     ...storedRefs(row.excluded_candidate_refs_json), ...allResultRefs(row),
-  ]));
+  ])]);
 }

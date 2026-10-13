@@ -11,6 +11,7 @@ import { supermaiCriteriaKey, startSupermaiScoutTask } from '../supermai-sourcin
 import { extractOpenmaiCandidates, buildOpenmaiDeliveryCard, STALE_SEARCH_MS } from '../openmai-delivery.js';
 import { nextSearchExclusions, nextSupermaiSearchExclusions } from '../search-rounds.js';
 import { registerFreeformDelivery } from '../sourcing-group-delivery.js';
+import { rejectedCandidateRefs } from '../candidate-search-feedback.js';
 
 function fail(code) {
   throw Object.assign(new Error(code), { code });
@@ -223,7 +224,8 @@ async function openmaiSearch(db, args, principal, sendCardFn, publicBaseUrl) {
   if (shared?.search_status === 'RUNNING' || (shared && !continuing)) {
     return sharedProjectSearch(args.job_id, shared, 'openmai');
   }
-  const exclusions = continuing ? nextSearchExclusions(db, args.job_id) : [];
+  const exclusions = continuing ? nextSearchExclusions(db, args.job_id, principal)
+    : rejectedCandidateRefs(db, args.job_id, principal);
   const blocked = continuing && continuingGate(cur, exclusions, args.job_id, 'openmai');
   if (blocked) return blocked;
   const out = startOpenmaiTask(db, null, principal.consultantId, args.job_id, {
@@ -312,7 +314,8 @@ async function supermaiScout(db, args, principal, sendCardFn, publicBaseUrl) {
     return sharedProjectSearch(jobId, shared, 'supermai');
   }
   // 续搜排除名单按落库主键取（自由找人=合成键），不再限 job 模式——自由找人也可续搜。
-  const exclusions = continuing ? nextSupermaiSearchExclusions(db, project_id) : [];
+  const exclusions = continuing ? nextSupermaiSearchExclusions(db, project_id, principal)
+    : rejectedCandidateRefs(db, project_id, principal);
   const blocked = continuing && continuingGate(cur, exclusions, project_id, 'supermai');
   if (blocked) return blocked;
   const out = startSupermaiScoutTask(db, null, principal.consultantId, criteria, {

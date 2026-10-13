@@ -9,6 +9,8 @@ import { sendPdfFile, sendTextMessage } from '../feishu-bot.js';
 import { getAuthorizedTtcJwt } from '../ttcsdk/auth.js';
 import { downloadTtcResumePdf, listTtcResumeAttachments } from '../ttcsdk/resume.js';
 import { createCandidateDecisionGroup } from '../candidate-decision-group.js';
+import { setCandidateSearchFeedback } from '../candidate-search-feedback.js';
+import { sendCandidatePrivateContact } from './candidate-private-contact.js';
 
 function fail(code) { throw Object.assign(new Error(code), { code }); }
 
@@ -136,6 +138,7 @@ export function createCandidateActionToolHandlers({
   createCandidateDecisionGroupFn = createCandidateDecisionGroup,
   sendTextMessageFn = sendTextMessage,
   addTalentFn = defaultAddTalent,
+  loadCandidateContactFn, contactAppId,
 } = {}) {
   return {
     brainx_candidate_workflow: async (args, context) => {
@@ -148,10 +151,24 @@ export function createCandidateActionToolHandlers({
       const focusedCandidate = listProjectCandidateFocus(db, context.principal.tenantId, args.job_id)
         .find((candidate) => candidate.candidate_ref === args.candidate_ref);
       const focused = Boolean(focusedCandidate);
-      const permitted = existing || discovered || focused
+      const ownFeedback = args.action === 'RESTORE_CANDIDATE' && db.prepare(`SELECT 1 FROM candidate_search_feedback
+        WHERE tenant_id=? AND consultant_id=? AND project_id=? AND candidate_ref=?`)
+        .get(context.principal.tenantId, context.principal.consultantId, args.job_id, args.candidate_ref);
+      const permitted = existing || discovered || focused || ownFeedback
         || await authorized(candidateShortlistFn, context.principal, args.job_id, args.candidate_ref);
       if (!permitted) {
         fail('NOT_FOUND_OR_FORBIDDEN');
+      }
+      if (args.action === 'SEND_CONTACT_PRIVATE') {
+        return sendCandidatePrivateContact(db, context.principal, args.candidate_ref,
+          { loadCandidateContactFn, sendTextMessageFn, appId: contactAppId });
+      }
+      if (['REJECT_CANDIDATE', 'RESTORE_CANDIDATE'].includes(args.action)) {
+        const row = setCandidateSearchFeedback(db, context.principal, args, discovered?.sourceTaskId);
+        return { data: row, facts: [{ candidate_ref: args.candidate_ref,
+          excluded_from_next_search: row.status === 'REJECTED' }],
+        inferences: [], recommendations: [], unknowns: [],
+        evidence_refs: [`candidate_feedback:${args.job_id}:${args.candidate_ref}`] };
       }
       if (args.action === 'KEEP_FOR_REVIEW' || args.action === 'REMOVE_FROM_REVIEW') {
         const row = setProjectCandidateFocus(db, {

@@ -2,6 +2,7 @@
 import { currentState } from './engagement.js';
 import { startOpenmaiTask, getOpenmaiResult } from './openmai-task.js';
 import { nextSearchExclusions } from './search-rounds.js';
+import { searchPrincipalForConsultant } from './candidate-search-feedback.js';
 import { body, err, json } from './server-http.js';
 
 export function openmaiRoutes(db, bus) {
@@ -24,7 +25,8 @@ export function openmaiRoutes(db, bus) {
       const searchBrief = String(payload?.search_brief || '').trim();
       if (searchBrief.length > 2000) return err(res, 422, 'SEARCH_BRIEF_TOO_LONG', '职位信息不能超过 2000 字');
       const out = startOpenmaiTask(db, bus, cid, id, {
-        force: true, searchBrief, excludeCandidateRefs: nextSearchExclusions(db, id),
+        force: true, searchBrief,
+        excludeCandidateRefs: nextSearchExclusions(db, id, searchPrincipalForConsultant(db, cid)),
       });
       json(res, 200, { ok: true, openmai: out });
     },

@@ -124,3 +124,5 @@ OpenMai 候选人总览同样不在 React Storybook 伪造飞书组件。正式�
 自由条件结果持久回群追加后端测试，不新增 Storybook 副本；真实群发送仍待验证。
 
 零命中标题优先级追加回归，仍复用生产卡片函数。
+
+项目及内部短名单四动作使用原生卡片渲染，不另建 Storybook 副本；状态见[本轮复核](frontend-reviews/2026-10-13-sourcing-result-context.md)。

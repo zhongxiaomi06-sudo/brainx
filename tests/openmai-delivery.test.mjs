@@ -265,7 +265,8 @@ ${JSON.stringify({ candidates: [
   assert.equal(names[1].tag, 'div', 'PT 外部渠道编号 TTC 查无此人，姓名降级纯文本');
   assert.equal(names[1].text.content, '2. 李四');
   const actions = rows.slice(1).map((row) => row.columns[2].elements);
-  assert.deepEqual(actions[0].map((button) => button.text.content), ['初筛通过', '加入reloop']);
+  assert.deepEqual(actions[0].map((button) => button.text.content), ['初筛通过', '加入reloop', '不合适', '查联系方式']);
+  assert.match(actions[0][2].confirm.title.content, /确认/);
   assert.match(actions[0][0].value.text, /candidate_ref=PL1878965686105948161/);
   assert.match(actions[0][0].value.text, /action=KEEP_FOR_REVIEW/);
   assert.match(actions[0][0].value.text, /confirm=true/);
@@ -306,7 +307,7 @@ ${JSON.stringify({ candidates: [
   const completeNames = completeRows.slice(1).map((row) => row.columns[0].elements[0]);
   assert.ok(completeNames.every((name) => name.tag === 'button'
     && /app\/talent\//.test(name.multi_url.url)));
-  assert.ok(completeRows.slice(1).every((row) => row.columns[2].elements.length === 2));
+  assert.ok(completeRows.slice(1).every((row) => row.columns[2].elements.length === 4));
   const continueActions = card.elements.filter((element) => element.tag === 'action'
     && element.actions[0].text.content.includes('继续找人'));
   assert.equal(continueActions.length, 1, '关注动作与继续找人分成两个动作块');

@@ -207,7 +207,8 @@ test('migrations：schema_migrations 逐文件记账，重开不重跑', () => {
                           '0063_candidate_search_feedback.sql',
                           '0064_project_search_briefs.sql',
                           '0065_freeform_candidate_decisions.sql',
-                          '0066_judgment_notice_deliveries.sql']);
+                          '0066_judgment_notice_deliveries.sql',
+                          '0067_sourcing_candidates.sql']);
 });
 
 const TMPDB = join(tmpdir(), `brainx-fw-${process.pid}.db`);
@@ -243,8 +244,9 @@ test('migrations：旧库 user_version=2 兼容——前 2 个文件标记已应
   legacy.close();
   const reopened = openDb(TMPDB);
   const rows = reopened.prepare('SELECT name FROM schema_migrations ORDER BY name').all().map((r) => r.name);
-  assert.equal(rows.length, 79); // 全部迁移文件记账（0001...0066，含并行编号）
+  assert.equal(rows.length, 80); // 全部迁移文件记账（0001...0067，含并行编号）
   assert.ok(reopened.prepare("SELECT name FROM sqlite_master WHERE name='sourcing_group_deliveries'").get());
+  assert.ok(reopened.prepare("SELECT name FROM sqlite_master WHERE name='sourcing_candidates'").get());
   assert.equal(reopened.prepare(`SELECT COUNT(*) n FROM decision_events
     WHERE event_type='RECOMMENDED'`).get().n, 0, '历史机器推荐轨迹已清理');
   assert.equal(reopened.prepare(`SELECT COUNT(*) n FROM decision_events

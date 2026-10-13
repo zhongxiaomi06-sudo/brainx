@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-10-13｜test(门禁): specs/036 新工具的接口面断言同步（工具数 32、migration 0067、插件清单 31）
+
+- 起因：81268d9 加入 brainx_sourcing_recall 与 migration 0067 后，全量测试 8 项失败——其中 6 项是接口面「断言需按实测同步」的预期项（agent-gateway-http 工具数 31→32、agent-golden-workflow 31→32、openclaw-plugin Set 30→31、framework migrations 清单 79→80 行并验证 sourcing_candidates 表存在、tool-contract-drift 五面一致要求 deploy/openclaw/openclaw.production.json 同步 recall、fixtures plugin-contract.json 31 项）。按 AGENT_COMMIT_LOG 既往惯例（测试断言按实测代码对齐，不沿用旧值）全部同步。
+- 同步面（specs/019 US5 五接口面）：①registry（81268d9）②runtime.js ③openclaw.plugin.json（均已在 81268d9）④deploy/openclaw/openclaw.production.json tools.allow + recall ⑤tests/fixtures/openclaw-production/plugin-contract.json + recall。
+- 其余 2 项失败为环境态：worker 就绪（并行压满本机，单跑通过）、visibility.test.mjs（219s 超时被杀，单跑 7/7 通过）。浏览器前后端链路在 full 中挂为并行端口竞争，单跑通过。
+- 验证：五个适配文件 37/37 过；全量复跑见后续记录。
+
 ## 2026-10-13｜feat(寻访): specs/036 快照结构化落库 + brainx_sourcing_recall 群内免费检索 + CONTACT 三态语义
 
 - 起因（用户指令）：群内实测暴露三连问题——顾问问「上次那轮里筛出有小红书或字节背景的」，agent 审计表零工具调用，bot 答「没保留卡片内容」并提议把筛选条件写进判据重新付费搜索；查已入库候选人联系方式仍报「未授权」。产品结论：机器人失忆 + 语义错位 + 付费当解法。

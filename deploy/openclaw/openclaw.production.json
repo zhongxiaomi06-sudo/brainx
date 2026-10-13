@@ -122,6 +122,7 @@
       "brainx_run_status",
       "brainx_openmai_search",
       "brainx_supermai_scout",
+      "brainx_sourcing_recall",
       "brainx_pending_job_facts",
       "brainx_review_job_fact",
       "brainx_submit_job_jd",

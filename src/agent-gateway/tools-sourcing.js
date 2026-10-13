@@ -10,6 +10,7 @@ import { startOpenmaiTask, getOpenmaiResult } from '../openmai-task.js';
 import { supermaiCriteriaKey, startSupermaiScoutTask } from '../supermai-sourcing.js';
 import { extractOpenmaiCandidates, buildOpenmaiDeliveryCard, STALE_SEARCH_MS } from '../openmai-delivery.js';
 import { nextSearchExclusions, nextSupermaiSearchExclusions } from '../search-rounds.js';
+import { registerFreeformDelivery } from '../sourcing-group-delivery.js';
 
 function fail(code) {
   throw Object.assign(new Error(code), { code });
@@ -266,7 +267,9 @@ async function supermaiScout(db, args, principal, sendCardFn, publicBaseUrl) {
   const stale = runningStale(cur);
   if ((cur.status === 'running' && !stale) || (cur.status === 'done' && !continuing)) {
     const candidates = cur.status === 'done' ? extractOpenmaiCandidates(cur.result_text) : [];
-    const disc = cur.status === 'running' ? pollDiscipline(cur.started_at, 'supermai', Boolean(jobId)) : null;
+    const autoDeliver = Boolean(jobId) || (cur.status === 'running'
+      && registerFreeformDelivery(db, principal, project_id));
+    const disc = cur.status === 'running' ? pollDiscipline(cur.started_at, 'supermai', autoDeliver) : null;
     // NO_REPLY/空结果：OpenMai 对极窄判据可能零命中（返回占位符）——语义化为「未搜到」而非当成成功交付。
     const noReply = cur.status === 'done' && !candidates.length
       && ['NO_REPLY', ''].includes(String(cur.result_text || '').trim());
@@ -315,6 +318,8 @@ async function supermaiScout(db, args, principal, sendCardFn, publicBaseUrl) {
   const out = startSupermaiScoutTask(db, null, principal.consultantId, criteria, {
     force: continuing, projectId: jobId || null, excludeCandidateRefs: exclusions,
   });
+  const autoDeliver = Boolean(jobId) || (['triggered', 'running'].includes(out.status)
+    && registerFreeformDelivery(db, principal, project_id));
   if (jobId) markProjectSearch(db, jobId, out);
   return {
     data: { entry: 'supermai', job_ref: jobId || null, criteria,
@@ -325,7 +330,7 @@ async function supermaiScout(db, args, principal, sendCardFn, publicBaseUrl) {
               ? '同判据结果已存在，请再次调用本工具读取'
               : out.status === 'error'
                 ? '找人任务未启动，请处理提示后重试；正常启动后 3-5 分钟收敛，请每隔约 1 分钟读取进度'
-              : jobId ? '找人任务已触发。立即回复顾问“正在找人，通常需要 3-5 分钟，完成后候选人会自动发到本群”并结束本轮；'
+              : autoDeliver ? '找人任务已触发。立即回复顾问“正在找人，通常需要 3-5 分钟，完成后候选人会自动发到本群”并结束本轮；'
                 + '除非顾问之后明确询问进度，不要原地轮询'
                 : '找人任务已触发，正常 3-5 分钟收敛；请每隔约 1 分钟（间隔至少 60 秒）再调本工具读取'
                 + '（最多守候 10 分钟），完成后完整呈现 result_text（保留「查看」链接）' },

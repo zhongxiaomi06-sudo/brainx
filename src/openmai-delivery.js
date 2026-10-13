@@ -5,6 +5,7 @@ import { sendInteractiveCard } from './feishu-bot.js';
 import { assessOpenmaiCandidateBatch, extractOpenmaiCandidates } from './openmai-result.js';
 import { emitEvent } from './hub/emit.js';
 import { buildOpenmaiDeliveryCard } from './sourcing-result-card.js';
+import { deliverFreeformResultsOnce } from './sourcing-group-delivery.js';
 export { buildOpenmaiDeliveryCard, groupSafeOpenmaiText, screenCandidateAction,
   addToReloopAction } from './sourcing-result-card.js';
 
@@ -248,7 +249,10 @@ export function startOpenmaiDeliveryWorker(db, dependencies = {}) {
   const tick = async () => {
     if (running) return;
     running = true;
-    try { await deliverOpenmaiResultsOnce(db, dependencies); }
+    try {
+      await deliverOpenmaiResultsOnce(db, dependencies);
+      await deliverFreeformResultsOnce(db, dependencies);
+    }
     catch (error) { console.error(`[worker] OpenMai 群投递异常: ${String(error?.message || error).slice(0, 120)}`); }
     finally { running = false; }
   };

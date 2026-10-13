@@ -14,6 +14,7 @@ import { getAuthorizedTtcJwt } from './ttcsdk/auth.js';
 import { assessOpenmaiCandidateBatch, looksLikeSessionPollution } from './openmai-result.js';
 import { normalizeExcludedCandidateRefs } from './search-rounds.js';
 import { emitEvent } from './hub/emit.js';
+import { snapshotFreeformResult } from './sourcing-group-delivery.js';
 
 /** specs/019 US1：找人结算补发 search_finished 事件（契约 specs/019 contracts/event-types.md）。
  *  与结算 UPDATE 同调用栈；重复结算（非 running）changes=0 不发事件。 */
@@ -54,6 +55,7 @@ export function settleOpenmaiTask(db, {
     finishedAt, projectId, consultantId, taskId,
   );
   if (output.changes === 1) {
+    snapshotFreeformResult(db, taskId, consultantId);
     emitSearchFinished(db, { projectId, consultantId, taskId, status, channel, resultCount });
   }
   return output.changes === 1;

@@ -21,7 +21,7 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
   // freeform = SuperMai 自由找人模式（无职位）：判据摘要替代 company/role，不放 deep link。
   // 项目模式 job.freeform 不传，行为不变（AGENTS.md §2 最小实现：复用同一函数）。
   const freeform = job?.freeform === true;
-  const baseUrl = productionBaseUrl(publicBaseUrl).href;
+  const baseUrl = freeform ? null : productionBaseUrl(publicBaseUrl).href;
   const target = freeform ? null
     : buildBrainxDeepLink({ baseUrl, objectType: 'opportunity', objectRef: job.project_id });
   const success = status === 'done' || status === 'needs_input';

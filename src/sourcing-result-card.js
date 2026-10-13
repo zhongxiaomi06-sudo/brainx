@@ -27,7 +27,6 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
   const success = status === 'done' || status === 'needs_input';
   const quality = success ? assessOpenmaiCandidateBatch(resultText) : null;
   const needsInput = status === 'needs_input' || quality?.needsInput;
-  const complete = success && quality.complete;
   const candidates = success ? extractOpenmaiCandidates(resultText) : [];
   const searchRound = Math.max(1, Number(job.search_round || 1));
   // 2026-09-16 用户拍板：首轮才写「首轮」，其他轮次用「续搜」，不写「第 N 轮」。
@@ -44,6 +43,7 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
   const partialTitle = `${brand} · ${roundWord}候选人不足`;
   const noMatches = status === 'done' && !candidates.length
     && ['', 'NO_REPLY'].includes(String(resultText || '').trim());
+  const complete = success && quality.complete && !noMatches;
   const headline = freeform
     ? `**自由找人 · ${groupSafeOpenmaiText(job.criteria, 60) || '未给判据'}**`
     : `**${job.company} · ${job.role}**`;

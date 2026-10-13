@@ -122,3 +122,5 @@ OpenMai 候选人总览同样不在 React Storybook 伪造飞书组件。正式�
 本轮寻访结果卡属于飞书原生 JSON，使用生产构建函数及卡片渲染门禁，不另造 Storybook 副本。新增条件/轮次/排除人数，状态见[审核记录](frontend-reviews/2026-10-13-sourcing-result-context.md)。
 
 自由条件结果持久回群追加后端测试，不新增 Storybook 副本；真实群发送仍待验证。
+
+零命中标题优先级追加回归，仍复用生产卡片函数。

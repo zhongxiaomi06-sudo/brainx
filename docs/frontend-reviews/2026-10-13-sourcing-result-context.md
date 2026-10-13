@@ -1,5 +1,7 @@
 # 寻访结果卡上下文复核
 
+零命中追加：正式 sourcing-result-card 调用 relaxedSearchElements，经 search-start-notice 结构化命令启动。仅明确软偏好可放宽，其他情况提示人工补充；自由条件新作用域不继承历史排除，确认中提示。sourcing-zero-relax 344px 截图已查看；新专项 2/2。原生卡不适用 Storybook，用户未审核、未发布、真实数据未验证；须真机验收确认取消不触发、确认只启动一次及排除行为。
+
 需求卡追加：openmai delivery worker 接 deliverJudgmentNoticesOnce（开关默认关），judgment-notice 160px 截图已查看；结构化按钮由 search-start-notice 直调。专项 40/40；原生卡不适用 Storybook、用户未审核、未发布、真实数据未验证。
 
 JD 卡追加：tools-jd-submit 调用 buildJdConfirmationCard；工具回调只放行本人原群 group_jd 草稿，缺公司/职位不出确认按钮。专项 25/25，220px 截图已查看无截断。原生卡不适用 Storybook；用户未审核、未发布、真实数据未验证。

@@ -4,6 +4,7 @@ import { alignSoloAction } from './card-layout.js';
 import { assessOpenmaiCandidateBatch, extractOpenmaiCandidates } from './openmai-result.js';
 import { normalizeExcludedCandidateRefs } from './search-rounds.js';
 import { rejectCandidateAction, contactCandidateAction, freeformCandidateActions } from './candidate-card-actions.js';
+import { relaxedSearchElements } from './search-relaxation.js';
 const PHONE = /(?<!\d)(?:\+?86[-\s]?)?1[3-9]\d{9}(?!\d)/g;
 const EMAIL = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
 
@@ -68,6 +69,7 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
       // 说明收成一行小灰字 note：按钮与候选人随行后不再需要长段教学。
       ...(candidates.length ? [focusIntroNote(freeform, source)] : []),
       ...rows,
+      ...(noMatches ? relaxedSearchElements(job, source) : []),
       // freeform 操作列统一「暂不支持」，不再逐条提示编号/链接问题（2026-10-09）。
       ...(freeform ? [] : candidateQualityNotes(candidates)),
       ...(candidates.length ? [continueSearchActions(job), ...(!freeform ? [continueSearchHint()] : [])] : []),

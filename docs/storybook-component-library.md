@@ -1,5 +1,7 @@
 # BrainX 内部 Storybook 组件库
 
+零命中确认重搜使用 sourcing-zero-relax 原生卡场景，不另造 Storybook 副本；确认计费、软硬条件保护有自动化。见[本轮复核](frontend-reviews/2026-10-13-sourcing-result-context.md)。
+
 需求线索使用 judgment-notice 原生卡渲染场景；原群确认及显式搜索有自动化，非真实飞书验证。见[本轮复核](frontend-reviews/2026-10-13-sourcing-result-context.md)。
 
 JD 原生卡由 jd-confirmation 渲染场景覆盖，确认后才建岗；不另建 Storybook 副本。状态见[本轮复核](frontend-reviews/2026-10-13-sourcing-result-context.md)。

@@ -1,5 +1,7 @@
 # 前端真实数据重构施工清单
 
+零命中放宽先预览再确认，未声明软偏好则不自动建议；本地接入，真实群待验收。见[本轮复核](frontend-reviews/2026-10-13-sourcing-result-context.md)。
+
 需求线索卡默认关闭、按原群授权启用；状态见[本轮复核](frontend-reviews/2026-10-13-sourcing-result-context.md)。
 
 JD 确认卡完成本地接入与测试；状态见[本轮复核](frontend-reviews/2026-10-13-sourcing-result-context.md)。

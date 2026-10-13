@@ -6,6 +6,16 @@ const CONDITION_LINE = /^找人条件[：:]\s*([\s\S]{1,500})$/;
 
 export function parseSearchStartNotice(content) {
   const raw = String(content || '').trim();
+  if (raw.startsWith('[BRAINTEX_PROJECT_START] ')) {
+    try {
+      const value = JSON.parse(raw.slice('[BRAINTEX_PROJECT_START] '.length));
+      if (!/^[A-Za-z0-9_-]{1,64}$/.test(value.job_id || '') || !['OpenMai', 'SuperMai'].includes(value.entry)
+          || typeof value.criteria !== 'string' || value.criteria.length < 5 || value.criteria.length > 2000
+          || value.continue_search !== true) return null;
+      return { projectRef: value.job_id, entry: value.entry, continuing: true, criteria: value.criteria,
+        text: `🔎 正在处理 ${value.entry} 继续找人请求，通常需要 3–5 分钟；完成后候选人会自动发到本群。` };
+    } catch { return null; }
+  }
   if (raw.startsWith('[BRAINTEX_FREEFORM_START] ')) {
     try {
       const value = JSON.parse(raw.slice('[BRAINTEX_FREEFORM_START] '.length));
@@ -110,7 +120,7 @@ export function createSearchStartNoticeHandler(api, dependencies = {}) {
           chat_id: to,
           thread_id: String(event?.metadata?.threadId || '').trim() || null,
         }, dependencies);
-        if (notice.projectRef && result?.ok !== false && result?.data?.status === 'triggered'
+        if (notice.projectRef && !notice.criteria && result?.ok !== false && result?.data?.status === 'triggered'
             && latestConditions.get(scope) === selected) latestConditions.delete(scope);
         if (result?.ok === false) {
           api.logger?.warn?.(`[brainx-search-notice] direct search start refused: ${String(result?.error?.code || 'UNKNOWN').slice(0, 80)}`);

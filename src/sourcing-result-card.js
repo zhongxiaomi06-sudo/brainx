@@ -19,7 +19,7 @@ export function groupSafeOpenmaiText(value, max = 6500) {
 }
 
 export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publicBaseUrl,
-  source = 'openmai' }) {
+  source = 'openmai', careerStatusMap = null }) {
   // freeform = SuperMai 自由找人模式（无职位）：判据摘要替代 company/role，不放 deep link。
   // 项目模式 job.freeform 不传，行为不变（AGENTS.md §2 最小实现：复用同一函数）。
   const freeform = job?.freeform === true;
@@ -55,7 +55,7 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
         + (quality.message ? `\n\n> ${quality.message}` : '')
       : `${headline}\n\n${noMatches ? '本轮未搜到匹配候选人。请确认可放宽的条件后重新发起；本次不会自动重跑。' : groupSafeOpenmaiText(resultText)}`)
     : `${headline}\n\n本轮候选人搜索失败：${groupSafeOpenmaiText(error, 500)}\n\n请修复连接后在工作台重试。`;
-  const rows = candidates.length ? candidateFocusRows(job, candidates, source) : [];
+  const rows = candidates.length ? candidateFocusRows(job, candidates, source, careerStatusMap) : [];
   return {
     config: { wide_screen_mode: true },
     header: { template: complete ? 'green' : success ? 'orange' : 'red', title: { tag: 'plain_text',
@@ -83,15 +83,19 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
 }
 
 /** 候选人每人一行：姓名直接打开 TTC，右侧只保留初筛通过与加入 reloop。
- *  三列权重 3/5/3，动作按钮纵向排列，确保四字姓名和两个动作都不被截断。 */
-function candidateFocusRows(job, candidates, source) {
+ *  三列权重 3/5/3，动作按钮纵向排列，确保四字姓名和两个动作都不被截断。
+ *  careerStatusMap（specs/036）：{candidate_ref → career_status}，有终态时在匹配行前加徽标。 */
+const CAREER_BADGE = { screened: '已初筛', in_pool: '已入库', rejected: '已排除', restored: '已恢复' };
+
+function candidateFocusRows(job, candidates, source, careerStatusMap = null) {
   const freeform = job?.freeform === true;
   return [
     { tag: 'column_set', flex_mode: 'none', background_style: 'grey',
       columns: [tableCell('候选人', 3), tableCell('匹配与背景 · 核心匹配', 5), tableCell('操作', 3)] },
     ...candidates.map((candidate, index) => {
+      const badge = CAREER_BADGE[careerStatusMap?.[candidate.candidateRef] || ''] || '';
       const info = [
-        `**匹配度 ${groupSafeOpenmaiText(candidate.score, 20)}** · ${groupSafeOpenmaiText(candidate.role, 120)}`,
+        `${badge ? `〔${badge}〕` : ''}**匹配度 ${groupSafeOpenmaiText(candidate.score, 20)}** · ${groupSafeOpenmaiText(candidate.role, 120)}`,
         backgroundText(candidate),
         groupSafeOpenmaiText(candidate.evaluation, 300),
       ].filter(Boolean).join('\n');

@@ -11,6 +11,7 @@ import { supermaiCriteriaKey, startSupermaiScoutTask } from '../supermai-sourcin
 import { extractOpenmaiCandidates, buildOpenmaiDeliveryCard, STALE_SEARCH_MS } from '../openmai-delivery.js';
 import { nextSearchExclusions, nextSupermaiSearchExclusions } from '../search-rounds.js';
 import { registerFreeformDelivery } from '../sourcing-group-delivery.js';
+import { careerStatusMap } from '../sourcing-candidates.js';
 import { rejectedCandidateRefs } from '../candidate-search-feedback.js';
 import { internalFirst } from './search-internal-first.js';
 
@@ -152,16 +153,21 @@ function runningStale(cur) {
 }
 
 /** 群上下文 done 读回：把标准候选人卡确定性发到本群（best-effort，失败不阻断）。
- *  幂等键按 职位×群×轮次×日 去重防刷屏；只有发卡调用成功才返回 true。 */
+ *  幂等键按 职位×群×轮次×日 去重防刷屏；只有发卡调用成功才返回 true。
+ *  specs/036：带生涯徽标（sourcing_candidates 缺表按无徽标渲染）。 */
 async function trySendOpenmaiResultCard(sendCardFn, publicBaseUrl, args, principal, row, cur, source = 'openmai') {
   if (!sendCardFn || principal.chatType !== 'group' || !principal.chatId) return false;
   try {
+    let careerMap = null;
+    try { careerMap = careerStatusMap(db, { searchKey: args.job_id, consultantId: principal.consultantId }); }
+    catch { /* best-effort 徽标 */ }
     await sendCardFn({
       target: principal.chatId,
       card: buildOpenmaiDeliveryCard({
         job: { ...row, search_round: cur.search_round || 1,
           search_brief: cur.search_brief, excluded_candidate_refs_json: cur.excluded_candidate_refs_json },
         status: cur.status, resultText: cur.result_text, error: cur.error, publicBaseUrl, source,
+        careerStatusMap: careerMap,
       }),
       idempotencyKey: `openmai-result-card:${args.job_id}:${principal.chatId}:round${cur.search_round || 1}:${shanghaiDate()}`,
     });
@@ -254,7 +260,7 @@ async function openmaiSearch(db, args, principal, sendCardFn, publicBaseUrl, int
  * SuperMai 找人 = 猎聘/脉脉渠道 → 与 openmai_search 共用 OpenMai 引擎，
  * 本入口是「无需职位、直接给判据」的自由找人（completions 无 job_id 模式）。
  * 触发/读取两段式：首次调用触发任务返回 running，完成后同参数再调读取结果。 */
-async function supermaiScout(db, args, principal, sendCardFn, publicBaseUrl, internalShortlistFn) {
+async function supermaiScout(db, args, principal, sendCardFn, publicBaseUrl, internalShortlistFn, sendTextMessageFn) {
   const jobId = String(args.job_id || '').trim();
   const continuing = args.continue_search === true;
   const extra = cleanSearchCriteria(args.criteria);
@@ -324,15 +330,32 @@ async function supermaiScout(db, args, principal, sendCardFn, publicBaseUrl, int
   const internal = await internalFirst(internalShortlistFn, jobId, principal);
   const concurrent = jobId ? activeProjectSearch(db, jobId) : null;
   if (concurrent?.search_status === 'RUNNING') return sharedProjectSearch(jobId, concurrent, 'supermai');
+  // specs/036：付费触发前统计本人近 30 天未排除的历史人选数——供 agent 提示「可先用 recall 免费筛选」，
+  // 不做静默拦截（顾问明确要新人才启动，脑内判断权留给顾问）。
+  let knownRecent = 0;
+  try {
+    knownRecent = db.prepare(`SELECT COUNT(*) c FROM sourcing_candidates
+      WHERE consultant_id=? AND career_status!='rejected' AND updated_at>=?`)
+      .get(principal.consultantId, new Date(Date.now() - 30 * 86_400_000).toISOString()).c;
+  } catch { knownRecent = 0; }
   const out = startSupermaiScoutTask(db, null, principal.consultantId, criteria, {
     force: continuing, projectId: jobId || null, excludeCandidateRefs: exclusions,
   });
   const autoDeliver = Boolean(jobId) || (['triggered', 'running'].includes(out.status)
     && registerFreeformDelivery(db, principal, project_id));
   if (jobId) markProjectSearch(db, jobId, out);
+  // specs/036：触发成功后 best-effort 发状态消息（等待期有反馈），失败不阻断。
+  if (autoDeliver && ['triggered', 'running'].includes(out.status) && sendTextMessageFn) {
+    try {
+      await sendTextMessageFn({ target: principal.chatId,
+        text: '正在按判据找人，通常 3-5 分钟收敛，完成后结果卡片会自动发到本群。',
+        idempotencyKey: `scout-status:${out.task_id}` });
+    } catch { /* 状态消息 best-effort，失败不影响任务 */ }
+  }
   return {
     data: { entry: 'supermai', job_ref: jobId || null, criteria, internal_shortlist: internal,
             continue_search: continuing, excluded_candidate_refs: exclusions,
+            known_recent_candidates: knownRecent,
             status: out.status || 'triggered',
             task_id: out.task_id || null, message: out.message || null,
             note: out.status === 'already_done'
@@ -343,14 +366,22 @@ async function supermaiScout(db, args, principal, sendCardFn, publicBaseUrl, int
                 + '除非顾问之后明确询问进度，不要原地轮询'
                 : '找人任务已触发，正常 3-5 分钟收敛；请每隔约 1 分钟（间隔至少 60 秒）再调本工具读取'
                 + '（最多守候 10 分钟），完成后完整呈现 result_text（保留「查看」链接）' },
-    facts: [], inferences: [], recommendations: [], unknowns: [],
+    facts: [], inferences: [],
+    recommendations: knownRecent >= 3 && out.status === 'triggered'
+      ? [{ action: 'mention_recall',
+        note: `启动前提醒：本人近 30 天已有 ${knownRecent} 个历史搜索人选（未排除），`
+          + '若顾问只是想在已有结果里筛选（如按公司/城市/背景），改用 brainx_sourcing_recall 免费秒查；'
+          + '本次已按顾问明确指令启动新搜索，不要撤销。' }]
+      : [],
+    unknowns: [],
     evidence_refs: [`supermai:${out.task_id || project_id}`],
   };
 }
 
-export function createSourcingToolHandlers({ db, sendCardFn = null, publicBaseUrl = process.env.BRAINX_BASE_URL, internalShortlistFn } = {}) {
+export function createSourcingToolHandlers({ db, sendCardFn = null, publicBaseUrl = process.env.BRAINX_BASE_URL,
+  internalShortlistFn, sendTextMessageFn = null } = {}) {
   return {
     brainx_openmai_search: (args, context) => openmaiSearch(db, args, context.principal, sendCardFn, publicBaseUrl, internalShortlistFn),
-    brainx_supermai_scout: (args, context) => supermaiScout(db, args, context.principal, sendCardFn, publicBaseUrl, internalShortlistFn),
+    brainx_supermai_scout: (args, context) => supermaiScout(db, args, context.principal, sendCardFn, publicBaseUrl, internalShortlistFn, sendTextMessageFn),
   };
 }

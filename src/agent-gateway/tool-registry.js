@@ -6,7 +6,8 @@ import { createJobFactsToolHandlers } from './tools-job-facts.js';
 import { createJudgmentToolHandlers } from './tools-judgments.js';
 import { createJdSubmitToolHandlers } from './tools-jd-submit.js';
 import { createFreeformCandidateHandlers } from './tools-freeform-candidates.js';
-import { sendInteractiveCard } from '../feishu-bot.js';
+import { createSourcingRecallToolHandlers } from './tools-sourcing-recall.js';
+import { sendInteractiveCard, sendTextMessage } from '../feishu-bot.js';
 import { createCandidateReportToolHandlers } from '../candidate-report.js';
 
 const BANNED_ARGUMENTS = new Set([
@@ -59,6 +60,11 @@ export const AGENT_TOOL_ROWS = Object.freeze([
   { name: 'brainx_supermai_scout', purpose: ['candidate_review'], parameters: object({
     job_id: string(), criteria: string({ maxLength: 2000 }), continue_search: boolean(),
   }), projectKey: 'job_id' },
+  // specs/036：在本人历史搜索结果里筛选/排序（零付费）；找全新的人用 brainx_supermai_scout。
+  { name: 'brainx_sourcing_recall', purpose: ['candidate_review'], parameters: object({
+    search_key: string(), filter: string({ maxLength: 200 }), city: string({ maxLength: 80 }),
+    order_by: string({ enum: ['score', 'time'] }), limit: integer(1, 20),
+  }) },
   { name: 'brainx_pending_job_facts', purpose: ['job_fact_review'], p2pOnly: true, parameters: object({
     limit: integer(1, 20),
   }) },
@@ -207,8 +213,8 @@ export function createProductionToolRegistry({ db, talentDependencies = {}, acti
   // 默认接上飞书发卡通道；未配置飞书凭证时 sendInteractiveCard 抛错，handler 内
   // try/catch 兜底吞掉（降级为不发卡，工具返回不受影响）。
   const jobs = createJobToolHandlers({ db, sendCardFn: sendInteractiveCard,
-    internalShortlistFn: (args, context) => talent.brainx_candidate_shortlist(args, context), ...jobDependencies });
-  // specs/014：默认接上飞书发卡通道，用于接单成功后把接单卡换成找人卡；
+    sendTextMessageFn: sendTextMessage,
+    internalShortlistFn: (args, context) => talent.brainx_candidate_shortlist(args, context), ...jobDependencies });  // specs/014：默认接上飞书发卡通道，用于接单成功后把接单卡换成找人卡；
   // 未配置飞书凭证时 sendInteractiveCard 抛错，已由 sendAcceptedCard 兜底吞掉。
   const actions = createActionToolHandlers({ db, sendCardFn: sendInteractiveCard, ...actionDependencies });
   const candidateActions = createCandidateActionToolHandlers({ db, ...talentDependencies });
@@ -223,7 +229,8 @@ export function createProductionToolRegistry({ db, talentDependencies = {}, acti
     ...talentDependencies,
     jobGapHandler: jobs.brainx_gap_questions,
   });
+  const sourcingRecall = createSourcingRecallToolHandlers({ db });
   return createToolRegistry({ handlers: {
-    ...jobs, ...talent, ...actions, ...candidateActions, ...freeformActions, ...jobFacts, ...judgments, ...jdSubmit, ...reports,
+    ...jobs, ...talent, ...actions, ...candidateActions, ...freeformActions, ...jobFacts, ...judgments, ...jdSubmit, ...reports, ...sourcingRecall,
   } });
 }

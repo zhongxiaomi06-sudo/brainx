@@ -167,6 +167,7 @@
 - [清理路径隔离与显式策略 dry-run 规格](../specs/025-retention-dry-run-safety/spec.md)：停止推荐事务隐式删除，禁用旧 apply，并以只读聚合验证引用保护；不提供执行器。
 - [Server 登录与人才路由边界拆分规格](../specs/026-server-route-boundaries/spec.md)：把 OAuth/session 与人才库 HTTP 路由移出超限入口，保持鉴权及响应契约不变并撤销行数例外。
 - [BrainX 桌面端统一登录与找人连接器规格](../specs/035-desktop-auth-connectors/spec.md)：以 BrainX 单一身份、系统浏览器官方授权、设备安全存储和统一 provider/task 契约收口 OpenMai、SuperMai、Reloop 三条找人链路。
+- [Sourcing 快照结构化与群内检索规格](../specs/036-sourcing-recall/spec.md)：每轮搜索结果拆行落 `sourcing_candidates`（append-only）；新增 `brainx_sourcing_recall` 在历史结果里免费筛选/排序/计数；CONTACT 三态语义（已入库待撞库 / 未入库无数据）；结果卡生涯徽标与付费搜索前库内提示；`bin/sync-agent-tools.mjs` 一键同步插件声明与白名单。
 - [SuperMai 桌面 Relay 运行手册](2026-09-24-supermai-desktop-relay-runbook.md)：内部同事的线上配对、桌面任务领取、Sourcing 执行、飞书回传、撤销和生产验收手册。
 - [推荐用例、仓储与入口边界收口规格](../specs/027-recommendation-use-case-boundary/spec.md)：以唯一 use case 和 SQLite repository 统一 API、CLI、scheduler、worker，集中校验既有推荐配置并保留兼容 facade。
 - [来源适配与版本化职位事实规格](../specs/028-versioned-job-facts/spec.md)：统一 TTC 与本地 CSV/fixture 来源信封，追加事实版本和字段证据，复用草稿确认链并建立提炼缓存、冲突留痕及投影对账/补偿。

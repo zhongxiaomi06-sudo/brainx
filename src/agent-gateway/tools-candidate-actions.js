@@ -11,8 +11,16 @@ import { downloadTtcResumePdf, listTtcResumeAttachments } from '../ttcsdk/resume
 import { createCandidateDecisionGroup } from '../candidate-decision-group.js';
 import { setCandidateSearchFeedback } from '../candidate-search-feedback.js';
 import { sendCandidatePrivateContact } from './candidate-private-contact.js';
+import { updateSourcingCareerStatus } from '../sourcing-candidates.js';
 
 function fail(code) { throw Object.assign(new Error(code), { code }); }
+
+/** specs/036：入库成功后把 sourcing_candidates 对应行标为 in_pool（缺表/缺行静默跳过，不影响主链路）。 */
+function markSourcingPoolStatus(db, searchKey, consultantId, candidateRef) {
+  try {
+    updateSourcingCareerStatus(db, { searchKey, consultantId, candidateRef, status: 'in_pool' });
+  } catch { /* 表未迁移或该候选人不在快照行内：不阻断入库主流程 */ }
+}
 
 const PHONE = /(?<!\d)(?:\+?86[-\s]?)?1[3-9]\d{9}(?!\d)/g;
 const EMAIL = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
@@ -238,11 +246,14 @@ export function createCandidateActionToolHandlers({
           inferences: [], recommendations: [], unknowns: [],
           evidence_refs: [`candidate_link:${args.job_id}:${args.candidate_ref}`], next_allowed_actions: [] };
       }
-      const row = transition(db, context.principal, args);
-      return { data: row, facts: [{ candidate_ref: args.candidate_ref, milestone: row.milestone,
-        outreach_state: row.outreach_state }], inferences: [], recommendations: [], unknowns: [],
-        evidence_refs: [`candidate_case:${row.case_id}`], next_allowed_actions: ['brainx_candidate_contact'] };
-    },
+  const row = transition(db, context.principal, args);
+  // 群内不指向 p2pOnly 工具（brainx_candidate_contact 私聊专属）——群聊建议曾导致 agent 按提示调用必失败。
+  return { data: row, facts: [{ candidate_ref: args.candidate_ref, milestone: row.milestone,
+    outreach_state: row.outreach_state }], inferences: [], recommendations: [], unknowns: [],
+    evidence_refs: [`candidate_case:${row.case_id}`],
+    next_allowed_actions: context.principal.chatType === 'group'
+      ? ['brainx_candidate_workflow'] : ['brainx_candidate_contact'] };
+  },
     brainx_send_candidate_resume: async (args, context) => {
       if (args.confirm !== true || context.principal.chatType !== 'group'
           || (!jobVisibleTo(db, context.principal.consultantId, args.job_id)
@@ -296,6 +307,7 @@ export function createCandidateActionToolHandlers({
         + `${safeCandidateText(candidate.role || '岗位待核实', 120)}｜${safeCandidateText(candidate.evaluation || '', 300)}`;
       try {
         const result = await addTalentFn({ name, summary, sourceRef: args.candidate_ref });
+        markSourcingPoolStatus(db, args.job_id, context.principal.consultantId, args.candidate_ref);
         return { data: { candidate_ref: args.candidate_ref, talent_id: result.id, already: result.already === true },
           facts: [{ candidate_ref: args.candidate_ref, talent_pool: true }], inferences: [], recommendations: [],
           unknowns: [result.already

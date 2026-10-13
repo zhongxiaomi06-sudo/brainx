@@ -4,6 +4,7 @@ import { extractOpenmaiCandidates } from '../openmai-result.js';
 import { defaultAddTalent } from './tools-candidate-actions.js';
 import { sendCandidatePrivateContact } from './candidate-private-contact.js';
 import { sendTextMessage } from '../feishu-bot.js';
+import { updateSourcingCareerStatus } from '../sourcing-candidates.js';
 
 const fail = code => { throw Object.assign(new Error(code), { code }); };
 const safe = value => String(value || '').replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[邮箱隐藏]')
@@ -42,12 +43,14 @@ export function createFreeformCandidateHandlers({ db, addTalentFn = defaultAddTa
         const result = await addTalentFn({ name: safe(candidate.name).slice(0, 80),
           summary: `[ref:${args.candidate_ref}] 来源:SuperMai自由找人｜${safe(candidate.role)}｜${safe(candidate.evaluation)}`,
           sourceRef: args.candidate_ref });
+        markCareer(db, p, args, 'in_pool');
         return envelope({ status: result.already ? 'already_exists' : 'added', talent_id: result.id }, args);
       } catch { return envelope({ status: 'failed', sync_pending: false }, args,
         ['人才库写入失败，没有排队，不得回复已加入或同步中。']); }
     }
     const status = { SCREEN: 'SCREENED', REJECT: 'REJECTED', RESTORE: 'RESTORED' }[args.action];
     if (!status) fail('INVALID_ARGUMENT');
+    markCareer(db, p, args, { SCREEN: 'screened', REJECT: 'rejected', RESTORE: 'restored' }[args.action]);
     const keys = [p.tenantId, p.consultantId, args.search_key, args.candidate_ref];
     const existing = db.prepare(`SELECT status FROM freeform_candidate_decisions
       WHERE tenant_id=? AND consultant_id=? AND search_key=? AND candidate_ref=?`).get(...keys);
@@ -73,4 +76,12 @@ function envelope(data, args, unknowns = []) {
   return { data: { candidate_ref: args.candidate_ref, search_key: args.search_key, ...data },
     facts: [], inferences: [], recommendations: [], unknowns,
     evidence_refs: [`search_candidate:${args.search_key}:${args.candidate_ref}`] };
+}
+
+/** specs/036：四动作回写快照行生涯状态（sourcing_candidates 缺表/缺行静默跳过，不影响主链路）。 */
+function markCareer(db, p, args, careerStatus) {
+  try {
+    updateSourcingCareerStatus(db, { searchKey: args.search_key,
+      consultantId: p.consultantId, candidateRef: args.candidate_ref, status: careerStatus });
+  } catch { /* 表未迁移或该行不存在：不阻断决策落库 */ }
 }

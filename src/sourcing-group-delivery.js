@@ -3,6 +3,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { now } from './db.js';
 import { configuredFeishuAppKeyHash, sendInteractiveCard } from './feishu-bot.js';
 import { buildOpenmaiDeliveryCard } from './sourcing-result-card.js';
+import { careerStatusMap } from './sourcing-candidates.js';
 
 function allowsReview(raw) {
   try { const purposes = JSON.parse(raw); return Array.isArray(purposes) && purposes.includes('candidate_review'); }
@@ -86,10 +87,13 @@ export async function deliverFreeformResultsOnce(db, deps = {}) {
     if (!claimed) continue;
     try {
       if (!appKeyHash || row.feishu_app_key_hash !== appKeyHash) throw new Error('DELIVERY_APP_MISMATCH');
+      let careerMap = null;
+      try { careerMap = careerStatusMap(db, { searchKey: row.search_key, consultantId: row.consultant_id }); }
+      catch { /* 徽标 best-effort：表未迁移或缺行按无徽标渲染 */ }
       const out = await send({ target: row.chat_id, idempotencyKey: row.delivery_id,
         card: buildOpenmaiDeliveryCard({ job: { ...row, freeform: true, criteria: row.search_brief },
           source: 'supermai', status: row.result_status, resultText: row.result_text,
-          error: row.error, publicBaseUrl: deps.publicBaseUrl }) });
+          error: row.error, publicBaseUrl: deps.publicBaseUrl, careerStatusMap: careerMap }) });
       db.prepare(`UPDATE sourcing_group_deliveries SET delivery_status='SENT',message_id=?,
         last_error=NULL,updated_at=? WHERE delivery_id=?`).run(out?.message_id || null, at, row.delivery_id);
       counts.sent += 1;

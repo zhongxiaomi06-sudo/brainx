@@ -90,11 +90,23 @@ test('撤权或应用不匹配时不读取；无电话与无授权区分', async
   });
   assert.equal(pending.data.delivery_status, 'pending');
   const denied = await sendCandidatePrivateContact(db, principal, 'PL1234567890', {
-    ...deps, appKeyHash: keyHash, loadCandidateContactFn: async () => {
+    ...deps, appKeyHash: keyHash, poolCheckFn: async () => null,
+    loadCandidateContactFn: async () => {
       throw Object.assign(new Error('NOT_FOUND_OR_FORBIDDEN'), { code: 'NOT_FOUND_OR_FORBIDDEN' });
     },
   });
-  assert.equal(denied.data.delivery_status, 'not_authorized');
+  // specs/036 三态：未入库 → no_contact_data；已入库待撞库 → in_pool_pending_match；都不再笼统 not_authorized。
+  assert.equal(denied.data.delivery_status, 'no_contact_data');
+  assert.match(denied.recommendations[0].note, /尚未入库/);
+  const inPool = await sendCandidatePrivateContact(db, principal, 'PL1234567890', {
+    ...deps, appKeyHash: keyHash, poolCheckFn: async () => 405,
+    loadCandidateContactFn: async () => {
+      throw Object.assign(new Error('NOT_FOUND_OR_FORBIDDEN'), { code: 'NOT_FOUND_OR_FORBIDDEN' });
+    },
+  });
+  assert.equal(inPool.data.delivery_status, 'in_pool_pending_match');
+  assert.match(inPool.recommendations[0].note, /待撞库/);
+  assert.doesNotThrow(() => assertSafeAgentProjection(inPool, principal));
   db.exec("UPDATE feishu_identity_bindings SET binding_status='REVOKED'");
   assert.equal((await sendCandidatePrivateContact(db, principal, 'PL1234567890', {
     ...deps, appKeyHash: keyHash,

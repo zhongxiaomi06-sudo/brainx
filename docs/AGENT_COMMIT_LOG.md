@@ -1,5 +1,15 @@
 # Agent Commit 记录
 
+## 2026-10-13｜feat(寻访): specs/036 快照结构化落库 + brainx_sourcing_recall 群内免费检索 + CONTACT 三态语义
+
+- 起因（用户指令）：群内实测暴露三连问题——顾问问「上次那轮里筛出有小红书或字节背景的」，agent 审计表零工具调用，bot 答「没保留卡片内容」并提议把筛选条件写进判据重新付费搜索；查已入库候选人联系方式仍报「未授权」。产品结论：机器人失忆 + 语义错位 + 付费当解法。
+- 数据地基：migration 0067 新表 `sourcing_candidates`（主键 search_key×consultant×round×ref，append-only，career_status 生涯状态）；`settleOpenmaiTask` done 时同步拆行（`src/sourcing-candidates.js`，落库层不做二次截断、2000 字符防御上限）；`bin/sourcing-candidates-backfill.mjs` 一次性回填历史 116 条 done 任务。
+- 新工具 `brainx_sourcing_recall`（gateway 注册 + 插件声明 + tools.allow 三处齐）：本人历史结果按关键词/城市筛选、按匹配度或时间排序、limit 1-20，零 OpenMai 费用秒回；description 与 supermai_scout 明确「筛选 vs 找新人」语义分工（治语义错位）。
+- CONTACT 三态：`candidate-private-contact.js` 授权查询失败先查 talent 库 `[ref:xxx]`——已入库 → `in_pool_pending_match`（已入库待撞库，可开 TTC 深链）；未入库 → `no_contact_data`；不再笼统回 not_authorized。
+- 群内体验：付费触发前统计近 30 天历史人选数并提示可先 recall（不静默拦截）；触发后 best-effort 发状态消息；结果卡候选人带生涯徽标（已初筛/已入库/已排除，`careerStatusMap` 注入 worker 与 agent 读回两处）；四动作与入库动作回写 career_status。
+- 顺修两个审计 bug：群内 `next_allowed_actions` 不再指向 p2pOnly 的 brainx_candidate_contact；`bin/sync-agent-tools.mjs` 从 tool-registry 生成插件声明+同步 tools.allow（dry-run 默认，--apply 执行），消除人肉三处同步。
+- 验证：新增 tests/sourcing-candidates.test.mjs 7/7（拆行/筛选/投影安全/四动作回写/幂等不重置状态/截断契约）；candidate-feedback-contact 三态断言适配后 4/4；受影响测试集 65/65；卡片渲染回归 24/24（新增 supermai-freeform-badges 徽标场景并重建基线）；verify:quick 16/16。全量 verify 与生产部署见后续记录。
+
 ## 2026-10-13｜fix(寻访): 群内查联系方式结果字段撞投影安全词被拦，contact_delivery 改名 delivery_status
 
 - 起因（用户指令）：「检查这个是什么意思」——群卡片点「查联系方式」，bot 回复工具不存在/让私聊。实测链条：新工具 `brainx_freeform_candidate_action` 未同步 openclaw 白名单与插件副本（3 处同步缺 ②③，已在生产补齐后 bot 正常调用）；调用报 `INTERNAL`。

@@ -15,6 +15,7 @@ import { assessOpenmaiCandidateBatch, looksLikeSessionPollution } from './openma
 import { normalizeExcludedCandidateRefs } from './search-rounds.js';
 import { emitEvent } from './hub/emit.js';
 import { snapshotFreeformResult } from './sourcing-group-delivery.js';
+import { storeSourcingCandidates } from './sourcing-candidates.js';
 import { effectiveSearchBrief } from './project-search-brief.js';
 
 /** specs/019 US1：找人结算补发 search_finished 事件（契约 specs/019 contracts/event-types.md）。
@@ -57,6 +58,11 @@ export function settleOpenmaiTask(db, {
   );
   if (output.changes === 1) {
     snapshotFreeformResult(db, taskId, consultantId);
+    // specs/036：done 结果同步拆行落 sourcing_candidates（群内检索数据地基）；拆行失败不阻断结算。
+    if (status === 'done') {
+      try { storeSourcingCandidates(db, { projectId, consultantId, taskId }); }
+      catch (error) { console.error('[sourcing-candidates] 拆行落库失败:', error?.message); }
+    }
     emitSearchFinished(db, { projectId, consultantId, taskId, status, channel, resultCount });
   }
   return output.changes === 1;

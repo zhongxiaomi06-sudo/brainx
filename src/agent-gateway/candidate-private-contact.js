@@ -4,7 +4,9 @@ import { loadAuthorizedCandidateContact } from './tools-talent.js';
 
 /** 联系方式只进可信发起人的私聊，工具结果不含号码，禁止模型代为转述。 */
 export async function sendCandidatePrivateContact(db, principal, candidateRef, deps) {
-  const envelope = (status, note) => ({ data: { candidate_ref: candidateRef, contact_delivery: status },
+  // 字段名禁用 contact 前缀：群聊结果经 assertSafeAgentProjection 时 GROUP_FORBIDDEN_KEY
+  // 会拦截任何 contact* key（2026-10-13 群内点查实证报 INTERNAL）。
+  const envelope = (status, note) => ({ data: { candidate_ref: candidateRef, delivery_status: status },
     facts: [], inferences: [], recommendations: [{ action: 'status_only', note }],
     unknowns: [], evidence_refs: [`candidate_contact:${candidateRef}`] });
   const binding = db.prepare(`SELECT feishu_app_key_hash FROM feishu_identity_bindings

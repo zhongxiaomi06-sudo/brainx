@@ -1,5 +1,13 @@
 # Agent Commit 记录
 
+## 2026-10-13｜fix(寻访): 群内查联系方式结果字段撞投影安全词被拦，contact_delivery 改名 delivery_status
+
+- 起因（用户指令）：「检查这个是什么意思」——群卡片点「查联系方式」，bot 回复工具不存在/让私聊。实测链条：新工具 `brainx_freeform_candidate_action` 未同步 openclaw 白名单与插件副本（3 处同步缺 ②③，已在生产补齐后 bot 正常调用）；调用报 `INTERNAL`。
+- 根因：`candidate-private-contact.js` 返回字段名 `contact_delivery` 撞 `projection.js` 的 `GROUP_FORBIDDEN_KEY`（群聊结果禁含 contact* key），`AgentProjectionError` 的 code 刻意为 `INTERNAL`。群聊里 CONTACT 动作必然被拦——今天 aad5270 接通四动作时的设计疏漏。
+- 修复：字段改名 `delivery_status`（避开禁词），并在测试中加投影安全回归断言（群 principal 下 `assertSafeAgentProjection` 不得拒 + 禁止再出现 contact* key）。
+- 生产运维配套（未入 git）：插件副本 4 文件同步（runtime/prompt/plugin.json/search-start-notice）、openclaw.json tools.allow 加 `brainx_freeform_candidate_action`（32 个）、重启 openclaw-brainx。
+- 验证：candidate-feedback-contact 4/4 过（含新回归）；verify:quick 16/16 过；群内实测见后续记录。
+
 ## 2026-10-13｜fix(寻访): 自由找人群投递与联系方式私发的应用指纹校验改为与 binding 同源
 
 - 起因（用户指令）：「重点检查 sourcing 的效果，在群里直接进行测试」。群内自由找人实测发现搜索 done 但结果卡 5 连败 `DELIVERY_APP_MISMATCH`。

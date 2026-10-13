@@ -226,7 +226,7 @@ test('looksLikeSessionPollution：识别会话污染元回复，不误伤正常�
   assert.equal(looksLikeSessionPollution('未找到匹配候选人，建议放宽条件'), false, '正常零命中不误伤');
 });
 
-test('会话污染自动重试：首次元回复自动重发，第二次成功则正常交付', async () => {
+test('会话污染立即失败：即使下一次可成功，也不能偷偷再次付费搜索', async () => {
   const db = seededDb();
   const bodies = [];
   const orig = global.fetch;
@@ -243,9 +243,9 @@ test('会话污染自动重试：首次元回复自动重发，第二次成功�
     const out = startSupermaiScoutTask(db, null, 'felix', CRITERIA);
     assert.equal(out.status, 'triggered');
     const settled = await waitForStatus(db, 'felix', supermaiCriteriaKey(CRITERIA));
-    assert.equal(settled.status, 'done', '污染回复自动重试后正常交付');
-    assert.ok(settled.result_text.includes('张三'));
-    assert.equal(bodies.length, 2, '恰好重试一次');
+    assert.equal(settled.status, 'failed');
+    assert.match(settled.error, /未自动重试/);
+    assert.equal(bodies.length, 1, '只允许这次明确触发的搜索请求');
     for (const b of bodies) {
       assert.ok(b.body.content.includes('【会话隔离'), '每次调用都带会话隔离前言');
       assert.ok(b.body.content.includes(CRITERIA), '判据仍然在场');
@@ -255,7 +255,7 @@ test('会话污染自动重试：首次元回复自动重发，第二次成功�
   }
 });
 
-test('会话污染二次重试仍元回复 → failed 关闭并明确报错，不交付垃圾', async () => {
+test('污染结果 failed 关闭并明确报错，不交付无关内容', async () => {
   const db = seededDb();
   const orig = global.fetch;
   const pollution = '我接上次进度：你在看职位 J5Z8J10 的岗匹人。';

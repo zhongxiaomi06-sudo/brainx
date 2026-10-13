@@ -123,14 +123,10 @@ export function startSupermaiScoutTask(db, bus, consultant_id, criteria, {
     let status = 'failed';
     let settled = false;
     try {
-      let result = await callOpenmaiContent(jwt, buildScoutPrompt(criteria, exclusions));
-      // 会话污染防护（2026-09-09）：拿到元回复自动重试一次，仍污染则失败关闭
+      const result = await callOpenmaiContent(jwt, buildScoutPrompt(criteria, exclusions));
+      // 搜索可能计费；污染回复应失败关闭，由顾问明确发起下一次，不隐式再调用。
       if (looksLikeSessionPollution(result)) {
-        console.warn('[supermai] session pollution detected, retrying once:', task_id);
-        result = await callOpenmaiContent(jwt, buildScoutPrompt(criteria, exclusions));
-        if (looksLikeSessionPollution(result)) {
-          throw new Error('OpenMai 会话上下文污染：两次均返回与找人无关的元回复，请稍后重试');
-        }
+        throw new Error('OpenMai 会话上下文污染：返回与找人无关的内容，未自动重试；请确认后重新发起。');
       }
       const batchQuality = assessOpenmaiCandidateBatch(result);
       // 与 job 模式一致保留 needs_input 语义（2026-10-09）：澄清反问不能记成 done，

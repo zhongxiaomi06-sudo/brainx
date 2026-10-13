@@ -316,13 +316,9 @@ export function startOpenmaiTask(db, bus, consultant_id, project_id, {
         result = await callOpenmaiContent(jwt, buildPrompt(pseudoJob, brief, exclusions)
           + '\n【自建岗说明】该职位为 BrainX 自建岗，没有 TTC ATS 编号；请严格按上面的公司、岗位与画像判据找人，不得以缺少职位描述为由停止。', {});
       }
-      // 会话污染防护（2026-09-09）：拿到元回复自动重试一次，仍污染则失败关闭
+      // 与 SuperMai 一致：污染回复失败关闭，不能隐式再次触发可能计费的搜索。
       if (looksLikeSessionPollution(result)) {
-        console.warn('[openmai] session pollution detected, retrying once:', task_id);
-        result = await callOpenmai(jwt, job, brief, exclusions);
-        if (looksLikeSessionPollution(result)) {
-          throw new Error('OpenMai 会话上下文污染：两次均返回与找人无关的元回复，请稍后重试');
-        }
+        throw new Error('OpenMai 会话上下文污染：返回与找人无关的内容，未自动重试；请确认后重新发起。');
       }
       const batchQuality = assessOpenmaiCandidateBatch(result);
       const resultStatus = batchQuality.needsInput ? 'needs_input' : 'done';

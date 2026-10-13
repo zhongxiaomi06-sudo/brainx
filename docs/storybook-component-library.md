@@ -117,3 +117,6 @@ OpenMai 候选人总览同样不在 React Storybook 伪造飞书组件。正式�
 - [BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md)
 - [推荐队列与职位决策产品架构](recommendation-queue-product-architecture.md)
 - [Agent Commit 记录](AGENT_COMMIT_LOG.md)
+# 2026-10-13 原生寻访卡说明
+
+本轮寻访结果卡属于飞书原生 JSON，使用生产构建函数及卡片渲染门禁，不另造 Storybook 副本。新增条件/轮次/排除人数，状态见[审核记录](frontend-reviews/2026-10-13-sourcing-result-context.md)。

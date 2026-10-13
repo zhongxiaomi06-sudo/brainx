@@ -1,5 +1,6 @@
 # BrainX 文档书
 找人产品要求本轮施工：[评估与逐条验收清单](2026-10-13-sourcing-delivery-plan.md)。
+结果卡本轮状态：[寻访结果卡上下文复核](frontend-reviews/2026-10-13-sourcing-result-context.md)。
 本轮发布记录：[云端寻访合并与连接状态复核](frontend-reviews/2026-10-13-cloud-sourcing-merge.md)。
 
 > 上级入口：[多 Agent 协作准则](../AGENTS.md)

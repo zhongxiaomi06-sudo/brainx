@@ -373,3 +373,6 @@
 - [质量门禁操作手册](standards/QUALITY_GATE_OPERATIONS.md)
 - [质量门禁与前端链路测试审计](audits/2026-08-26-quality-gate-frontend-test-audit.md)
 - [推荐队列与职位决策产品架构](recommendation-queue-product-architecture.md)
+# 2026-10-13 寻访结果卡追加
+
+条件、轮次和排除人数已接入本地正式卡片；缺字段不造数、缺链接不造按钮。五项状态以[中央审核记录](frontend-reviews/2026-10-13-sourcing-result-context.md)为准：用户未审核、未发布、真实数据未验证。

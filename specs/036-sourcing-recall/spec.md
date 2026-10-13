@@ -46,9 +46,13 @@ talent_url/resume_url/profile_url）+ `career_status`（recommended|screened|in_
 
 `brainx_sourcing_recall`，purpose `candidate_review`：
 - 参数：`search_key`（可选，省略查本人全部自由找人历史）、`filter`（自由文本关键词，匹配
-  公司/职位/评估）、`city`、`order_by`（score|time，默认 score）、`limit`（1-20，默认 10）。
+  公司/职位/评估/姓名）、`city`、`order_by`（score|time，默认 score）、`limit`（1-20，默认 10）。
+- filter 语义：多个词之间 AND；「|」/「｜」分隔 OR 组——组内 AND、组间 OR
+  （2026-10-13 群测第二次回归实证：「小红书或字节」按纯 AND 查询零命中，工具层把
+  「或/或者/or//」归一化为「|」后由数据层分组匹配）。
 - 只读本人行（consultant_id 隔离），返回脱敏行，字段不触投影禁词（GROUP_FORBIDDEN_KEY）。
-- description 明确：「在已有搜索结果里筛选用本工具；要找全新的人用 brainx_supermai_scout。」
+- description 明确：「在已有搜索结果里筛选用本工具；要找全新的人用 brainx_supermai_scout；
+  用户说的『或』写成 A|B。」
 
 ### CONTACT 三态
 

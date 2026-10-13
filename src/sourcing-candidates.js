@@ -93,7 +93,16 @@ export function careerStatusMap(db, { searchKey, consultantId }) {
   return Object.fromEntries(rows.map((r) => [r.candidate_ref, r.career_status]));
 }
 
-/** 群内检索（brainx_sourcing_recall 数据面）：只读本人行，关键词 AND 语义，无关键词匹配全部。 */
+/** specs/036 群内检索（brainx_sourcing_recall 数据面）：只读本人行，无关键词匹配全部。
+ *  filter 语义：词之间 AND；「|」（或全角「｜」）分隔的是 OR 组——组内 AND、组间 OR。
+ *  例：「小红书|字节」＝有小红书或字节背景（2026-10-13 群测实证：「A 或 B」按纯 AND 必然零命中）。 */
+export function parseFilterGroups(filter) {
+  return String(filter || '').split(/[|｜]/)
+    .map((group) => group.split(/[\s,，、;；]+/).map((t) => t.trim()).filter(Boolean).slice(0, 6))
+    .filter((terms) => terms.length > 0)
+    .slice(0, 4);
+}
+
 export function recallSourcingCandidates(db, {
   consultantId, searchKey = null, filter = null, city = null,
   orderBy = 'score', limit = 10,
@@ -104,12 +113,22 @@ export function recallSourcingCandidates(db, {
   const params = [consultantId];
   if (searchKey) { where.push('sc.search_key = ?'); params.push(String(searchKey).slice(0, 200)); }
   if (city) { where.push('sc.city LIKE ? ESCAPE \'\\\''); params.push(`%${escapeLike(city)}%`); }
-  const terms = String(filter || '').split(/[\s,，、;；]+/).map((t) => t.trim()).filter(Boolean).slice(0, 6);
-  for (const term of terms) {
-    where.push(`(sc.company LIKE ? ESCAPE '\\' OR sc.title LIKE ? ESCAPE '\\'
-      OR sc.evaluation LIKE ? ESCAPE '\\' OR sc.name LIKE ? ESCAPE '\\')`);
-    const like = `%${escapeLike(term)}%`;
-    params.push(like, like, like, like);
+  const groups = parseFilterGroups(filter);
+  const termSql = () => `(sc.company LIKE ? ESCAPE '\\' OR sc.title LIKE ? ESCAPE '\\'
+      OR sc.evaluation LIKE ? ESCAPE '\\' OR sc.name LIKE ? ESCAPE '\\')`;
+  if (groups.length === 1) {
+    for (const term of groups[0]) {
+      where.push(termSql());
+      const like = `%${escapeLike(term)}%`;
+      params.push(like, like, like, like);
+    }
+  } else if (groups.length > 1) {
+    const groupClauses = groups.map((terms) => terms.map((term) => {
+      const like = `%${escapeLike(term)}%`;
+      params.push(like, like, like, like);
+      return termSql();
+    }).join(' AND '));
+    where.push(`(${groupClauses.join(' OR ')})`);
   }
   const order = orderBy === 'time' ? 'sc.updated_at DESC' : 'sc.score_num DESC, sc.updated_at DESC';
   return db.prepare(`SELECT sc.candidate_ref, sc.name, sc.company, sc.title, sc.city,

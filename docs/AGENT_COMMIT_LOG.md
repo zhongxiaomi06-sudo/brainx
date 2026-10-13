@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-10-13｜fix(寻访): specs/036 recall filter 支持「或」语义（10-13 群测第二次回归实证）
+
+- 起因：a6b5cec 部署后群内复测「上次那轮里筛出有小红书或字节背景的」——recall 工具被调用（3ms、ALLOWED）但零命中，回复「没有命中」；而 Mia 名下 sourcing_candidates 实有 17 行小红书/字节背景。根因：filter 按空白/顿号拆词后逐词 AND，「A 或 B」类查询必然零命中。
+- 修复三层：① `src/sourcing-candidates.js` 数据层新增 `parseFilterGroups`——「|/｜」分 OR 组、组内多词仍 AND（含 4 组×6 词上限）；② `tools-sourcing-recall.js` 工具层把「或/或者/or//」归一化为「|」（LLM 原样传「小红书或字节」也能命中）；③ runtime.js description + 空结果 recommendation 教学「或写成 A|B」。插件版本 1.5.1→1.5.2。
+- 测试：tests/sourcing-candidates.test.mjs 新增 2 用例（OR 分组回归 + 工具层归一化），9/9 过；openclaw-plugin 8/8 过（工具名无变化，接口面不动）。
+
 ## 2026-10-13｜fix(部署): sync-agent-tools tools.allow 事实源改用插件声明，内部处理器不进白名单
 
 - 起因：specs/036 部署段 dry-run 发现脚本把 registry 全量 32 项当 tools.allow 事实源，会把 `brainx_send_candidate_resume`（gateway 内部处理器，09-09 起刻意不外露，见 docs/2026-09-02-tool-exposure-whitelist.md）加进 OpenClaw 白名单，与仓库权威 `deploy/openclaw/openclaw.production.json`（31 项，不含 resume、不含 talent_search/add 死条目）矛盾。

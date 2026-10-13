@@ -4,6 +4,14 @@ import { recallSourcingCandidates } from '../sourcing-candidates.js';
 
 const fail = (code) => { throw Object.assign(new Error(code), { code }); };
 
+/** specs/036 群测实证（10-13）：用户问「小红书或字节」时 LLM 会把「或」原样写进 filter，
+ *  纯 AND 语义下必然零命中。这里把「或/或者/or//」统一折成「|」（数据层的 OR 分组语法）。 */
+function normalizeFilterOr(raw) {
+  return String(raw || '')
+    .replace(/\s*(?:\|\||\||｜)\s*/g, '|')
+    .replace(/\s*(?:或者?|\/)\s*/g, '|');
+}
+
 const CAREER_LABEL = {
   recommended: '新推荐',
   screened: '已初筛',
@@ -17,7 +25,7 @@ export function createSourcingRecallToolHandlers({ db } = {}) {
     const p = context.principal;
     const searchKey = String(args.search_key || '').trim() || null;
     if (searchKey && !/^[A-Za-z0-9:_-]{1,100}$/.test(searchKey)) fail('INVALID_ARGUMENT');
-    const filter = String(args.filter || '').trim().slice(0, 200) || null;
+    const filter = normalizeFilterOr(args.filter).trim().slice(0, 200) || null;
     const city = String(args.city || '').trim().slice(0, 80) || null;
     const orderBy = ['score', 'time'].includes(args.order_by) ? args.order_by : 'score';
     const limit = Math.min(Math.max(Number(args.limit) || 10, 1), 20);
@@ -45,8 +53,9 @@ export function createSourcingRecallToolHandlers({ db } = {}) {
       recommendations: [{ action: 'present_or_narrow',
         note: rows.length
           ? '把 items 完整呈现给顾问（姓名/公司/职位/城市/匹配度/状态），不要自行省略或改写匹配度；'
-            + '顾问要缩小范围时用 filter/city 参数再次调用本工具，要全新人选时才改用 brainx_supermai_scout。'
-          : '没有命中的历史人选——如实告知；顾问要新人才用 brainx_supermai_scout 重新搜索。' }],
+            + '顾问要缩小范围时用 filter/city 参数再次调用本工具（filter 词间是「且」、用「|」表示「或」，如「小红书|字节」），要全新人选时才改用 brainx_supermai_scout。'
+          : '没有命中时先建议放宽（去掉一个关键词，或把「或」写成「A|B」）再调一次；确认没有才如实告知，'
+            + '顾问要新人才用 brainx_supermai_scout 重新搜索。' }],
       unknowns: [],
       evidence_refs: [`sourcing_recall:${p.consultantId}:${searchKey || 'all'}`],
       next_allowed_actions: ['brainx_sourcing_recall', 'brainx_supermai_scout'],

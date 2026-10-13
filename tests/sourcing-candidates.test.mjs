@@ -73,6 +73,34 @@ test('recall：关键词过滤 + 顾问隔离 + 排序 + limit', t => {
   assert.equal(recallSourcingCandidates(db, { consultantId: 'felix', filter: '%' }).length, 0);
 });
 
+test('recall OR 分组（10-13 群测回归）：「A|B」命中任一即出、组内多词仍是 AND', t => {
+  const { db, settleDone } = fixture(t);
+  settleDone();
+  // 复现群测失败：两个词按 AND 查必然零命中
+  assert.equal(recallSourcingCandidates(db, { consultantId: 'felix', filter: '小红书 字节' }).length, 0);
+  // 「|」＝或：小红书、字节跳动两行都命中
+  const orHits = recallSourcingCandidates(db, { consultantId: 'felix', filter: '小红书|字节' });
+  assert.equal(orHits.length, 2);
+  assert.ok(orHits.some((r) => r.company === '小红书'));
+  assert.ok(orHits.some((r) => r.company === '字节跳动'));
+  // 全角「｜」同义
+  assert.equal(recallSourcingCandidates(db, { consultantId: 'felix', filter: '小红书｜字节' }).length, 2);
+  // 组内 AND：产品经理且字节 → 只命中字节那行
+  const combo = recallSourcingCandidates(db, { consultantId: 'felix', filter: '产品经理 字节|小红书 AI' });
+  assert.equal(combo.length, 2); // 两组各命中一行（组1=字节产品经理、组2=小红书AI）
+});
+
+test('recall 工具层「或」归一化：LLM 原样传「小红书或字节」也能命中', t => {
+  const { db, settleDone } = fixture(t);
+  settleDone();
+  const handlers = createSourcingRecallToolHandlers({ db });
+  for (const raw of ['小红书或字节', '小红书 或者 字节', '小红书 / 字节', '小红书|字节']) {
+    const out = handlers.brainx_sourcing_recall({ filter: raw }, { principal });
+    assert.equal(out.data.recalled, 2, `filter=${raw} 应命中 2 行`);
+  }
+});
+
+
 test('recall 工具 envelope 过群聊投影安全，不含付费搜索暗示', async t => {
   const { db, settleDone } = fixture(t);
   settleDone();

@@ -9,7 +9,7 @@ import { currentState } from '../engagement.js';
 import { startOpenmaiTask, getOpenmaiResult } from '../openmai-task.js';
 import { supermaiCriteriaKey, startSupermaiScoutTask } from '../supermai-sourcing.js';
 import { extractOpenmaiCandidates, buildOpenmaiDeliveryCard, STALE_SEARCH_MS } from '../openmai-delivery.js';
-import { nextSearchExclusions } from '../search-rounds.js';
+import { nextSearchExclusions, nextSupermaiSearchExclusions } from '../search-rounds.js';
 
 function fail(code) {
   throw Object.assign(new Error(code), { code });
@@ -117,6 +117,7 @@ function terminalSearchEnvelope({ entry, jobRef, criteria = null, cur, stale }) 
  *  failed/needs_input/零命中轮次没有可重复推荐的人，不得把顾问卡在 cannot_continue。 */
 function continuingGate(cur, exclusions, projectId, entry) {
   return exclusions.length === 0 && cur.status === 'done'
+    && !['', 'NO_REPLY'].includes(String(cur.result_text || '').trim())
     ? missingExclusions(projectId, entry) : null;
 }
 
@@ -149,17 +150,18 @@ function runningStale(cur) {
 
 /** 群上下文 done 读回：把标准候选人卡确定性发到本群（best-effort，失败不阻断）。
  *  幂等键按 职位×群×轮次×日 去重防刷屏；只有发卡调用成功才返回 true。 */
-function trySendOpenmaiResultCard(sendCardFn, publicBaseUrl, args, principal, row, cur) {
+async function trySendOpenmaiResultCard(sendCardFn, publicBaseUrl, args, principal, row, cur, source = 'openmai') {
   if (!sendCardFn || principal.chatType !== 'group' || !principal.chatId) return false;
   try {
-    Promise.resolve(sendCardFn({
+    await sendCardFn({
       target: principal.chatId,
       card: buildOpenmaiDeliveryCard({
-        job: { ...row, search_round: cur.search_round || 1 },
-        status: 'done', resultText: cur.result_text, publicBaseUrl,
+        job: { ...row, search_round: cur.search_round || 1,
+          search_brief: cur.search_brief, excluded_candidate_refs_json: cur.excluded_candidate_refs_json },
+        status: cur.status, resultText: cur.result_text, error: cur.error, publicBaseUrl, source,
       }),
       idempotencyKey: `openmai-result-card:${args.job_id}:${principal.chatId}:round${cur.search_round || 1}:${shanghaiDate()}`,
-    })).catch(() => {});
+    });
     return true;
   } catch { return false; }
 }
@@ -167,7 +169,7 @@ function trySendOpenmaiResultCard(sendCardFn, publicBaseUrl, args, principal, ro
 /** OpenMai 找人（第 11 工具，2026-09-03）：纪律与承接路由一致——
  * 仅本人 ACCEPTED/COMPLETED 的职位可触发/读取（fail-closed，不泄露存在性）。
  * 费用门控：done 读缓存、running 报状态、终态如实告知，其他才触发新任务（防重复费用）。 */
-function openmaiSearch(db, args, principal, sendCardFn, publicBaseUrl) {
+async function openmaiSearch(db, args, principal, sendCardFn, publicBaseUrl) {
   const row = db.prepare('SELECT * FROM job_facts WHERE project_id=?').get(args.job_id);
   if (!row || (!jobVisibleTo(db, principal.consultantId, args.job_id)
       && !jobAccessibleFromGroup(db, principal, args.job_id))) fail('NOT_FOUND_OR_FORBIDDEN');
@@ -184,7 +186,7 @@ function openmaiSearch(db, args, principal, sendCardFn, publicBaseUrl) {
     // 群上下文 done 读回：候选人名单由标准卡片承担（代码渲染），envelope 只留引导语；
     // 私聊 / 缺 sendCardFn / 发卡失败维持原样（result_text 原样带出）。
     const cardSent = cur.status === 'done'
-      && trySendOpenmaiResultCard(sendCardFn, publicBaseUrl, args, principal, row, cur);
+      && await trySendOpenmaiResultCard(sendCardFn, publicBaseUrl, args, principal, row, cur);
     return {
       data: { job_ref: args.job_id, status: cur.status,
               result_text: cardSent ? null : cur.result_text || null,
@@ -245,7 +247,7 @@ function openmaiSearch(db, args, principal, sendCardFn, publicBaseUrl) {
  * SuperMai 找人 = 猎聘/脉脉渠道 → 与 openmai_search 共用 OpenMai 引擎，
  * 本入口是「无需职位、直接给判据」的自由找人（completions 无 job_id 模式）。
  * 触发/读取两段式：首次调用触发任务返回 running，完成后同参数再调读取结果。 */
-function supermaiScout(db, args, principal, sendCardFn, publicBaseUrl) {
+async function supermaiScout(db, args, principal, sendCardFn, publicBaseUrl) {
   const jobId = String(args.job_id || '').trim();
   const continuing = args.continue_search === true;
   const extra = cleanSearchCriteria(args.criteria);
@@ -276,7 +278,7 @@ function supermaiScout(db, args, principal, sendCardFn, publicBaseUrl) {
       search_round: cur.search_round || 1, freeform: true, criteria,
     };
     const cardSent = cur.status === 'done' && !noReply
-      && trySendOpenmaiResultCard(sendCardFn, publicBaseUrl, { job_id: project_id }, principal, synthJob, cur);
+      && await trySendOpenmaiResultCard(sendCardFn, publicBaseUrl, { job_id: project_id }, principal, synthJob, cur, 'supermai');
     return {
       data: { entry: 'supermai', job_ref: jobId || null, criteria, status: cur.status,
               result_text: cardSent ? null : (noReply ? null : cur.result_text || null),
@@ -307,7 +309,7 @@ function supermaiScout(db, args, principal, sendCardFn, publicBaseUrl) {
     return sharedProjectSearch(jobId, shared, 'supermai');
   }
   // 续搜排除名单按落库主键取（自由找人=合成键），不再限 job 模式——自由找人也可续搜。
-  const exclusions = continuing ? nextSearchExclusions(db, project_id) : [];
+  const exclusions = continuing ? nextSupermaiSearchExclusions(db, project_id) : [];
   const blocked = continuing && continuingGate(cur, exclusions, project_id, 'supermai');
   if (blocked) return blocked;
   const out = startSupermaiScoutTask(db, null, principal.consultantId, criteria, {

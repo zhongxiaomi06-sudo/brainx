@@ -284,8 +284,9 @@ ${JSON.stringify({ candidates: [{ candidate_ref: 'openmai-talent-1', name: '王�
     addTalentFn: async () => { throw new Error('RDS down'); } });
   const degraded = await failing.brainx_talent_pool_add({
     job_id: jobId, candidate_ref: 'openmai-talent-1', confirm: true }, context);
-  assert.equal(degraded.data.sync_pending, true, 'RDS 不可写必须降级为待同步而不是 500');
-  assert.ok(degraded.unknowns.some((u) => u.includes('同步中')));
+  assert.equal(degraded.data.sync_pending, false, '没有持久队列就不能声称正在同步');
+  assert.equal(degraded.data.status, 'failed');
+  assert.ok(degraded.unknowns.some((u) => u.includes('未加入，也未进入同步队列')));
 
   await assert.rejects(() => handlers.brainx_talent_pool_add({
     job_id: jobId, candidate_ref: 'candidate-x', confirm: true }, context), /NOT_FOUND_OR_FORBIDDEN/);

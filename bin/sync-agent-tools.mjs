@@ -22,7 +22,7 @@ const inRegistryNotPlugin = expected.filter((n) => !pluginTools.includes(n));
 const inPluginNotRegistry = pluginTools.filter((n) => !expected.includes(n));
 
 console.log(`registry ${expected.length} / plugin ${pluginTools.length}`);
-if (inRegistryNotPlugin.length) console.log('插件清单缺:', inRegistryNotPlugin.join(', '));
+if (inRegistryNotPlugin.length) console.log('插件清单缺（gateway 内部处理器、设计内不外露）:', inRegistryNotPlugin.join(', '));
 if (inPluginNotRegistry.length) console.log('插件清单多余:', inPluginNotRegistry.join(', '));
 
 // ① 插件副本同步（cp + chown brainx）
@@ -35,15 +35,17 @@ for (const f of FILES) {
 }
 
 // ② tools.allow：openclaw config set（必须 brainx 用户执行，禁 root）
+// 事实源 = 插件声明的 OpenClaw 外露面（plugin.contracts.tools），不是 registry 全量——
+// registry 里的 brainx_send_candidate_resume 是 gateway 内部处理器（09-09 起刻意不外露，见 docs/2026-09-02-tool-exposure-whitelist.md），不进 tools.allow。
 const cfg = JSON.parse(readFileSync('/var/lib/brainx/.openclaw/openclaw.json', 'utf8'));
 const allow = cfg.tools?.allow || [];
-const missing = expected.filter((n) => !allow.includes(n));
-const dead = allow.filter((n) => !expected.includes(n) && !String(n).startsWith('openclaw'));
+const missing = pluginTools.filter((n) => !allow.includes(n));
+const dead = allow.filter((n) => !pluginTools.includes(n) && !String(n).startsWith('openclaw'));
 console.log(`tools.allow ${allow.length} 项，缺 ${missing.length}，死条目 ${dead.length}`);
 if (missing.length) console.log('  缺失:', missing.join(', '));
 if (dead.length) console.log('  死条目:', dead.join(', '));
 if (APPLY && (missing.length || dead.length)) {
-  const target = [...new Set([...expected, ...allow.filter((n) => !dead.includes(n) && String(n).startsWith('openclaw'))])];
+  const target = [...new Set([...pluginTools, ...allow.filter((n) => !dead.includes(n) && String(n).startsWith('openclaw'))])];
   const value = JSON.stringify(target);
   console.log(`config set ${ALLOW_KEY}=${value}`);
   execFileSync('openclaw', ['config', 'set', ALLOW_KEY, value], { stdio: 'inherit' });

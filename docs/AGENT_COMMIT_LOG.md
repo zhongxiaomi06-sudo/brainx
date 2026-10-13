@@ -1,5 +1,15 @@
 # Agent Commit 记录
 
+## 2026-10-13｜test(e2e): 真实飞书 CLI 云端实测——BrainTex 机器人身份 profile + 读写回流全通
+
+- 起因（用户指令）：「云端进行使用真实的飞书 cli 进行测试」。
+- 通道建立：lark-cli 官方 bot（cli_aac5…）不在任何群、用户身份已过期；改用 BrainTex 机器人真实应用凭证建独立 profile（`cli_aaf72a911bb9dd21`，不动原有配置）。
+- 读通道实证：项目群消息读回——首轮候选人卡（10 人）、凭证失效红卡、续搜卡（9 人）三张卡真实在群，卡片含 TTC 链接与动作按钮。
+- 写通道实证：CLI 以机器人身份发文本消息成功（om_…01dab）。
+- 回流实证：该消息约 90 秒后经 bridge 进入 `lark_messages`（群消息→抽取链路入口）；候选人卡片 JSON 同样被回流捕获。
+- 侧证修正：首轮卡实际含多名 Research Intern（马千里/冯晟昊等），此前「第一轮全偏资深」的判词以卡片正文为准修正为「偏算法研究实习方向，与 JS 工程实习有偏差」。
+- 服务器新增：`/root/.lark-cli/config.json` 多了 brainx-bot profile（仅此一处配置变更）。
+
 ## 2026-10-13｜merge(主线): 统一三端代码——纳入 codex/offer-single-report-sync 寻访链路
 
 - 起因（用户指令）：「检查github最新上传的代码，然后三端代码进行统一」。

@@ -75,7 +75,7 @@ test('推荐快照不再污染人工决策轨迹，推荐态从 recommendations 
   }
 });
 
-test('A：推荐快照只保留最近三轮，并限制每轮冻结规模', () => {
+test('A：推荐快照限制单轮冻结规模，但不在业务事务内删除历史', () => {
   const local = openDb(':memory:');
   try {
     runSync(local, { source: 'fixture', consultant_id: CID });
@@ -84,8 +84,8 @@ test('A：推荐快照只保留最近三轮，并限制每轮冻结规模', () =
     }
     assert.equal(
       local.prepare('SELECT COUNT(*) n FROM recommendations WHERE consultant_id=?').get(CID).n,
-      15,
-      '仅保留最近三轮、每轮五条冻结记录',
+      20,
+      '四轮历史均保留、每轮最多五条冻结记录',
     );
     assert.equal(latestRun(local, CID).items.length, 5);
   } finally {

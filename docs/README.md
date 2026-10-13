@@ -1,4 +1,7 @@
 # BrainX 文档书
+找人产品要求本轮施工：[评估与逐条验收清单](2026-10-13-sourcing-delivery-plan.md)。
+结果卡本轮状态：[寻访结果卡上下文复核](frontend-reviews/2026-10-13-sourcing-result-context.md)。
+本轮发布记录：[云端寻访合并与连接状态复核](frontend-reviews/2026-10-13-cloud-sourcing-merge.md)。
 
 > 上级入口：[多 Agent 协作准则](../AGENTS.md)
 
@@ -15,7 +18,8 @@
 
 | 任务类型 | 必读文档 |
 |---|---|
-| 产品范围、功能规划或验收标准 | [BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md) |
+| 仓库重构、来源解耦、Algorithm A 或本轮跨域施工 | [2026-09-22 仓库重构与 Algorithm A 施工总手册](2026-09-22-refactor-agentic-ranking-manual.md)、[阶段 00 冻结基线](2026-09-22-refactor-phase-00-baseline.md)、[Agent 最终决策契约](2026-09-22-algorithm-a-contract.md)、[数据契约与迁移手册](2026-09-22-ranking-data-migration.md) |
+| 产品范围、功能规划或验收标准 | [当前产品 PRD](prd-2026-09-02-brainx-workflow.md)；历史范围见 [BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md) |
 | OpenClaw、飞书机器人、AI 猎头工作流、人才权限或简历解析 | [BrainX × OpenClaw AI 猎头工作流产品需求文档](prd-2026-09-02-openclaw-ai-recruiting-workflow.md)、[安全操作手册](SECURITY.md) |
 | BrainTex 飞书欢迎页、功能菜单、按钮卡片或新用户指引 | [BrainTex 飞书功能首页与新用户指引](2026-09-03-braintex-feishu-home.md)、[BrainTex 群聊工作流技术 PRD](prd-2026-09-01-braintex-group-workflow.md) |
 | OpenClaw 多顾问安装、上线、运维、故障或回滚 | [BrainTex 服务器部署与飞书接入 Agent 完整施工手册](2026-09-03-braintex-server-deployment-agent-manual.md)、[OpenClaw 多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md)、[部署编排](DEPLOYMENT.md) |
@@ -27,15 +31,16 @@
 | **候选短名单查任何职位都返回 NO_AUTHORIZED_SHORTLIST、要给活跃职位补预计算匹配** | **[人才匹配跑批模块](2026-09-15-talent-match-run.md)**（独立可插拔，dry-run 默认 + --write 幂等落 RDS 预计算链路与授权账本） |
 | **群里机器人发的候选人名单排版不规范、要统一成标准卡片** | **[群内候选人呈现标准化](2026-09-15-group-candidate-cards.md)**（handler 确定性发卡 + 模型只回引导语 + 幂等防刷屏） |
 | 历史 Codex 插件、旧版飞书副驾驶方案 | [历史：BrainX 飞书 AI 猎头副驾驶产品需求文档](prd-2026-09-01-feishu-ai-consultant-copilot.md)、[历史：BrainX Codex Agent 职责与权限规范](codex-agent-responsibilities-and-permissions.md) |
-| 最终产品形态、跨前后端施工顺序或总体验收 | [BrainX 最终交付蓝图与施工总清单](brainx-final-delivery-blueprint.md) |
+| 最终产品形态、跨前后端施工顺序或总体验收 | [当前产品 PRD](prd-2026-09-02-brainx-workflow.md)、[本轮重构施工总手册](2026-09-22-refactor-agentic-ranking-manual.md)；历史交付细项见[旧交付蓝图](brainx-final-delivery-blueprint.md) |
 | BrainX×reloop 工作流总线、身份、Case 或跨系统桥接 | [Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) |
-| 全景架构、技术施工安排、分步代码逻辑或组件选型 | [全景架构与技术施工蓝图](architecture-2026-09-01-full-blueprint.md)、[Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) |
+| 全景架构、技术施工安排、分步代码逻辑或组件选型 | [本轮重构施工总手册](2026-09-22-refactor-agentic-ranking-manual.md)、[Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md)；旧选型背景见[全景架构蓝图](architecture-2026-09-01-full-blueprint.md) |
 | 开源组件复用、自建边界或权限最小集 | [复用与自建边界及权限需求 PRD](prd-2026-09-01-reuse-selfbuild-boundary.md)、[全景架构与技术施工蓝图](architecture-2026-09-01-full-blueprint.md) |
 | spec-kit、规格驱动开发或 constitution 修订 | [规范驱动研发流程](standards/SPEC_DRIVEN_WORKFLOW.md)、[多 Agent 协作准则](../AGENTS.md) |
 | 参考代码镜像、开源仓库学习或外部设计对照 | [参考代码本地镜像清单](standards/REFERENCE_REPOS.md)、[全景架构与技术施工蓝图](architecture-2026-09-01-full-blueprint.md) |
 | 飞书群聊工作流、BrainTex 机器人、事件/卡片回调或信息鉴权分工 | [BrainTex 群聊工作流技术 PRD](prd-2026-09-01-braintex-group-workflow.md)、[Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) |
 | **拉群后卡片没弹出来、OpenClaw 群准入失败、要补发职位卡或排查"群建了但机器人不响应"** | **[拉群即见卡规格](../specs/013-launch-card-first/spec.md)**（卡片先发 + 准入降级 best-effort + 补偿重放 + 节流重启 gateway + launch-redeliver 补发）、[OpenClaw 多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md) |
-| **群内接单被拒、卡片没有找人按钮、要在项目群里直接接单或按条件找人** | **[项目群卡片动作规格](../specs/014-launch-card-actions/spec.md)**（群内接单放开、卡片按承接状态分岔、OpenMai/Reloop/SuperMai 三按钮 + 条件输入框、存量群 scope 补齐 job_action）、[拉群即见卡规格](../specs/013-launch-card-first/spec.md) |
+| **群内接单被拒、卡片没有找人按钮、要在项目群里直接接单或按条件找人** | **[项目群卡片动作规格](../specs/014-launch-card-actions/spec.md)**（群内接单放开、卡片按承接状态分岔、OpenMai/Reloop/SuperMai 三按钮 + 同群条件消息、存量群 scope 补齐 job_action）、[拉群即见卡规格](../specs/013-launch-card-first/spec.md) |
+| **OpenMai / SuperMai 如何融入日常工作流、接单后为何不能自动找人、双链路下一步怎么验收** | **[OpenMai × SuperMai 日常寻访闭环](../specs/036-dual-sourcing-daily-workflow/spec.md)**、[桌面端统一登录与找人连接器规格](../specs/035-desktop-auth-connectors/spec.md)、[OpenClaw 招聘闭环](2026-09-03-openclaw-recruiting-loop.md) |
 | **机器人被拉进已有群后没反应、想让它自动发「绑定职位」卡、或在旧群里绑定职位开始找人** | **[机器人进群接管规格](../specs/015-group-intake/spec.md)**（轮询发现新群发绑定卡 + groupIntakeBinding 特例授权 + 绑定后发找人卡与拉群指引/防滥用提醒）、[群成员权限放开与绑定自愈](2026-09-15-group-member-access-and-bind-selfheal.md)（旧群绑定不再依赖轮询登记，@机器人 即绑） |
 | **共享职位群里非协作者点找人/候选工具被拒、想在项目群里放开给所有成员** | **[群成员找人权限放开与旧群绑定自愈](2026-09-15-group-member-access-and-bind-selfheal.md)**（绑定群即信任边界，群成员都能点找人/自助接单；私聊与非绑定群仍 fail-closed） |
 | **顾问点了「绑定我的职位」却绑不上（群绑定停在 CARD_SENT、project_id 一直为空）** | 先查 `agent_tool_calls.error_code`：`BRAINX_BASE_URL_REQUIRED` = `brainx-agent-gateway` 缺生产基址 —— 本服务以 `brainx` 用户运行读不到 `root:600` 的 `/opt/brainx/.env`，须单独挂 `/etc/brainx/base-url.env`（见 [提交日志 2026-09-11](AGENT_COMMIT_LOG.md)、[机器人进群接管规格](../specs/015-group-intake/spec.md)） |
@@ -54,6 +59,7 @@
 | **后端架构全貌、现状核实结论或"什么算做完"** | **[BrainX 后端架构 PRD（代码核实版）](prd-2026-09-02-backend-architecture.md)**（六层现状逐项核实 + 差距盘点含 3 个清单外新发现 + 工期关键路径 + 7 条验收标准）、[后端侧模块结构](2026-09-02-backend-module-structure.md) |
 | **飞书后台要勾选哪些权限/scope、事件订阅、敏感权限审批** | **[飞书权限清单（9/2 研发对齐会定论版）](2026-09-02-feishu-permission-scopes.md)**、`src/oauth.js` 用户身份 scope 实证注释 |
 | **这个架构承担哪些业务工作、每段业务走哪个工具** | **[业务工作全景](2026-09-02-business-work-breakdown.md)**（全链路六段 + MVP 每日循环 + 权限对照）、**[AI leader 工作流 + 日历助手](2026-09-02-ai-leader-workflow.md)**（一面前后两种形态）、[Workflow Hub 与猎头全链路架构](workflow-hub-architecture.md) |
+| 展示会技术栈、工作流节点技术与 Q&A | [招聘工作流技术栈与代码证据](audits/2026-09-17-workflow-tech-stack.md)、[技术展开区复核](frontend-reviews/2026-09-17-workflow-tech-stack.md) |
 | **一面之前怎么串联 AI leader 工作流 / 一面之后的待办提醒** | **[AI leader 工作流 + 日历助手](2026-09-02-ai-leader-workflow.md)**、`src/scheduler.js` `src/engagement.js` `src/push.js` |
 | **某个工具能不能外露给 OpenClaw / 生成 Skill** | **[工具外露白名单（全量）](2026-09-02-tool-exposure-whitelist.md)**、[OpenClaw 壳子架构 §5.2](2026-09-02-openclaw-shell-architecture.md) |
 | 任何代码、测试或配置改动 | [上传前完整验证](standards/PRE_PUSH_VERIFICATION.md)、[质量门禁操作手册](standards/QUALITY_GATE_OPERATIONS.md) |
@@ -62,7 +68,23 @@
 | 前端信息架构、页面流程或交互重构 | [前端交互架构](frontend-interaction-architecture.md)、[推荐队列与职位决策产品架构](recommendation-queue-product-architecture.md)、[BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md) |
 | 精选盘、推荐队列、推荐卡片或加入项目闭环 | [推荐队列与职位决策产品架构](recommendation-queue-product-architecture.md)、[前端审核台账](frontend-reviews/README.md) |
 | **改飞书群机器人卡片的文案、按钮或排版** | **[飞书群卡片文字排版规范](standards/CARD_TYPOGRAPHY.md)**（五级层级 + 7 条硬规则 + 卡片内不用 emoji）、[卡片渲染回归门禁](2026-09-12-feishu-card-render-gate.md)、[前端审核台账](frontend-reviews/README.md) |
-| 推荐算法、评分口径或学习排序规划 | [BrainX 岗位推荐算法与评分标准](BrainX岗位推荐算法与评分标准.md)、[推荐队列与职位决策产品架构](recommendation-queue-product-architecture.md) |
+| 推荐算法、评分口径或学习排序规划 | [Algorithm A 决策契约](2026-09-22-algorithm-a-contract.md)、[本轮施工总手册](2026-09-22-refactor-agentic-ranking-manual.md)；现有规则实现参考[历史评分基线](BrainX岗位推荐算法与评分标准.md)，队列交互参考[产品架构](recommendation-queue-product-architecture.md) |
+| 排序历史特征变化、LTR 未来泄漏或影子评估不可回放 | [排序特征冻结快照规格](../specs/020-ranking-feature-snapshots/spec.md)、[阶段 00 冻结基线](2026-09-22-refactor-phase-00-baseline.md) |
+| 排序标签时间切分、未来结果泄漏、样本成熟度或迟到结果 | [排序标签观察窗口规格](../specs/021-ranking-label-windows/spec.md)、[Algorithm A 决策契约](2026-09-22-algorithm-a-contract.md) |
+| 排序负反馈、忽略撤销、原因更正或按截点回放 | [排序负反馈事件回放规格](../specs/022-ranking-feedback-replay/spec.md)、[忽略状态后端收口复审](frontend-reviews/2026-08-31-ignore-state-backend.md) |
+| 人才库自动内存回退、运行期建表、RDS 失败关闭或持久层选择 | [人才库持久层失败关闭规格](../specs/023-talent-persistence-fail-closed/spec.md)、[候选人事实与 shortlist 数据契约](2026-09-03-candidate-data-contracts.md)、[安全操作手册](SECURITY.md) |
+| 数据增长、保留责任、TTL、清理 dry-run 或推荐快照引用 | [数据增长与保留责任只读盘点规格](../specs/024-retention-inventory/spec.md)、[推荐数据契约与迁移手册](2026-09-22-ranking-data-migration.md) |
+| 旧 retention apply、推荐隐式裁剪或清理 dry-run 安全 | [清理路径隔离与显式策略 dry-run 规格](../specs/025-retention-dry-run-safety/spec.md)、[数据增长与保留责任只读盘点](2026-09-22-retention-inventory.md) |
+| `server.js` 超限、登录/OAuth 或人才库 HTTP 路由拆分 | [Server 登录与人才路由边界拆分规格](../specs/026-server-route-boundaries/spec.md)、[本轮重构施工总手册](2026-09-22-refactor-agentic-ranking-manual.md) |
+| 推荐入口分叉、API/CLI/worker/scheduler 复用或推荐 repository/use case 边界 | [推荐用例、仓储与入口边界收口规格](../specs/027-recommendation-use-case-boundary/spec.md)、[本轮重构施工总手册](2026-09-22-refactor-agentic-ranking-manual.md) |
+| TTC/CSV 来源解耦、职位事实版本、字段证据、提炼缓存或投影对账 | [来源适配与版本化职位事实规格](../specs/028-versioned-job-facts/spec.md)、[推荐重构数据契约](2026-09-22-ranking-data-migration.md) |
+| 顾问主动画像、短期信号、真实曝光、Case 结果或归因 | [画像、曝光与结果账本规格](../specs/029-profile-exposure-outcomes/spec.md)、[推荐重构数据契约](2026-09-22-ranking-data-migration.md) |
+| Agent 多轮用量、预算、Context Registry 或排名窄工具 | [Agent 上下文与完整用量规格](../specs/030-agent-context-usage/spec.md)、[Algorithm A 契约](2026-09-22-algorithm-a-contract.md) |
+| Algorithm A、Agent 最终排序、严格校验、弃权或 generation/CAS 发布 | [Algorithm A 最小端到端规格](../specs/031-agentic-ranking-v1/spec.md)、[Algorithm A 决策契约](2026-09-22-algorithm-a-contract.md) |
+| Algorithm A 离线对照、影子评估、召回覆盖、稳定性、成本或晋升门槛 | [Algorithm A 离线与影子评估规格](../specs/032-agentic-shadow-evaluation/spec.md)、[Algorithm A 决策契约](2026-09-22-algorithm-a-contract.md) |
+| Algorithm A 工作台/飞书展示、原序分页、异步状态、主动偏好、排除项或容量设置 | [Algorithm A 忠实展示与主动设置规格](../specs/033-agentic-presentation/spec.md)、[前端审核台账](frontend-reviews/README.md)、[飞书卡片排版规范](standards/CARD_TYPOGRAPHY.md) |
+| 运营看板、事件投影、checkpoint、真实漏斗、排序分歧、Agent 成本或样本成熟度 | [事件投影运营、业务、效果与成本看板规格](../specs/034-operations-dashboard/spec.md)、[推荐数据迁移手册](2026-09-22-ranking-data-migration.md)、[前端审核台账](frontend-reviews/README.md) |
+| 桌面客户端下载、统一登录、官方浏览器授权、OpenMai/SuperMai/Reloop 找人连接器或设备会话 | [BrainX 桌面端统一登录与找人连接器规格](../specs/035-desktop-auth-connectors/spec.md)、[SuperMai 桌面 Relay 运行手册](2026-09-24-supermai-desktop-relay-runbook.md)、[首次入口与统一连接中心接入记录](frontend-reviews/2026-09-24-onboarding-connection-center.md)、[安全操作手册](SECURITY.md) |
 | 前端重构排期、施工范围或阶段验收 | [前端真实数据重构施工清单](frontend-refactor-construction-checklist.md)、[前端交互架构](frontend-interaction-architecture.md) |
 | TTC 职位字段、筛选能力或字段变化 | [TTC 职位字段库](ttc-field-catalog.md)、[BrainX v2.0 产品需求文档](prd-2026-08-24-brainx-v2.md) |
 | Commit、协作记录 | [Agent Commit 记录](AGENT_COMMIT_LOG.md) |
@@ -132,17 +154,40 @@
 
 ### 设计与数据
 
+- [仓库重构与 Algorithm A 施工总手册（2026-09-22）](2026-09-22-refactor-agentic-ranking-manual.md)：本轮重构的唯一施工总入口；审计复核、八领域边界、00–12 任务卡、依赖、验收与回滚。施工已启动，阶段 01 首个评估正确性单元已实现。
+- [仓库重构阶段 00：冻结基线与首个施工单元](2026-09-22-refactor-phase-00-baseline.md)：记录开工 commit、协作状态、迁移编号、真实入口、兼容表、NDCG 口径和改造前完整门禁；数据恢复点与责任角色仍待补齐。
+- [Algorithm A：Agentic Adaptive Ranking 决策契约](2026-09-22-algorithm-a-contract.md)：Agent 获取授权证据并决定最终推荐顺序；规则校验、补查、弃权、缓存、失败语义与评估，不采用后置固定加权排序。
+- [推荐重构：数据契约与迁移手册](2026-09-22-ranking-data-migration.md)：Canonical Job、字段证据、画像/事件/结果/用量、旧表复用、单写迁移、对账、恢复与生命周期。
+- [排序特征冻结快照规格](../specs/020-ranking-feature-snapshots/spec.md)：冻结新推荐的 LTR 输入；旧记录缺快照时明确排除，不读取当前职位事实伪造历史。
+- [排序标签观察窗口规格](../specs/021-ranking-label-windows/spec.md)：为离线标签增加显式观察窗口、数据截点、发生/收到双时间、成熟度和推荐项关联。
+- [排序负反馈事件回放规格](../specs/022-ranking-feedback-replay/spec.md)：追加记录忽略、撤销和原因更正，按双时间及明确推荐关联回放负反馈标签。
+- [人才库持久层失败关闭规格](../specs/023-talent-persistence-fail-closed/spec.md)：显式选择 MySQL 或易失内存后端；生产缺配置、断连或 schema 未就绪时不再伪装写入成功。
+- [数据增长与保留责任只读盘点规格](../specs/024-retention-inventory/spec.md)：只读、脱敏地统计增长、引用和责任阻断；未批准 TTL 与恢复点前不产生可执行删除集合。
+- [数据增长、引用与保留责任只读盘点](2026-09-22-retention-inventory.md)：本地聚合规模、跨表引用、责任矩阵、安全 dry-run、执行阻断和下一单元准入条件。
+- [清理路径隔离与显式策略 dry-run 规格](../specs/025-retention-dry-run-safety/spec.md)：停止推荐事务隐式删除，禁用旧 apply，并以只读聚合验证引用保护；不提供执行器。
+- [Server 登录与人才路由边界拆分规格](../specs/026-server-route-boundaries/spec.md)：把 OAuth/session 与人才库 HTTP 路由移出超限入口，保持鉴权及响应契约不变并撤销行数例外。
+- [BrainX 桌面端统一登录与找人连接器规格](../specs/035-desktop-auth-connectors/spec.md)：以 BrainX 单一身份、系统浏览器官方授权、设备安全存储和统一 provider/task 契约收口 OpenMai、SuperMai、Reloop 三条找人链路。
+- [SuperMai 桌面 Relay 运行手册](2026-09-24-supermai-desktop-relay-runbook.md)：内部同事的线上配对、桌面任务领取、Sourcing 执行、飞书回传、撤销和生产验收手册。
+- [推荐用例、仓储与入口边界收口规格](../specs/027-recommendation-use-case-boundary/spec.md)：以唯一 use case 和 SQLite repository 统一 API、CLI、scheduler、worker，集中校验既有推荐配置并保留兼容 facade。
+- [来源适配与版本化职位事实规格](../specs/028-versioned-job-facts/spec.md)：统一 TTC 与本地 CSV/fixture 来源信封，追加事实版本和字段证据，复用草稿确认链并建立提炼缓存、冲突留痕及投影对账/补偿。
+- [画像、曝光与结果账本规格](../specs/029-profile-exposure-outcomes/spec.md)：版本化主动画像，分离短期信号与实时负载，幂等记录真实曝光和 Case 结果/更正/归因。
+- [Agent 上下文与完整用量规格](../specs/030-agent-context-usage/spec.md)：逐模型尝试记录成功、失败、重试、取消与缓存，建立授权 Context Registry 和 A 专用只读窄工具。
+- [Algorithm A 最小端到端规格](../specs/031-agentic-ranking-v1/spec.md)：默认关闭的独立 A 路径，覆盖硬过滤、多路召回、Agent 原序输出、严格校验和 generation/CAS 原子发布。
+- [Algorithm A 离线与影子评估规格](../specs/032-agentic-shadow-evaluation/spec.md)：冻结门槛后同池比较旧基线与 A，拆分召回/选择遗漏并保存稳定性、成本、延迟、分组和样本不确定性证据；影子不投递也不伪造转化。
+- [Algorithm A 忠实展示与主动设置规格](../specs/033-agentic-presentation/spec.md)：默认关闭地接入 LIVE A 原序、冻结分页、异步/旧结果状态、Web/飞书统一投影和主动偏好/排除/容量设置；不把旧六维分或候选数伪装成 A 结论。
 - [找人链路产品形态设定（2026-10-09）](2026-10-09-sourcing-product-form.md)：找人链路的唯一权威形态设定——群卡片=即时交付面/工作台=沉淀回溯面、四通道分工、逐步「动作→效果」交互表、Sourcing.app 路线 B（只消费成果）、隐私纪律与验收口径。
 - [BrainTex 飞书功能首页与新用户指引](2026-09-03-braintex-feishu-home.md)：定义 `/brainx` 确定性卡片、六个顾问任务入口、权限边界、首次出现时机和真实验收流程。
 - [候选人事实与 shortlist 数据契约](2026-09-03-candidate-data-contracts.md)：`candidate_fact_v1`、`candidate_match_bundle_v1`、reloop 真实数据转换、人才/职位双授权、固定飞书文案、MCP PoC 暴露条件及当前未完成项的唯一施工说明。
 - [候选人保留与项目共享上下文复核](frontend-reviews/2026-09-09-candidate-focus-context.md)：飞书候选行“保留”、项目级重点名单、后续群问答读取与安全边界。
 - [重点关注并发送人才卡复核](frontend-reviews/2026-09-10-candidate-focus-share-card.md)：9 月 10 日历史交互与共享上下文边界。
 - [候选总览三入口与人才链接直发复核](frontend-reviews/2026-09-15-candidate-link-actions.md)：姓名直达 TTC、初筛通过与加入 reloop，并由飞书展开人才链接。
+- [候选结果卡继续找人提示复核](frontend-reviews/2026-09-15-candidate-continue-search-hint.md)：继续找人按钮下方用弱化提示说明条件消息格式、默认搜索和历史候选排除。
 - [每日推荐卡一键接单并建群复核](frontend-reviews/2026-09-10-daily-card-quick-launch.md)：推荐卡签名确认、自动加入项目、接单、幂等建群和不自动找人的边界。
 - [候选人 Offer 决策群复核](frontend-reviews/2026-09-09-candidate-decision-group.md)：重点候选人独立建群、原项目群摘要迁移、群准入与幂等边界。
 - [候选卡片与对话建群复核](frontend-reviews/2026-09-09-candidate-card-conversation-group.md)：逐行发送人才卡、移除建群按钮、自然语言建群与自动重点名单边界。
-- [候选人 Offer 决策报告](2026-09-10-candidate-offer-report.md)：决策群首卡、飞书云文档版式、`/report` 更新、安全与真实验收边界。
-- [Offer 决策群首卡与报告复核](frontend-reviews/2026-09-10-candidate-offer-report.md)：三个首卡动作、上下文迁移和发布/真机状态。
+- [候选人 Offer 决策报告](2026-09-10-candidate-offer-report.md)：决策群首卡、单一可编辑飞书报告、实时正文读取问答、安全与真实验收边界。
+- [Offer 决策群首卡与报告复核](frontend-reviews/2026-09-10-candidate-offer-report.md)：历史三个首卡动作、上下文迁移和发布/真机状态。
+- [Offer 决策群单报告与编辑稿问答复核](frontend-reviews/2026-09-16-candidate-offer-single-report.md)：单文档幂等、人工编辑稿只读问答和本轮真机状态。
 - [Offer 谈判演示：三人种子数据与排练手册](2026-09-16-offer-demo-seed-and-rehearsal.md)：曹国鸿/杨东旭/从容地演示数据灌入工具、排练纪律与 ECS 拉群执行方案。
 - [BrainX × OpenClaw AI 猎头工作流产品需求文档](prd-2026-09-02-openclaw-ai-recruiting-workflow.md)：当前阶段权威开发基线；基于代码审计和官方能力，定义 OpenClaw 主 Agent、飞书最小权限、BrainX 窄网关、人才授权、简历事实、匹配、施工阶段和发布门禁。
 - [历史：BrainX 飞书 AI 猎头副驾驶产品需求文档](prd-2026-09-01-feishu-ai-consultant-copilot.md)：主 Agent 调整前的 Codex 方案和用户研究，仅作历史参考。
@@ -168,12 +213,14 @@
 - [BrainX → OpenClaw 接口包（模块化交付信息）](2026-09-02-openclaw-interface-pack.md)：用户指令「后端的结构我打包给对方模块化的信息」的**单一打包文档**。§1 三接缝一屏图 + 三条红线；§2 stdio MCP 接入配置模板 + 15 工具快照（含黑名单 `brainx_sync_now`/`brainx_talent`）+ 调用纪律；§3 consultant_id 身份映射规则（**后端不碰 open_id，映射权威在对方**；群消息通道与身份映射互不相干）；§4 Skill 素材交付与合规基线；§6 交付包清单。
 - [OpenClaw 招聘闭环（2026-09-03）](2026-09-03-openclaw-recruiting-loop.md)：记录用户从“只读首版”升级为可执行闭环后的权威范围：卡片化回复、自然语言推送设置、职位负责人、确认后接单/找人/进展、候选 Case 推进、联系方式独立授权，以及尚未接通的外发和建群。
 - [AI Native 猎头全链路轨迹图](design/ai-native-headhunter-workflow.html)：环节级轨迹、人工/自动分工与证据来源的蒸馏工作稿，阶段三回填进行中。
+- [BrainTex 招聘工作流](design/braintex-ai-recruiting-os.html)：四阶段、16 个节点的连续箭头轨迹图；点击加号展开英文技术栈、中文机制与 Q&A 边界，默认仍保持简洁。[本轮审核](frontend-reviews/2026-09-17-workflow-tech-stack.md)。
+- [招聘工作流技术栈与代码证据](audits/2026-09-17-workflow-tech-stack.md)：16 个节点的实际实现来源、现场追问口径与未实现/未验收边界，不把架构规划当作生产事实。
 - [双项目 14 天作战计划](design/week-plan-brainx-reloop.html)：BrainX × reloop 至 9/14 决赛的双泳道排期、底线条件与不做清单。
-- [BrainX 最终交付蓝图与施工总清单](brainx-final-delivery-blueprint.md)：基于当前代码审计定义最终产品形态、黄金路径、跨前后端施工顺序和端到端验收。
+- [BrainX 最终交付蓝图与施工总清单](brainx-final-delivery-blueprint.md)：保留 8 月交付基线、黄金路径和历史验收；本轮跨域重构顺序以 9 月 22 日施工总手册为准。
 - [前端审核台账](frontend-reviews/README.md)：前端审核、正式接入、发布与真实数据验证状态的唯一权威入口。
 - [前端交互架构](frontend-interaction-architecture.md)：BrainX 页面分层、状态诚实性和核心用户动作链。
 - [推荐队列与职位决策产品架构](recommendation-queue-product-architecture.md)：完整200条推荐队列、20条分页、决策分层、卡片字段、动作闭环与全部职位进入详情规则。
-- [BrainX 岗位推荐算法与评分标准](BrainX岗位推荐算法与评分标准.md)：当前 `baseline-1.1` 六维确定性评分、前端口径、验收标准与未来学习排序路线。
+- [BrainX 岗位推荐算法与评分标准（历史基线）](BrainX岗位推荐算法与评分标准.md)：`baseline-1.1` 六维确定性评分与旧学习排序方案；新 Algorithm A 以专门契约为准，尚未替换现有代码。
 - [完整推荐队列排序复核](frontend-reviews/2026-08-30-recommendation-sort.md)：推荐优先级、最近活动、事实可信度三种服务端排序及游标稳定性证据。
 - [精选盘评分与队列视图整改](frontend-reviews/2026-08-30-pick-board-score-views.md)：评分参考恢复、五种完整队列视图、数据来源筛选删除及命名收口证据。
 - [精选盘卡片删除判断摘要区复审](frontend-reviews/2026-08-30-pick-card-remove-assessment.md)：列表卡片删除理由、风险、事实可信度与更新时间区，并保留详情数据边界。

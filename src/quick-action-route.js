@@ -14,6 +14,7 @@ async function launchFromCard(db, bus, params, dependencies) {
   const membership = confirmMembership(db, params.consultant, params.project, {
     relation: 'MY_JOB',
     idempotency_key: `quick-launch:${params.consultant}:${params.project}:${params.day}:membership`,
+    decision_id: params.decision || null,
   });
   if (!membership.ok) {
     return { ok: false, status: membership.status, text: membership.error || '加入项目失败' };
@@ -22,6 +23,7 @@ async function launchFromCard(db, bus, params, dependencies) {
     const result = await launchRecruitingWorkflow(db, bus, params.consultant, params.project, {
       confirm: true,
       idempotency_key: `quick-launch:${params.consultant}:${params.project}:${params.day}`,
+      decision_id: params.decision || null,
     }, dependencies);
     return {
       ok: true,
@@ -45,7 +47,9 @@ export function quickActionRoute(db, bus, dependencies = {}) {
       return sendPage(res, result.ok, result.text, result.status);
     }
     const result = recordOpportunityIgnore(db, params.consultant, params.project,
-      `quick-ignore:${params.consultant}:${params.project}:${params.day}`);
+      `quick-ignore:${params.consultant}:${params.project}:${params.day}`, {
+        decision_id: params.decision || null, reason: '其他', source: 'FEISHU_QUICK',
+      });
     if (!result.ok) return sendPage(res, false, result.error || result.message || '操作失败');
     return sendPage(res, true,
       `已记录：${QUICK_ACTIONS[params.action]}${result.already ? '（此前已记录）' : ''}`);

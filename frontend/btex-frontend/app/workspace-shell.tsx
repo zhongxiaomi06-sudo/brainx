@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 import {
   BriefcaseBusiness,
+  Cable,
   ChevronUp,
   ClipboardCheck,
   Settings2,
@@ -13,13 +14,14 @@ import {
 } from "lucide-react";
 import "./workspace-shell.css";
 
-export type WorkspaceShellPage = "today" | "jobs" | "projects" | "clients" | "settings";
+export type WorkspaceShellPage = "today" | "jobs" | "projects" | "clients" | "connections" | "settings";
 
 const primaryNavigation = [
   { id: "today", label: "精选盘", icon: Sparkles },
   { id: "projects", label: "我的项目", icon: ClipboardCheck },
   { id: "jobs", label: "全部职位", icon: BriefcaseBusiness },
   { id: "clients", label: "客户洞察", icon: Users },
+  { id: "connections", label: "连接中心", icon: Cable },
 ] as const;
 
 const pageMeta: Record<WorkspaceShellPage, { title: string; description: string }> = {
@@ -27,6 +29,7 @@ const pageMeta: Record<WorkspaceShellPage, { title: string; description: string 
   jobs: { title: "全部职位", description: "检索和核验 TTC 真实职位事实" },
   projects: { title: "我的项目", description: "查看项目状态并推进下一行动" },
   clients: { title: "客户洞察", description: "按客户查看可核验的职位事实" },
+  connections: { title: "连接中心", description: "统一查看身份与找人来源的真实连接状态" },
   settings: { title: "设置中心", description: "管理身份、数据连接、推荐策略与同步诊断" },
 };
 

@@ -1,4 +1,4 @@
-/** 人才库查询(MySQL 不可用时自动内存回退;列表/单人/简历三合一)。 */
+/** 人才库查询（显式持久层失败关闭；列表/单人/简历三合一）。 */
 import { listTalentsWithTags, getTalent, listResumes, talentHealth } from '../../talent.js';
 
 export default {

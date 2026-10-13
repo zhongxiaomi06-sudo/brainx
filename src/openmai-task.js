@@ -14,6 +14,8 @@ import { getAuthorizedTtcJwt } from './ttcsdk/auth.js';
 import { assessOpenmaiCandidateBatch, looksLikeSessionPollution } from './openmai-result.js';
 import { normalizeExcludedCandidateRefs } from './search-rounds.js';
 import { emitEvent } from './hub/emit.js';
+import { snapshotFreeformResult } from './sourcing-group-delivery.js';
+import { effectiveSearchBrief } from './project-search-brief.js';
 
 /** specs/019 US1：找人结算补发 search_finished 事件（契约 specs/019 contracts/event-types.md）。
  *  与结算 UPDATE 同调用栈；重复结算（非 running）changes=0 不发事件。 */
@@ -54,6 +56,7 @@ export function settleOpenmaiTask(db, {
     finishedAt, projectId, consultantId, taskId,
   );
   if (output.changes === 1) {
+    snapshotFreeformResult(db, taskId, consultantId);
     emitSearchFinished(db, { projectId, consultantId, taskId, status, channel, resultCount });
   }
   return output.changes === 1;
@@ -209,7 +212,7 @@ export function startOpenmaiTask(db, bus, consultant_id, project_id, {
   force = false, searchBrief = '', excludeCandidateRefs = [],
 } = {}) {
   const key = `${project_id}|${consultant_id}`;
-  const brief = String(searchBrief || '').trim().slice(0, 2000);
+  const brief = effectiveSearchBrief(db, project_id, searchBrief);
   const exclusions = normalizeExcludedCandidateRefs(excludeCandidateRefs);
   const existing = db.prepare(`SELECT status,started_at,finished_at,search_round
     FROM openmai_results WHERE project_id=? AND consultant_id=?`)
@@ -314,13 +317,9 @@ export function startOpenmaiTask(db, bus, consultant_id, project_id, {
         result = await callOpenmaiContent(jwt, buildPrompt(pseudoJob, brief, exclusions)
           + '\n【自建岗说明】该职位为 BrainX 自建岗，没有 TTC ATS 编号；请严格按上面的公司、岗位与画像判据找人，不得以缺少职位描述为由停止。', {});
       }
-      // 会话污染防护（2026-09-09）：拿到元回复自动重试一次，仍污染则失败关闭
+      // 与 SuperMai 一致：污染回复失败关闭，不能隐式再次触发可能计费的搜索。
       if (looksLikeSessionPollution(result)) {
-        console.warn('[openmai] session pollution detected, retrying once:', task_id);
-        result = await callOpenmai(jwt, job, brief, exclusions);
-        if (looksLikeSessionPollution(result)) {
-          throw new Error('OpenMai 会话上下文污染：两次均返回与找人无关的元回复，请稍后重试');
-        }
+        throw new Error('OpenMai 会话上下文污染：返回与找人无关的内容，未自动重试；请确认后重新发起。');
       }
       const batchQuality = assessOpenmaiCandidateBatch(result);
       const resultStatus = batchQuality.needsInput ? 'needs_input' : 'done';

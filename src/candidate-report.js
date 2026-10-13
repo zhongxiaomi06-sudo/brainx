@@ -2,7 +2,11 @@
 import { randomUUID } from 'node:crypto';
 import { now } from './db.js';
 import { listProjectCandidateFocus } from './candidate-focus.js';
-import { createFeishuDocument } from './feishu-document.js';
+import {
+  appendFeishuDocumentSections,
+  createFeishuDocument,
+  readFeishuDocument,
+} from './feishu-document.js';
 import { sendInteractiveCard } from './feishu-bot.js';
 import { alignSoloAction } from './card-layout.js';
 
@@ -15,20 +19,26 @@ function safe(value, max = 1200) {
   return text.length > max ? `${text.slice(0, max)}…` : text;
 }
 
+function safeDocumentText(value, max = 20_000) {
+  const text = String(value || '').replace(PHONE, '[联系方式已隐藏]').replace(EMAIL, '[联系方式已隐藏]')
+    .split(/\r?\n/).map((line) => line.replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n');
+  return text.length > max ? `${text.slice(0, max)}…` : text;
+}
+
 function groupMessages(db, chatId) {
   return db.prepare(`SELECT text,create_time FROM lark_messages
     WHERE chat_id=? AND text IS NOT NULL ORDER BY create_time DESC LIMIT 60`).all(chatId)
     .reverse().map((row) => ({ text: safe(row.text, 600), create_time: row.create_time })).filter((row) => row.text);
 }
 
-function sectionsFor(job, candidate, decisionGroup, messages, version) {
+function sectionsFor(job, candidate, decisionGroup, messages) {
   const evidence = messages.length
     ? messages.map((row) => `${safe(row.create_time, 40)}｜${row.text}`)
     : ['当前决策群尚无已记录的新讨论。'];
   return [
     { title: '一、决策摘要', paragraphs: [
       `候选人：${safe(candidate.name || candidate.candidate_ref, 100)}；目标岗位：${safe(job.role, 160)}；项目：${safe(job.company, 120)}（${safe(job.project_id, 80)}）。`,
-      `当前结论：待团队结合以下证据决定继续评估、进入面试、准备 Offer 或不推进。报告版本：V${version}。`,
+      '当前结论：待团队结合以下证据决定继续评估、进入面试、准备 Offer 或不推进。',
     ] },
     { title: '二、候选人事实', paragraphs: [
       `当前岗位：${safe(candidate.role || '待核实', 160)}。经验 / 城市 / 学历：${safe([candidate.experience, candidate.city, candidate.education].filter(Boolean).join(' / ') || '待核实', 240)}。`,
@@ -47,24 +57,45 @@ function sectionsFor(job, candidate, decisionGroup, messages, version) {
   ];
 }
 
+function sectionsText(sections) {
+  return sections.flatMap((section) => [section.title, ...(section.paragraphs || [])]).join('\n');
+}
+
+function currentReport(db, decisionGroupId) {
+  return db.prepare(`SELECT * FROM candidate_reports
+    WHERE decision_group_id=? AND status='READY' ORDER BY version DESC,created_at DESC LIMIT 1`)
+    .get(decisionGroupId);
+}
+
+function resultFor(report, content, extra = {}) {
+  return { data: { report_id: report.report_id, document_url: report.document_url,
+    report_content: safeDocumentText(content), ...extra },
+  facts: [{ candidate_ref: report.candidate_ref, report_ref: 'current' }],
+  inferences: [], recommendations: [], unknowns: [],
+  evidence_refs: [`candidate_report:${report.report_id}`], next_allowed_actions: [] };
+}
+
 // 导出供卡片渲染门禁（scripts/quality-gate/card-render）直接取真实卡片，避免样本漂移。
 export function readyCard(candidate, report) {
   const url = new URL(report.document_url);
   if (url.protocol !== 'https:' || !url.hostname.endsWith('.feishu.cn')) fail('FEISHU_DOC_URL_INVALID');
   return { config: { wide_screen_mode: true },
-    header: { template: 'purple', title: { tag: 'plain_text', content: `BrainTex · Offer 决策报告 V${report.version}` } },
+    header: { template: 'purple', title: { tag: 'plain_text', content: 'BrainTex · Offer 决策报告' } },
     elements: [
       { tag: 'markdown', content: `**${safe(candidate.name || candidate.candidate_ref, 100)}**\n已汇总候选事实、来源项目群上下文和本群最新讨论。` },
       alignSoloAction({ tag: 'action', actions: [{ tag: 'button', type: 'primary', text: { tag: 'plain_text', content: '打开飞书报告' },
         multi_url: { url: url.toString(), pc_url: url.toString(), android_url: url.toString(), ios_url: url.toString() } }] }),
-      { tag: 'note', elements: [{ tag: 'plain_text', content: '后续有新讨论或电话纪要时，发送 /report 即可生成新版本。' }] },
+      { tag: 'note', elements: [{ tag: 'plain_text', content: '这是本群唯一报告，可直接编辑；@机器人提问时会读取当前内容回答。' }] },
     ] };
 }
 
 export function createCandidateReportToolHandlers({ db, createDocumentFn = createFeishuDocument,
-  sendInteractiveCardFn = sendInteractiveCard } = {}) {
+    readDocumentFn = readFeishuDocument, appendDocumentFn = appendFeishuDocumentSections,
+    sendInteractiveCardFn = sendInteractiveCard } = {}) {
   return { brainx_candidate_report: async (args, context) => {
-    if (args.confirm !== true || context.principal.chatType !== 'group') fail('INVALID_ARGUMENT');
+    if (!['GENERATE', 'REGENERATE', 'READ'].includes(args.mode)
+        || context.principal.chatType !== 'group') fail('INVALID_ARGUMENT');
+    if (args.mode !== 'READ' && args.confirm !== true) fail('INVALID_ARGUMENT');
     const group = db.prepare(`SELECT * FROM candidate_decision_groups
       WHERE tenant_id=? AND target_chat_id=? AND status='READY' LIMIT 2`)
       .all(context.principal.tenantId, context.principal.chatId);
@@ -75,6 +106,31 @@ export function createCandidateReportToolHandlers({ db, createDocumentFn = creat
     const job = db.prepare('SELECT project_id,company,role FROM job_facts WHERE project_id=?')
       .get(decisionGroup.position_id);
     if (!candidate || !job) fail('NOT_FOUND_OR_FORBIDDEN');
+    const existing = currentReport(db, decisionGroup.decision_group_id);
+    if (args.mode === 'READ' && !existing) {
+      return { data: { status: 'NOT_CREATED' }, facts: [], inferences: [], recommendations: [],
+        unknowns: ['当前候选人决策群还没有 Offer 决策报告。'], evidence_refs: [],
+        next_allowed_actions: ['brainx_candidate_report'] };
+    }
+    if (existing) {
+      let updated = false;
+      if (args.mode === 'REGENERATE') {
+        const messages = groupMessages(db, decisionGroup.target_chat_id);
+        const previousCount = Number(existing.source_message_count || 0);
+        const additions = messages.slice(Math.min(previousCount, messages.length));
+        if (additions.length) {
+          await appendDocumentFn({ documentId: existing.document_id, sections: [{
+            title: 'BrainX 新增群聊证据',
+            paragraphs: additions.map((row) => `${safe(row.create_time, 40)}｜${row.text}`),
+          }] });
+          db.prepare(`UPDATE candidate_reports SET source_message_count=?,updated_at=? WHERE report_id=?`)
+            .run(messages.length, now(), existing.report_id);
+          updated = true;
+        }
+      }
+      const document = await readDocumentFn({ documentId: existing.document_id });
+      return resultFor(existing, document.content, { status: 'READY', already: true, updated });
+    }
     const version = (db.prepare('SELECT MAX(version) version FROM candidate_reports WHERE decision_group_id=?')
       .get(decisionGroup.decision_group_id).version || 0) + 1;
     const reportId = randomUUID();
@@ -87,19 +143,19 @@ export function createCandidateReportToolHandlers({ db, createDocumentFn = creat
         decisionGroup.position_id, decisionGroup.candidate_ref, version, messages.length,
         context.principal.consultantId, at, at);
     try {
+      const sections = sectionsFor(job, candidate, decisionGroup, messages);
       const document = await createDocumentFn({
-        title: `${candidate.name || candidate.candidate_ref} × ${job.role} Offer 决策报告 V${version}`,
-        sections: sectionsFor(job, candidate, decisionGroup, messages, version),
+        title: `${candidate.name || candidate.candidate_ref} × ${job.role} Offer 决策报告`,
+        sections,
       });
       db.prepare(`UPDATE candidate_reports SET status='READY',document_id=?,document_url=?,updated_at=?
         WHERE report_id=?`).run(document.document_id, document.document_url, now(), reportId);
       const report = { ...document, version };
       await sendInteractiveCardFn({ target: context.principal.chatId, card: readyCard(candidate, report),
         idempotencyKey: `candidate-report-${reportId}` });
-      return { data: { report_id: reportId, version, document_url: document.document_url,
-        source_message_count: messages.length }, facts: [{ candidate_ref: candidate.candidate_ref,
-        report_version: version }], inferences: [], recommendations: [], unknowns: [],
-      evidence_refs: [`candidate_report:${reportId}`], next_allowed_actions: ['brainx_candidate_report'] };
+      return resultFor({ ...report, report_id: reportId, candidate_ref: candidate.candidate_ref },
+        sectionsText(sections), { status: 'READY', already: false, created: true,
+          source_message_count: messages.length });
     } catch (error) {
       db.prepare(`UPDATE candidate_reports SET status='FAILED',error_code=?,error_message=?,updated_at=?
         WHERE report_id=?`).run(error.code || 'CANDIDATE_REPORT_FAILED', safe(error.message, 240), now(), reportId);

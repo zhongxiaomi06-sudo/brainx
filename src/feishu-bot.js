@@ -42,6 +42,11 @@ async function readJson(response, fallback) {
   }
 }
 
+/** 非敏感应用标识，用于异步投递前复核是否仍是原应用，绝不返回凭据。 */
+export function configuredFeishuAppId() {
+  return feishuCredentials().appId || null;
+}
+
 export async function getTenantAccessToken({
   appId,
   appSecret,

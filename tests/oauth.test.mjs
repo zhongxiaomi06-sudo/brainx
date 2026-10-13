@@ -33,7 +33,8 @@ test('花名册：种子幂等 + open_id 匹配 + 在线 upsert 不丢画像', (
 test('oauth state：签发/校验/篡改/过期', () => {
   const s = signState();
   assert.ok(verifyState(s));
-  assert.ok(!verifyState(s.slice(0, -2) + 'aa'));          // 篡改签名
+  const tampered = `${s.slice(0, -1)}${s.endsWith('a') ? 'b' : 'a'}`;
+  assert.ok(!verifyState(tampered));                        // 确定性篡改签名
   assert.ok(!verifyState('garbage'));                       // 畸形
   const [nonce] = s.split('.');
   const oldTs = String(Date.now() - 11 * 60 * 1000);

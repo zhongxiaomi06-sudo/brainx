@@ -1,5 +1,7 @@
 # BrainX 最终交付蓝图与施工总清单
 
+> 2026-09-22 范围更新：本文保存早期交付基线与历史勾选。本轮仓库重构、来源解耦及推荐算法的施工总入口已迁至[新施工手册](2026-09-22-refactor-agentic-ranking-manual.md)；下文旧排期和“下一步”不作为当前开工顺序。整体产品目标见[当前 PRD](prd-2026-09-02-brainx-workflow.md)，前端状态仍以中央台账为准。
+
 > 上级入口：[BrainX 文档书](README.md)
 >
 > 审核状态权威：[前端审核台账](frontend-reviews/README.md)

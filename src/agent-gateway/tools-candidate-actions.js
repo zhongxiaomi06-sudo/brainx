@@ -9,6 +9,8 @@ import { sendPdfFile, sendTextMessage } from '../feishu-bot.js';
 import { getAuthorizedTtcJwt } from '../ttcsdk/auth.js';
 import { downloadTtcResumePdf, listTtcResumeAttachments } from '../ttcsdk/resume.js';
 import { createCandidateDecisionGroup } from '../candidate-decision-group.js';
+import { setCandidateSearchFeedback } from '../candidate-search-feedback.js';
+import { sendCandidatePrivateContact } from './candidate-private-contact.js';
 
 function fail(code) { throw Object.assign(new Error(code), { code }); }
 
@@ -102,7 +104,8 @@ function transition(db, principal, args) {
 
 function openmaiResume(db, jobId, candidateRef) {
   const results = db.prepare(`SELECT consultant_id,result_text FROM openmai_results
-    WHERE project_id=? AND status='done' ORDER BY finished_at DESC`).all(jobId);
+    WHERE project_id IN (?,?) AND status='done' ORDER BY finished_at DESC`)
+    .all(jobId, `supermai-result:${jobId}`);
   for (const result of results) {
     const candidate = extractOpenmaiCandidates(result.result_text)
       .find((item) => item.candidateRef === candidateRef);
@@ -115,7 +118,7 @@ function openmaiResume(db, jobId, candidateRef) {
  * 冲刺 T12：候选人一键加入 RDS 人才库。幂等口径 = 姓名 + summary 里的 [ref:xxx] 来源标记；
  * talent 表不加迁移、不改结构。RDS 不可写时由调用方降级，不在此处吞错。
  */
-async function defaultAddTalent({ name, summary, sourceRef }) {
+export async function defaultAddTalent({ name, summary, sourceRef }) {
   const existingId = await withMysql(async (conn) => {
     const [rows] = await conn.execute(
       'SELECT id FROM talent WHERE name=? AND summary LIKE ? LIMIT 1',
@@ -135,6 +138,7 @@ export function createCandidateActionToolHandlers({
   createCandidateDecisionGroupFn = createCandidateDecisionGroup,
   sendTextMessageFn = sendTextMessage,
   addTalentFn = defaultAddTalent,
+  loadCandidateContactFn, contactAppId,
 } = {}) {
   return {
     brainx_candidate_workflow: async (args, context) => {
@@ -147,10 +151,24 @@ export function createCandidateActionToolHandlers({
       const focusedCandidate = listProjectCandidateFocus(db, context.principal.tenantId, args.job_id)
         .find((candidate) => candidate.candidate_ref === args.candidate_ref);
       const focused = Boolean(focusedCandidate);
-      const permitted = existing || discovered || focused
+      const ownFeedback = args.action === 'RESTORE_CANDIDATE' && db.prepare(`SELECT 1 FROM candidate_search_feedback
+        WHERE tenant_id=? AND consultant_id=? AND project_id=? AND candidate_ref=?`)
+        .get(context.principal.tenantId, context.principal.consultantId, args.job_id, args.candidate_ref);
+      const permitted = existing || discovered || focused || ownFeedback
         || await authorized(candidateShortlistFn, context.principal, args.job_id, args.candidate_ref);
       if (!permitted) {
         fail('NOT_FOUND_OR_FORBIDDEN');
+      }
+      if (args.action === 'SEND_CONTACT_PRIVATE') {
+        return sendCandidatePrivateContact(db, context.principal, args.candidate_ref,
+          { loadCandidateContactFn, sendTextMessageFn, appId: contactAppId });
+      }
+      if (['REJECT_CANDIDATE', 'RESTORE_CANDIDATE'].includes(args.action)) {
+        const row = setCandidateSearchFeedback(db, context.principal, args, discovered?.sourceTaskId);
+        return { data: row, facts: [{ candidate_ref: args.candidate_ref,
+          excluded_from_next_search: row.status === 'REJECTED' }],
+        inferences: [], recommendations: [], unknowns: [],
+        evidence_refs: [`candidate_feedback:${args.job_id}:${args.candidate_ref}`] };
       }
       if (args.action === 'KEEP_FOR_REVIEW' || args.action === 'REMOVE_FROM_REVIEW') {
         const row = setProjectCandidateFocus(db, {
@@ -286,9 +304,10 @@ export function createCandidateActionToolHandlers({
           evidence_refs: [`talent_pool:${result.id}`],
           next_allowed_actions: ['brainx_candidate_workflow'] };
       } catch {
-        return { data: { candidate_ref: args.candidate_ref, talent_id: null, already: false, sync_pending: true },
+        return { data: { candidate_ref: args.candidate_ref, talent_id: null, already: false,
+          sync_pending: false, status: 'failed' },
           facts: [], inferences: [], recommendations: [],
-          unknowns: [`人才库暂时不可写，「${name}」已记录为待同步；请回复顾问“已收藏（同步中）”，不要说操作失败。`],
+          unknowns: [`人才库暂时不可写，「${name}」未加入，也未进入同步队列。请恢复连接后重试，不要回复已收藏或同步中。`],
           evidence_refs: [], next_allowed_actions: ['brainx_candidate_workflow'] };
       }
     },

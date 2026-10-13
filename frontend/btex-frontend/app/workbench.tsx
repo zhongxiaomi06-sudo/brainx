@@ -75,6 +75,7 @@ export default function DecisionWorkbench({ demo = false }: { demo?: boolean } =
     runId: null,
     snapshotId: null,
     policyVersion: null,
+    engine: "baseline-1.1",
   });
   const [brainxDismissReasons, setBrainxDismissReasons] = useState<string[]>(FALLBACK_DISMISS_REASONS);
   const [brainxReplay, setBrainxReplay] = useState<Record<string, BrainxReplay>>({});
@@ -100,7 +101,7 @@ export default function DecisionWorkbench({ demo = false }: { demo?: boolean } =
   const recommendationQueue = useRecommendationPages((page) => {
     setBrainxJobs(page.jobs as DecisionJob[]);
     setEngagement((current) => ({ ...current, ...page.engagement }));
-    setBrainxRun({ runId: page.runId, snapshotId: page.snapshotId, policyVersion: page.policyVersion });
+    setBrainxRun({ runId: page.runId, snapshotId: page.snapshotId, policyVersion: page.policyVersion, engine: page.engine });
   });
   const { hydrated, done, snoozed, extraTasks, weights } = useWorkbenchHydration({
     setDecisionActions,
@@ -276,7 +277,7 @@ export default function DecisionWorkbench({ demo = false }: { demo?: boolean } =
   const navigateShell = (next: WorkspaceShellPage) => {
     if (next === "jobs") setJobCompanyFilter(null);
     if (next === "settings") setAssistantOpen(false);
-    go(next === "projects" ? "accepted" : next === "settings" ? "settings" : next);
+    go(next === "projects" ? "accepted" : next === "connections" ? "sources" : next === "settings" ? "settings" : next);
   };
   return (
     <div className="btex-app formal-workbench">
@@ -287,6 +288,7 @@ export default function DecisionWorkbench({ demo = false }: { demo?: boolean } =
           keywords={brainxKeywords}
           note={brainxNote}
           policyVersion={brainxRun.policyVersion}
+          engine={brainxRun.engine}
           sync={sync}
           fieldReport={brainxRadar?.fieldReport ?? null}
           onBack={() => go("today")}
@@ -400,6 +402,7 @@ export default function DecisionWorkbench({ demo = false }: { demo?: boolean } =
                 notify={notify}
                 mode={brainxMode}
                 policy={brainxRun.policyVersion}
+                engine={brainxRun.engine}
                 keywords={brainxKeywords}
                 note={brainxNote}
                 onRefresh={async () => {

@@ -2,7 +2,8 @@
 import { latestSync, latestCompleteSnapshot } from '../../sync.js';
 import { latestRun, loadConsultants } from '../../recommend.js';
 import { commitmentSummary } from '../../engagement.js';
-import { buildDailyCard, buildSyncAlertCard } from '../../push.js';
+import { buildAgenticDailyCard, buildDailyCard, buildSyncAlertCard } from '../../push.js';
+import { agenticRecommendationPage } from '../../agentic-ranking/presentation.js';
 
 export default {
   name: 'brainx_push_preview',
@@ -12,11 +13,15 @@ export default {
     const { db, cid } = ctx;
     const sync = latestSync(db, cid);
     const snapshot = latestCompleteSnapshot(db, cid);
-    const run = latestRun(db, cid, { hideEngaged: true });
+    const agentic = process.env.BRAINX_AGENTIC_READ === '1';
+    const run = agentic ? agenticRecommendationPage(db, cid)
+      : latestRun(db, cid, { hideEngaged: true });
     const c = commitmentSummary(db, cid);
     const name = loadConsultants(db).find((x) => x.consultant_id === cid)?.display_name || cid;
     return sync && !sync.complete ? buildSyncAlertCard(sync)
-      : buildDailyCard({ consultant_name: name, consultant_id: cid, run: run?.run, items: run?.items || [],
+      : agentic ? buildAgenticDailyCard({ consultant_name: name, run,
+          items: run?.items || [], commitments: c })
+        : buildDailyCard({ consultant_name: name, consultant_id: cid, run: run?.run, items: run?.items || [],
                          commitments: c, sync, snapshot_id: snapshot?.sync_id });
   },
 };

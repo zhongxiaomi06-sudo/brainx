@@ -3,6 +3,7 @@ import { candidateShortlist, maskCandidateName } from '../candidate-shortlist.js
 import { listProjectCandidateFocus } from '../candidate-focus.js';
 import { parseCandidateFact } from '../talent-contracts.js';
 import { buildShortlistCard } from '../shortlist-card.js';
+import { rejectedCandidateRefs } from '../candidate-search-feedback.js';
 
 function fail(code) {
   throw Object.assign(new Error(code), { code });
@@ -27,7 +28,7 @@ function emptyShortlistGuidance(db, consultantId, jobId) {
         ? `该岗位的候选人结果已由 OpenMai 找人完成（openmai_results 有 done 记录），请调用 brainx_openmai_search(job_id) 获取完整候选人列表并呈现给顾问；本内部短名单（RDS）只覆盖部分合作岗位，为空不代表没有候选人，更不是数据源故障。`
         : `该岗位已进入 OpenMai 找人流程（状态：${openmai?.status || '进行中'}），请调用 brainx_openmai_search(job_id) 查询/刷新结果并呈现给顾问；本内部短名单（RDS）只覆盖部分合作岗位，为空不代表没有候选人。`;
     }
-    return '当前岗位暂无授权的人才短名单数据（内部短名单仅覆盖部分合作岗位）。如需找候选人：先接单触发 OpenMai 找人，完成后用 brainx_openmai_search(job_id) 获取结果。';
+    return '当前岗位暂无授权的人才短名单数据（内部短名单仅覆盖部分合作岗位）。如需找候选人：先接单并进入项目群，再由顾问明确选择 OpenMai 或 SuperMai；完成后从对应渠道获取结果。';
   } catch { return null; }
 }
 
@@ -68,7 +69,7 @@ async function loadAuthorizedCandidateFact(input, dependencies = {}) {
   }
 }
 
-async function loadAuthorizedCandidateContact(input, dependencies = {}) {
+export async function loadAuthorizedCandidateContact(input, dependencies = {}) {
   const withConnection = dependencies.withConnection || withMysql;
   const sql = `SELECT t.phone, t.email
     FROM candidate_fact_versions cfv
@@ -170,7 +171,7 @@ function shanghaiDate() {
 /** 群上下文：把本页短名单渲染成标准卡片发到本群（best-effort，失败不阻断）。
  *  幂等键同日同页去重，防模型重复调用刷屏。只有真的发了卡才返回 true——
  *  envelope 只有在卡片确实送达的前提下才能换成「不列名单」引导。 */
-function trySendShortlistCard(options, sendCard, args, principal, bundle) {
+async function trySendShortlistCard(options, sendCard, args, principal, bundle) {
   if (!sendCard || principal.chatType !== 'group' || !principal.chatId || !bundle.items?.length) {
     return false;
   }
@@ -180,11 +181,11 @@ function trySendShortlistCard(options, sendCard, args, principal, bundle) {
     role: jobRow.role || bundle.job_context?.title || '' };
   const page = args.page_token ? String(args.page_token).slice(0, 64) : 'first';
   try {
-    Promise.resolve(sendCard({
+    await sendCard({
       target: principal.chatId,
       card: buildShortlistCard({ job, items: bundle.items }),
       idempotencyKey: `shortlist-card:${args.job_id}:${principal.chatId}:${page}:${shanghaiDate()}`,
-    })).catch(() => {});
+    });
     return true;
   } catch { return false; }
 }
@@ -246,12 +247,14 @@ export function createTalentToolHandlers(options = {}) {
     },
     brainx_candidate_shortlist: async (args, context) => {
       const bundle = await getShortlist(args, context);
+      const rejected = new Set(rejectedCandidateRefs(options.db, args.job_id, context.principal));
+      bundle.items = bundle.items.filter(item => !rejected.has(item.candidate_ref));
       const focusedCandidates = listProjectCandidateFocus(options.db,
         context.principal.tenantId, args.job_id);
       const envelope = shortlistResult(bundle, focusedCandidates);
       // 群上下文：名单由标准卡片承担（代码渲染），envelope 只留引导语；
       // 私聊 / 缺 sendCardFn / 发卡失败维持原 envelope（模型仍可读到名单交付）。
-      if (trySendShortlistCard(options, sendCard, args, context.principal, bundle)) {
+      if (await trySendShortlistCard(options, sendCard, args, context.principal, bundle)) {
         return cardDeliveredEnvelope(envelope, bundle);
       }
       if (!bundle.items?.length) {

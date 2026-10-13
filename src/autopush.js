@@ -11,7 +11,7 @@
  * 以 run_id 为幂等键（push_log 唯一键），同轮重复触发不会重发。
  */
 import { buildHeatingAlertCard, pushCard } from './push.js';
-import { loadConsultants } from './recommend.js';
+import { createRecommendationUseCase } from './recommendation-use-case.js';
 
 const CHANGE_LABEL = {
   TOP1_CHANGED: '今日推荐 Top1 易主',
@@ -41,14 +41,17 @@ export function detectMaterialChange(db, consultant_id) {
 }
 
 /** 桥接器 onRecommended 钩子工厂。pushImpl 可注入（测试绝不打真实 lark-cli）。 */
-export function makeAutoPush(db, { pushImpl = pushCard } = {}) {
+export function makeAutoPush(db, {
+  pushImpl = pushCard,
+  recommendations = createRecommendationUseCase(db),
+} = {}) {
   // async：pushCard 是异步函数，同步闭包里 out.status 读的是 Promise（恒 undefined，误报 pushed:true），
   // 且内部同步 DB 抛错会变 unhandled rejection 冲垮进程
   return async (consultant_id) => {
     if (process.env.BRAINX_PUSH_AUTO !== '1') return { pushed: false, reason: 'disabled' };
     const change = detectMaterialChange(db, consultant_id);
     if (!change) return { pushed: false, reason: 'no_material_change' };
-    const c = loadConsultants(db).find((x) => x.consultant_id === consultant_id);
+    const c = recommendations.consultants().find((x) => x.consultant_id === consultant_id);
     if (!c?.open_id) return { pushed: false, reason: 'no_open_id' };
     const rec = db.prepare(`SELECT r.*, j.company, j.role, j.city FROM recommendations r
       JOIN job_facts j ON j.project_id = r.project_id

@@ -181,13 +181,33 @@ test('migrations：schema_migrations 逐文件记账，重开不重跑', () => {
                           '0048_project_launch_openclaw_status.sql',
                           '0049_candidate_reports.sql',
                           '0049_group_scope_job_action.sql',
-                          '0050_bot_chat_intake.sql', '0051_judgment_facts.sql',
-                          '0052_consumer_failures.sql', '0053_feedback_metrics.sql',
-                          '0054_client_profiles.sql', '0055_consultant_profiles.sql',
-                          '0056_lark_messages_origin.sql', '0057_job_agent_facts.sql',
-                          '0058_client_metrics.sql', '0059_decision_runs_alive_count.sql',
+                          '0050_bot_chat_intake.sql',
+                          '0051_judgment_facts.sql',
+                          '0051_recommendation_feature_snapshots.sql',
+                          '0052_consumer_failures.sql',
+                          '0052_ranking_label_times.sql',
+                          '0053_feedback_metrics.sql',
+                          '0053_ranking_feedback_events.sql',
+                          '0054_client_profiles.sql',
+                          '0054_versioned_job_facts.sql',
+                          '0055_consultant_profiles.sql',
+                          '0055_profile_exposure_outcomes.sql',
+                          '0056_agent_context_usage.sql',
+                          '0056_lark_messages_origin.sql',
+                          '0057_agentic_ranking_v1.sql',
+                          '0057_job_agent_facts.sql',
+                          '0058_agentic_shadow_evaluation.sql',
+                          '0058_client_metrics.sql',
+                          '0059_decision_runs_alive_count.sql',
+                          '0059_operations_dashboard.sql',
                           '0060_openmai_deliveries_needs_input.sql',
-                          '0061_group_scope_job_fact_review.sql']);
+                          '0060_supermai_desktop_relay.sql',
+                          '0061_group_scope_job_fact_review.sql',
+                          '0062_freeform_sourcing_delivery.sql',
+                          '0063_candidate_search_feedback.sql',
+                          '0064_project_search_briefs.sql',
+                          '0065_freeform_candidate_decisions.sql',
+                          '0066_judgment_notice_deliveries.sql']);
 });
 
 const TMPDB = join(tmpdir(), `brainx-fw-${process.pid}.db`);
@@ -223,7 +243,8 @@ test('migrations：旧库 user_version=2 兼容——前 2 个文件标记已应
   legacy.close();
   const reopened = openDb(TMPDB);
   const rows = reopened.prepare('SELECT name FROM schema_migrations ORDER BY name').all().map((r) => r.name);
-  assert.equal(rows.length, 64); // 全部迁移文件记账（0001...0061，含 0017/0049 重复编号）
+  assert.equal(rows.length, 79); // 全部迁移文件记账（0001...0066，含并行编号）
+  assert.ok(reopened.prepare("SELECT name FROM sqlite_master WHERE name='sourcing_group_deliveries'").get());
   assert.equal(reopened.prepare(`SELECT COUNT(*) n FROM decision_events
     WHERE event_type='RECOMMENDED'`).get().n, 0, '历史机器推荐轨迹已清理');
   assert.equal(reopened.prepare(`SELECT COUNT(*) n FROM decision_events

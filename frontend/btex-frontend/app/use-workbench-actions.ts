@@ -27,7 +27,10 @@ import type { NotifyFn } from "./workbench-toast";
 
 type Mode = "connecting" | "connected" | "offline";
 
-export type BrainxRun = { runId: string | null; snapshotId: string | null; policyVersion: string | null };
+export type BrainxRun = {
+  runId: string | null; snapshotId: string | null; policyVersion: string | null;
+  engine: "baseline-1.1" | "agentic-ranking-v1";
+};
 
 type RecommendationQueue = ReturnType<typeof useRecommendationPages>;
 
@@ -119,6 +122,7 @@ export function useWorkbenchFeedback({
         if (brainxMode === "connected") {
           await sendRecommendationFeedback(
             job.id,
+            job.brainxDecisionId || null,
             clean,
             brainxRun.snapshotId,
             makeIdempotencyKey(`recommendation-feedback:${job.id}`),
@@ -134,7 +138,8 @@ export function useWorkbenchFeedback({
                 setBrainxJobs(snapshot);
                 recommendationQueue.restore(pageSnapshot);
                 if (brainxMode === "connected")
-                  void undoRecommendationFeedback(job.id)
+                  void undoRecommendationFeedback(job.id, job.brainxDecisionId || null,
+                    makeIdempotencyKey(`recommendation-feedback-undo:${job.id}`))
                     .then(() => notify("已撤销不感兴趣"))
                     .catch((error) =>
                       notify(

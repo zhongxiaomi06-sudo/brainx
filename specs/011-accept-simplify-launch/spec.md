@@ -3,6 +3,8 @@
 状态：Implemented（2026-09-10）
 上游：york 机器人会话诊断（2026-09-10）。证据：09-01 以来 `brainx_accept_job` 网关调用 0 次；模型（stepfun step-3.5-flash）契约遵循差（gap_questions 参数错多次、幻觉工具调用），而接单工具要求一次传全 6 个必填参数。代码侧「接单→拉群」（launchProject）已存在但生产 `project_launches` 全空，从未跑通。
 
+> 2026-10-09 现行修订：本规格保留当时的历史决策，但“接单后自动启动 OpenMai”已被 [OpenMai × SuperMai 日常寻访闭环](../036-dual-sourcing-daily-workflow/spec.md) 取代。现行行为是接单、建群后返回 `awaiting_method`，由顾问明确选择 OpenMai 或 SuperMai。
+
 ## 1. 三项调整
 
 ### 1.1 accept_job 减参（根因修复）
@@ -29,7 +31,7 @@
 
 - 只改 web 端接单路由与接单工具参数；bot 端 `brainx_accept_job` 不自动拉群（群里按钮命令走既有 launch 路由）。
 - 接单幂等语义不变（decision_events idempotency_key 去重、already 分支、 repaired 分支全部保留）。
-- 接单自动启动 OpenMai 找人的既有行为不变；拉群失败不影响找人触发。
+- 历史行为：当时接单会自动启动 OpenMai。2026-10-09 起不再适用，现行边界见规格 036。
 - 证据先行：所有默认值写入响应（active_action），顾问可在工作台看到接单目标与截止时间。
 
 ## 3. 验收

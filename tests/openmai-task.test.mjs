@@ -9,6 +9,33 @@ import {
 
 const JWT = 'eyJhbGciOiJIUzI1NiJ9.eyJleHAiOjk5OTk5OTk5OTl9.signature';
 
+test('OpenMai 污染回复不得隐式发起第二次搜索', async () => {
+  const db = openDb(':memory:');
+  runSync(db, { source: 'fixture', consultant_id: 'felix' });
+  saveTtcToken(db, 'felix', JWT, { userName: 'Felix', personId: 'test', expiresAt: '2099-01-01T00:00:00.000Z' });
+  const original = global.fetch;
+  let searches = 0;
+  global.fetch = async url => {
+    if (String(url).includes('/api/crm/v1/openmai/jobs/detail')) {
+      return Response.json({ code: 0, data: { jobs: [{ unique_id: 'J-TEST', name: '开发' }] } });
+    }
+    searches += 1;
+    return new Response('data: {"done":true,"canonical_content":"我这边没有可恢复的上一轮运行上下文：当前会话列表为空。"}\n\n');
+  };
+  try {
+    const projectId = 'P-FIX-6FFEA4D1';
+    assert.equal(startOpenmaiTask(db, null, 'felix', projectId).status, 'triggered');
+    const deadline = Date.now() + 2000;
+    while (getOpenmaiResult(db, 'felix', projectId).status === 'running' && Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    const result = getOpenmaiResult(db, 'felix', projectId);
+    assert.equal(result.status, 'failed');
+    assert.match(result.error, /未自动重试/);
+    assert.equal(searches, 1);
+  } finally { global.fetch = original; db.close(); }
+});
+
 function runningTask() {
   const db = openDb(':memory:');
   const at = now();

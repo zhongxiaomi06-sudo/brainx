@@ -47,6 +47,7 @@ for (const r of rows) {
   if (dryRun) { results.inserted++; continue; }
   const out = recordOutcome(db, r.consultant, {
     project_id: r.project, stage: r.stage, value,
+    occurred_at: r.date ? `${r.date}T00:00:00.000+08:00` : null,
     idempotency_key: `outcome-import:${r.consultant}:${r.project}:${r.stage}:${r.date || 'nodate'}`,
   });
   if (!out.ok) results.failed.push({ line: r.line, error: out.error, row: r });

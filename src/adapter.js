@@ -19,6 +19,7 @@ import { deriveProjectId } from './bitable.js';
 import { runSync } from './sync.js';
 import { now } from './db.js';
 import { isLlmConfigured, chatJson } from './llm.js';
+import { createSourceEnvelope } from './job-source-contract.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -348,7 +349,19 @@ export async function runAdapter(db, {
       });
     }
   }
-  const jobs = [...jobsByPid.values()];
+  const jobs = [...jobsByPid.values()].map((job) => ({
+    ...job,
+    source_meta: {
+      source_instance_id: 'local-csv:market-cockpit',
+      external_id: job.project_id,
+      adapter_version: 'local-csv-v1',
+      schema_version: 'canonical-job-v1',
+      observed_at: job.captured_at || t0,
+      evidence: Object.fromEntries([
+        'company', 'role', 'city', 'pipeline', 'hc', 'active_state', 'priority', 'notes',
+      ].map((field) => [field, { ref: `${job.source_url || 'local-csv'}#${field}`, confidence: 'HIGH' }])),
+    },
+  }));
 
   if (dry_run) {
     return {
@@ -376,7 +389,17 @@ export async function runAdapter(db, {
   // ---- 落库：复用 runSync 写 sync_runs + job_facts（事实/关系分离，relation=null）----
   const syncOut = runSync(db, {
     source: 'adapter', consultant_id, dry_run: false,
-    payload: { as_of: t0, jobs },
+    payload: createSourceEnvelope({
+      sourceType: 'local-csv',
+      sourceInstanceId: 'local-csv:market-cockpit',
+      adapterVersion: 'local-csv-v1',
+      batchId: `local-csv:${t0}`,
+      scope: { tenant_id: 'brainx', consultant_id },
+      complete: true,
+      receivedAt: t0,
+      asOf: t0,
+      records: jobs,
+    }),
   });
 
   // ---- 三张 PRD 1.2 新表（0008）----

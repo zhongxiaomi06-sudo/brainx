@@ -111,7 +111,8 @@ test('发卡失败（同步抛错/异步拒绝）不阻断，envelope 维持原�
   assert.equal(syncThrow.data.items.length, 1, '同步失败时模型仍能拿到名单交付');
   const asyncReject = await talentHandlers([], () => Promise.reject(new Error('FEISHU_DOWN')))
     .brainx_candidate_shortlist({ job_id: 'job-a' }, groupPrincipal);
-  assert.equal(asyncReject.data.card_delivered, true, '异步失败按已受理处理（best-effort）');
+  assert.equal(asyncReject.data.card_delivered, undefined, '异步发送失败不得宣称卡片已送达');
+  assert.ok(asyncReject.data.items.length > 0, '失败保留结果供读取');
 });
 
 // —— openmai_search done 群读回 ——
@@ -140,18 +141,18 @@ test('openmai_search done 群读回：发卡且 envelope 只留引导；running 
   const sent = [];
   const { db, projectId, handlers } = jobsFixture((payload) => { sent.push(payload); return { message_id: 'om_y' }; });
   insertResult(db, projectId, 'done');
-  const out = handlers.brainx_openmai_search({ job_id: projectId }, groupPrincipal);
+  const out = await handlers.brainx_openmai_search({ job_id: projectId }, groupPrincipal);
   assert.equal(sent.length, 1);
   assert.equal(sent[0].target, 'oc_group1');
   assert.match(sent[0].idempotencyKey, /^openmai-result-card:.+:oc_group1:round1:\d{4}-\d{2}-\d{2}$/);
-  assert.equal(sent[0].card.header.title.content, 'Reloop 候选人推荐 · 首轮已就绪');
+  assert.equal(sent[0].card.header.title.content, 'OpenMai 候选人推荐 · 首轮已就绪');
   assert.equal(out.data.card_delivered, true);
   assert.equal(out.data.result_text, null, '已发卡后 result_text 不再交给模型');
   assert.ok(out.recommendations.some((r) => r.action === 'guide_only'));
   assert.ok(out.unknowns.some((u) => u.includes('复用')), '复用纪律保留');
 
   db.prepare(`UPDATE openmai_results SET status='running', result_text=NULL WHERE project_id=?`).run(projectId);
-  const running = handlers.brainx_openmai_search({ job_id: projectId }, groupPrincipal);
+  const running = await handlers.brainx_openmai_search({ job_id: projectId }, groupPrincipal);
   assert.equal(sent.length, 1, 'running 不再发卡');
   assert.equal(running.data.status, 'running');
   db.close();
@@ -161,14 +162,14 @@ test('openmai_search done 私聊读回：不发卡，result_text 原样带出', 
   const sent = [];
   const { db, projectId, handlers } = jobsFixture((payload) => sent.push(payload));
   insertResult(db, projectId, 'done');
-  const out = handlers.brainx_openmai_search({ job_id: projectId }, p2pPrincipal);
+  const out = await handlers.brainx_openmai_search({ job_id: projectId }, p2pPrincipal);
   assert.equal(sent.length, 0);
   assert.ok(out.data.result_text.includes('张三'));
   assert.ok(out.recommendations.some((r) => r.action === 'present_result'));
   db.close();
 });
 
-test('buildShortlistCard：缺字段回退不炸（无经历/无学历/无城市）', () => {
+test('buildShortlistCard：缺字段回退不炸（无经历/无学历/无城市）', async () => {
   const card = buildShortlistCard({ job: { project_id: 'job-a', company: '', role: '' }, items: [
     { candidate_ref: 'talent-db:1', display_name_masked: '候*', rank: 1,
       profile: { current_city: null, recent_experiences: [], education: [], skills: [] },

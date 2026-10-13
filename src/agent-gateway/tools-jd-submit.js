@@ -9,6 +9,7 @@
  */
 import { submitPrivateJd } from '../job-extract/p2p-submit.js';
 import { confirmDraft } from '../job-extract/confirm.js';
+import { buildJdConfirmationCard } from '../jd-confirmation-card.js';
 
 function fail(code) {
   throw Object.assign(new Error(code), { code });
@@ -36,8 +37,8 @@ function authorizeCreate(db, draftId, cid) {
   return c;
 }
 
-export function createJdSubmitToolHandlers({ db }) {
-  return {
+export function createJdSubmitToolHandlers({ db, sendCardFn }) {
+  const tools = {
     brainx_submit_job_jd: async (args, context) => {
       if (args.confirm !== true) fail('INVALID_ARGUMENT');
       const cid = context.principal.consultantId;
@@ -100,4 +101,18 @@ export function createJdSubmitToolHandlers({ db }) {
       };
     },
   };
+  return { brainx_submit_job_jd: async (args, context) => {
+    const out = await tools.brainx_submit_job_jd(args, context);
+    if (sendCardFn && context.principal.chatType === 'group' && out.data.status === 'pending') {
+      try {
+        await sendCardFn({ target: context.principal.chatId, card: buildJdConfirmationCard(out.data),
+          idempotencyKey: `jd-confirm:${out.data.draft_ref}` });
+        out.data.card_delivered = true;
+      } catch {
+        out.data.card_delivered = false;
+        out.unknowns.push('确认卡发送失败，草稿仍未建岗；请复述字段并请顾问确认，不得冒充已发送。');
+      }
+    }
+    return out;
+  } };
 }

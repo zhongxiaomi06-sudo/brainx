@@ -30,7 +30,7 @@ function safeAction(action) {
     status: action.status, source: action.source, updated_at: action.updated_at };
 }
 
-function acceptJob(db, args, principal, startSearch) {
+function acceptJob(db, args, principal) {
   requireConfirmation(args);
   requireVisible(db, principal, args.job_id);
   // specs/011：goal/action_title/due_at/idempotency_key 服务端兜底——模型只传 job_id + confirm
@@ -48,8 +48,10 @@ function acceptJob(db, args, principal, startSearch) {
         && currentState(db, principal.consultantId, args.job_id).state === 'ACCEPTED') {
       return {
         data: { job_ref: args.job_id, state: 'ACCEPTED', already: true,
-          active_action: safeAction(result.active_action), search: null },
-        facts: [{ job_ref: args.job_id, state: 'ACCEPTED', already_accepted: true }],
+          active_action: safeAction(result.active_action),
+          search: { status: 'awaiting_method' } },
+        facts: [{ job_ref: args.job_id, state: 'ACCEPTED', already_accepted: true,
+          sourcing_state: 'awaiting_method' }],
         inferences: [], recommendations: [],
         unknowns: ['这单你已经在接了，直接点卡片上的找人按钮即可，无需重复接单。'],
         evidence_refs: [`engagement:${args.job_id}`],
@@ -78,26 +80,15 @@ function acceptJob(db, args, principal, startSearch) {
       evidence_refs: [{ table: 'job_memberships', id: `${principal.consultantId}:${args.job_id}` }],
     });
   }
-  let search = null;
-  if (!result.already || result.state === 'ACCEPTED') {
-    search = startSearch(db, principal.consultantId, args.job_id);
-  }
-  const unknowns = [];
-  // 项目搜索由投递 worker 自动回群；工具只要求模型给出即时可见状态后结束本轮。
-  if (search?.status === 'triggered') {
-    unknowns.push('候选人搜索已异步启动。立即回复顾问“正在找人，通常需要 3-5 分钟，完成后候选人会自动发到项目群”并结束本轮；'
-      + '除非顾问之后明确询问进度，不要原地轮询。');
-  } else if (search?.status === 'already_done') {
-    unknowns.push('该岗位已有完成结果，用 brainx_openmai_search(job_id) 取回并呈现给顾问。');
-  } else if (search?.status === 'error') {
-    unknowns.push(`候选人搜索暂未启动：${search.message || '请稍后重试'}。`);
-  }
+  const search = { status: 'awaiting_method' };
   return {
     data: { job_ref: args.job_id, state: result.state, active_action: safeAction(result.active_action), search },
-    facts: [{ job_ref: args.job_id, state: result.state }],
-    inferences: [], recommendations: [], unknowns,
+    facts: [{ job_ref: args.job_id, state: result.state, sourcing_state: 'awaiting_method' }],
+    inferences: [], recommendations: [],
+    unknowns: ['接单已完成。先建立或复用项目群，再由顾问在群里明确选择 OpenMai 或 SuperMai；不要自动启动找人。'],
     evidence_refs: [`engagement:${args.job_id}`, `action:${result.active_action?.action_id || 'none'}`],
-    next_allowed_actions: ['brainx_openmai_search', 'brainx_run_status', 'brainx_record_job_progress'],
+    next_allowed_actions: ['brainx_launch_project_chat', 'brainx_openmai_search', 'brainx_supermai_scout',
+      'brainx_candidate_shortlist', 'brainx_record_job_progress'],
   };
 }
 
@@ -255,7 +246,7 @@ export function createActionToolHandlers({ db, startSearchFn, sendCardFn, launch
       next_allowed_actions: ['brainx_job_assessment'] };
     },
     brainx_accept_job: (args, context) => {
-      const out = acceptJob(db, args, context.principal, startSearch);
+      const out = acceptJob(db, args, context.principal);
       sendAcceptedCard(db, args.job_id, sendCardFn);
       return out;
     },

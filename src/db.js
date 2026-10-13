@@ -99,14 +99,14 @@ export const uuid = () => crypto.randomUUID();
  *    （内网地址 rm-bp12ok9so2ma3i3j7.mysql.rds.aliyuncs.com 只在 VPC 内可用，
  *     本机不在 VPC，必须走外网地址。）
  *
- * 3) 建库 + 建账号：在 RDS 上先建好目标库（如 brainx_talent），
- *    并建一个对该库有增删改查权限的账号。
+ * 3) 建库 + 分账号：运行账号只授予职责所需的 SELECT 或 DML；迁移窗口另用临时 DDL
+ *    账号，完成后立即撤销。应用运行过程不会自动建表。
  *
  * 4) 填凭据：把 .env.example 里的 MYSQL_ 段复制到 .env（.env 已在 .gitignore，
  *    永不提交），填真实账号/密码/库名。绝不把密码硬编码进本文件。
  *
- * 5) 建表：首次接通后跑一次 `await initTalentSchema()`（幂等，IF NOT EXISTS），
- *    或直接在 RDS 控制台/客户端执行下方 TALENT_DDL 里的 7 条建表语句。
+ * 5) 建表：只在获准迁移窗口使用临时 DDL 账号执行 `npm run init-talent`；运行服务
+ *    设置 `BRAINX_TALENT_BACKEND=mysql` 后仅做只读 schema 就绪校验。
  */
 import mysql from 'mysql2/promise'; // TODO 依赖：npm install mysql2（见上「1) 装依赖」）
 

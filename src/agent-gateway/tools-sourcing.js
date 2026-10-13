@@ -9,7 +9,10 @@ import { currentState } from '../engagement.js';
 import { startOpenmaiTask, getOpenmaiResult } from '../openmai-task.js';
 import { supermaiCriteriaKey, startSupermaiScoutTask } from '../supermai-sourcing.js';
 import { extractOpenmaiCandidates, buildOpenmaiDeliveryCard, STALE_SEARCH_MS } from '../openmai-delivery.js';
-import { nextSearchExclusions } from '../search-rounds.js';
+import { nextSearchExclusions, nextSupermaiSearchExclusions } from '../search-rounds.js';
+import { registerFreeformDelivery } from '../sourcing-group-delivery.js';
+import { rejectedCandidateRefs } from '../candidate-search-feedback.js';
+import { internalFirst } from './search-internal-first.js';
 
 function fail(code) {
   throw Object.assign(new Error(code), { code });
@@ -117,6 +120,7 @@ function terminalSearchEnvelope({ entry, jobRef, criteria = null, cur, stale }) 
  *  failed/needs_input/零命中轮次没有可重复推荐的人，不得把顾问卡在 cannot_continue。 */
 function continuingGate(cur, exclusions, projectId, entry) {
   return exclusions.length === 0 && cur.status === 'done'
+    && !['', 'NO_REPLY'].includes(String(cur.result_text || '').trim())
     ? missingExclusions(projectId, entry) : null;
 }
 
@@ -149,17 +153,18 @@ function runningStale(cur) {
 
 /** 群上下文 done 读回：把标准候选人卡确定性发到本群（best-effort，失败不阻断）。
  *  幂等键按 职位×群×轮次×日 去重防刷屏；只有发卡调用成功才返回 true。 */
-function trySendOpenmaiResultCard(sendCardFn, publicBaseUrl, args, principal, row, cur) {
+async function trySendOpenmaiResultCard(sendCardFn, publicBaseUrl, args, principal, row, cur, source = 'openmai') {
   if (!sendCardFn || principal.chatType !== 'group' || !principal.chatId) return false;
   try {
-    Promise.resolve(sendCardFn({
+    await sendCardFn({
       target: principal.chatId,
       card: buildOpenmaiDeliveryCard({
-        job: { ...row, search_round: cur.search_round || 1 },
-        status: 'done', resultText: cur.result_text, publicBaseUrl,
+        job: { ...row, search_round: cur.search_round || 1,
+          search_brief: cur.search_brief, excluded_candidate_refs_json: cur.excluded_candidate_refs_json },
+        status: cur.status, resultText: cur.result_text, error: cur.error, publicBaseUrl, source,
       }),
       idempotencyKey: `openmai-result-card:${args.job_id}:${principal.chatId}:round${cur.search_round || 1}:${shanghaiDate()}`,
-    })).catch(() => {});
+    });
     return true;
   } catch { return false; }
 }
@@ -167,7 +172,7 @@ function trySendOpenmaiResultCard(sendCardFn, publicBaseUrl, args, principal, ro
 /** OpenMai 找人（第 11 工具，2026-09-03）：纪律与承接路由一致——
  * 仅本人 ACCEPTED/COMPLETED 的职位可触发/读取（fail-closed，不泄露存在性）。
  * 费用门控：done 读缓存、running 报状态、终态如实告知，其他才触发新任务（防重复费用）。 */
-function openmaiSearch(db, args, principal, sendCardFn, publicBaseUrl) {
+async function openmaiSearch(db, args, principal, sendCardFn, publicBaseUrl, internalShortlistFn) {
   const row = db.prepare('SELECT * FROM job_facts WHERE project_id=?').get(args.job_id);
   if (!row || (!jobVisibleTo(db, principal.consultantId, args.job_id)
       && !jobAccessibleFromGroup(db, principal, args.job_id))) fail('NOT_FOUND_OR_FORBIDDEN');
@@ -184,7 +189,7 @@ function openmaiSearch(db, args, principal, sendCardFn, publicBaseUrl) {
     // 群上下文 done 读回：候选人名单由标准卡片承担（代码渲染），envelope 只留引导语；
     // 私聊 / 缺 sendCardFn / 发卡失败维持原样（result_text 原样带出）。
     const cardSent = cur.status === 'done'
-      && trySendOpenmaiResultCard(sendCardFn, publicBaseUrl, args, principal, row, cur);
+      && await trySendOpenmaiResultCard(sendCardFn, publicBaseUrl, args, principal, row, cur);
     return {
       data: { job_ref: args.job_id, status: cur.status,
               result_text: cardSent ? null : cur.result_text || null,
@@ -220,15 +225,19 @@ function openmaiSearch(db, args, principal, sendCardFn, publicBaseUrl) {
   if (shared?.search_status === 'RUNNING' || (shared && !continuing)) {
     return sharedProjectSearch(args.job_id, shared, 'openmai');
   }
-  const exclusions = continuing ? nextSearchExclusions(db, args.job_id) : [];
+  const exclusions = continuing ? nextSearchExclusions(db, args.job_id, principal)
+    : rejectedCandidateRefs(db, args.job_id, principal);
   const blocked = continuing && continuingGate(cur, exclusions, args.job_id, 'openmai');
   if (blocked) return blocked;
+  const internal = await internalFirst(internalShortlistFn, args.job_id, principal);
+  const concurrent = activeProjectSearch(db, args.job_id);
+  if (concurrent?.search_status === 'RUNNING') return sharedProjectSearch(args.job_id, concurrent, 'openmai');
   const out = startOpenmaiTask(db, null, principal.consultantId, args.job_id, {
     force: continuing, searchBrief: criteria, excludeCandidateRefs: exclusions,
   });
   markProjectSearch(db, args.job_id, out);
   return {
-    data: { entry: 'openmai', job_ref: args.job_id, criteria: criteria || null,
+    data: { entry: 'openmai', job_ref: args.job_id, criteria: criteria || null, internal_shortlist: internal,
             continue_search: continuing, excluded_candidate_refs: exclusions,
             status: out.status || 'triggered', task_id: out.task_id || null,
             message: out.message || null,
@@ -245,7 +254,7 @@ function openmaiSearch(db, args, principal, sendCardFn, publicBaseUrl) {
  * SuperMai 找人 = 猎聘/脉脉渠道 → 与 openmai_search 共用 OpenMai 引擎，
  * 本入口是「无需职位、直接给判据」的自由找人（completions 无 job_id 模式）。
  * 触发/读取两段式：首次调用触发任务返回 running，完成后同参数再调读取结果。 */
-function supermaiScout(db, args, principal, sendCardFn, publicBaseUrl) {
+async function supermaiScout(db, args, principal, sendCardFn, publicBaseUrl, internalShortlistFn) {
   const jobId = String(args.job_id || '').trim();
   const continuing = args.continue_search === true;
   const extra = cleanSearchCriteria(args.criteria);
@@ -264,7 +273,8 @@ function supermaiScout(db, args, principal, sendCardFn, publicBaseUrl) {
   const stale = runningStale(cur);
   if ((cur.status === 'running' && !stale) || (cur.status === 'done' && !continuing)) {
     const candidates = cur.status === 'done' ? extractOpenmaiCandidates(cur.result_text) : [];
-    const disc = cur.status === 'running' ? pollDiscipline(cur.started_at, 'supermai', Boolean(jobId)) : null;
+    const autoDeliver = Boolean(jobId) || registerFreeformDelivery(db, principal, project_id);
+    const disc = cur.status === 'running' ? pollDiscipline(cur.started_at, 'supermai', autoDeliver) : null;
     // NO_REPLY/空结果：OpenMai 对极窄判据可能零命中（返回占位符）——语义化为「未搜到」而非当成成功交付。
     const noReply = cur.status === 'done' && !candidates.length
       && ['NO_REPLY', ''].includes(String(cur.result_text || '').trim());
@@ -276,7 +286,7 @@ function supermaiScout(db, args, principal, sendCardFn, publicBaseUrl) {
       search_round: cur.search_round || 1, freeform: true, criteria,
     };
     const cardSent = cur.status === 'done' && !noReply
-      && trySendOpenmaiResultCard(sendCardFn, publicBaseUrl, { job_id: project_id }, principal, synthJob, cur);
+      && await trySendOpenmaiResultCard(sendCardFn, publicBaseUrl, { job_id: project_id }, principal, synthJob, cur, 'supermai');
     return {
       data: { entry: 'supermai', job_ref: jobId || null, criteria, status: cur.status,
               result_text: cardSent ? null : (noReply ? null : cur.result_text || null),
@@ -307,15 +317,21 @@ function supermaiScout(db, args, principal, sendCardFn, publicBaseUrl) {
     return sharedProjectSearch(jobId, shared, 'supermai');
   }
   // 续搜排除名单按落库主键取（自由找人=合成键），不再限 job 模式——自由找人也可续搜。
-  const exclusions = continuing ? nextSearchExclusions(db, project_id) : [];
+  const exclusions = continuing ? nextSupermaiSearchExclusions(db, project_id, principal)
+    : rejectedCandidateRefs(db, project_id, principal);
   const blocked = continuing && continuingGate(cur, exclusions, project_id, 'supermai');
   if (blocked) return blocked;
+  const internal = await internalFirst(internalShortlistFn, jobId, principal);
+  const concurrent = jobId ? activeProjectSearch(db, jobId) : null;
+  if (concurrent?.search_status === 'RUNNING') return sharedProjectSearch(jobId, concurrent, 'supermai');
   const out = startSupermaiScoutTask(db, null, principal.consultantId, criteria, {
     force: continuing, projectId: jobId || null, excludeCandidateRefs: exclusions,
   });
+  const autoDeliver = Boolean(jobId) || (['triggered', 'running'].includes(out.status)
+    && registerFreeformDelivery(db, principal, project_id));
   if (jobId) markProjectSearch(db, jobId, out);
   return {
-    data: { entry: 'supermai', job_ref: jobId || null, criteria,
+    data: { entry: 'supermai', job_ref: jobId || null, criteria, internal_shortlist: internal,
             continue_search: continuing, excluded_candidate_refs: exclusions,
             status: out.status || 'triggered',
             task_id: out.task_id || null, message: out.message || null,
@@ -323,7 +339,7 @@ function supermaiScout(db, args, principal, sendCardFn, publicBaseUrl) {
               ? '同判据结果已存在，请再次调用本工具读取'
               : out.status === 'error'
                 ? '找人任务未启动，请处理提示后重试；正常启动后 3-5 分钟收敛，请每隔约 1 分钟读取进度'
-              : jobId ? '找人任务已触发。立即回复顾问“正在找人，通常需要 3-5 分钟，完成后候选人会自动发到本群”并结束本轮；'
+              : autoDeliver ? '找人任务已触发。立即回复顾问“正在找人，通常需要 3-5 分钟，完成后候选人会自动发到本群”并结束本轮；'
                 + '除非顾问之后明确询问进度，不要原地轮询'
                 : '找人任务已触发，正常 3-5 分钟收敛；请每隔约 1 分钟（间隔至少 60 秒）再调本工具读取'
                 + '（最多守候 10 分钟），完成后完整呈现 result_text（保留「查看」链接）' },
@@ -332,9 +348,9 @@ function supermaiScout(db, args, principal, sendCardFn, publicBaseUrl) {
   };
 }
 
-export function createSourcingToolHandlers({ db, sendCardFn = null, publicBaseUrl = process.env.BRAINX_BASE_URL } = {}) {
+export function createSourcingToolHandlers({ db, sendCardFn = null, publicBaseUrl = process.env.BRAINX_BASE_URL, internalShortlistFn } = {}) {
   return {
-    brainx_openmai_search: (args, context) => openmaiSearch(db, args, context.principal, sendCardFn, publicBaseUrl),
-    brainx_supermai_scout: (args, context) => supermaiScout(db, args, context.principal, sendCardFn, publicBaseUrl),
+    brainx_openmai_search: (args, context) => openmaiSearch(db, args, context.principal, sendCardFn, publicBaseUrl, internalShortlistFn),
+    brainx_supermai_scout: (args, context) => supermaiScout(db, args, context.principal, sendCardFn, publicBaseUrl, internalShortlistFn),
   };
 }

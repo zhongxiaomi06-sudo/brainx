@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { openDb } from '../src/db.js';
-import { saveTtcToken } from '../src/ttcsdk/auth.js';
+import { saveTtcToken, grantSharedTtcCredential, revokeSharedTtcCredential } from '../src/ttcsdk/auth.js';
 import { getOpenmaiResult } from '../src/openmai-task.js';
 import {
   supermaiCriteriaKey, buildScoutPrompt, startSupermaiScoutTask,
@@ -18,6 +18,35 @@ function seededDb() {
 }
 
 const CRITERIA = '北京 5年 React 资深前端工程师';
+
+test('云端 SuperMai 使用显式共享授权，撤销后不能启动新搜索', async () => {
+  const db = openDb(':memory:');
+  const owner = db.prepare("SELECT display_name FROM consultants WHERE consultant_id='mia'").get();
+  saveTtcToken(db, 'mia', JWT, {
+    userName: owner.display_name, personId: 'mia-test', expiresAt: '2099-01-01T00:00:00.000Z',
+  });
+  grantSharedTtcCredential(db, {
+    sourceConsultantId: 'mia', granteeConsultantId: 'felix',
+    grantedBy: 'test-admin', reason: '回归测试显式共享',
+  });
+  const original = global.fetch;
+  let calls = 0;
+  global.fetch = async () => {
+    calls++;
+    return sseResponse([{ done: true, message_id: 'shared-1', canonical_content: DONE_RESULT }]);
+  };
+  try {
+    assert.equal(startSupermaiScoutTask(db, null, 'felix', CRITERIA).status, 'triggered');
+    assert.equal((await waitForStatus(db, 'felix', supermaiCriteriaKey(CRITERIA))).status, 'done');
+    assert.equal(calls, 1);
+    revokeSharedTtcCredential(db, 'felix');
+    assert.equal(startSupermaiScoutTask(db, null, 'felix', CRITERIA + ' 新方向').status, 'error');
+    assert.equal(calls, 1, '撤权后不发付费请求');
+  } finally {
+    global.fetch = original;
+    db.close();
+  }
+});
 const DONE_RESULT = [
   '1. 张三（Acme · 高级前端）——匹配。',
   '<!-- BRAINX_CANDIDATES_V1',
@@ -197,7 +226,7 @@ test('looksLikeSessionPollution：识别会话污染元回复，不误伤正常�
   assert.equal(looksLikeSessionPollution('未找到匹配候选人，建议放宽条件'), false, '正常零命中不误伤');
 });
 
-test('会话污染自动重试：首次元回复自动重发，第二次成功则正常交付', async () => {
+test('会话污染立即失败：即使下一次可成功，也不能偷偷再次付费搜索', async () => {
   const db = seededDb();
   const bodies = [];
   const orig = global.fetch;
@@ -214,9 +243,9 @@ test('会话污染自动重试：首次元回复自动重发，第二次成功�
     const out = startSupermaiScoutTask(db, null, 'felix', CRITERIA);
     assert.equal(out.status, 'triggered');
     const settled = await waitForStatus(db, 'felix', supermaiCriteriaKey(CRITERIA));
-    assert.equal(settled.status, 'done', '污染回复自动重试后正常交付');
-    assert.ok(settled.result_text.includes('张三'));
-    assert.equal(bodies.length, 2, '恰好重试一次');
+    assert.equal(settled.status, 'failed');
+    assert.match(settled.error, /未自动重试/);
+    assert.equal(bodies.length, 1, '只允许这次明确触发的搜索请求');
     for (const b of bodies) {
       assert.ok(b.body.content.includes('【会话隔离'), '每次调用都带会话隔离前言');
       assert.ok(b.body.content.includes(CRITERIA), '判据仍然在场');
@@ -226,7 +255,7 @@ test('会话污染自动重试：首次元回复自动重发，第二次成功�
   }
 });
 
-test('会话污染二次重试仍元回复 → failed 关闭并明确报错，不交付垃圾', async () => {
+test('污染结果 failed 关闭并明确报错，不交付无关内容', async () => {
   const db = seededDb();
   const orig = global.fetch;
   const pollution = '我接上次进度：你在看职位 J5Z8J10 的岗匹人。';

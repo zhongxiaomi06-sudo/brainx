@@ -10,6 +10,7 @@ const meta = {
     notify: fn(),
     mode: "offline",
     policy: "baseline-1.1",
+    engine: "baseline-1.1",
     keywords: ["海外增长", "AI 应用", "商业化"],
     note: "优先判断有真实 Pipeline 和明确负责人信息的机会。",
     onRefresh: async () => undefined,
@@ -24,4 +25,9 @@ export const OfflineBaseline: Story = {};
 
 export const Connecting: Story = {
   args: { mode: "connecting", policy: null },
+};
+
+export const AgentActivePreferences: Story = {
+  name: "Algorithm A 主动偏好与容量",
+  args: { mode: "connected", policy: "agentic-ranking-v1", engine: "agentic-ranking-v1" },
 };

@@ -17,7 +17,8 @@
     "group_prefix": "chat:"
   },
   "allowed_tools": [
-    "brainx_me_context",
+      "brainx_freeform_candidate_action",
+      "brainx_me_context",
     "brainx_daily_brief",
     "brainx_job_assessment",
     "brainx_candidate_shortlist",
@@ -45,7 +46,7 @@
     "brainx_bind_group_project",
     "brainx_launch_project_chat",
     "brainx_candidate_report",
-    "brainx_talent_pool_add"
+      "brainx_talent_pool_add"
   ],
   "denied_tool_ids": [
     "exec",

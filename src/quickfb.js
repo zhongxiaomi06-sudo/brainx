@@ -4,7 +4,7 @@
  * 没有任何反馈入口。一键链接把“忽略”和“接单并建群”直接做进卡片按钮；
  * 后者复用既有权限、确认、幂等建群和接单链路，不自动发起收费找人任务。
  *
- * 安全：链接带 HMAC-SHA256 签名（consultant|project|action|day），密钥走
+ * 安全：链接带 HMAC-SHA256 签名（consultant|project|action|day|decision），密钥走
  * env BRAINX_FEEDBACK_SECRET；当日/次日双窗口校验（跨时区点击宽容）。
  * 未配置密钥 → quickLink 返回 null（卡片不渲染按钮）、端点 503，fail-closed。
  */
@@ -26,19 +26,27 @@ function localDerivedSecret() {
 // 本地登录密钥做域隔离派生，避免每次重启临时换钥导致当天已发卡片全部失效。
 const secret = () => process.env.BRAINX_FEEDBACK_SECRET || localDerivedSecret();
 
-const sig = (cid, pid, action, day) =>
-  createHmac('sha256', secret()).update(`${cid}|${pid}|${action}|${day}`).digest('hex').slice(0, 24);
+const sig = (cid, pid, action, day, decision = '') => {
+  // 未携带决策标识时沿用旧签名载荷，保证已发出的卡片在有效期内仍可点击。
+  const payload = decision
+    ? `${cid}|${pid}|${action}|${day}|${decision}`
+    : `${cid}|${pid}|${action}|${day}`;
+  return createHmac('sha256', secret()).update(payload).digest('hex').slice(0, 24);
+};
 
 /** 生成一键链接；未配密钥返回 null（卡片层据此省略按钮）。 */
-export function quickLink(baseUrl, cid, pid, action, dayIso) {
+export function quickLink(baseUrl, cid, pid, action, dayIso, decisionId = null) {
   if (!secret() || !QUICK_ACTIONS[action]) return null;
   const day = dayIso.slice(0, 10);
-  const q = new URLSearchParams({ consultant: cid, project: pid, action, day, sig: sig(cid, pid, action, day) });
+  const decision = decisionId || '';
+  const q = new URLSearchParams({ consultant: cid, project: pid, action, day });
+  if (decision) q.set('decision', decision);
+  q.set('sig', sig(cid, pid, action, day, decision));
   return `${String(baseUrl).replace(/\/+$/, '')}/api/v1/feedback/quick?${q}`;
 }
 
 /** 校验请求参数。today 为服务器当天 ISO（now()）；放行当天与前一天（推送常在夜间点击）。 */
-export function verifyQuick({ consultant, project, action, day, sig: given }, today) {
+export function verifyQuick({ consultant, project, action, day, decision = '', sig: given }, today) {
   if (!secret()) return { ok: false, status: 503, error: '一键反馈未配置（BRAINX_FEEDBACK_SECRET）' };
   if (!consultant || !project || !QUICK_ACTIONS[action] || !day || !given) {
     return { ok: false, status: 400, error: '参数不完整' };
@@ -46,7 +54,7 @@ export function verifyQuick({ consultant, project, action, day, sig: given }, to
   const days = [today.slice(0, 10),
                 new Date(Date.parse(today) - 86400000).toISOString().slice(0, 10)];
   if (!days.includes(day)) return { ok: false, status: 403, error: '链接已过期（仅当日/次日有效）' };
-  const expect = Buffer.from(sig(consultant, project, action, day));
+  const expect = Buffer.from(sig(consultant, project, action, day, decision));
   const got = Buffer.from(String(given));
   if (expect.length !== got.length || !timingSafeEqual(expect, got)) {
     return { ok: false, status: 403, error: '签名无效' };

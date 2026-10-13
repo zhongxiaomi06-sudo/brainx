@@ -1,6 +1,7 @@
 /** membership.js — 顾问确认职位归属；关系历史只关闭、只追加。 */
 import { now } from './db.js';
 import { legalActions } from './engagement.js';
+import { decisionReferenceIsValid } from './event-time.js';
 import { clearOpportunityIgnore, recordOpportunityIgnore } from './opportunity-ignore.js';
 
 const ALLOWED_RELATIONS = new Set(['MY_JOB', 'TEAM_SHARED']);
@@ -9,6 +10,8 @@ const LOCKED_RELATIONS = new Set(['PRIMARY_PM', 'OTHER_CONSULTANT']);
 export function confirmMembership(db, consultant_id, project_id, {
   relation,
   idempotency_key = '',
+  decision_id = null,
+  occurred_at = null,
 } = {}) {
   if (!idempotency_key || typeof idempotency_key !== 'string') {
     return { ok: false, status: 400, error: '缺 idempotency_key' };
@@ -22,12 +25,18 @@ export function confirmMembership(db, consultant_id, project_id, {
   if (!db.prepare('SELECT 1 FROM job_facts WHERE project_id=?').get(project_id)) {
     return { ok: false, status: 404, error: '职位不存在' };
   }
+  if (decision_id && !decisionReferenceIsValid(db, consultant_id, project_id, decision_id)) {
+    return { ok: false, status: 422, error: 'decision_id 与顾问/职位不匹配' };
+  }
 
   const current = db.prepare(`SELECT relation, source FROM job_memberships
     WHERE consultant_id=? AND project_id=? AND valid_to IS NULL
     ORDER BY id DESC LIMIT 1`).get(consultant_id, project_id);
   if (current?.relation === relation) {
-    clearOpportunityIgnore(db, consultant_id, project_id);
+    clearOpportunityIgnore(db, consultant_id, project_id, {
+      decision_id, occurred_at, source: 'MEMBERSHIP_CONFIRMED',
+      idempotency_key: `${idempotency_key}:ignore-revoked`,
+    });
     return { ok: true, already: true, relation,
       legal_actions: legalActions(db, consultant_id, project_id) };
   }
@@ -43,7 +52,10 @@ export function confirmMembership(db, consultant_id, project_id, {
     db.prepare(`INSERT INTO job_memberships
       (consultant_id, project_id, relation, source, valid_from)
       VALUES (?,?,?,?,?)`).run(consultant_id, project_id, relation, 'MANUAL_CONFIRMATION', at);
-    clearOpportunityIgnore(db, consultant_id, project_id);
+    clearOpportunityIgnore(db, consultant_id, project_id, {
+      decision_id, occurred_at, source: 'MEMBERSHIP_CONFIRMED',
+      idempotency_key: `${idempotency_key}:ignore-revoked`,
+    });
     db.exec('COMMIT');
   } catch (error) {
     db.exec('ROLLBACK');
@@ -54,7 +66,9 @@ export function confirmMembership(db, consultant_id, project_id, {
     legal_actions: legalActions(db, consultant_id, project_id) };
 }
 
-export function removeMembership(db, consultant_id, project_id, { idempotency_key = '' } = {}) {
+export function removeMembership(db, consultant_id, project_id, {
+  idempotency_key = '', decision_id = null, reason = '', occurred_at = null,
+} = {}) {
   if (!idempotency_key || typeof idempotency_key !== 'string') {
     return { ok: false, status: 400, error: '缺 idempotency_key' };
   }
@@ -63,6 +77,9 @@ export function removeMembership(db, consultant_id, project_id, { idempotency_ke
   }
   if (!db.prepare('SELECT 1 FROM job_facts WHERE project_id=?').get(project_id)) {
     return { ok: false, status: 404, error: '职位不存在' };
+  }
+  if (decision_id && !decisionReferenceIsValid(db, consultant_id, project_id, decision_id)) {
+    return { ok: false, status: 422, error: 'decision_id 与顾问/职位不匹配' };
   }
   const current = db.prepare(`SELECT id, relation FROM job_memberships
     WHERE consultant_id=? AND project_id=? AND valid_to IS NULL
@@ -76,7 +93,9 @@ export function removeMembership(db, consultant_id, project_id, { idempotency_ke
   }
   db.exec('BEGIN');
   try {
-    const ignored = recordOpportunityIgnore(db, consultant_id, project_id, idempotency_key);
+    const ignored = recordOpportunityIgnore(db, consultant_id, project_id, idempotency_key, {
+      decision_id, reason, occurred_at, source: 'PROJECT_IGNORE',
+    });
     if (!ignored.ok) { db.exec('ROLLBACK'); return ignored; }
     const removed = current
       ? db.prepare('UPDATE job_memberships SET valid_to=? WHERE id=? AND valid_to IS NULL')

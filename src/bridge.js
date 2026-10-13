@@ -29,6 +29,7 @@ import { larkProfileArgs } from './env.js';
 import { getValidTtcJwt, markTtcReauth } from './ttcsdk/auth.js';
 import { searchAll, searchSince, toJobRow } from './ttcsdk/job.js';
 import { TtcApiError } from './ttcsdk/http.js';
+import { createSourceEnvelope } from './job-source-contract.js';
 
 // deriveProjectId 权威已迁 bitable.js；此处 re-export 保持既有 import 不破
 export { deriveProjectId };
@@ -240,12 +241,16 @@ export async function bridgeOnce(db, { consultant_ids, execImpl = lark, api = { 
   if (api) {
     const union = new Map();
     const ttcErrs = [];
+    let ttcBatchComplete = false;
+    let ttcBatchCursor = null;
+    let ttcSourceCid = 'unknown';
     const withJwt = cids.filter((cid) => getValidTtcJwt(db, cid));
     if (withJwt.length) {
       const rrKey = 'ttc_rr';
       const prevRr = db.prepare('SELECT checkpoint FROM bridge_cursor WHERE source=?').get(rrKey);
       const rrIdx = prevRr ? Number(prevRr.checkpoint) || 0 : 0;
       const cid = withJwt[rrIdx % withJwt.length];
+      ttcSourceCid = cid;
       const jwt = getValidTtcJwt(db, cid);
       // 首次全量与后续增量共用可恢复游标。限流时必须保存 TTC 返回的 cursor；
       // 只推进 update_time 水位会跳过尚未翻到的旧页，造成“永远只有第一页”。
@@ -269,6 +274,8 @@ export async function bridgeOnce(db, { consultant_ids, execImpl = lark, api = { 
         // 因此每 tick 只取一页，先持久化下一页 cursor，下个 tick 再继续。
         const { jobs, complete: ttcComplete, nextCursor } = await searchSince(jwt,
           { sinceMs, initialCursor, paceMs: TTC_PAGE_PACE_MS, maxPages: 1 }, fetchImpl);
+        ttcBatchComplete = ttcComplete;
+        ttcBatchCursor = nextCursor || null;
         for (const j of jobs) {
           if (!j.unique_id || j.has_permission === false) continue;
           if (!union.has(j.unique_id)) union.set(j.unique_id, toJobRow(j));
@@ -300,7 +307,18 @@ export async function bridgeOnce(db, { consultant_ids, execImpl = lark, api = { 
       }
     }
     if (union.size) {
-      const ttcPayload = { as_of: now(), jobs: [...union.values()] };
+      const receivedAt = now();
+      const ttcPayload = createSourceEnvelope({
+        sourceType: 'ttc',
+        sourceInstanceId: `ttc:${ttcSourceCid}`,
+        adapterVersion: 'ttc-job-v1',
+        batchId: `ttc:${ttcSourceCid}:${receivedAt}`,
+        scope: { tenant_id: 'brainx', consultant_id: ttcSourceCid },
+        cursor: ttcBatchCursor,
+        complete: ttcBatchComplete,
+        receivedAt,
+        records: [...union.values()],
+      });
       for (const cid of cids) {
         const prev = db.prepare(`SELECT input_hash FROM sync_runs
           WHERE consultant_id=? AND source='ttc' ORDER BY started_at DESC LIMIT 1`).get(cid);

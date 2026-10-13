@@ -37,6 +37,13 @@ lark_messages（原文，已有）→ workflow_event_log（账本，已有）
 
 ## 确认入口
 
+### 原群需求线索通知（2026-10-13）
+
+新 worker 消费既有草稿，不再调用 AI。`BRAINX_DEMAND_NOTICES_ENABLED=1` 显式开启，默认关闭；只处理近 24 小时、高置信的客户/职位偏好或硬要求，来源群须登记 `bot_mode=ALL` 且 ACTIVE scope 同时允许 candidate_review/job_fact_review，应用身份一致。只发原群、持久幂等、失败最多三次，不会因为通知重试而搜索。
+
+“记下来”调用原群判断确认，不改 search_brief；“按此找人”明确二次确认可能计费后按结构化条件启动一次 SuperMai。群确认仅本人可见的同源草稿，不接受跨群/指定其他职位。历史未确认草稿不会无限回补。仅本地验收，启用前需在目标群验证授权、静默模式、撤权和重复消息。
+
+
 agent 工具 `brainx_pending_judgments` / `brainx_review_judgment`（复用 `job_fact_review` 授权域，已外露 OpenClaw 插件）。确认血缘走 `sync_runs(source='lark_judgment_extract')`。
 
 ## 已知边界（本版不做）

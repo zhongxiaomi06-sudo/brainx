@@ -48,7 +48,7 @@
 ### action（动作模板）
 
 - `fixed_reply`：直接回固定文案，拦截 LLM。字段：`text`（字符串或按行数组，数组由引擎以 `\n` 连接——长文案必须用数组写法，避免单行超过门禁长度限制）。
-- `accept_job`：私聊直调 `brainx_accept_job`（接单 + 自动找人），按 already / search.status 分支回复。字段：`job_id`、`job_label`（回复里展示的职位名）、`idempotency_key`（缺省自动生成 `<id>-<job_id>`）、`account_id`（缺省 `mia`）、`replies`（可选，覆盖引擎默认文案，支持 `{{job_label}}` 占位符）。
+- `accept_job`：私聊直调 `brainx_accept_job`（只接单，不自动找人），按 already / search.status 分支回复；当前成功态为 `awaiting_method`，提示顾问进入项目群明确选择 OpenMai 或 SuperMai。字段：`job_id`、`job_label`（回复里展示的职位名）、`idempotency_key`（缺省自动生成 `<id>-<job_id>`）、`account_id`（缺省 `mia`）、`replies`（可选，覆盖引擎默认文案，支持 `{{job_label}}` 占位符）。
 - `offer_group`：私聊按候选人映射建/找 Offer 决策群并幂等发报告卡。字段：`candidates`（候选人姓名 → `{ group_name, report_doc_id, report_url, members }`）、`success_template`（可选，占位符 `{{name}}` `{{action}}` `{{group_name}}` `{{report_url}}`）、`no_match_reply`（可选）。
 
 ### priority
@@ -69,6 +69,12 @@
 - 真机验收：配置重启发服务后，用目标顾问账号按 trigger 发消息，确认回复与网关调用（`agent_tool_calls` 表）符合预期。
 
 ## 相关文档
+
+### 找人条件临时补充（2026-10-13）
+
+`search-start-notice.js` 按机器人账号和群隔离临时条件，最多 500 字，支持多行；超长不截断。条件仅保留 30 分钟，成功启动一轮后消费；失败或只查询已有任务不消费。同群并发点击不会重复拿同一补充。该缓存不跨进程重启，持久条件应在工作台权威编辑器保存；不得把缓存当成权威字段或由模型擅自从历史补回。
+
+自动化：`tests/openclaw-search-notice.test.mjs` 验证隔离、过期、失败保留与成功消费；真实群尚未验收。
 
 - [BrainX 文档书](README.md)
 - [OpenClaw 多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md)

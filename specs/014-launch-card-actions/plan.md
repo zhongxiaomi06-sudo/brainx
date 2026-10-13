@@ -5,7 +5,7 @@
 | 文件 | 改动 |
 |---|---|
 | src/agent-gateway/tool-registry.js | `brainx_accept_job`：`p2pOnly: true` → `groupRequiresProject: true`（仅此一个工具放开） |
-| src/project-launch.js | `GROUP_PURPOSES` 增 `job_action`；`buildProjectLaunchCard(job, { state })` 按承接状态分岔：未接单→「接单」单按钮；已接单→OpenMai/Reloop/SuperMai 三按钮 + `criteria` 输入框 + 「按条件找人」；发卡处按 `currentState` 传状态 |
+| src/project-launch.js | `GROUP_PURPOSES` 增 `job_action`；`buildProjectLaunchCard(job, { state })` 按承接状态分岔：未接单→「接单」单按钮；已接单→OpenMai/Reloop/SuperMai 三按钮 + 「按条件找人」；补充条件通过同群 `找人条件：……` 明确消息提供；发卡处按 `currentState` 传状态 |
 | migrations/0049_group_scope_job_action.sql | 存量 ACTIVE 群 scope 幂等追加 `job_action`（`json_insert` + `NOT EXISTS`，脏 JSON/非 ACTIVE 行跳过） |
 | tests/project-launch-card.test.mjs | 新增：卡片分岔、指令兜底、群内接单放行、存量群拒绝、migration 幂等 |
 | tests/project-launch.test.mjs | 断言更新为「未接单只给接单按钮」 |
@@ -18,7 +18,7 @@
 ## 关键设计决策
 
 1. **只放开接单，不放开其他写操作。** `brainx_start_candidate_search`、`brainx_record_job_progress`、`brainx_me_context` 等仍 `p2pOnly`。群内可写面收窄到「接单」这一个动作，其余仍需私聊/工作台。
-2. **卡片不依赖 `form_value`。** openclaw 飞书插件不解析输入框内容（dist 全仓无该字段，card action 只把按钮 `value.text` 合成文本消息）。因此按钮指令自带三级兜底：卡片输入值 → 群里最近一条「找人条件：」→ 职位事实。填了不生效也不会卡在追问。
+2. **卡片不依赖 `form_value`。** openclaw 飞书插件不解析输入框内容（dist 全仓无该字段，card action 只把按钮 `value.text` 合成文本消息）。卡片不展示假输入框；按钮只读取群里最近一条「找人条件：」，没有则按职位事实执行。
 3. **卡片不承诺结果。** 按钮指令只要求「现在直接调用 X 工具」，不写「自动推送/自动通知」。
 4. **存量群靠 migration 0049 补齐**，不改 `grantGroupScope` 的默认 purposes，避免新建群的默认授权面变化。
 
@@ -29,7 +29,7 @@
 3. 冒烟：
    - `SELECT allowed_purposes_json FROM agent_group_scopes WHERE chat_id='oc_baf49b…'` 应含 `job_action`。
    - 在 york 项目群内发「帮我接单」→ 应返回接单成功而不是 `NOT_FOUND_OR_FORBIDDEN`。
-   - 补发卡片（未接单）应只出现「接单」按钮；接单后再补发应出现三个找人按钮 + 输入框。
+   - 补发卡片（未接单）应只出现「接单」按钮；接单后再补发应出现三个找人按钮与“按条件找人”，不出现无法回传值的输入框。
 
 ## 风险
 

@@ -26,6 +26,7 @@ import {
 import { DEFAULT_FOLDERS, type DecisionJob, type MembershipRelation, type PickFolder } from "./workbench-model";
 import type { useRecommendationPages } from "./use-recommendation-pages";
 import type { WorkspaceEntryKind } from "./workbench-entry";
+import type { BrainxRun } from "./use-workbench-actions";
 
 type Mode = "connecting" | "connected" | "offline";
 
@@ -48,7 +49,7 @@ interface WorkbenchConnectionArgs {
   setNotifications: Dispatch<SetStateAction<Notification[]>>;
   setBrainxDismissReasons: Dispatch<SetStateAction<string[]>>;
   setBrainxRun: Dispatch<
-    SetStateAction<{ runId: string | null; snapshotId: string | null; policyVersion: string | null }>
+    SetStateAction<BrainxRun>
   >;
   setBrainxKeywords: Dispatch<SetStateAction<string[]>>;
   setTray: Dispatch<SetStateAction<string[]>>;
@@ -114,6 +115,7 @@ export function useWorkbenchConnection({
       runId: snapshot.runId,
       snapshotId: snapshot.snapshotId,
       policyVersion: snapshot.policyVersion,
+      engine: "baseline-1.1",
     });
     setBrainxKeywords(snapshot.profileKeywords);
     setTray(snapshot.preferences.tray);

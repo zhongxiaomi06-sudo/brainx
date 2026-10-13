@@ -5,6 +5,7 @@ import { createCandidateActionToolHandlers } from './tools-candidate-actions.js'
 import { createJobFactsToolHandlers } from './tools-job-facts.js';
 import { createJudgmentToolHandlers } from './tools-judgments.js';
 import { createJdSubmitToolHandlers } from './tools-jd-submit.js';
+import { createFreeformCandidateHandlers } from './tools-freeform-candidates.js';
 import { sendInteractiveCard } from '../feishu-bot.js';
 import { createCandidateReportToolHandlers } from '../candidate-report.js';
 
@@ -21,6 +22,10 @@ const object = (properties, required = []) => ({
 });
 
 export const AGENT_TOOL_ROWS = Object.freeze([
+  { name: 'brainx_freeform_candidate_action', purpose: ['candidate_action'], parameters: object({
+    search_key: string({ pattern: '^supermai:[a-f0-9]{12}$' }), candidate_ref: string(),
+    action: string({ enum: ['SCREEN', 'ADD_TO_RELOOP', 'REJECT', 'RESTORE', 'CONTACT'] }), confirm: boolean(),
+  }, ['search_key', 'candidate_ref', 'action', 'confirm']) },
   { name: 'brainx_me_context', purpose: ['self_context'], p2pOnly: true, parameters: object({}) },
   { name: 'brainx_daily_brief', purpose: ['daily_brief'], parameters: object({
     date: string({ pattern: '^\\d{4}-\\d{2}-\\d{2}$' }), limit: integer(1, 10),
@@ -57,7 +62,7 @@ export const AGENT_TOOL_ROWS = Object.freeze([
   { name: 'brainx_pending_job_facts', purpose: ['job_fact_review'], p2pOnly: true, parameters: object({
     limit: integer(1, 20),
   }) },
-  { name: 'brainx_review_job_fact', purpose: ['job_fact_review'], p2pOnly: true, parameters: object({
+  { name: 'brainx_review_job_fact', purpose: ['job_fact_review'], parameters: object({
     draft_id: string(), action: string({ enum: ['confirm', 'reject'] }), job_id: string(), confirm: boolean(),
   }, ['draft_id', 'action', 'confirm']) },
   { name: 'brainx_submit_job_jd', purpose: ['job_fact_review'], parameters: object({
@@ -68,7 +73,7 @@ export const AGENT_TOOL_ROWS = Object.freeze([
   { name: 'brainx_pending_judgments', purpose: ['job_fact_review'], p2pOnly: true, parameters: object({
     limit: integer(1, 20),
   }) },
-  { name: 'brainx_review_judgment', purpose: ['job_fact_review'], p2pOnly: true, parameters: object({
+  { name: 'brainx_review_judgment', purpose: ['job_fact_review'], parameters: object({
     draft_id: string(), action: string({ enum: ['confirm', 'reject'] }), job_id: string(), confirm: boolean(),
   }, ['draft_id', 'action', 'confirm']) },
   { name: 'brainx_push_preferences', purpose: ['preferences'], p2pOnly: true, parameters: object({}) },
@@ -107,7 +112,8 @@ export const AGENT_TOOL_ROWS = Object.freeze([
   { name: 'brainx_candidate_workflow', purpose: ['candidate_action'], parameters: object({
     job_id: string(), candidate_ref: string(), action: string({ enum: ['ADD_TO_PROJECT', 'MARK_PREPARING',
       'RECORD_OUTREACH_SENT', 'RECORD_REPLIED', 'SUBMIT_TO_CLIENT', 'MOVE_TO_INTERVIEW',
-      'KEEP_FOR_REVIEW', 'REMOVE_FROM_REVIEW', 'CREATE_DECISION_GROUP', 'SEND_TALENT_CARD'] }),
+      'KEEP_FOR_REVIEW', 'REMOVE_FROM_REVIEW', 'CREATE_DECISION_GROUP', 'SEND_TALENT_CARD',
+      'REJECT_CANDIDATE', 'RESTORE_CANDIDATE', 'SEND_CONTACT_PRIVATE'] }),
     note: string({ maxLength: 1000 }), confirm: boolean(),
   }, ['job_id', 'candidate_ref', 'action', 'confirm']), projectKey: 'job_id' },
   { name: 'brainx_send_candidate_resume', purpose: ['candidate_action'], parameters: object({
@@ -118,7 +124,7 @@ export const AGENT_TOOL_ROWS = Object.freeze([
     job_id: string(), candidate_ref: string(), confirm: boolean(),
   }, ['job_id', 'candidate_ref', 'confirm']), projectKey: 'job_id' },
   { name: 'brainx_candidate_report', purpose: ['candidate_review'], parameters: object({
-    mode: string({ enum: ['GENERATE', 'REGENERATE'] }), confirm: boolean(),
+    mode: string({ enum: ['GENERATE', 'REGENERATE', 'READ'] }), confirm: boolean(),
   }, ['mode', 'confirm']) },
 ]);
 
@@ -200,14 +206,16 @@ export function createProductionToolRegistry({ db, talentDependencies = {}, acti
   // 2026-09-15：群里呈现候选人一律改标准卡片——shortlist/openmai_search 的 handler
   // 默认接上飞书发卡通道；未配置飞书凭证时 sendInteractiveCard 抛错，handler 内
   // try/catch 兜底吞掉（降级为不发卡，工具返回不受影响）。
-  const jobs = createJobToolHandlers({ db, sendCardFn: sendInteractiveCard, ...jobDependencies });
+  const jobs = createJobToolHandlers({ db, sendCardFn: sendInteractiveCard,
+    internalShortlistFn: (args, context) => talent.brainx_candidate_shortlist(args, context), ...jobDependencies });
   // specs/014：默认接上飞书发卡通道，用于接单成功后把接单卡换成找人卡；
   // 未配置飞书凭证时 sendInteractiveCard 抛错，已由 sendAcceptedCard 兜底吞掉。
   const actions = createActionToolHandlers({ db, sendCardFn: sendInteractiveCard, ...actionDependencies });
   const candidateActions = createCandidateActionToolHandlers({ db, ...talentDependencies });
+  const freeformActions = createFreeformCandidateHandlers({ db, ...talentDependencies });
   const jobFacts = createJobFactsToolHandlers({ db });
   const judgments = createJudgmentToolHandlers({ db });
-  const jdSubmit = createJdSubmitToolHandlers({ db });
+  const jdSubmit = createJdSubmitToolHandlers({ db, sendCardFn: sendInteractiveCard, ...jobDependencies });
   const reports = createCandidateReportToolHandlers({ db, ...reportDependencies });
   const talent = createTalentToolHandlers({
     db, // 供 shortlist 空结果溯源（区分「OpenMai 找人岗」与「未授权岗」，2026-09-04 wendy 案例）
@@ -216,6 +224,6 @@ export function createProductionToolRegistry({ db, talentDependencies = {}, acti
     jobGapHandler: jobs.brainx_gap_questions,
   });
   return createToolRegistry({ handlers: {
-    ...jobs, ...talent, ...actions, ...candidateActions, ...jobFacts, ...judgments, ...jdSubmit, ...reports,
+    ...jobs, ...talent, ...actions, ...candidateActions, ...freeformActions, ...jobFacts, ...judgments, ...jdSubmit, ...reports,
   } });
 }

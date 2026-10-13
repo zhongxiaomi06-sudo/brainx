@@ -1,4 +1,4 @@
-/** OpenMai 找人结果(接单后自动找人任务的状态与结果 markdown)。 */
+/** OpenMai 找人结果（顾问明确选择渠道后启动的任务状态与结果 markdown）。 */
 import { getOpenmaiResult } from '../../openmai-task.js';
 import { jobVisibleTo } from '../../visibility.js';
 

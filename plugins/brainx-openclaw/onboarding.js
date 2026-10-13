@@ -113,14 +113,14 @@ export function createBraintexHomeCommand({ publicBaseUrl = process.env.BRAINX_B
 export function createCandidateReportCommand() {
   return {
     name: 'report', nativeNames: { default: 'report' },
-    description: '生成或更新当前候选人 Offer 决策报告',
-    descriptionLocalizations: { 'zh-CN': '生成或更新当前候选人 Offer 决策报告' },
+    description: '读取当前候选人 Offer 决策报告',
+    descriptionLocalizations: { 'zh-CN': '读取当前候选人 Offer 决策报告' },
     channels: ['feishu'], acceptsArgs: false, requireAuth: true,
     handler: async (ctx) => {
       if (ctx.channel !== 'feishu' || !ctx.isAuthorizedSender) {
         return { text: '当前账号暂未获得 BrainTex 使用权限。', isError: true };
       }
-      return { text: '请结合当前候选人决策群的最新内容更新 Offer 决策报告。', continueAgent: true };
+      return { text: '请读取当前候选人决策群唯一的 Offer 决策报告并概括当前结论；不要创建新报告。', continueAgent: true };
     },
   };
 }

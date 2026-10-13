@@ -1,5 +1,7 @@
 # Workflow Hub 与猎头全链路架构
 
+> 2026-09-22 来源边界补充：本文 TTC 职位所有权描述是现有集成基线。来源解耦后的内部 ID、字段权威注册、版本和兼容映射以[数据契约与迁移手册](2026-09-22-ranking-data-migration.md)为准；不重编号 project/Case，不改变人选域所有权或跨系统授权边界。
+
 > 上级入口：[BrainX 文档书](README.md)
 >
 > 配套视图：[工作流架构图](design/architecture-workflow.html) · [技术架构图](design/architecture-tech.html)

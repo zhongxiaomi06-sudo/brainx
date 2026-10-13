@@ -1,7 +1,7 @@
 import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
 
 const GATEWAY_URL = 'http://127.0.0.1:3102/internal/v1/agent/tools';
-const PLUGIN_VERSION = '1.5.0';
+const PLUGIN_VERSION = '1.5.1';
 const OPENCLAW_VERSION = '2026.7.1-2';
 const string = (extra = {}) => ({ type: 'string', minLength: 1, maxLength: 512, ...extra });
 const integer = (minimum, maximum) => ({ type: 'integer', minimum, maximum });
@@ -12,6 +12,11 @@ const object = (properties, required = []) => ({
 });
 
 export const BRAINX_OPENCLAW_TOOLS = Object.freeze([
+  { name: 'brainx_freeform_candidate_action', purpose: () => 'candidate_action', parameters: object({
+    search_key: string({ pattern: '^supermai:[a-f0-9]{12}$' }), candidate_ref: string(),
+    action: string({ enum: ['SCREEN', 'ADD_TO_RELOOP', 'REJECT', 'RESTORE', 'CONTACT'] }), confirm: boolean(),
+  }, ['search_key', 'candidate_ref', 'action', 'confirm']),
+  description: '自由找人结果四动作：初筛留在搜索重点名单、加入人才库、确认不合适、撤销、私发已授权联系方式；不伪造职位或项目归属。' },
   { name: 'brainx_me_context', purpose: () => 'self_context', parameters: object({}), description: '读取当前顾问本人脱敏工作上下文和开工就绪状态；可用于首次使用自检。' },
   { name: 'brainx_daily_brief', purpose: () => 'daily_brief', parameters: object({ date: string({ pattern: '^\\d{4}-\\d{2}-\\d{2}$' }), limit: integer(1, 10) }), description: '读取当前顾问今日优先事项与依据。' },
   { name: 'brainx_job_assessment', purpose: () => 'job_review', parameters: object({ job_id: string() }, ['job_id']), description: '判断授权职位是否值得投入并返回证据。' },
@@ -33,7 +38,7 @@ export const BRAINX_OPENCLAW_TOOLS = Object.freeze([
   { name: 'brainx_update_push_preferences', purpose: () => 'preferences', parameters: object({ times: array(string({ pattern: '^(?:[01]\\d|2[0-3]):[0-5]\\d$' })), job_count: integer(1, 10), enabled: boolean(), confirm: boolean() }, ['confirm']), description: '按用户自然语言要求更新每天推荐时间和职位数量；执行前复述设置并取得确认。' },
   { name: 'brainx_job_contacts', purpose: () => 'job_contact', parameters: object({ job_id: string() }, ['job_id']), description: '读取授权职位的负责人姓名和可联系状态。' },
   { name: 'brainx_candidate_contact', purpose: () => 'candidate_contact', parameters: object({ candidate_ref: string(), reason: string({ maxLength: 240 }) }, ['candidate_ref', 'reason']), description: '仅在私聊中按业务理由读取已单独授权候选人的联系方式。' },
-  { name: 'brainx_accept_job', purpose: () => 'job_action', parameters: object({ job_id: string(), goal: string({ maxLength: 240 }), action_title: string({ maxLength: 240 }), due_at: string(), idempotency_key: string(), confirm: boolean() }, ['job_id', 'confirm']), description: '经用户确认后正式接单、建立首个行动并自动启动找人。只需 job_id 与 confirm=true，目标/首条行动/截止时间/幂等键由服务端自动生成。' },
+  { name: 'brainx_accept_job', purpose: () => 'job_action', parameters: object({ job_id: string(), goal: string({ maxLength: 240 }), action_title: string({ maxLength: 240 }), due_at: string(), idempotency_key: string(), confirm: boolean() }, ['job_id', 'confirm']), description: '经用户确认后正式接单并建立首个行动；接单不自动找人，之后由顾问在项目群明确选择 OpenMai 或 SuperMai。只需 job_id 与 confirm=true，目标/首条行动/截止时间/幂等键由服务端自动生成。' },
   { name: 'brainx_start_candidate_search', purpose: () => 'job_action', parameters: object({ job_id: string(), force: boolean(), confirm: boolean() }, ['job_id', 'confirm']), description: '经用户确认后为已接单职位启动或重新启动自动找人。' },
   { name: 'brainx_record_job_progress', purpose: () => 'job_action', parameters: object({
     job_id: string(), action_id: string(), kind: string({ enum: ['PROGRESS', 'STAGE', 'BLOCKED'] }),
@@ -47,6 +52,7 @@ export const BRAINX_OPENCLAW_TOOLS = Object.freeze([
       'ADD_TO_PROJECT', 'MARK_PREPARING', 'RECORD_OUTREACH_SENT',
       'RECORD_REPLIED', 'SUBMIT_TO_CLIENT', 'MOVE_TO_INTERVIEW',
       'KEEP_FOR_REVIEW', 'REMOVE_FROM_REVIEW', 'CREATE_DECISION_GROUP', 'SEND_TALENT_CARD',
+      'REJECT_CANDIDATE', 'RESTORE_CANDIDATE', 'SEND_CONTACT_PRIVATE',
     ] }), note: string({ maxLength: 1000 }), confirm: boolean(),
   }, ['job_id', 'candidate_ref', 'action', 'confirm']),
   description: '经用户确认后把授权候选人加入项目、发送 TTC 人才链接、管理共享重点名单、创建候选人决策群，并记录后续阶段。' },
@@ -59,8 +65,8 @@ export const BRAINX_OPENCLAW_TOOLS = Object.freeze([
   }, ['job_id', 'confirm']),
   description: '为某个已接单职位创建飞书项目群并投放职位卡（specs/017）。私聊里接单后如果还没有项目群，直接调用它补建，不要跟用户要群号、群名或任何参数；已有群时重复调用是幂等的，只返回已存在。card 内容变了要重发时传 force=true。' },
   { name: 'brainx_candidate_report', purpose: () => 'candidate_review', parameters: object({
-    mode: string({ enum: ['GENERATE', 'REGENERATE'] }), confirm: boolean(),
-  }, ['mode', 'confirm']), description: '在当前候选人 Offer 决策群生成或更新飞书云文档报告。' },
+    mode: string({ enum: ['GENERATE', 'REGENERATE', 'READ'] }), confirm: boolean(),
+  }, ['mode', 'confirm']), description: '在当前候选人 Offer 决策群创建唯一报告，或读取其当前飞书正文用于问答。' },
   { name: 'brainx_talent_pool_add', purpose: () => 'candidate_action', parameters: object({
     job_id: string(), candidate_ref: string(), confirm: boolean(),
   }, ['job_id', 'candidate_ref', 'confirm']), description: '把授权候选人一键加入团队人才库（RDS，幂等）。候选人卡上的「加入reloop」按钮点击后调用；重复调用只返回已存在。' },

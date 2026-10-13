@@ -15,11 +15,10 @@ import { consumeJobExtract } from '../src/job-extract/index.js';
 import { confirmDraft, rejectDraft } from '../src/job-extract/confirm.js';
 import { consumeJudgmentExtract } from '../src/judgment-extract/index.js';
 import { confirmJudgment, rejectJudgment } from '../src/judgment-extract/confirm.js';
-import { saveTtcToken } from '../src/ttcsdk/auth.js';
-import { getOpenmaiResult, settleOpenmaiTask } from '../src/openmai-task.js';
-import { startSupermaiScoutTask, supermaiCriteriaKey } from '../src/supermai-sourcing.js';
-
-const JWT = 'eyJhbGciOiJIUzI1NiJ9.eyJleHAiOjk5OTk5OTk5OTl9.signature';
+import { settleOpenmaiTask } from '../src/openmai-task.js';
+import { startSupermaiScoutTask, supermaiCriteriaKey } from '../src/supermai-desktop-sourcing.js';
+import { claimSupermaiPairCode, createSupermaiPairCode, finishSupermaiTask,
+  ingestSupermaiResults, pollSupermaiRelay } from '../src/supermai-relay.js';
 
 /** 接单夹具（模式同 tests/agent-action-tools.test.mjs）。 */
 function acceptFixture() {
@@ -168,82 +167,59 @@ const DONE_RESULT = [
   '-->',
 ].join('\n');
 
-function sseResponse(frames) {
-  const text = frames.map((f) => `data: ${JSON.stringify(f)}`).join('\n\n') + '\n\n';
-  const stream = new ReadableStream({
-    start(controller) {
-      controller.enqueue(new TextEncoder().encode(text));
-      controller.close();
-    },
-  });
-  return new Response(stream, { status: 200 });
-}
-
-async function waitForStatus(db, consultantId, projectId, timeoutMs = 2000) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const row = getOpenmaiResult(db, consultantId, projectId);
-    if (row.status === 'done' || row.status === 'failed') return row;
-    await new Promise((r) => setTimeout(r, 20));
-  }
-  return getOpenmaiResult(db, consultantId, projectId);
-}
-
-test('US1: 找人触发产 sourcing.search_started，结算产 sourcing.search_finished（success+计数）', async () => {
+test('US1: SuperMai 桌面找人触发 started，定稿产 finished（success+计数）', () => {
   const db = createLedgerDb();
-  saveTtcToken(db, 'felix', JWT, {
-    userName: 'Felix', personId: 'person-felix', expiresAt: '2099-01-01T00:00:00.000Z',
+  const out = startSupermaiScoutTask(db, null, 'felix', CRITERIA);
+  assert.equal(out.status, 'triggered');
+  const pid = supermaiCriteriaKey(CRITERIA);
+
+  const started = eventsByType(db, 'sourcing.search_started');
+  assert.equal(started.length, 1, '触发应产 search_started');
+  assert.equal(started[0].idem_key, `sourcing.started:${pid}:${out.task_id}`);
+  assert.equal(started[0].actor, 'agent:brainx_supermai_scout');
+  assert.deepEqual(started[0].payload, { project_id: pid, channel: 'supermai', round: 1 });
+
+  const pair = createSupermaiPairCode(db, 'felix');
+  const claimed = claimSupermaiPairCode(db, { code: pair.code, name: '测试桌面' });
+  const task = pollSupermaiRelay(db, { device_id: claimed.device_id, consultant_id: 'felix',
+    connector_version: null }, {
+    local: { available: true, platforms: { boss: { logged_in: true } } },
   });
-  const orig = global.fetch;
-  global.fetch = async () => sseResponse([{ done: true, canonical_content: DONE_RESULT }]);
+  assert.equal(task.task_id, out.task_id);
+  assert.deepEqual(ingestSupermaiResults(db, out.task_id, task.ingest_token, {
+    platform: 'boss', items: [{ external_id: 'boss-1', name: '张三', company: 'Acme',
+      title: '高级前端', skills: ['React'] }],
+  }), { accepted: 1, deduped: 0, statuses: {} });
+  assert.deepEqual(finishSupermaiTask(db, out.task_id, task.ingest_token, { status: 'done' }),
+    { status: 'completed', result_count: 1 });
+
+  const finished = eventsByType(db, 'sourcing.search_finished');
+  assert.equal(finished.length, 1, '结算应产 search_finished');
+  assert.equal(finished[0].idem_key, `sourcing.finished:${pid}:${out.task_id}`);
+  assert.equal(finished[0].actor, 'system:worker');
+  assert.equal(finished[0].payload.channel, 'supermai');
+  assert.equal(finished[0].payload.status, 'success');
+  assert.equal(finished[0].payload.result_count, 1);
+
+  const again = startSupermaiScoutTask(db, null, 'felix', CRITERIA);
+  assert.equal(again.status, 'already_done');
+  assert.equal(countEvents(db, 'sourcing.search_started'), 1, '复用结果不得重复产事件');
+});
+
+test('US1: 无桌面设备进入 waiting_for_device，不读取 TTC 或发网络请求', async () => {
+  const db = createLedgerDb();
+  const originalFetch = global.fetch;
+  let called = 0;
+  global.fetch = async () => { called += 1; throw new Error('不应访问网络'); };
   try {
     const out = startSupermaiScoutTask(db, null, 'felix', CRITERIA);
     assert.equal(out.status, 'triggered');
-    const pid = supermaiCriteriaKey(CRITERIA);
-
-    const started = eventsByType(db, 'sourcing.search_started');
-    assert.equal(started.length, 1, '触发应产 search_started');
-    assert.equal(started[0].idem_key, `sourcing.started:${pid}:${out.task_id}`);
-    assert.equal(started[0].actor, 'agent:brainx_supermai_scout');
-    assert.deepEqual(started[0].payload, { project_id: pid, channel: 'supermai', round: 1 });
-
-    const settled = await waitForStatus(db, 'felix', pid);
-    assert.equal(settled.status, 'done');
-    const finished = eventsByType(db, 'sourcing.search_finished');
-    assert.equal(finished.length, 1, '结算应产 search_finished');
-    assert.equal(finished[0].idem_key, `sourcing.finished:${pid}:${out.task_id}`);
-    assert.equal(finished[0].actor, 'system:worker');
-    assert.equal(finished[0].payload.channel, 'supermai');
-    assert.equal(finished[0].payload.status, 'success');
-    assert.equal(finished[0].payload.result_count, 1, '结果计数来自候选人机器块，不含名单正文');
-
-    const again = startSupermaiScoutTask(db, null, 'felix', CRITERIA);
-    assert.equal(again.status, 'already_done');
-    assert.equal(countEvents(db, 'sourcing.search_started'), 1, '复用结果不得重复产事件');
+    assert.equal(out.task_status, 'waiting_for_device');
+    assert.equal(called, 0, '云端不得代替桌面访问招聘平台');
+    assert.equal(countEvents(db, 'sourcing.search_started'), 1);
+    assert.equal(countEvents(db, 'sourcing.search_finished'), 0);
   } finally {
-    global.fetch = orig;
-  }
-});
-
-test('US1: 无 TTC 凭证快速失败产 sourcing.search_finished（error），不产 search_started', async () => {
-  const db = createLedgerDb(); // 不注入 JWT
-  const orig = global.fetch;
-  let called = 0;
-  global.fetch = async () => { called += 1; return sseResponse([]); };
-  try {
-    const out = startSupermaiScoutTask(db, null, 'felix', CRITERIA);
-    assert.equal(out.status, 'error');
-    assert.equal(called, 0, '无凭证不得发起请求');
-    const pid = supermaiCriteriaKey(CRITERIA);
-
-    assert.equal(countEvents(db, 'sourcing.search_started'), 0, '未启动不产 started');
-    const finished = eventsByType(db, 'sourcing.search_finished');
-    assert.equal(finished.length, 1, '凭证失败也要留痕（错误可调度）');
-    assert.equal(finished[0].payload.status, 'error');
-    assert.equal(finished[0].payload.result_count, 0);
-    assert.equal(finished[0].payload.channel, 'supermai');
-  } finally {
-    global.fetch = orig;
+    global.fetch = originalFetch;
   }
 });
 

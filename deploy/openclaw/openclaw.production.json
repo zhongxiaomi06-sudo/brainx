@@ -109,6 +109,7 @@
       "enabled": false
     },
     "allow": [
+      "brainx_freeform_candidate_action",
       "brainx_me_context",
       "brainx_daily_brief",
       "brainx_job_assessment",

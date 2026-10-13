@@ -84,6 +84,9 @@ export function createJobFactsToolHandlers({ db }) {
       if (args.confirm !== true) fail('INVALID_ARGUMENT');
       const row = visibleDraft(db, context.principal.consultantId, args.draft_id);
       if (!row) fail('NOT_FOUND_OR_FORBIDDEN');
+      if (context.principal.chatType === 'group'
+          && (row.chat_id !== context.principal.chatId || row.origin !== 'group_jd'
+            || row.submitted_by !== context.principal.consultantId || args.job_id)) fail('NOT_FOUND_OR_FORBIDDEN');
       const cid = context.principal.consultantId;
       if (row.status !== 'pending') {
         if (row.confirmed_by === cid && row.status === `${args.action}ed`) {

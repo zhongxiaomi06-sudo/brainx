@@ -48,19 +48,19 @@ test('职位负责人只返回业务身份和可联系状态，不泄露 chat_id
   assert.equal(JSON.stringify(result).includes('oc_secret'), false);
 });
 
-test('确认接单会建立行动并自动启动找人，重复键保持幂等', () => {
+test('确认接单会建立行动并等待顾问选择找人渠道，重复键保持幂等', () => {
   const { db, jobId, handlers, searches, context } = fixture();
   const due = new Date(Date.now() + 2 * 86400000).toISOString();
   const args = { job_id: jobId, goal: '本周确认职位画像并找到首批候选人',
     action_title: '确认硬性条件', due_at: due, idempotency_key: 'agent:accept:1', confirm: true };
   const first = handlers.brainx_accept_job(args, context);
   assert.equal(first.data.state, 'ACCEPTED');
-  assert.equal(searches.length, 1);
-  assert.ok(first.unknowns.some((u) => u.includes('异步启动') && u.includes('正在找人')
-    && u.includes('自动发到项目群') && u.includes('结束本轮')),
-  '项目找人启动后必须立即给出可见状态，并由 worker 自动回群');
-  assert.ok(first.unknowns.every((u) => !u.includes('每隔约 1 分钟')),
-    '项目搜索不得再指引模型原地轮询');
+  assert.equal(searches.length, 0, '接单不得暗中选择或启动付费找人渠道');
+  assert.equal(first.data.search.status, 'awaiting_method');
+  assert.ok(first.unknowns.some((u) => u.includes('明确选择 OpenMai 或 SuperMai')),
+    '接单后必须明确告诉顾问下一步由人选择渠道');
+  assert.ok(first.next_allowed_actions.includes('brainx_launch_project_chat'),
+    '私聊接单后应先允许建立或复用项目群');
   assert.ok(first.next_allowed_actions.includes('brainx_openmai_search'),
     '接单后应把 openmai_search 列为下一步允许动作');
   const again = handlers.brainx_accept_job(args, context);
@@ -71,23 +71,20 @@ test('确认接单会建立行动并自动启动找人，重复键保持幂等',
     WHERE consultant_id='felix' AND project_id=? AND valid_to IS NULL`).get(jobId)?.relation, 'MY_JOB');
 });
 
-test('接单触发的找人状态分支注入对应取回指引（already_done/error）', () => {
+test('接单不会调用注入的找人实现，渠道必须由后续显式动作启动', () => {
   const due = new Date(Date.now() + 2 * 86400000).toISOString();
   const args = (jobId, key) => ({ job_id: jobId, goal: '找到首批候选人',
     action_title: '启动找人', due_at: due, idempotency_key: key, confirm: true });
 
-  const done = fixture();
-  const dOut = createActionToolHandlers({ db: done.db, startSearchFn: () => ({ status: 'already_done' }) })
-    .brainx_accept_job(args(done.jobId, 'agent:accept:done'), done.context);
-  assert.equal(dOut.data.state, 'ACCEPTED');
-  assert.ok(dOut.unknowns.some((u) => u.includes('brainx_openmai_search') && u.includes('完成结果')),
-    '已有人选结果时应指引取回而非重新触发费用');
-
-  const failed = fixture();
-  const fOut = createActionToolHandlers({ db: failed.db, startSearchFn: () => ({ status: 'error', message: '凭证失效，请重扫' }) })
-    .brainx_accept_job(args(failed.jobId, 'agent:accept:failed'), failed.context);
-  assert.ok(fOut.unknowns.some((u) => u.includes('凭证失效，请重扫')),
-    '启动失败要透传具体原因，不能静默装作成功');
+  const current = fixture();
+  let calls = 0;
+  const out = createActionToolHandlers({ db: current.db, startSearchFn: () => {
+    calls += 1;
+    throw new Error('接单不应调用找人实现');
+  } }).brainx_accept_job(args(current.jobId, 'agent:accept:awaiting'), current.context);
+  assert.equal(out.data.state, 'ACCEPTED');
+  assert.equal(out.data.search.status, 'awaiting_method');
+  assert.equal(calls, 0);
 });
 
 test('接单最小参数只需 job_id + confirm，默认值由服务端生成（specs/011）', () => {
@@ -211,6 +208,6 @@ test('重复接单（不同幂等键）按已接单优雅返回，不再报 INVA
   assert.equal(second.data.state, 'ACCEPTED');
   assert.equal(second.data.already, true, '重复接单按幂等成功返回');
   assert.ok(second.unknowns.some((u) => u.includes('已经在接了')));
-  assert.equal(searches.length, 1, '重复接单不再重复触发搜索');
+  assert.equal(searches.length, 0, '接单与重复接单都不应触发搜索');
   db.close();
 });

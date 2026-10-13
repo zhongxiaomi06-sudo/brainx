@@ -49,7 +49,7 @@
 
 ## TTC 闭环与人工覆盖层
 
-- **TTC 闭环**：TTC CRM 抓取（`src/ttcsdk/`，JWT 托管）→ 职位入 `job_facts`（权威源）→ 推荐 → 顾问接单（`brainx_engage`）→ 接单自动找人（`src/openmai-task.js`）。
+- **TTC 闭环**：TTC CRM 抓取（`src/ttcsdk/`，JWT 托管）→ 职位入 `job_facts`（权威源）→ 推荐 → 顾问接单（`brainx_engage`）→ 项目群内明确选择 OpenMai / SuperMai 找人。
 - **人工事实覆盖层**（`src/facts.js`）：6 个关键字段支持人工修正，人工值优先于同步值，落 `manual_fact_overrides` 表。
 - **推荐分页**（`src/recommendation-batch.js`）：精选盘 pick tray + 下一批 + 不感兴趣反馈（含撤销/补充原因）。
 
@@ -86,7 +86,7 @@ src/                  后端核心（36 文件，~5200 行）
   talent.js           RDS 人才库完整读写闭环（upsert/匹配/简历/CSV 同步/内存回退）
   talent-supply.js    人才供给侧只读旁路（刻意不进评分，scorer 无 import）
   resume.js           简历侧能力
-  openmai-task.js     接单自动找人（OpenMai 任务）
+  openmai-task.js     显式启动的 OpenMai 找人任务
   ttcsdk/             TTC CRM SDK（6 文件）：auth(JWT 托管)/http/config/job/company/user
 migrations/           16 个迁移：init / push_log / consultants / bridge / per_user / framework
                       / bitable_fields / agent12（1.2 三表）/ switch_app / ttc_tokens / ttc_owner

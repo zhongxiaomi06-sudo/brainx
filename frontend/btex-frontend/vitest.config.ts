@@ -7,6 +7,7 @@ import { defineConfig } from "vitest/config";
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
+  define: { "process.env": "{}" },
   test: {
     projects: [
       {

@@ -58,6 +58,11 @@ export type DecisionJob = {
   actions: DecisionAction[];
   brainxLegal?: EngagementCommand[];
   brainxDecisionId?: string;
+  rankingEngine?: "baseline-1.1" | "agentic-ranking-v1";
+  agenticTradeoff?: string;
+  agenticUncertainties?: string[];
+  agenticNextAction?: string;
+  agenticEvidenceRefs?: string[];
 };
 export type Panel = { kind: "job"; jobId: string; tab: "facts" | "judgement" | "engagement" | "trail" | "replay" } | { kind: "sync" } | { kind: "identity" } | { kind: "notifications" } | { kind: "commitments" } | null;
 export type DirectSegmentOption<T extends string> = { value: T; label: React.ReactNode; ariaLabel?: string };

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { brainxFetch, type RadarFieldReport } from "./brainx-api";
 import type { AuthStatus, SyncStatus } from "./decision-demo";
 import { SettingsCenterReview, type SettingsCenterData } from "./settings-center-review";
+import { normalizeOperationsDashboard, type OperationsDashboardModel } from "./operations-dashboard-model";
 
 type TtcStatus = {
   connected: boolean;
@@ -33,6 +34,7 @@ function WorkbenchSettingsPage({
   keywords,
   note,
   policyVersion,
+  engine,
   sync,
   fieldReport,
   onBack,
@@ -46,6 +48,7 @@ function WorkbenchSettingsPage({
   keywords: string[];
   note: string;
   policyVersion: string | null;
+  engine: "baseline-1.1" | "agentic-ranking-v1";
   sync: SyncStatus;
   fieldReport: RadarFieldReport | null;
   onBack: () => void;
@@ -56,18 +59,24 @@ function WorkbenchSettingsPage({
 }) {
   const [ttc, setTtc] = useState<TtcStatus>(emptyTtc);
   const [talent, setTalent] = useState<TalentHealth>(emptyTalent);
+  const [operations, setOperations] = useState<OperationsDashboardModel | null>(null);
   useEffect(() => {
     let active = true;
     void Promise.all([
       brainxFetch<TtcStatus>("/api/v1/ttc/connect").catch(() => emptyTtc),
       brainxFetch<TalentHealth>("/api/v1/talent/health").catch(() => emptyTalent),
-    ]).then(([nextTtc, nextTalent]) => {
+      auth.operationsAdmin
+        ? brainxFetch<OperationsDashboardModel>("/api/v1/admin/operations/dashboard")
+          .then(normalizeOperationsDashboard).catch(() => null)
+        : Promise.resolve(null),
+    ]).then(([nextTtc, nextTalent, nextOperations]) => {
       if (!active) return;
       setTtc(nextTtc);
       setTalent(nextTalent);
+      setOperations(nextOperations);
     });
     return () => { active = false; };
-  }, []);
+  }, [auth.operationsAdmin]);
 
   const data = useMemo<SettingsCenterData>(() => ({
     profile: {
@@ -92,7 +101,7 @@ function WorkbenchSettingsPage({
       host: talent.config?.host || null,
       degraded: talent.degraded,
     },
-    strategy: { policyVersion, customized: null },
+    strategy: { policyVersion, customized: null, engine },
     sync: {
       state: sync.state === "READY" ? "READY" : sync.state === "ERROR" ? "ERROR" : sync.state === "EMPTY" ? "EMPTY" : "INCOMPLETE",
       rowsRead: sync.rowsRead ?? null,
@@ -106,7 +115,8 @@ function WorkbenchSettingsPage({
         unavailableFilters: fieldNames(fieldReport, false),
       } : null,
     },
-  }), [auth, consultantId, fieldReport, keywords, note, policyVersion, sync, talent, ttc]);
+    operations,
+  }), [auth, consultantId, engine, fieldReport, keywords, note, operations, policyVersion, sync, talent, ttc]);
 
   const handleAction = (action: "edit-profile" | "connect-ttc" | "reauthorize-feishu" | "open-strategy" | "refresh-diagnostics" | "logout") => {
     if (action === "logout") {
@@ -123,12 +133,15 @@ function WorkbenchSettingsPage({
     if (action === "refresh-diagnostics") return onRefresh();
     // T7：方向画像「编辑」接入真实的画像编辑器（判断规则页），保存即生效并回显。
     if (action === "edit-profile") return onEditProfile();
-    notify("推荐策略将在只读预演接口完成后接入");
+    if (action === "open-strategy") return onEditProfile();
+    notify("当前设置入口不可用");
   };
 
   const initialSection = typeof window !== "undefined"
     && new URLSearchParams(window.location.search).get("settings") === "model" ? "model" : "profile";
-  return <SettingsCenterReview data={data} initialSection={initialSection} review={false} onBack={onBack} onAction={handleAction} />;
+  return <SettingsCenterReview data={data} initialSection={initialSection} review={false}
+    onBack={onBack} onSectionChange={section => { if (section === "connections") onOpenConnections(); }}
+    onAction={handleAction} />;
 }
 
 export { WorkbenchSettingsPage };

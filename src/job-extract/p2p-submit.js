@@ -16,6 +16,7 @@ import { uuid, now } from '../db.js';
 
 import { extractRules } from './classify.js';
 import { validateDraft } from './schema.js';
+import { extractWithCache } from './cache.js';
 
 const INSERT_MSG_SQL = `INSERT OR IGNORE INTO lark_messages
   (message_id, chat_id, message_type, text, mentions_json, create_time, received_at)
@@ -45,7 +46,7 @@ function fail(code) {
 }
 
 /** LLM 优先（AI_JOB_EXTRACT_ENABLED=1 且 llm 已配置），失败/违规静默降级规则层。 */
-async function extractFields(text) {
+async function extractFields(db, text, { tenantId, scopeId }) {
   if (process.env.AI_JOB_EXTRACT_ENABLED !== '1') {
     return { fields: extractRules(text), layer: 'rules', extra: null };
   }
@@ -53,10 +54,18 @@ async function extractFields(text) {
     const { isLlmConfigured } = await import('../llm.js');
     if (!isLlmConfigured()) return { fields: extractRules(text), layer: 'rules', extra: null };
     const { extractJdFields } = await import('./jd-extract.js');
-    const out = await extractJdFields(text);
+    const out = await extractWithCache(db, {
+      tenantId,
+      scopeId,
+      text,
+      extractorVersion: 'jd-extract-v1',
+      modelId: process.env.BRAINX_LLM_MODEL || 'configured-default',
+      promptVersion: 'jd-extract-v1',
+      extractor: async () => ({ ...(await extractJdFields(text)), layer: 'llm' }),
+    });
     const hasAny = out.fields && Object.values(out.fields)
       .some((f) => f && (f.text || f.number != null || f.stage || f.state));
-    if (hasAny) return { fields: out.fields, layer: 'llm', extra: out.extra };
+    if (hasAny) return { fields: out.fields, layer: out.layer, extra: out.extra };
   } catch { /* LLM 未配置/超时/输出违规 → 规则层保底（不向顾问报错中断） */ }
   return { fields: extractRules(text), layer: 'rules', extra: null };
 }
@@ -128,7 +137,10 @@ export async function submitPrivateJd(db, { consultant_id, chat_id, text, create
              draft: existing, layer: existing.source };
   }
 
-  let { fields, layer, extra } = await extractFields(norm);
+  let { fields, layer, extra } = await extractFields(db, norm, {
+    tenantId: 'brainx',
+    scopeId: origin === 'group_jd' ? `group:${chat_id}` : `p2p:${consultant_id}`,
+  });
   let draft = buildDraft(eventId, messageId, chat_id, fields, extra, layer);
   let v = validateDraft(pickForSchema(draft));
   if (!v.ok && layer === 'llm') {

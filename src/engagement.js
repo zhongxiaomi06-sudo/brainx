@@ -7,6 +7,7 @@
  */
 import { now, uuid } from './db.js';
 import { relationOf } from './relations.js';
+import { decisionReferenceIsValid, eventTimes } from './event-time.js';
 
 /** 正式动作表；旧关注/暂不考虑动作不再接受写入。 */
 const TRANSITIONS = {
@@ -65,7 +66,8 @@ export function currentStateMap(db, consultant_id) {
  * 幂等：同 idempotency_key 直接返回首次结果（already=true）。
  */
 export function engage(db, consultant_id, project_id, action,
-                       { reason = '', confirm = false, idempotency_key = '', payload = {} } = {}) {
+                       { reason = '', confirm = false, idempotency_key = '', payload = {},
+                         decision_id = null, occurred_at = null } = {}) {
   if (!idempotency_key) return { ok: false, status: 400, error: '缺 idempotency_key' };
   const dup = db.prepare(`SELECT event_id, next_state FROM decision_events
     WHERE idempotency_key=?`).get(idempotency_key);
@@ -78,6 +80,11 @@ export function engage(db, consultant_id, project_id, action,
   if (!t) return { ok: false, status: 400, error: `未知动作 ${action}` };
   const job = db.prepare(`SELECT * FROM job_facts WHERE project_id=?`).get(project_id);
   if (!job) return { ok: false, status: 404, error: '职位不存在' };
+  if (!decisionReferenceIsValid(db, consultant_id, project_id, decision_id)) {
+    return { ok: false, status: 422, error: 'decision_id 与当前顾问或职位不匹配' };
+  }
+  const times = eventTimes(occurred_at);
+  if (!times.ok) return times;
 
   const cur = currentState(db, consultant_id, project_id);
   if (!t.from.includes(cur.state)) {
@@ -89,10 +96,11 @@ export function engage(db, consultant_id, project_id, action,
   const next = typeof t.to === 'function' ? t.to(cur.state) : t.to;
   db.prepare(`INSERT INTO decision_events
     (event_id, event_type, actor, occurred_at, project_id, decision_id, policy_version,
-     idempotency_key, prev_state, next_state, reason, payload_json)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`)
-    .run(event_id, t.event, consultant_id, now(), project_id, null, null,
-         idempotency_key, cur.state, next, t.note || reason || null, JSON.stringify(payload || {}));
+     idempotency_key, prev_state, next_state, reason, payload_json, received_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+    .run(event_id, t.event, consultant_id, times.occurred_at, project_id, decision_id, null,
+         idempotency_key, cur.state, next, t.note || reason || null, JSON.stringify(payload || {}),
+         times.received_at);
   return { ok: true, already: false, event_id, state: next,
            legal_actions: legalActions(db, consultant_id, project_id) };
 }

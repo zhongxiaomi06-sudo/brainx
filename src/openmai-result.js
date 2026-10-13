@@ -3,6 +3,15 @@ const CANDIDATE_BLOCK = /<!--\s*BRAINX_CANDIDATES_V1\s*([\s\S]*?)-->/;
 const SAFE_CANDIDATE_REF = /^[A-Za-z0-9:_-]{1,100}$/;
 const CLARIFICATION_ONLY = /(?:请选择|请补充|补充).{0,20}(?:岗位|职位|画像|方向|条件)|(?:岗位|职位).{0,12}(?:不明确|信息不足)/;
 
+function officialProfileUrl(value) {
+  try {
+    const url = new URL(String(value || ''));
+    const trusted = ['zhipin.com', 'maimai.cn', 'liepin.com']
+      .some((host) => url.hostname === host || url.hostname.endsWith(`.${host}`));
+    return url.protocol === 'https:' && trusted ? url.href : null;
+  } catch { return null; }
+}
+
 export function extractOpenmaiCandidates(value) {
   const match = String(value || '').match(CANDIDATE_BLOCK);
   if (!match) return [];
@@ -23,6 +32,7 @@ export function extractOpenmaiCandidates(value) {
         score: String(item?.score || '—').slice(0, 20),
         resumeUrl: typeof item?.resume_url === 'string' ? item.resume_url : null,
         talentUrl: typeof item?.talent_url === 'string' ? item.talent_url : null,
+        profileUrl: officialProfileUrl(item?.profile_url),
       };
     });
   } catch { return []; }

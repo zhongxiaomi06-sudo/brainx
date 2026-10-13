@@ -123,6 +123,7 @@ cd /opt/brainx
 export BRAINX_MYSQL_HOST=<RDS_HOST>
 export BRAINX_MYSQL_PORT=3306
 export BRAINX_MYSQL_DATABASE=brainx_talent
+export BRAINX_TALENT_BACKEND=mysql
 export BRAINX_MYSQL_USER=<TEMP_MIGRATION_USER>
 read -rsp "Migration password: " BRAINX_MYSQL_PASSWORD
 export BRAINX_MYSQL_PASSWORD
@@ -132,7 +133,7 @@ npm run talent:health
 exit
 ```
 
-迁移成功后撤销临时迁移账号。然后由加载了 `/etc/brainx/agent.env` 的管理员 shell 逐个绑定灰度顾问；以下仅是形状示例，尖括号必须替换，不能从聊天文本猜身份：
+`talent:health` 只读校验基础表与迁移历史；迁移成功并留证后撤销临时迁移账号。然后由加载了 `/etc/brainx/agent.env` 的管理员 shell 逐个绑定灰度顾问；以下仅是形状示例，尖括号必须替换，不能从聊天文本猜身份：
 
 ```bash
 node bin/brainx-agent-admin.mjs bind-identity \

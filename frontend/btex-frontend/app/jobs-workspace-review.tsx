@@ -180,8 +180,14 @@ export function JobsWorkspaceReview({
       if (city !== "全部" && city !== "待确认" && !cityIndex.byProject.get(row.projectId)?.includes(city)) return false;
       if (status !== "全部" && ttcStatusLabel[row.activeState] !== status) return false;
       if (!normalized) return true;
-      return [row.role, row.company, row.ownerName || "", ...row.cities]
-        .join(" ").toLocaleLowerCase("zh-CN").includes(normalized);
+      const searchable = [row.role, row.company, row.ownerName || "", ...row.cities]
+        .join(" ").toLocaleLowerCase("zh-CN");
+      // 中文用户常把“公司 + 职位”连续输入（例如“荆华密算销售”）。字段间的展示空格
+      // 和字段排列顺序都不应改变搜索结果，因此额外匹配“公司 + 职位”。
+      const compactNormalized = normalized.replace(/\s+/g, "");
+      return searchable.includes(normalized)
+        || searchable.replace(/\s+/g, "").includes(compactNormalized)
+        || `${row.company}${row.role}`.toLocaleLowerCase("zh-CN").replace(/\s+/g, "").includes(compactNormalized);
     }).sort((a, b) => {
       const order = String(b.capturedAt || "").localeCompare(String(a.capturedAt || ""));
       return sortDescending ? order : -order;

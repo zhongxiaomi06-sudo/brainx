@@ -16,8 +16,9 @@
  * 集合 + DB 主键防并发重入；done 复用（already_done）；失败 60s 冷却；无凭证快速失败。
  */
 import { createHash } from 'node:crypto';
+import { effectiveSearchBrief } from './project-search-brief.js';
 import { now, uuid } from './db.js';
-import { getValidTtcJwt } from './ttcsdk/auth.js';
+import { getAuthorizedTtcJwt } from './ttcsdk/auth.js';
 import { callOpenmaiContent, settleOpenmaiTask as settleSupermaiTask } from './openmai-task.js';
 import { assessOpenmaiCandidateBatch, looksLikeSessionPollution } from './openmai-result.js';
 import { normalizeExcludedCandidateRefs } from './search-rounds.js';
@@ -55,6 +56,7 @@ export function startSupermaiScoutTask(db, bus, consultant_id, criteria, {
   force = false, projectId = null, excludeCandidateRefs = [],
 } = {}) {
   const project_id = String(projectId || '').trim() || supermaiCriteriaKey(criteria);
+  if (projectId) criteria = effectiveSearchBrief(db, project_id, criteria);
   const key = `${project_id}|${consultant_id}`;
   const exclusions = normalizeExcludedCandidateRefs(excludeCandidateRefs);
   const existing = db.prepare(`SELECT status,started_at,finished_at,search_round
@@ -69,7 +71,7 @@ export function startSupermaiScoutTask(db, bus, consultant_id, criteria, {
   if (!force && existing?.status === 'failed' && Date.now() - Date.parse(existing.started_at || 0) < 60_000)
     return { status: 'error', message: '最近一次失败未超过 1 分钟，稍后再试或调整判据重试' };
 
-  const jwt = getValidTtcJwt(db, consultant_id);
+  const jwt = getAuthorizedTtcJwt(db, consultant_id, 'OPENMAI');
   if (!jwt) {
     const t = now();
     db.prepare(`INSERT INTO openmai_results
@@ -123,14 +125,10 @@ export function startSupermaiScoutTask(db, bus, consultant_id, criteria, {
     let status = 'failed';
     let settled = false;
     try {
-      let result = await callOpenmaiContent(jwt, buildScoutPrompt(criteria, exclusions));
-      // 会话污染防护（2026-09-09）：拿到元回复自动重试一次，仍污染则失败关闭
+      const result = await callOpenmaiContent(jwt, buildScoutPrompt(criteria, exclusions));
+      // 搜索可能计费；污染回复应失败关闭，由顾问明确发起下一次，不隐式再调用。
       if (looksLikeSessionPollution(result)) {
-        console.warn('[supermai] session pollution detected, retrying once:', task_id);
-        result = await callOpenmaiContent(jwt, buildScoutPrompt(criteria, exclusions));
-        if (looksLikeSessionPollution(result)) {
-          throw new Error('OpenMai 会话上下文污染：两次均返回与找人无关的元回复，请稍后重试');
-        }
+        throw new Error('OpenMai 会话上下文污染：返回与找人无关的内容，未自动重试；请确认后重新发起。');
       }
       const batchQuality = assessOpenmaiCandidateBatch(result);
       // 与 job 模式一致保留 needs_input 语义（2026-10-09）：澄清反问不能记成 done，

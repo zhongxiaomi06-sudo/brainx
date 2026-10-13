@@ -14,7 +14,7 @@
  *
  *  动作模板（action.type）：
  *    fixed_reply  直接回固定文案，拦截 LLM。字段：text（字符串，或按行数组——引擎以 \n 连接，避免超长行）
- *    accept_job   直调 brainx_accept_job（接单+自动找人），按结果分支回复。
+ *    accept_job   直调 brainx_accept_job（只接单，不自动找人），按结果分支回复。
  *                 字段：job_id、job_label、idempotency_key、account_id、replies（可选覆盖默认文案）
  *    offer_group  按候选人映射建/找 Offer 决策群并发报告卡。
  *                 字段：candidates（姓名 → 群名/报告/成员）、success_template、no_match_reply
@@ -35,6 +35,7 @@ const ACTION_TYPES = new Set(['fixed_reply', 'accept_job', 'offer_group']);
 const ACCEPT_JOB_REPLIES = Object.freeze({
   already: '职位已接单（之前已接，无需重复）',
   accepted: '✅ 已接单',
+  search_awaiting_method: '接单已完成，请进入项目群明确选择 OpenMai 或 SuperMai 开始找人。',
   search_triggered: '🔎 已启动找人，第一批候选人出来后会自动发到项目群里（通常 3-5 分钟）。',
   search_already_done: '该岗位已有完成结果，在项目群里点「找人」按钮即可取回。',
   search_error: '⚠️ 接单成功但找人未启动，请在项目群里点「找人」按钮。',
@@ -206,7 +207,8 @@ async function runAcceptJob(hook, matched, context, dependencies) {
       ? replyText('already')
       : (data.state === 'ACCEPTED' ? replyText('accepted') : `接单完成（状态：${data.state || '未知'}）`);
     const searchStatus = data.search?.status;
-    const findMsg = searchStatus === 'triggered' ? replyText('search_triggered')
+    const findMsg = searchStatus === 'awaiting_method' ? replyText('search_awaiting_method')
+      : searchStatus === 'triggered' ? replyText('search_triggered')
       : searchStatus === 'already_done' ? replyText('search_already_done')
         : searchStatus === 'error' ? replyText('search_error')
           : replyText('search_other');

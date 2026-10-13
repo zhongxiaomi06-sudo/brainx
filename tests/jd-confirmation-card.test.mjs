@@ -1,0 +1,33 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { openDb } from '../src/db.js';
+import { createJdSubmitToolHandlers } from '../src/agent-gateway/tools-jd-submit.js';
+import { createJobFactsToolHandlers } from '../src/agent-gateway/tools-job-facts.js';
+import { buildJdConfirmationCard } from '../src/jd-confirmation-card.js';
+process.env.BRAINX_LLM_DISABLE = '1';
+delete process.env.AI_JOB_EXTRACT_ENABLED;
+const jd = '星曜科技有限公司急招后端工程师，base 上海，HC 3，团队负责交易系统核心链路，要求三年以上 Java 或 Go 服务端经验，熟悉高并发与分布式事务。';
+test('群 JD 卡先展示真实草稿字段，原提交人点击后才建岗，跨群拒绝', async t => {
+  const db = openDb(':memory:'); t.after(() => db.close());
+  db.exec("INSERT INTO chat_contexts (chat_id,enabled,bot_mode,registered_at,updated_at) VALUES ('oc_test',1,'ALL',datetime('now'),datetime('now'))");
+  db.exec("INSERT INTO consultant_chats (consultant_id,chat_id,name,seen_at) VALUES ('mia','oc_test','测试',datetime('now'))");
+  const context = { principal: { consultantId: 'mia', chatId: 'oc_test', chatType: 'group' } };
+  const cards = [];
+  const tools = createJdSubmitToolHandlers({ db, sendCardFn: async value => { cards.push(value); } });
+  const out = await tools.brainx_submit_job_jd({ jd_text: jd, confirm: true }, context);
+  assert.equal(out.data.status, 'pending'); assert.equal(out.data.card_delivered, true);
+  assert.match(JSON.stringify(cards[0].card), /星曜科技有限公司/);
+  assert.match(JSON.stringify(cards[0].card), /确认建岗/);
+  const args = { draft_id: out.data.draft_ref, action: 'confirm', confirm: true };
+  const review = createJobFactsToolHandlers({ db }).brainx_review_job_fact;
+  assert.throws(() => review(args, { principal: { ...context.principal, chatId: 'oc_other' } }), /FORBIDDEN/);
+  const created = review(args, context);
+  assert.equal(created.data.status, 'confirmed');
+  assert.equal(db.prepare('SELECT count(*) n FROM openmai_results').get().n, 0);
+  assert.equal(review(args, context).data.already, true);
+});
+test('缺公司/职位的卡不生成建岗按钮，展示内容不包含手机号', () => {
+  const card = buildJdConfirmationCard({ draft_ref: 'd', fields: { role: '联系13812345678' } });
+  assert.doesNotMatch(JSON.stringify(card), /brainx_review_job_fact|13812345678/);
+  assert.match(JSON.stringify(card), /待补充/);
+});

@@ -26,6 +26,7 @@ export type RecommendationReason = {
 };
 
 export type RecommendationQueueItem = {
+  engine?: "baseline-1.1" | "agentic-ranking-v1";
   projectId: string;
   rank: number;
   tier: RecommendationDecisionTier;
@@ -48,6 +49,10 @@ export type RecommendationQueueItem = {
   factsUpdatedAt: string | null;
   engagementLabel: string | null;
   legalActions: RecommendationCardAction[];
+  tradeoff?: string | null;
+  uncertainties?: string[];
+  nextAction?: string | null;
+  evidenceRefs?: string[];
 };
 
 type RecommendationQueueV2ReviewProps = {
@@ -61,6 +66,7 @@ type RecommendationQueueV2ReviewProps = {
   loading?: boolean;
   error?: string | null;
   newRunAvailable?: boolean;
+  presentationState?: string;
   emptyMessage?: string;
   onPrevious?: () => void;
   onNext?: () => void;
@@ -137,13 +143,21 @@ function RecommendationCard({ item, onOpen, onAction }: {
       <span className="recommendation-v2-rank">{String(item.rank).padStart(2, "0")}</span>
       <div className="recommendation-v2-identity"><h3>{item.role || "职位待确认"}</h3><p><BriefcaseBusiness />{item.company || "公司待确认"}<span><MapPin />{item.cities.length ? item.cities.join("、") : "城市待确认"}</span></p></div>
       <div className="recommendation-v2-head-meta">
-        <span className="recommendation-v2-match" aria-label={`AI 匹配分 ${display(item.score)}`}><small>匹配</small><b>{display(item.score)}</b></span>
+        {item.engine === "agentic-ranking-v1"
+          ? <span className="recommendation-v2-match" aria-label="Agent 原序判断"><small>排序</small><b>Agent</b></span>
+          : <span className="recommendation-v2-match" aria-label={`AI 匹配分 ${display(item.score)}`}><small>匹配</small><b>{display(item.score)}</b></span>}
         <DecisionPriorityBadge tier={item.tier} />
       </div>
     </header>
 
     <div className="recommendation-v2-body">
       {item.summary && <p className="recommendation-v2-summary-line"><span>推荐摘要</span>{item.summary}</p>}
+      {item.engine === "agentic-ranking-v1" && <dl className="recommendation-v2-facts">
+        <div><dt>权衡</dt><dd>{display(item.tradeoff)}</dd></div>
+        <div><dt>待核实</dt><dd>{item.uncertainties?.join("；") || "无额外待核实项"}</dd></div>
+        <div><dt>下一步</dt><dd>{display(item.nextAction)}</dd></div>
+        <div><dt>证据</dt><dd>{item.evidenceRefs?.length ? `${item.evidenceRefs.length} 项可追溯引用` : "待确认"}</dd></div>
+      </dl>}
       <dl className="recommendation-v2-facts">
         <div><dt>关系</dt><dd>{display(item.relation)}</dd></div>
         <div><dt>HC</dt><dd>{display(item.hc)}</dd></div>
@@ -169,7 +183,7 @@ function RecommendationCard({ item, onOpen, onAction }: {
 export function RecommendationQueueV2Review({
   items, pageIndex, totalCount, evaluatedCount, generatedAt,
   loading = false, error = null, newRunAvailable = false, onPrevious, onNext,
-  onRefreshRun, emptyMessage = "这一页没有推荐岗位", onOpen, onAction,
+  onRefreshRun, emptyMessage = "这一页没有推荐岗位", presentationState, onOpen, onAction,
 }: RecommendationQueueV2ReviewProps) {
   const pageItems = items.slice(0, PAGE_SIZE);
   const start = pageItems.length ? pageIndex * PAGE_SIZE + 1 : 0;
@@ -180,6 +194,8 @@ export function RecommendationQueueV2Review({
       <h2>推荐队列</h2>
       <p><span>岗位数量：<b>{totalCount}</b></span><span>更新时间：<b>{displayDate(generatedAt)}</b></span></p>
     </header>
+    {presentationState === "PREVIOUS_RESULT" && <div className="recommendation-v2-new-run" role="status"><AlertTriangle /><span><b>当前展示上一轮有效判断</b>较新一轮未成功，不会用失败结果覆盖。</span><button type="button" onClick={onRefreshRun}>重试刷新</button></div>}
+    {presentationState === "GENERATING" && <div className="recommendation-v2-new-run" role="status"><RefreshCw className="spin" /><span><b>Agent 正在生成判断</b>完成前不会补造推荐或分数。</span></div>}
     {newRunAvailable && <div className="recommendation-v2-new-run" role="status"><RefreshCw /><span><b>有新一轮判断可用</b>当前页面仍保持原排序，不会静默刷新。</span><button type="button" onClick={onRefreshRun}>查看新一轮</button></div>}
     {error && <div className="recommendation-v2-page-error" role="alert"><AlertTriangle /><span><b>这一页没有加载成功</b>{error}</span><button type="button" onClick={onNext}>重试</button></div>}
     <div className={`recommendation-v2-list${loading ? " is-loading" : ""}`} aria-busy={loading}>

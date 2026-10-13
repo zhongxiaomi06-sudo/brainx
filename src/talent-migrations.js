@@ -17,6 +17,9 @@ const HISTORY_DDL = `CREATE TABLE IF NOT EXISTS \`talent_schema_migrations\` (
 const checksum = (statements) => createHash('sha256')
   .update(JSON.stringify(statements)).digest('hex');
 
+export const talentMigrationNames = (migrationDir = TALENT_MIGRATIONS_DIR) =>
+  readdirSync(migrationDir).filter((name) => /^\d+_.+\.mjs$/.test(name)).sort();
+
 /**
  * MySQL DDL implicitly commits. Every migration therefore uses additive,
  * idempotent statements and records its checksum only after all statements pass.
@@ -25,7 +28,7 @@ export async function applyTalentMigrations(conn, migrationDir = TALENT_MIGRATIO
   await conn.execute(HISTORY_DDL);
   const [rows] = await conn.execute('SELECT name, checksum FROM talent_schema_migrations ORDER BY name');
   const applied = new Map(rows.map((row) => [row.name, row.checksum]));
-  const files = readdirSync(migrationDir).filter((name) => /^\d+_.+\.mjs$/.test(name)).sort();
+  const files = talentMigrationNames(migrationDir);
   const result = { discovered: files, applied: [] };
 
   for (const name of files) {

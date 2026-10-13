@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, userEvent, within } from "storybook/test";
+import { expect, fn, userEvent, waitFor, within } from "storybook/test";
 import { JobsWorkspaceReview, type JobsWorkspaceReviewRow } from "../jobs-workspace-review";
 
 const rows: JobsWorkspaceReviewRow[] = [
@@ -8,6 +8,7 @@ const rows: JobsWorkspaceReviewRow[] = [
   { projectId: "TTC-EXAMPLE-003", role: "解决方案架构师", company: "示例科技 C", cities: ["深圳市"], activeState: "COOLING", hc: 1, pipeline: { sourcing: 4, interview: 2 }, ownerName: "顾问甲", capturedAt: "2026-08-25T11:00:00+08:00", workflowState: "FOLLOWING" },
   { projectId: "TTC-EXAMPLE-004", role: "数据分析经理", company: "示例科技 D", cities: ["上海市"], activeState: "OPEN", hc: null, pipeline: null, ownerName: null, capturedAt: null, workflowState: "WATCHING" },
   { projectId: "TTC-EXAMPLE-005", role: "前端技术专家", company: "示例科技 E", cities: ["北京市", "上海市"], activeState: "UNKNOWN", hc: 2, pipeline: { recommendation: 2 }, ownerName: "顾问丙", capturedAt: "2026-08-24T12:00:00+08:00", workflowState: "FOLLOWING", newThisWeek: true },
+  { projectId: "TTC-EXAMPLE-006", role: "销售", company: "荆华密算", cities: ["北京市"], activeState: "OPEN", hc: 1, pipeline: null, ownerName: "顾问甲", capturedAt: "2026-08-23T12:00:00+08:00", workflowState: "PENDING" },
 ];
 
 const sync = fn();
@@ -30,7 +31,7 @@ export const DesktopReview: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.queryByRole("dialog")).not.toBeInTheDocument();
-    await expect(canvas.getByRole("tab", { name: "待判断 2" })).toBeInTheDocument();
+    await expect(canvas.getByRole("tab", { name: "待判断 3" })).toBeInTheDocument();
     await expect(canvas.getAllByLabelText("负责人 顾问甲").length).toBeGreaterThanOrEqual(1);
     await userEvent.click(canvas.getByRole("button", { name: "同步职位" }));
     await expect(sync).toHaveBeenCalledOnce();
@@ -57,6 +58,12 @@ export const FilteringAndSelection: Story = {
     await userEvent.click(canvas.getByRole("button", { name: "搜索" }));
     await expect(canvas.getByText("企业服务产品总监")).toBeInTheDocument();
     await expect(canvas.queryByText("高级算法工程师")).not.toBeInTheDocument();
+    await userEvent.click(canvas.getByRole("button", { name: "清除条件" }));
+    await userEvent.type(search, "荆华密算销售");
+    await userEvent.click(canvas.getByRole("button", { name: "搜索" }));
+    await waitFor(() => expect(canvas.queryByText("高级算法工程师")).not.toBeInTheDocument());
+    await expect(canvas.getByRole("row", { name: /销售 · 荆华密算/ })).toBeInTheDocument();
+    await expect(canvas.getAllByRole("row")).toHaveLength(2);
     await userEvent.click(canvas.getByRole("button", { name: "清除条件" }));
     await userEvent.click(canvas.getByRole("tab", { name: /跟进中/ }));
     await expect(canvas.getByText("解决方案架构师")).toBeInTheDocument();

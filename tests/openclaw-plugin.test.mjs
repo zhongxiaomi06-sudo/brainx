@@ -45,7 +45,7 @@ test('plugin package and manifest declare exactly the approved tools', () => {
   assert.deepEqual(manifest.contracts.commands, ['brainx', 'report']);
   assert.deepEqual(manifest.contracts.tools, fixture.allowed_tools);
   assert.deepEqual(BRAINX_OPENCLAW_TOOLS.map(({ name }) => name), fixture.allowed_tools);
-  assert.equal(new Set(manifest.contracts.tools).size, 29);
+  assert.equal(new Set(manifest.contracts.tools).size, 30);
   assert.ok(!manifest.contracts.tools.includes('brainx_send_candidate_resume'));
   for (const tool of BRAINX_OPENCLAW_TOOLS) {
     assert.equal(tool.parameters.additionalProperties, false);
@@ -73,7 +73,10 @@ test('BrainTex prompt routes natural-language job recommendations to authorized 
   assert.match(prompt, /按钮本身就是.*明确选择/);
   assert.match(prompt, /KEEP_FOR_REVIEW/);
   assert.match(prompt, /focused_candidates/);
-  assert.match(prompt, /\/report.*brainx_candidate_report/s);
+  assert.match(prompt, /mode=READ.*report_content/s);
+  assert.match(prompt, /不得调用 GENERATE\/REGENERATE/);
+  assert.match(prompt, /\/report.*读取当前报告/s);
+  assert.match(prompt, /绝不创建 V2\/V3/);
   assert.match(prompt, /为这个人建群.*CREATE_DECISION_GROUP/s);
   assert.match(prompt, /消息本身就是.*明确确认/);
   // 项目搜索由 worker 自动投递；自由搜索仍保留轮询纪律。
@@ -88,6 +91,7 @@ test('BrainTex prompt routes natural-language job recommendations to authorized 
   assert.match(prompt, /岗位理解[\s\S]*?确认接【公司·职位】这个岗位吗/);
   assert.match(prompt, /立即调用 brainx_accept_job，不要再问第二遍/);
   assert.match(prompt, /参数只有 \{ job_id, confirm: true \}/);
+  assert.match(prompt, /接单只建立承接关系，不得自动启动找人/);
   assert.match(prompt, /职位无法唯一定位或用户未确认时，不得调用接单工具/);
   assert.equal(createBraintexPromptContext({ messageProvider: 'telegram' }), undefined);
 });
@@ -174,7 +178,7 @@ test('tool request is fixed to loopback and produces a BrainX-verifiable asserti
   const body = JSON.parse(calls[0].options.body);
   assert.equal(body.schema_version, 'agent_tool_request.v1');
   assert.deepEqual(body.client, {
-    plugin_version: '1.5.0', openclaw_version: '2026.7.1-2', model_ref: 'openai/gpt-5',
+    plugin_version: '1.5.1', openclaw_version: '2026.7.1-2', model_ref: 'openai/gpt-5',
   });
   const payload = verifyPrincipalAssertion(body.principal_assertion, {
     secret,

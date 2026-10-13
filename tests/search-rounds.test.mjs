@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { openDb } from '../src/db.js';
-import { nextSearchExclusions, normalizeExcludedCandidateRefs } from '../src/search-rounds.js';
+import { nextSearchExclusions, nextSupermaiSearchExclusions,
+  normalizeExcludedCandidateRefs } from '../src/search-rounds.js';
 
 function result(candidates) {
   return `候选人结果\n<!-- BRAINX_CANDIDATES_V1\n${JSON.stringify({ candidates })}\n-->`;
@@ -20,7 +21,7 @@ test('下一轮累计历史 OpenMai TTC 编号，并忽略 SuperMai 非 TTC 引�
     (project_id,consultant_id,status,result_text,task_id,started_at,finished_at,
      excluded_candidate_refs_json)
     VALUES ('P-ROUND','felix','done',?,'om_first',?,?,?),
-           ('P-ROUND','mia','done',?,'sm_second',?,?,?)`).run(
+           ('supermai-result:P-ROUND','mia','done',?,'sm_second',?,?,?)`).run(
     result([{ candidate_ref: 'TTC-1', name: '甲' }]), at, at, JSON.stringify(['TTC-OLD']),
     result([
       { candidate_ref: 'EXT-1', name: '乙' },
@@ -28,5 +29,7 @@ test('下一轮累计历史 OpenMai TTC 编号，并忽略 SuperMai 非 TTC 引�
     ]), at, at, '[]',
   );
   assert.deepEqual(nextSearchExclusions(db, 'P-ROUND'), ['TTC-OLD', 'TTC-1', 'TTC-2']);
+  assert.deepEqual(nextSupermaiSearchExclusions(db, 'P-ROUND'),
+    ['TTC-OLD', 'TTC-1', 'EXT-1', 'TTC-2']);
   db.close();
 });

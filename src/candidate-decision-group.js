@@ -71,8 +71,8 @@ function splitSections(summary) {
 // 导出供卡片渲染门禁（scripts/quality-gate/card-render）直接取真实卡片，避免样本漂移。
 export function contextCard(job, candidate, summary) {
   const ttcUrl = `https://app.ttcadvisory.com/app/talent/${encodeURIComponent(candidate.candidate_ref)}`;
-  const generate = `请生成当前候选人的 Offer 决策报告。调用 brainx_candidate_report，mode=GENERATE，confirm=true。`;
-  const update = `请结合本群最新内容更新当前候选人的 Offer 决策报告。调用 brainx_candidate_report，mode=REGENERATE，confirm=true。`;
+  const generate = '[BRAINTEX_REPORT_CREATE] 请创建本群唯一的 Offer 决策报告。'
+    + '调用 brainx_candidate_report，mode=GENERATE，confirm=true。';
   return { config: { wide_screen_mode: true },
     header: { template: 'purple', title: { tag: 'plain_text', content: 'BrainTex · 候选人 Offer 决策群' } },
     elements: [
@@ -81,16 +81,15 @@ export function contextCard(job, candidate, summary) {
       ...splitSections(summary).map((section) => ({ tag: 'markdown', content: section })),
       { tag: 'markdown', content: '**本群讨论目标**\n核实关键风险，并决定：继续评估、进入面试、准备 Offer 或不推进。' },
       // F1 主次颠倒：primary 曾挂在「查看 TTC 人才」这个纯跳转上，真实业务动作
-      // （生成 / 更新 Offer 决策报告）反而是灰按钮。现在 primary 给「生成报告」，
+      // 生成 Offer 决策报告反而是灰按钮。现在 primary 给「生成报告」，
       // 跳转降为 default —— 顾问最先该点的是「让机器人产出报告」。
       { tag: 'action', actions: [
         { tag: 'button', type: 'primary', text: { tag: 'plain_text', content: '生成报告' },
           value: { text: generate } },
-        { tag: 'button', text: { tag: 'plain_text', content: '更新报告' }, value: { text: update } },
         { tag: 'button', text: { tag: 'plain_text', content: '查看 TTC 人才' },
           multi_url: { url: ttcUrl, pc_url: ttcUrl, android_url: ttcUrl, ios_url: ttcUrl } },
       ] },
-      { tag: 'note', elements: [{ tag: 'plain_text', content: '本群不展示联系方式或简历原文；有新讨论或电话纪要后也可发送 /report 更新报告。' }] },
+      { tag: 'note', elements: [{ tag: 'plain_text', content: '报告只创建一次，可直接编辑；之后 @机器人即可基于当前正文提问。' }] },
     ] };
 }
 

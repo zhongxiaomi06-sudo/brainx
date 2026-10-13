@@ -10,6 +10,7 @@ function valid() {
     BRAINX_AGENT_FEISHU_APP_KEYS_JSON: JSON.stringify({ mia: value('d') }),
     BRAINX_AGENT_ADMIN_ID: 'operator-1', BRAINX_AGENT_ADMIN_ALLOWLIST: 'operator-1,operator-2',
     BRAINX_DB: '/opt/brainx/data/brainx.sqlite', BRAINX_MYSQL_HOST: 'db.internal',
+    BRAINX_TALENT_BACKEND: 'mysql',
     BRAINX_MYSQL_DATABASE: 'brainx_talent', BRAINX_MYSQL_USER: 'brainx_agent_readonly',
     BRAINX_MYSQL_PASSWORD: value('e'), BRAINX_MYSQL_SSL: '1',
     BRAINX_FEISHU_CREDENTIALS_FROM_OPENCLAW: '1',
@@ -22,6 +23,7 @@ function valid() {
     BRAINX_RELOOP_SYNC_ENABLED: '1', BRAINX_TENANT_ID: 'tenant-1',
     BRAINX_RELOOP_CONSULTANT_ID: 'mia', BRAINX_RELOOP_SOURCE_OWNER_ID: 'owner-1',
     BRAINX_RELOOP_EXPECTED_BOUND_NAME: 'Mia', BRAINX_MYSQL_HOST: 'db.internal',
+    BRAINX_TALENT_BACKEND: 'mysql',
     BRAINX_MYSQL_DATABASE: 'brainx_talent', BRAINX_MYSQL_USER: 'brainx_worker_runtime',
     BRAINX_MYSQL_PASSWORD: value('g'), BRAINX_MYSQL_SSL: '1',
   };
@@ -40,6 +42,18 @@ function valid() {
 
 test('运行配置预检接受三份一致且无占位符的最小生产配置', () => {
   assert.deepEqual(validateRuntimeConfig(valid()), { ok: true, errors: [] });
+});
+
+test('运行配置预检拒绝未显式选择 MySQL 的生产人才后端', () => {
+  const missing = valid();
+  delete missing.agent.BRAINX_TALENT_BACKEND;
+  assert.ok(validateRuntimeConfig(missing).errors
+    .includes('agent.env:BRAINX_TALENT_BACKEND:MISSING'));
+
+  const volatile = valid();
+  volatile.worker.BRAINX_TALENT_BACKEND = 'memory';
+  assert.ok(validateRuntimeConfig(volatile).errors
+    .includes('worker.env:BRAINX_TALENT_BACKEND:NOT_MYSQL'));
 });
 
 test('运行配置预检一次指出 Agent API、身份白名单和回群 worker 的具体配置层', () => {

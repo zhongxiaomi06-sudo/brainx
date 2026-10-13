@@ -54,7 +54,8 @@ test('项目启动：建群、投放职位、绑定项目并激活群 Agent 范�
   assert.ok(buttons[0].value.text.includes(`项目 ${PID}`));
   assert.match(calls[1][1].card.elements[1].content, /尚未接单/);
   // specs/014 + PR#60：已接单卡片给三个找人入口。异步入口必须带 [BRAINTEX_SEARCH_START]
-  // 标记（插件据此立刻回一条群状态）并声明「不要原地轮询」；Reloop 走同步读取，不加标记。
+  // 标记（插件据此立刻回一条群状态并确定性直调）并声明「不要原地轮询」；
+  // Reloop 走同步读取，不加标记。
   const acceptedCard = buildProjectLaunchCard({
     project_id: PID, company: '海马云', role: '产品经理', city: '上海', hc: 2,
     pipeline: '待推荐', consultant_name: 'Felix',
@@ -65,7 +66,8 @@ test('项目启动：建群、投放职位、绑定项目并激活群 Agent 范�
     ['OpenMai 找人', 'Reloop 找人', 'SuperMai 找人', '按条件找人']);
   const markedButtons = acceptedButtons
     .filter((button) => button.value.text.startsWith('[BRAINTEX_SEARCH_START]'));
-  assert.deepEqual(markedButtons.map((button) => button.text.content), ['OpenMai 找人', 'SuperMai 找人']);
+  assert.deepEqual(markedButtons.map((button) => button.text.content),
+    ['OpenMai 找人', 'SuperMai 找人', '按条件找人']);
   const asyncButtons = acceptedButtons.filter((button) => button.text.content !== 'Reloop 找人');
   assert.ok(asyncButtons.every((button) => button.value.text.includes('正在找人')));
   assert.ok(asyncButtons.every((button) => button.value.text.includes('结束本轮')));

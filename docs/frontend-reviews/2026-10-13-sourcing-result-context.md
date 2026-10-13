@@ -1,0 +1,46 @@
+# 寻访结果卡上下文复核
+
+零命中追加：正式 sourcing-result-card 调用 relaxedSearchElements，经 search-start-notice 结构化命令启动。仅明确软偏好可放宽，其他情况提示人工补充；自由条件新作用域不继承历史排除，确认中提示。sourcing-zero-relax 344px 截图已查看；新专项 2/2。原生卡不适用 Storybook，用户未审核、未发布、真实数据未验证；须真机验收确认取消不触发、确认只启动一次及排除行为。
+
+需求卡追加：openmai delivery worker 接 deliverJudgmentNoticesOnce（开关默认关），judgment-notice 160px 截图已查看；结构化按钮由 search-start-notice 直调。专项 40/40；原生卡不适用 Storybook、用户未审核、未发布、真实数据未验证。
+
+JD 卡追加：tools-jd-submit 调用 buildJdConfirmationCard；工具回调只放行本人原群 group_jd 草稿，缺公司/职位不出确认按钮。专项 25/25，220px 截图已查看无截断。原生卡不适用 Storybook；用户未审核、未发布、真实数据未验证。
+
+自由候选追加：有稳定编号时正式卡调用 brainx_freeform_candidate_action。仅原搜索发起人、原群或本人私聊可处理已授权快照；初筛落搜索重点名单而非项目，拒绝可撤销并用于续搜。两张截图已查看；原生卡不适用 Storybook；用户未审核、未发布、真实数据未验证。
+
+追加权威编辑器：正式 workbench 抽屉复用 OpenmaiPanel → search-brief-api → GET/PUT search-brief，保存带版本，不启动任务。Storybook NeedsInput 1/1、后端专项 47/47；用户未审核，未发布，真实账号未验证。独立存储 project_search_briefs，不将历史群补充迁成权威条件。
+
+> 上级：[前端审核台账](README.md) · [施工清单](../2026-10-13-sourcing-delivery-plan.md)
+
+## 审核范围
+
+追加：项目及内部短名单四动作正式接入本地；二次确认、私发和失败路径专项通过，两张截图已查看。Storybook 不适用原生卡；用户未审核、未发布、真实数据未验证。自由条件候选未接四动作。
+
+用户授权按 10-09 产品要求实施。此次只变更正式飞书结果卡：条件摘要、轮次、排除人数及无来源姓名。
+对应提交为本记录所在提交；上一基线 2387f78。
+用户尚未确认本轮视觉效果，不把附件中的要求等同于视觉审核。
+
+## 接入与字段
+
+- 正式入口：openmai-delivery worker 与 tools-sourcing 共用 sourcing-result-card。
+- 字段：openmai_results.search_brief / search_round / excluded_candidate_refs_json。
+- 条件与结果同轮；缺排除记录明确“未记录”，不编造零；条件文本隐藏联系方式。
+- 没有真实来源的姓名为文本，不再生成无链接按钮；零命中不展示 NO_REPLY。
+- 没有增加自动搜索、手机号读取或入库权限。
+
+## 五项状态
+
+| 维度 | 状态 |
+|---|---|
+| Storybook | 不适用（飞书原生卡，使用卡片渲染门禁） |
+| 用户审核 | 未审核 |
+| 正式接入 | 已接入本地正式构建函数 |
+| 目标环境发布 | 未发布 |
+| 真实数据验证 | 未验证；当前仅自动化夹具与本地截图 |
+
+本地已查看完成、自由条件、失败三种截图，无横向溢出或按钮截断；自动化结果见提交日志。
+尚未完成四动作、自由搜索自动回群和真实飞书验收，不能称整条产品要求已完成。
+
+追加证据：自由搜索原群持久交付已接入本地 worker，并通过终态、续搜覆盖、失败恢复和撤权等 10 项测试；无需工作台链接的自由卡不再依赖 BRAINX_BASE_URL。此更新不改变视觉审核、部署与真实数据仍未完成的状态。
+
+完整回归追加：修正 NO_REPLY 零命中标题被标为“已就绪”的优先级错误；对应断言现通过。其余五项状态不变。

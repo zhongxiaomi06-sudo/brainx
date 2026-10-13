@@ -6,6 +6,8 @@ OpenClaw Agent 的 App 身份、群 scope、短时签名、十工具边界、撤
 
 OpenClaw/Agent Gateway 与后台 worker 不共用人才库账号：`/etc/brainx/agent.env` 只允许读取 `brainx_talent`；`/etc/brainx/worker.env` 只额外允许确定性同步所需的 `reloop_app` SELECT 和 `brainx_talent` SELECT/INSERT/UPDATE/DELETE；DDL 只在迁移窗口使用临时账号，完成后撤销。
 
+生产运行环境必须设置 `BRAINX_TALENT_BACKEND=mysql`。缺凭据、断连或 schema 未就绪时人才读写失败关闭，不允许自动落到进程内内存；内存后端仅供离线演示，且必须同时显式设置 `BRAINX_TALENT_BACKEND=memory` 与 `BRAINX_ALLOW_VOLATILE_TALENT=1`。
+
 ## 一、data/.secret 单点密钥：备份与恢复
 
 ### 密钥用途（为什么它这么重要）

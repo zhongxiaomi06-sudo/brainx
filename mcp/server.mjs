@@ -11,7 +11,7 @@ import '../src/env.js';
 import { createInterface } from 'node:readline';
 import { openDb } from '../src/db.js';
 import { runSync, latestSync, latestCompleteSnapshot } from '../src/sync.js';
-import { recommend, latestRun, loadConsultants } from '../src/recommend.js';
+import { createRecommendationUseCase } from '../src/recommendation-use-case.js';
 import { engage, commitmentSummary, currentState, legalActions } from '../src/engagement.js';
 import { replay, recordOutcome } from '../src/replay.js';
 import { confirmDraft, rejectDraft } from '../src/job-extract/confirm.js';
@@ -25,11 +25,12 @@ import { feedback as recommendationFeedback, undoFeedback as recommendationUndoF
 import { candidateShortlist } from '../src/candidate-shortlist.js';
 
 const db = openDb();
+const recommendations = createRecommendationUseCase(db);
 const BOUND_CONSULTANT_ID = String(process.env.BRAINX_MCP_CONSULTANT_ID || '').trim();
 const BOUND_TENANT_ID = String(process.env.BRAINX_MCP_TENANT_ID || '').trim();
 const RELOOP_JOB_REF = /^reloop-position:\d+$/;
 
-if (BOUND_CONSULTANT_ID && !loadConsultants(db)
+if (BOUND_CONSULTANT_ID && !recommendations.consultants()
   .some((consultant) => consultant.consultant_id === BOUND_CONSULTANT_ID)) {
   throw new Error('BRAINX_MCP_CONSULTANT_ID 未对应有效顾问，MCP 拒绝启动');
 }
@@ -54,7 +55,8 @@ const TOOLS = {
   brainx_consultants: {
     description: '顾问花名册（consultant_id/显示名；open_id 不出 MCP）',
     inputSchema: { type: 'object', properties: {} },
-    run: () => loadConsultants(db).map((c) => ({ consultant_id: c.consultant_id, display_name: c.display_name })),
+    run: () => recommendations.consultants()
+      .map((c) => ({ consultant_id: c.consultant_id, display_name: c.display_name })),
   },
   brainx_workbench: {
     description: '工作台模型：同步状态/承接摘要/今日 Top3（与 Web 首屏同源）',
@@ -62,7 +64,7 @@ const TOOLS = {
       consultant_id: { type: 'string' } } },
     run: ({ consultant_id: cid }) => {
       const sync = latestSync(db, cid);
-      const run = latestRun(db, cid, { hideEngaged: true });
+      const run = recommendations.latest(cid, { hideEngaged: true });
       const c = commitmentSummary(db, cid);
       return {
         consultant_id: cid,
@@ -83,7 +85,7 @@ const TOOLS = {
       consultant_id: { type: 'string' }, limit: { type: 'number' } } },
     run: ({ consultant_id: cid, limit = 10 }) => {
       const sync = latestSync(db, cid);
-      const run = latestRun(db, cid, { hideEngaged: true });
+      const run = recommendations.latest(cid, { hideEngaged: true });
       if (sync && !sync.complete) return { blocked: true, reason: '本次同步不完整，为避免误导，暂不生成正式推荐', items: [] };
       if (!run) return { blocked: false, empty: true, items: [] };
       return { blocked: false, run_id: run.run.run_id, policy_version: run.run.policy_version,
@@ -113,7 +115,7 @@ const TOOLS = {
       const wait = RECOMMEND_RUN_MIN_MS - (Date.now() - last);
       if (wait > 0) return { error: 'rate_limited', retry_after_ms: wait };
       RECOMMEND_RUN_AT.set(cid, Date.now());
-      return recommend(db, cid, { top });
+      return recommendations.run(cid, { top });
     },
   },
   brainx_confirm_facts: {
@@ -136,10 +138,11 @@ const TOOLS = {
       idempotency_key: { type: 'string' } } },
     run: ({ consultant_id: cid, project_id, reason = 'agent 会话反馈', undo = false, idempotency_key }) => {
       // 默认键含当前快照：后续反馈走 existingForProject 更新 reason（补充原因），固定键会 already 短路
-      if (undo) return recommendationUndoFeedback(db, cid, { project_id });
-      const snap = latestRun(db, cid)?.run?.snapshot_id || 'nosnap';
+      if (undo) return recommendationUndoFeedback(db, cid, { project_id }, { recommendations });
+      const snap = recommendations.latest(cid)?.run?.snapshot_id || 'nosnap';
       return recommendationFeedback(db, cid, { project_id, feedback: 'NOT_INTERESTED', reason,
-        idempotency_key: idempotency_key || `mcp-feedback:${cid}:${project_id}:${snap}` });
+        idempotency_key: idempotency_key || `mcp-feedback:${cid}:${project_id}:${snap}` },
+      { recommendations });
     },
   },
   brainx_opportunity: {
@@ -220,7 +223,7 @@ const TOOLS = {
     run: ({ decision_id, consultant_id: cid }) => {
       // 与 HTTP 一致：只能回放自己名下的推荐。consultant_id 必填（roster 校验），
       // 不再提供"缺失时按声明身份兜底"的放行路径（2026-08-20 信任对齐收紧）。
-      if (!cid || !loadConsultants(db).some((c) => c.consultant_id === cid)) {
+      if (!cid || !recommendations.consultants().some((c) => c.consultant_id === cid)) {
         return { error: 'UNKNOWN_CONSULTANT', consultant_id: cid };
       }
       const owner = db.prepare('SELECT consultant_id FROM recommendations WHERE decision_id=?').get(decision_id);
@@ -255,7 +258,7 @@ const TOOLS = {
       if (profile_keywords !== undefined || profile_note !== undefined) {
         return updateProfile(db, cid, { profile_keywords, profile_note });
       }
-      const c = loadConsultants(db).find((x) => x.consultant_id === cid);
+      const c = recommendations.consultants().find((x) => x.consultant_id === cid);
       if (!c) return { error: 'NOT_FOUND', consultant_id: cid };
       return { consultant_id: cid, display_name: c.display_name,
                profile_keywords: c.profile_keywords || [], profile_note: c.profile_note || '' };
@@ -268,9 +271,10 @@ const TOOLS = {
     run: ({ consultant_id: cid }) => {
       const sync = latestSync(db, cid);
       const snapshot = latestCompleteSnapshot(db, cid);
-      const run = latestRun(db, cid, { hideEngaged: true });
+      const run = recommendations.latest(cid, { hideEngaged: true });
       const c = commitmentSummary(db, cid);
-      const name = loadConsultants(db).find((x) => x.consultant_id === cid)?.display_name || cid;
+      const name = recommendations.consultants()
+        .find((x) => x.consultant_id === cid)?.display_name || cid;
       return sync && !sync.complete ? buildSyncAlertCard(sync)
         : buildDailyCard({ consultant_name: name, consultant_id: cid, run: run?.run, items: run?.items || [],
                            commitments: c, sync, snapshot_id: snapshot?.sync_id });

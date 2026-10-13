@@ -1,9 +1,11 @@
 # 007 — 找人双入口：OpenMai（按职位）× SuperMai（按判据）
 
-状态：Implemented（2026-09-08）
+状态：Superseded（2026-09-24；历史上的 OpenMai criteria 过渡方案已由 specs/035 的 SuperMai 桌面 relay 替代）
 上游：用户拍板「建立两个入口，可以选择找人」；「SuperMai 找人 = 在猎聘、脉脉上找人，不在 TTC」。
 
 ## 1. 背景与根因（已验证）
+
+> 本文保留 2026-09-08 的过渡决策证据，不再代表现行生产架构。当前 `brainx_supermai_scout` 不调用 OpenMai，权威契约见 [BrainX 桌面端统一登录与找人连接器](../035-desktop-auth-connectors/spec.md)。
 
 - `brainx_supermai_scout` 旧实现（2026-09-07）按前端 chunk 接了
   `app.ttcadvisory.com/app/sourcing/api/sourcing/v1`（/sessions + /chat/sql_query，

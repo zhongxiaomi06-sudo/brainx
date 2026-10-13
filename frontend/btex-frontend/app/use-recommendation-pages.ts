@@ -127,6 +127,7 @@ export function useRecommendationPages(onShow: (page: RecommendationPage) => voi
   };
 
   const changeSort = (value: RecommendationSort) => {
+    if (current?.engine === "agentic-ranking-v1") return;
     if (value === sort) return;
     const previousSort = sort;
     const request = ++searchRequest.current;

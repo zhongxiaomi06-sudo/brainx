@@ -12,6 +12,9 @@ import { recordOutcome } from '../src/replay.js';
 import { labelFor, labelsForRun } from '../src/labels.js';
 import { evaluate } from '../scripts/eval-ranking.mjs';
 
+const labelWindow = () => ({ windowDays: 7,
+  cutoffAt: new Date(Date.now() + 8 * 86400000).toISOString() });
+
 let db;
 before(() => { db = openDb(':memory:'); });
 after(() => { db.close(); });
@@ -77,7 +80,7 @@ test('评估：排序组形状与指标范围', () => {
     WHERE consultant_id='felix' AND status='COMPLETED' ORDER BY created_at DESC LIMIT 1`).get().run_id;
   const rows = labelsForRun(db, 'felix', runId);
   assert.ok(rows.length > 0 && rows.every((r) => r.rank >= 1));
-  const ev = evaluate(db, { runs: 1, consultant_ids: ['felix'] });
+  const ev = evaluate(db, { runs: 1, consultant_ids: ['felix'], ...labelWindow() });
   assert.equal(ev.groups, 1);
   for (const v of Object.values(ev.metrics)) {
     if (v === null) continue;
@@ -135,7 +138,7 @@ test('影子日报：分歧 TopN 形状与位移计算', async () => {
   writeFileSync(mp, JSON.stringify(dump));
   const model = loadShadowModel(mp);
   assert.ok(model && typeof model.score === 'function');
-  const out = divergenceTopN(db, model, 'felix', { top: 3 });
+  const out = divergenceTopN(db, model, 'felix', { top: 3, labelWindow: labelWindow() });
   assert.ok(out && Array.isArray(out.top) && out.top.length <= 3);
   for (const t of out.top) {
     assert.ok(t.rule_rank >= 1 && t.shadow_rank >= 1 && t.delta >= 0);

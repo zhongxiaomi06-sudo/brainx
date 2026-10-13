@@ -111,7 +111,7 @@ export function useWorkbenchNavigation({
           ? "jobs"
           : page === "today"
             ? "today"
-            : "settings";
+            : page === "sources" ? "connections" : "settings";
   const recommendationPagination = demo
     ? undefined
     : {
@@ -121,6 +121,8 @@ export function useWorkbenchNavigation({
         runId: recommendationQueue.current?.runId || brainxRun.runId || "",
         generatedAt: recommendationQueue.current?.generatedAt || sync.updatedAt || "时间待确认",
         policyVersion: recommendationQueue.current?.policyVersion || brainxRun.policyVersion || "待确认",
+        engine: recommendationQueue.current?.engine || brainxRun.engine,
+        state: recommendationQueue.current?.state || "READY",
         loading: recommendationQueue.loading,
         error: recommendationQueue.error,
         newRunAvailable: recommendationQueue.current?.newRunAvailable ?? false,

@@ -6,10 +6,8 @@
  * 设计约束（与项目既有纪律一致）：
  *   1) 双库并存、互不干扰：本模块只碰 MySQL 人才库（异步 API），绝不触碰 SQLite 决策库。
  *   2) 懒连接：不调用任何写入/读取函数就不会连 RDS，SQLite-only 的命令行入口不受影响。
- *   3) 无 RDS 回退：阿里云 RDS 走 IP 白名单，本地/沙箱常连不通。为了让功能可开发、可
- *      测试、可离线演示，未配置或连不通 MySQL 时自动降级到进程内内存库（memory store），
- *      读写语义与 MySQL 版一致（UPSERT 幂等、外键级联概念保留）。切回真库只需在 .env
- *      填 BRAINX_MYSQL_* 凭据 + 白名单，无需改调用方代码。
+ *   3) 失败关闭：运行期必须显式选择 MySQL 或双重确认的易失内存演示；缺凭据、断连或
+ *      schema 未就绪不自动回退，也不由应用运行账号建表。
  *   4) 幂等：候选人按 (phone|email|name) 归一去重 UPSERT；标签按 (name,category) 字典去重；
  *      匹配记录按 (talent_id,position_id) 覆盖写。重复同步不产生脏数据。
  */
@@ -17,9 +15,10 @@ import { parseCsvFile } from './csv.js';
 import { tokenize } from './scorer.js';
 import { parseResumeText } from './resume.js';
 import { buildTalentListQuery } from './talent-mysql-query.js';
+import { configuredTalentBackendLabel, connectTalentBackend } from './talent-backend-policy.js';
 
 // ---------------------------------------------------------------------------
-// 后端选择：优先真 MySQL；未配置/连不通则回退内存库。
+// 后端选择：显式 MySQL 或显式易失内存；任何配置/连接错误都失败关闭。
 // ---------------------------------------------------------------------------
 let _backend = null; // 缓存已选后端，避免每次调用重连
 let _forcedMemory = false;
@@ -32,29 +31,8 @@ export function resetBackend() { _backend = null; _forcedMemory = false; MEM.res
 async function backend() {
   if (_backend) return _backend;
   if (_forcedMemory) return (_backend = MEM);
-  // 未填凭据 → 直接内存库（不抛错、不 import mysql 连接）
-  if (!process.env.BRAINX_MYSQL_USER || !process.env.BRAINX_MYSQL_DATABASE) {
-    _backend = MEM;
-    _backend.degraded = 'NO_CREDENTIALS';
-    return _backend;
-  }
-  // 有凭据 → 尝试连真库；连不通（白名单/网络）自动降级
-  try {
-    const db = await import('./db.js');
-    await db.pingMysql();
-    // 首次连通即幂等建表（IF NOT EXISTS），保证空库也能立刻读写。
-    // 建表失败（如账号无 DDL 权限）不阻断——降级为「已连库但表未就绪」，由 health 暴露。
-    let schema = 'ready';
-    try { await db.initTalentSchema(); }
-    catch (e) { schema = `SCHEMA_INIT_FAILED: ${String(e.message).slice(0, 80)}`; }
-    _backend = makeMysqlBackend(db);
-    _backend.schema = schema;
-    return _backend;
-  } catch (e) {
-    _backend = MEM;
-    _backend.degraded = `MYSQL_UNREACHABLE: ${String(e.message).slice(0, 80)}`;
-    return _backend;
-  }
+  _backend = await connectTalentBackend({ memoryBackend: MEM, makeMysqlBackend });
+  return _backend;
 }
 
 /** 丢弃缓存后端，下次调用重新按 env 选择（填完 .env 后无需重启即可切库）。 */
@@ -62,33 +40,39 @@ export function reconnectBackend() { _backend = null; _forcedMemory = false; }
 
 /** 当前后端状态（给 /health 与前端提示用；绝不出凭据本体）。 */
 export async function talentBackendStatus() {
-  const b = await backend();
-  return { backend: b === MEM ? 'memory' : 'mysql', degraded: b.degraded || null };
+  try {
+    const b = await backend();
+    return { backend: b === MEM ? 'memory' : 'mysql', ready: true,
+      volatile: b === MEM, degraded: b === MEM ? 'VOLATILE_MEMORY' : null, error_code: null };
+  } catch (error) {
+    return { backend: configuredTalentBackendLabel(), ready: false, volatile: false,
+      degraded: error?.code || 'TALENT_BACKEND_UNAVAILABLE',
+      error_code: error?.code || 'TALENT_BACKEND_UNAVAILABLE' };
+  }
 }
 
 /** 详细健康自检：后端类型 + 连通性 + 建表状态（凭据只出 host/库名，绝不出密码）。 */
 export async function talentHealth() {
-  reconnectBackend(); // 每次都按最新 env 重判，方便填完凭据刷新即见效
-  const b = await backend();
-  const isMysql = b !== MEM;
+  reconnectBackend();
+  const status = await talentBackendStatus();
+  const isMysql = status.backend === 'mysql';
   return {
-    backend: isMysql ? 'mysql' : 'memory',
-    connected: isMysql,
-    schema: isMysql ? (b.schema || 'unknown') : 'n/a (memory)',
-    degraded: b.degraded || null,
+    ...status,
+    connected: isMysql && (status.ready || status.error_code === 'TALENT_SCHEMA_NOT_READY'),
+    schema: status.ready ? (isMysql ? 'ready' : 'not_applicable')
+      : status.error_code === 'TALENT_SCHEMA_NOT_READY' ? 'not_ready' : 'unavailable',
     // 只回显非敏感连接信息，密码/账号绝不出
     config: {
       host: process.env.BRAINX_MYSQL_HOST || 'ttc-rds-public-0707.mysql.rds.aliyuncs.com',
       port: Number(process.env.BRAINX_MYSQL_PORT) || 3306,
       database: process.env.BRAINX_MYSQL_DATABASE || null,
-      credentials_present: !!(process.env.BRAINX_MYSQL_USER && process.env.BRAINX_MYSQL_DATABASE),
+      credentials_present: !!(process.env.BRAINX_MYSQL_USER
+        && process.env.BRAINX_MYSQL_PASSWORD && process.env.BRAINX_MYSQL_DATABASE),
       ssl: process.env.BRAINX_MYSQL_SSL === '1',
     },
-    hint: isMysql
-      ? '已连接真实 RDS 人才库'
-      : (process.env.BRAINX_MYSQL_USER
-          ? '已填凭据但连不通：检查公网 IP 是否已加 RDS 白名单 / 账号密码 / 网络'
-          : '未填凭据，当前使用内存库；在 .env 填 BRAINX_MYSQL_USER/PASSWORD/DATABASE 后重试'),
+    hint: status.ready
+      ? (isMysql ? '已连接持久化人才库' : '当前为易失内存演示，重启后数据会丢失')
+      : '人才库不可用；请检查显式后端配置、连接凭据和迁移就绪状态',
   };
 }
 
@@ -392,14 +376,14 @@ function toMysqlDatetime(v) {
 // 内存后端（无 RDS 回退；读写语义与 MySQL 版对齐）
 // ---------------------------------------------------------------------------
 const MEM = {
-  degraded: 'MEMORY',
+  degraded: 'VOLATILE_MEMORY',
   _talents: new Map(), _tags: new Map(), _talentTags: [], _positions: new Map(), _matches: [], _resumes: [],
   _seq: { talent: 0, tag: 0, position: 0, match: 0, resume: 0 },
   reset() {
     this._talents.clear(); this._tags.clear(); this._talentTags = [];
     this._positions.clear(); this._matches = []; this._resumes = [];
     this._seq = { talent: 0, tag: 0, position: 0, match: 0, resume: 0 };
-    this.degraded = 'MEMORY';
+    this.degraded = 'VOLATILE_MEMORY';
   },
   async upsertTalent(rec) {
     const key = talentDedupeKey(rec);

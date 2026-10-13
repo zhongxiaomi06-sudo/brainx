@@ -7,6 +7,13 @@
 - 处理：main 以 --no-ff 合并该分支；唯一冲突为本文档顶部双方同日记录，保留双方全部条目。
 - 验证：合并后跑 npm run verify 完整门禁，通过后才 push 并发布生产。
 
+## 2026-10-13｜chore(发布): 三端统一落地——生产 ff 到 551f78c 并重启验证
+
+- 门禁：首次 verify 23/25（npm audit 遇 registry TLS 抖动、Storybook 组件交互 22s 早退），分别复跑均通过（audit 0 漏洞、Storybook 105/105），第二次完整 verify 25/25 通过、Push 条件满足。
+- 发布：push main（0325abd→551f78c）后，生产 /opt/brainx 从 detached HEAD(ec2b374) 切回 main 并 ff 到 551f78c，npm ci + 前端构建 + systemctl restart brainx。
+- 结果：本地 / GitHub / 生产三端 HEAD 均为 551f78c；brainx.service active；https://base.yorkteam.cn/api/v1/meta/guard 健康返回。
+- 备注：服务器直连 github.com 有间歇性 TLS/连接失败，重试或改用本地已 fetch 的 origin/main ff 即可绕过。
+
 ## 2026-10-13｜test(e2e): mia 凭证重连后续搜成功——判据增强效果生产实证
 
 - 起因（用户指令）：「完成连接，mia的继续测试」。

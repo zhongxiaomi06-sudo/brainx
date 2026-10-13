@@ -12,6 +12,7 @@ import { extractOpenmaiCandidates, buildOpenmaiDeliveryCard, STALE_SEARCH_MS } f
 import { nextSearchExclusions, nextSupermaiSearchExclusions } from '../search-rounds.js';
 import { registerFreeformDelivery } from '../sourcing-group-delivery.js';
 import { rejectedCandidateRefs } from '../candidate-search-feedback.js';
+import { internalFirst } from './search-internal-first.js';
 
 function fail(code) {
   throw Object.assign(new Error(code), { code });
@@ -171,7 +172,7 @@ async function trySendOpenmaiResultCard(sendCardFn, publicBaseUrl, args, princip
 /** OpenMai 找人（第 11 工具，2026-09-03）：纪律与承接路由一致——
  * 仅本人 ACCEPTED/COMPLETED 的职位可触发/读取（fail-closed，不泄露存在性）。
  * 费用门控：done 读缓存、running 报状态、终态如实告知，其他才触发新任务（防重复费用）。 */
-async function openmaiSearch(db, args, principal, sendCardFn, publicBaseUrl) {
+async function openmaiSearch(db, args, principal, sendCardFn, publicBaseUrl, internalShortlistFn) {
   const row = db.prepare('SELECT * FROM job_facts WHERE project_id=?').get(args.job_id);
   if (!row || (!jobVisibleTo(db, principal.consultantId, args.job_id)
       && !jobAccessibleFromGroup(db, principal, args.job_id))) fail('NOT_FOUND_OR_FORBIDDEN');
@@ -228,12 +229,15 @@ async function openmaiSearch(db, args, principal, sendCardFn, publicBaseUrl) {
     : rejectedCandidateRefs(db, args.job_id, principal);
   const blocked = continuing && continuingGate(cur, exclusions, args.job_id, 'openmai');
   if (blocked) return blocked;
+  const internal = await internalFirst(internalShortlistFn, args.job_id, principal);
+  const concurrent = activeProjectSearch(db, args.job_id);
+  if (concurrent?.search_status === 'RUNNING') return sharedProjectSearch(args.job_id, concurrent, 'openmai');
   const out = startOpenmaiTask(db, null, principal.consultantId, args.job_id, {
     force: continuing, searchBrief: criteria, excludeCandidateRefs: exclusions,
   });
   markProjectSearch(db, args.job_id, out);
   return {
-    data: { entry: 'openmai', job_ref: args.job_id, criteria: criteria || null,
+    data: { entry: 'openmai', job_ref: args.job_id, criteria: criteria || null, internal_shortlist: internal,
             continue_search: continuing, excluded_candidate_refs: exclusions,
             status: out.status || 'triggered', task_id: out.task_id || null,
             message: out.message || null,
@@ -250,7 +254,7 @@ async function openmaiSearch(db, args, principal, sendCardFn, publicBaseUrl) {
  * SuperMai 找人 = 猎聘/脉脉渠道 → 与 openmai_search 共用 OpenMai 引擎，
  * 本入口是「无需职位、直接给判据」的自由找人（completions 无 job_id 模式）。
  * 触发/读取两段式：首次调用触发任务返回 running，完成后同参数再调读取结果。 */
-async function supermaiScout(db, args, principal, sendCardFn, publicBaseUrl) {
+async function supermaiScout(db, args, principal, sendCardFn, publicBaseUrl, internalShortlistFn) {
   const jobId = String(args.job_id || '').trim();
   const continuing = args.continue_search === true;
   const extra = cleanSearchCriteria(args.criteria);
@@ -317,6 +321,9 @@ async function supermaiScout(db, args, principal, sendCardFn, publicBaseUrl) {
     : rejectedCandidateRefs(db, project_id, principal);
   const blocked = continuing && continuingGate(cur, exclusions, project_id, 'supermai');
   if (blocked) return blocked;
+  const internal = await internalFirst(internalShortlistFn, jobId, principal);
+  const concurrent = jobId ? activeProjectSearch(db, jobId) : null;
+  if (concurrent?.search_status === 'RUNNING') return sharedProjectSearch(jobId, concurrent, 'supermai');
   const out = startSupermaiScoutTask(db, null, principal.consultantId, criteria, {
     force: continuing, projectId: jobId || null, excludeCandidateRefs: exclusions,
   });
@@ -324,7 +331,7 @@ async function supermaiScout(db, args, principal, sendCardFn, publicBaseUrl) {
     && registerFreeformDelivery(db, principal, project_id));
   if (jobId) markProjectSearch(db, jobId, out);
   return {
-    data: { entry: 'supermai', job_ref: jobId || null, criteria,
+    data: { entry: 'supermai', job_ref: jobId || null, criteria, internal_shortlist: internal,
             continue_search: continuing, excluded_candidate_refs: exclusions,
             status: out.status || 'triggered',
             task_id: out.task_id || null, message: out.message || null,
@@ -341,9 +348,9 @@ async function supermaiScout(db, args, principal, sendCardFn, publicBaseUrl) {
   };
 }
 
-export function createSourcingToolHandlers({ db, sendCardFn = null, publicBaseUrl = process.env.BRAINX_BASE_URL } = {}) {
+export function createSourcingToolHandlers({ db, sendCardFn = null, publicBaseUrl = process.env.BRAINX_BASE_URL, internalShortlistFn } = {}) {
   return {
-    brainx_openmai_search: (args, context) => openmaiSearch(db, args, context.principal, sendCardFn, publicBaseUrl),
-    brainx_supermai_scout: (args, context) => supermaiScout(db, args, context.principal, sendCardFn, publicBaseUrl),
+    brainx_openmai_search: (args, context) => openmaiSearch(db, args, context.principal, sendCardFn, publicBaseUrl, internalShortlistFn),
+    brainx_supermai_scout: (args, context) => supermaiScout(db, args, context.principal, sendCardFn, publicBaseUrl, internalShortlistFn),
   };
 }

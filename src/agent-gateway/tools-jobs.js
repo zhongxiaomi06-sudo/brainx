@@ -200,7 +200,7 @@ function runStatus(db, args, principal) {
   return { data: run, facts: [{ run_ref: args.run_id, status: run.status }], inferences: [], recommendations: [], unknowns: [], evidence_refs: [`run:${args.run_id}`] };
 }
 
-export function createJobToolHandlers({ db, sendCardFn = null, publicBaseUrl = process.env.BRAINX_BASE_URL } = {}) {
+export function createJobToolHandlers({ db, sendCardFn = null, publicBaseUrl = process.env.BRAINX_BASE_URL, internalShortlistFn } = {}) {
   return {
     brainx_me_context: (args, context) => meContext(db, context.principal),
     brainx_daily_brief: (args, context) => dailyBrief(db, args, context.principal),
@@ -209,6 +209,6 @@ export function createJobToolHandlers({ db, sendCardFn = null, publicBaseUrl = p
     brainx_personal_review: (args, context) => personalReview(db, args, context.principal),
     brainx_run_status: (args, context) => runStatus(db, args, context.principal),
     // 找人两工具已拆到 tools-sourcing.js（2026-10-09，500 行硬约束）
-    ...createSourcingToolHandlers({ db, sendCardFn, publicBaseUrl }),
+    ...createSourcingToolHandlers({ db, sendCardFn, publicBaseUrl, internalShortlistFn }),
   };
 }

@@ -70,6 +70,12 @@
 
 ## 相关文档
 
+### 找人条件临时补充（2026-10-13）
+
+`search-start-notice.js` 按机器人账号和群隔离临时条件，最多 500 字，支持多行；超长不截断。条件仅保留 30 分钟，成功启动一轮后消费；失败或只查询已有任务不消费。同群并发点击不会重复拿同一补充。该缓存不跨进程重启，持久条件应在工作台权威编辑器保存；不得把缓存当成权威字段或由模型擅自从历史补回。
+
+自动化：`tests/openclaw-search-notice.test.mjs` 验证隔离、过期、失败保留与成功消费；真实群尚未验收。
+
 - [BrainX 文档书](README.md)
 - [OpenClaw 多顾问生产运行手册](2026-09-03-openclaw-production-runbook.md)
 - [BrainTex 同事开通与首次使用实用手册](2026-09-10-braintex-coworker-onboarding-runbook.md)

@@ -207,4 +207,33 @@ test('parseSearchCondition 只认「找人条件」前缀', async () => {
   assert.equal(parseSearchCondition('找人条件:  深圳'), '深圳');
   assert.equal(parseSearchCondition('顺便说下找人条件很重要'), null);
   assert.equal(parseSearchCondition('[BRAINTEX_SEARCH_START] 为项目 J1 使用 OpenMai 继续找人。'), null);
+  assert.equal(parseSearchCondition('找人条件：北京\n必须芯片'), '北京\n必须芯片');
+  assert.equal(parseSearchCondition(`找人条件：${'x'.repeat(501)}`), null, '不能静默截断硬条件');
+});
+
+test('条件按账号隔离，失败保留，成功消费，过期不注入', async () => {
+  let clock = 0, status = 'failed';
+  const calls = [];
+  const api = { runtime: { channel: { outbound: { loadAdapter: async () => ({ sendText: async () => {} }) } } } };
+  const handler = createSearchStartNoticeHandler(api, {
+    nowMs: () => clock, gatewayToken: 't'.repeat(40), assertionSecret: 's'.repeat(40),
+    fetchImpl: async (_url, options) => {
+      calls.push(JSON.parse(options.body).arguments);
+      return { json: async () => ({ ok: true, data: { status } }) };
+    },
+  });
+  const ctx = { channelId: 'feishu', conversationId: 'oc_g', accountId: 'a' };
+  const condition = { content: '找人条件：北京', senderId: 'ou_1' };
+  let serial = 0;
+  const start = accountId => handler({ content: '为项目 P1 使用 OpenMai 继续找人。',
+    senderId: 'ou_1', messageId: `m${++serial}` }, { ...ctx, accountId });
+  await handler(condition, ctx);
+  await start('b'); assert.equal(calls.at(-1).criteria, undefined);
+  await start('a'); assert.equal(calls.at(-1).criteria, '北京');
+  status = 'triggered';
+  await start('a'); assert.equal(calls.at(-1).criteria, '北京');
+  await start('a'); assert.equal(calls.at(-1).criteria, undefined);
+  await handler(condition, ctx);
+  clock = 31 * 60_000;
+  await start('a'); assert.equal(calls.at(-1).criteria, undefined);
 });

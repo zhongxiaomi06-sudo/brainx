@@ -2,7 +2,7 @@ import { callBrainxGatewayTool } from './runtime.js';
 
 const SEARCH_COMMAND = /^(?:\[BRAINTEX_SEARCH_START\]\s*)?为项目\s+([A-Za-z0-9_-]{1,64})\s+使用\s+(OpenMai|SuperMai)\s+(?:(继续)\s*)?找人。/;
 const SEARCH_TOOL_BY_ENTRY = { OpenMai: 'brainx_openmai_search', SuperMai: 'brainx_supermai_scout' };
-const CONDITION_LINE = /^找人条件[：:]\s*(.{1,500})/;
+const CONDITION_LINE = /^找人条件[：:]\s*([\s\S]{1,500})$/;
 
 export function parseSearchStartNotice(content) {
   const match = String(content || '').trim().match(SEARCH_COMMAND);
@@ -41,19 +41,27 @@ function senderFromEvent(event) {
 export function createSearchStartNoticeHandler(api, dependencies = {}) {
   const delivered = new Set();
   const latestConditions = new Map();
+  const inFlight = new Set();
+  const clock = dependencies.nowMs || Date.now;
   return async (event, context = {}) => {
     if (context.channelId !== 'feishu') return false;
     const to = groupTarget(event, context);
+    const accountId = String(context.accountId || '').trim() || 'mia';
+    const scope = `${accountId}:${to}`;
     // 找人条件按群静默记录（即使本条不是按钮命令），供下一次直调注入。
     const condition = to ? parseSearchCondition(event?.content) : null;
     if (condition) {
-      latestConditions.set(to, condition);
+      latestConditions.set(scope, { text: condition, expires: clock() + 30 * 60_000 });
       if (latestConditions.size > 256) latestConditions.delete(latestConditions.keys().next().value);
     }
     const notice = parseSearchStartNotice(event?.content);
     if (!notice || !to) return false;
-    const key = String(event?.messageId || event?.runId || `${to}:${notice.projectRef}:${notice.entry}:${notice.continuing}`);
-    if (delivered.has(key)) return false;
+    const key = `${scope}:${String(event?.messageId || event?.runId || `${notice.projectRef}:${notice.entry}:${notice.continuing}`)}`;
+    if (delivered.has(key) || inFlight.has(scope)) return false;
+    inFlight.add(scope);
+    const pending = latestConditions.get(scope);
+    const selected = pending?.expires > clock() ? pending : null;
+    if (pending && !selected) latestConditions.delete(scope);
     delivered.add(key);
     if (delivered.size > 256) delivered.delete(delivered.values().next().value);
     let noticeSent = false;
@@ -79,18 +87,20 @@ export function createSearchStartNoticeHandler(api, dependencies = {}) {
     if (sender) {
       try {
         // 本群最近一次「找人条件：…」作为 criteria 注入（没有则不传）。
-        const criteria = latestConditions.get(to) || null;
+        const criteria = selected?.text || null;
         const result = await callBrainxGatewayTool(SEARCH_TOOL_BY_ENTRY[notice.entry], {
           job_id: notice.projectRef, continue_search: notice.continuing,
           ...(criteria ? { criteria } : {}),
         }, {
           channel: 'feishu',
-          account_id: String(context.accountId || '').trim() || 'mia',
+          account_id: accountId,
           requester_sender_id: sender,
           chat_type: 'group',
           chat_id: to,
           thread_id: String(event?.metadata?.threadId || '').trim() || null,
         }, dependencies);
+        if (result?.ok !== false && result?.data?.status === 'triggered'
+            && latestConditions.get(scope) === selected) latestConditions.delete(scope);
         if (result?.ok === false) {
           api.logger?.warn?.(`[brainx-search-notice] direct search start refused: ${String(result?.error?.code || 'UNKNOWN').slice(0, 80)}`);
         }
@@ -98,6 +108,7 @@ export function createSearchStartNoticeHandler(api, dependencies = {}) {
         api.logger?.warn?.(`[brainx-search-notice] direct search start failed: ${String(error?.message || error).slice(0, 160)}`);
       }
     }
+    inFlight.delete(scope);
     return noticeSent;
   };
 }

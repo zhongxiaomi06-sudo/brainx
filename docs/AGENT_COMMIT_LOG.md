@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-10-13｜fix(部署): sync-agent-tools tools.allow 事实源改用插件声明，内部处理器不进白名单
+
+- 起因：specs/036 部署段 dry-run 发现脚本把 registry 全量 32 项当 tools.allow 事实源，会把 `brainx_send_candidate_resume`（gateway 内部处理器，09-09 起刻意不外露，见 docs/2026-09-02-tool-exposure-whitelist.md）加进 OpenClaw 白名单，与仓库权威 `deploy/openclaw/openclaw.production.json`（31 项，不含 resume、不含 talent_search/add 死条目）矛盾。
+- 修复：tools.allow 的事实源改为 `openclaw.plugin.json contracts.tools`（31 项）＝部署同步的同一份外露面声明；「插件清单缺」提示改为如实标注「gateway 内部处理器、设计内不外露」。脚本本身无测试覆盖（bin/ 部署工具），node --check 过。
+- 影响：仅 bin/sync-agent-tools.mjs 3 处小改，不影响任何产品代码路径。
+
 ## 2026-10-13｜test(门禁): specs/036 新工具的接口面断言同步（工具数 32、migration 0067、插件清单 31）
 
 - 起因：81268d9 加入 brainx_sourcing_recall 与 migration 0067 后，全量测试 8 项失败——其中 6 项是接口面「断言需按实测同步」的预期项（agent-gateway-http 工具数 31→32、agent-golden-workflow 31→32、openclaw-plugin Set 30→31、framework migrations 清单 79→80 行并验证 sourcing_candidates 表存在、tool-contract-drift 五面一致要求 deploy/openclaw/openclaw.production.json 同步 recall、fixtures plugin-contract.json 31 项）。按 AGENT_COMMIT_LOG 既往惯例（测试断言按实测代码对齐，不沿用旧值）全部同步。

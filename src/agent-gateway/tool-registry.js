@@ -62,7 +62,7 @@ export const AGENT_TOOL_ROWS = Object.freeze([
   { name: 'brainx_pending_job_facts', purpose: ['job_fact_review'], p2pOnly: true, parameters: object({
     limit: integer(1, 20),
   }) },
-  { name: 'brainx_review_job_fact', purpose: ['job_fact_review'], p2pOnly: true, parameters: object({
+  { name: 'brainx_review_job_fact', purpose: ['job_fact_review'], parameters: object({
     draft_id: string(), action: string({ enum: ['confirm', 'reject'] }), job_id: string(), confirm: boolean(),
   }, ['draft_id', 'action', 'confirm']) },
   { name: 'brainx_submit_job_jd', purpose: ['job_fact_review'], parameters: object({
@@ -215,7 +215,7 @@ export function createProductionToolRegistry({ db, talentDependencies = {}, acti
   const freeformActions = createFreeformCandidateHandlers({ db, ...talentDependencies });
   const jobFacts = createJobFactsToolHandlers({ db });
   const judgments = createJudgmentToolHandlers({ db });
-  const jdSubmit = createJdSubmitToolHandlers({ db });
+  const jdSubmit = createJdSubmitToolHandlers({ db, sendCardFn: sendInteractiveCard, ...jobDependencies });
   const reports = createCandidateReportToolHandlers({ db, ...reportDependencies });
   const talent = createTalentToolHandlers({
     db, // 供 shortlist 空结果溯源（区分「OpenMai 找人岗」与「未授权岗」，2026-09-04 wendy 案例）

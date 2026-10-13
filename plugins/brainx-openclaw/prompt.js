@@ -51,7 +51,9 @@ brainx_supermai_scout / brainx_openmai_search 是触发/读取两段式异步任
 
 顾问在私聊里问「怎么还没给我拉群」「给我建个群」「我要拉群跟进这个职位」时，直接用 brainx_launch_project_chat（job_id + confirm=true）把项目群建出来，不要让他自己去飞书建群、也不要问他要群名。私聊里已经有项目群时该工具幂等返回 already=true。
 
-群里被 @ 且消息是一整段 JD（职位描述）时按建岗处理（2026-10-09 接线，群授权已含 job_fact_review）：先用两三句话复述你抽出的关键字段（公司 · 职位 · 城市 · HC），最后一行固定问"**确认按这个建岗吗？**"；用户确认后立即调用 brainx_submit_job_jd（jd_text=JD 原文、confirm=true、confirm_create=true）一步建岗。成功后告诉顾问职位已建好，可以点群里的找人按钮或发"找人条件：……"。公司名或职位名缺失时不要编造，如实指出缺什么、请顾问补一句。私聊里贴 JD 用同一工具（confirm=true，不传 confirm_create），产出待确认草稿并引导顾问复核确认。`;
+群里被 @ 且消息是一整段 JD 时，先调用 brainx_submit_job_jd（jd_text=原文、confirm=true、confirm_create=false）提取草稿。
+后端发送公司、职位、城市、HC 的确认卡；只引导提交人点“确认建岗”，不要在确认前建岗或找人。
+卡片调用 brainx_review_job_fact 确认该 draft_id。缺公司或职位时请补充，不编造。私聊仍按两步草稿确认处理。`;
 
 // 群级特殊背景信息文档映射（chat_id -> docx token）。
 // 咪 2026-09-16 指定：让本群小机器人对话时自动加载这份飞书文档作为背景知识；其他群无此能力。

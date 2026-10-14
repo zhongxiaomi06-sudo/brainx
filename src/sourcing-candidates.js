@@ -2,6 +2,7 @@
  *  列宽不设限；拆行时超长字段显式抛错，不做静默截断（禁止无声丢数据）。 */
 import { now } from './db.js';
 import { extractOpenmaiCandidates } from './openmai-result.js';
+import { rejectedCandidateRefs } from './candidate-search-feedback.js';
 
 // 防御上限：OpenMai 正常字段最长 300 字符，超出视为引擎异常输出，落库时报错而非截断。
 const MAX_FIELD = 2000;
@@ -86,11 +87,15 @@ export function updateSourcingCareerStatus(db, { searchKey, consultantId, candid
 const escapeLike = (value) => String(value).replace(/[\\%_]/g, (ch) => `\\${ch}`);
 
 /** specs/036：给结果卡渲染用的 {candidate_ref → career_status} 映射（含全部轮次）。 */
-export function careerStatusMap(db, { searchKey, consultantId }) {
+export function careerStatusMap(db, { searchKey, consultantId, tenantId = null }) {
   checkSchema(db);
   const rows = db.prepare(`SELECT candidate_ref, career_status FROM sourcing_candidates
     WHERE search_key=? AND consultant_id=?`).all(searchKey, consultantId);
-  return Object.fromEntries(rows.map((r) => [r.candidate_ref, r.career_status]));
+  const statuses = Object.fromEntries(rows.map((r) => [r.candidate_ref, r.career_status]));
+  if (tenantId) for (const ref of rejectedCandidateRefs(db, searchKey, { tenantId, consultantId })) {
+    statuses[ref] = 'rejected';
+  }
+  return statuses;
 }
 
 /** specs/036 群内检索（brainx_sourcing_recall 数据面）：只读本人行，无关键词匹配全部。
@@ -104,8 +109,8 @@ export function parseFilterGroups(filter) {
 }
 
 export function recallSourcingCandidates(db, {
-  consultantId, searchKey = null, filter = null, city = null,
-  orderBy = 'score', limit = 10,
+  consultantId, tenantId = null, searchKey = null, filter = null, city = null,
+  orderBy = 'score', limit = 10, careerStatus = null,
 }) {
   checkSchema(db);
   const safeLimit = Math.min(Math.max(Number(limit) || 10, 1), 20);
@@ -131,11 +136,15 @@ export function recallSourcingCandidates(db, {
     where.push(`(${groupClauses.join(' OR ')})`);
   }
   const order = orderBy === 'time' ? 'sc.updated_at DESC' : 'sc.score_num DESC, sc.updated_at DESC';
-  return db.prepare(`SELECT sc.candidate_ref, sc.name, sc.company, sc.title, sc.city,
+  const rejected = tenantId ? new Set(rejectedCandidateRefs(db, searchKey, { tenantId, consultantId })) : new Set();
+  const rows = db.prepare(`SELECT sc.candidate_ref, sc.name, sc.company, sc.title, sc.city,
       sc.experience, sc.education, sc.evaluation, sc.score_raw, sc.score_num,
       sc.career_status, sc.search_key, sc.search_round, sc.updated_at, sc.talent_url
     FROM sourcing_candidates sc
     WHERE ${where.join(' AND ')}
-    ORDER BY ${order}
-    LIMIT ?`).all(...params, safeLimit);
+    ORDER BY ${order}`).all(...params);
+  return rows.filter((row) => careerStatus !== 'rejected' || rejected.has(row.candidate_ref))
+    .slice(0, safeLimit).map((row) => ({ ...row,
+      career_status: rejected.has(row.candidate_ref) ? 'rejected' : row.career_status === 'rejected'
+        ? 'restored' : row.career_status }));
 }

@@ -28,9 +28,11 @@ export function createSourcingRecallToolHandlers({ db } = {}) {
     const filter = normalizeFilterOr(args.filter).trim().slice(0, 200) || null;
     const city = String(args.city || '').trim().slice(0, 80) || null;
     const orderBy = ['score', 'time'].includes(args.order_by) ? args.order_by : 'score';
+    const careerStatus = args.career_status === 'rejected' ? 'rejected' : null;
     const limit = Math.min(Math.max(Number(args.limit) || 10, 1), 20);
     const items = recallSourcingCandidates(db, {
-      consultantId: p.consultantId, searchKey, filter, city, orderBy, limit,
+      consultantId: p.consultantId, tenantId: p.tenantId, searchKey, filter, city,
+      orderBy, limit, careerStatus,
     });
     const rows = items.map((row) => ({
       candidate_ref: row.candidate_ref,
@@ -47,15 +49,16 @@ export function createSourcingRecallToolHandlers({ db } = {}) {
       talent_url: row.talent_url,
     }));
     return {
-      data: { recalled: rows.length, order_by: orderBy, items: rows },
+      data: { recalled: rows.length, order_by: orderBy, career_status: careerStatus, items: rows },
       facts: [{ recall_only: true, paid_search_triggered: false }],
       inferences: [],
       recommendations: [{ action: 'present_or_narrow',
         note: rows.length
           ? '把 items 完整呈现给顾问（姓名/公司/职位/城市/匹配度/状态），不要自行省略或改写匹配度；'
             + '顾问要缩小范围时用 filter/city 参数再次调用本工具（filter 词间是「且」、用「|」表示「或」，如「小红书|字节」），要全新人选时才改用 brainx_supermai_scout。'
-          : '没有命中时先建议放宽（去掉一个关键词，或把「或」写成「A|B」）再调一次；确认没有才如实告知，'
-            + '顾问要新人才用 brainx_supermai_scout 重新搜索。' }],
+          : careerStatus === 'rejected' ? '目前没有可查的长期排除人选；不要触发付费找人。'
+            : '没有命中时先建议放宽（去掉一个关键词，或把「或」写成「A|B」）再调一次；确认没有才如实告知，'
+              + '顾问要新人才用 brainx_supermai_scout 重新搜索。' }],
       unknowns: [],
       evidence_refs: [`sourcing_recall:${p.consultantId}:${searchKey || 'all'}`],
       next_allowed_actions: ['brainx_sourcing_recall', 'brainx_supermai_scout'],

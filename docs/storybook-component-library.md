@@ -1,4 +1,5 @@
 # BrainX 内部 Storybook 组件库
+[10-15 群候选卡片复核](frontend-reviews/2026-10-15-contact-reject-cards.md)：撤销小卡与排除结果卡是飞书原生卡，不另造 Storybook 副本；以正式构建函数的脱敏渲染场景审核，目标环境和真实点击另行验收。
 
 零命中确认重搜使用 sourcing-zero-relax 原生卡场景，不另造 Storybook 副本；确认计费、软硬条件保护有自动化。见[本轮复核](frontend-reviews/2026-10-13-sourcing-result-context.md)。
 

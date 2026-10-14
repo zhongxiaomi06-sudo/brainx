@@ -64,6 +64,7 @@ export const AGENT_TOOL_ROWS = Object.freeze([
   { name: 'brainx_sourcing_recall', purpose: ['candidate_review'], parameters: object({
     search_key: string(), filter: string({ maxLength: 200 }), city: string({ maxLength: 80 }),
     order_by: string({ enum: ['score', 'time'] }), limit: integer(1, 20),
+    career_status: string({ enum: ['rejected'] }),
   }) },
   { name: 'brainx_pending_job_facts', purpose: ['job_fact_review'], p2pOnly: true, parameters: object({
     limit: integer(1, 20),

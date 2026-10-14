@@ -5,14 +5,19 @@ import { rejectedCandidateRefs } from './candidate-search-feedback.js';
 const SAFE_REF = /^[A-Za-z0-9:_-]{1,100}$/;
 
 export function normalizeExcludedCandidateRefs(values) {
-  return [...new Set((Array.isArray(values) ? values : [])
+  const refs = [...new Set((Array.isArray(values) ? values : [])
     .map((value) => String(value || '').trim())
-    .filter((value) => SAFE_REF.test(value)))].slice(0, 100);
+    .filter((value) => SAFE_REF.test(value)))];
+  // 引擎最多接受 100 人；静默截断会让长期排除的人重新出现并产生付费搜索。
+  if (refs.length > 100) throw new Error('SEARCH_EXCLUSIONS_OVER_LIMIT');
+  return refs;
 }
 
 function storedRefs(value) {
-  try { return normalizeExcludedCandidateRefs(JSON.parse(value || '[]')); }
+  let parsed;
+  try { parsed = JSON.parse(value || '[]'); }
   catch { return []; }
+  return normalizeExcludedCandidateRefs(parsed);
 }
 
 function hasTtcTalentUrl(candidate) {

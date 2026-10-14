@@ -29,7 +29,9 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
   const success = status === 'done' || status === 'needs_input';
   const quality = success ? assessOpenmaiCandidateBatch(resultText) : null;
   const needsInput = status === 'needs_input' || quality?.needsInput;
-  const candidates = success ? extractOpenmaiCandidates(resultText) : [];
+  const parsedCandidates = success ? extractOpenmaiCandidates(resultText) : [];
+  // 外部引擎未必完全遵守排除提示，发卡前仍须按本人决策做最后一道过滤。
+  const candidates = parsedCandidates.filter((item) => careerStatusMap?.[item.candidateRef] !== 'rejected');
   const searchRound = Math.max(1, Number(job.search_round || 1));
   // 2026-09-16 用户拍板：首轮才写「首轮」，其他轮次用「续搜」，不写「第 N 轮」。
   const roundWord = searchRound > 1 ? '续搜' : '首轮';
@@ -53,7 +55,10 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
     ? (candidates.length
       ? `${headline}\n\n本轮共找到 ${candidates.length} 位候选人。`
         + (quality.message ? `\n\n> ${quality.message}` : '')
-      : `${headline}\n\n${noMatches ? '本轮未搜到匹配候选人。请确认可放宽的条件后重新发起；本次不会自动重跑。' : groupSafeOpenmaiText(resultText)}`)
+      : `${headline}\n\n${parsedCandidates.length
+        ? '本轮没有可展示的人选；已为你保留长期排除名单。'
+        : noMatches ? '本轮未搜到匹配候选人。请确认可放宽的条件后重新发起；本次不会自动重跑。'
+          : groupSafeOpenmaiText(resultText)}`)
     : `${headline}\n\n本轮候选人搜索失败：${groupSafeOpenmaiText(error, 500)}\n\n请修复连接后在工作台重试。`;
   const rows = candidates.length ? candidateFocusRows(job, candidates, source, careerStatusMap) : [];
   return {

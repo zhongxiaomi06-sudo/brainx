@@ -19,6 +19,7 @@ import { contextCard } from '../../../src/candidate-decision-group.js';
 import { readyCard } from '../../../src/candidate-report.js';
 import { buildJdConfirmationCard } from '../../../src/jd-confirmation-card.js';
 import { buildJudgmentNoticeCard } from '../../../src/judgment-extract/notices.js';
+import { candidateDecisionCard } from '../../../src/candidate-decision-card.js';
 
 const BASE = 'https://base.yorkteam.cn';
 
@@ -184,6 +185,12 @@ export function buildScenarios() {
         candidate_ref: 'PT123456789012', name: '测试候选', role: '算法工程师',
         experience: '5 年', city: '北京', education: '硕士', evaluation: '技能待核实', score: '待评估',
       }] })}\n-->`, source: 'supermai', publicBaseUrl: BASE })],
+    ['candidate-reject-followup', '长期排除回执与撤销按钮',
+      candidateDecisionCard({ name: '测试候选', status: 'REJECTED',
+        searchKey: 'supermai:0123456789ab', candidateRef: 'PT123456789012' })],
+    ['candidate-restore-followup', '撤销排除回执',
+      candidateDecisionCard({ name: '测试候选', status: 'RESTORED',
+        searchKey: 'supermai:0123456789ab', candidateRef: 'PT123456789012' })],
     ['openmai-delivery-failed', '找人失败卡',
       buildOpenmaiDeliveryCard({ job: JOB, status: 'failed',
         error: 'OpenMai 连接超时：TTC 登录状态可能已失效，请在工作台重新授权后重试。',

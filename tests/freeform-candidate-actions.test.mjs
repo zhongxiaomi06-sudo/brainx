@@ -36,12 +36,15 @@ test('自由人选四动作有真实作用域，拒绝需确认且幂等，撤�
   await assert.rejects(() => act('REJECT', p, false), /INVALID_ARGUMENT/);
   await act('REJECT'); await act('REJECT');
   assert.deepEqual(rejectedCandidateRefs(db, search_key, p), [candidate_ref]);
-  assert.equal(db.prepare('SELECT count(*) n FROM freeform_candidate_events').get().n, 1);
+  assert.deepEqual(rejectedCandidateRefs(db, 'unrelated-project', p), [candidate_ref]);
+  assert.deepEqual(rejectedCandidateRefs(db, search_key, { ...p, consultantId: 'mia' }), []);
+  assert.equal(db.prepare('SELECT count(*) n FROM freeform_candidate_events').get().n, 2);
   await act('RESTORE'); assert.deepEqual(rejectedCandidateRefs(db, search_key, p), []);
+  assert.deepEqual(rejectedCandidateRefs(db, 'unrelated-project', p), []);
   const result = await act('SCREEN');
   assert.equal(result.data.status, 'SCREENED');
   assert.match(result.unknowns[0], /尚未关联职位/);
-  assert.equal(db.prepare('SELECT count(*) n FROM freeform_candidate_events').get().n, 3);
+  assert.equal(db.prepare('SELECT count(*) n FROM freeform_candidate_events').get().n, 5);
 });
 test('猜搜索键不能跨账号、群、租户或顾问使用，撤权立即失效', async t => {
   const { db, act, calls } = fixture(t);
@@ -62,4 +65,20 @@ test('下一轮覆盖后旧卡仍可操作自己的冻结结果；真实入库�
   assert.equal(out.data.status, 'failed');
   assert.equal(out.data.sync_pending, false);
   assert.doesNotMatch(JSON.stringify(out), /secret/);
+});
+
+test('长期排除原群跟发小卡，发卡失败不抹掉已保存决策', async t => {
+  const { db } = fixture(t);
+  const sent = [];
+  const handlers = createFreeformCandidateHandlers({ db, sendCardFn: async (input) => { sent.push(input); } });
+  const args = { search_key, candidate_ref, action: 'REJECT', confirm: true };
+  const out = await handlers.brainx_freeform_candidate_action(args, { principal: p });
+  assert.equal(out.data.decision_delivery, 'sent');
+  assert.equal(sent[0].target, 'oc_g');
+  assert.match(JSON.stringify(sent[0].card), /撤销排除|RESTORE/);
+  const bad = createFreeformCandidateHandlers({ db, sendCardFn: async () => { throw new Error('network-secret'); } });
+  const restored = await bad.brainx_freeform_candidate_action({ ...args, action: 'RESTORE' }, { principal: p });
+  assert.equal(restored.data.decision_delivery, 'failed');
+  assert.deepEqual(rejectedCandidateRefs(db, 'another-search', p), []);
+  assert.doesNotMatch(JSON.stringify(restored), /network-secret/);
 });

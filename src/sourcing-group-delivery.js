@@ -88,7 +88,8 @@ export async function deliverFreeformResultsOnce(db, deps = {}) {
     try {
       if (!appKeyHash || row.feishu_app_key_hash !== appKeyHash) throw new Error('DELIVERY_APP_MISMATCH');
       let careerMap = null;
-      try { careerMap = careerStatusMap(db, { searchKey: row.search_key, consultantId: row.consultant_id }); }
+      try { careerMap = careerStatusMap(db, { searchKey: row.search_key,
+        consultantId: row.consultant_id, tenantId: row.tenant_id }); }
       catch { /* 徽标 best-effort：表未迁移或缺行按无徽标渲染 */ }
       const out = await send({ target: row.chat_id, idempotencyKey: row.delivery_id,
         card: buildOpenmaiDeliveryCard({ job: { ...row, freeform: true, criteria: row.search_brief },

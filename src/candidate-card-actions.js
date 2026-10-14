@@ -6,15 +6,15 @@ export function freeformCandidateActions(job, candidate) {
     .map(([action, label]) => ({ tag: 'button', type: action === 'SCREEN' ? 'primary' : 'default',
       text: { tag: 'plain_text', content: label },
       ...(action === 'REJECT' ? { confirm: { title: { tag: 'plain_text', content: '确认不合适？' },
-        text: { tag: 'plain_text', content: '只在你这份搜索条件的后续轮次排除，不影响其他顾问，可撤销。' } } } : {}),
+        text: { tag: 'plain_text', content: '将此人加入你长期排除名单，后续所有找人不再推荐；可撤销，不影响其他顾问。' } } } : {}),
       value: { text: `调用 brainx_freeform_candidate_action，search_key=${searchKey}、candidate_ref=${candidate.candidateRef}、action=${action}、confirm=true。只按工具回执报告结果；联系方式只能私发我本人。` } }));
 }
 
 export function rejectCandidateAction(job, candidate) {
   return { tag: 'button', type: 'danger', text: { tag: 'plain_text', content: '不合适' },
     confirm: { title: { tag: 'plain_text', content: '确认不合适？' },
-      text: { tag: 'plain_text', content: '为你在这个职位的后续搜索排除此人，不影响其他顾问。可让助手撤销。' } },
-    value: { text: `[BRAINTEX_CANDIDATE_REJECT] 我已二次确认：调用 brainx_candidate_workflow，job_id=${job.project_id}、candidate_ref=${candidate.candidateRef}、action=REJECT_CANDIDATE、confirm=true。只记录当前职位的负反馈并排除，不删除人才、不发起搜索。成功后明确回执。` } };
+      text: { tag: 'plain_text', content: '将此人加入你长期排除名单，后续所有找人不再推荐；可撤销，不影响其他顾问。' } },
+    value: { text: `[BRAINTEX_CANDIDATE_REJECT] 我已二次确认：调用 brainx_candidate_workflow，job_id=${job.project_id}、candidate_ref=${candidate.candidateRef}、action=REJECT_CANDIDATE、confirm=true。只为我长期排除，不删除人才、不影响其他顾问、不发起搜索。成功后明确回执。` } };
 }
 
 export function contactCandidateAction(job, candidate) {

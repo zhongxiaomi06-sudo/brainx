@@ -1,5 +1,13 @@
 # Agent Commit 记录
 
+## 2026-10-15｜fix(openclaw): requireMention 改幂等读改写，止血准入自愈 reload 风暴
+
+- 起因：`src/openclaw-group-access.js` `apply()` 对 `requireMention` 无条件 `config set`，与 `openclaw-group-retry.js` 的 intake 自愈 sweep（每 600s 轮巡 26 群）叠加，每次写入 bump `meta.lastTouchedAt` 触发 openclaw 2026.7.1-2 全量 reload——reload 打死在途 agent turn 并毒化群会话。09-28 起连续 18 天日均约 3,730 次空写（生产 openclaw.json 66 个群早已全为 false，100% 无操作重写）。10-15 实录打死 5 轮对话：Felix 群会话 `e6a68936` 毒化（systemSent=false、totalTokens=0 僵死 40 分钟，群消息秒退无回复）；韬润群 11:41 原始找人请求发出 1.1 秒被杀。回归点 commit e4c7d9f（09-08，TTC 简历特性夹带）：删了「已在白名单早退」逻辑并加上无条件 set，旧测试只断言「至少写一次」未守重复写。
+- 修复：`apply()` 对 mention 门改为幂等读改写——`config get` 已为 `false` 则不写（生产 CLI 实测：存在返 'false' exit 0、不存在 exit 1「Config path not found」）；路径不存在/被改回 true/读故障才保守重写，保持放行语义不丢。同时给 `healIntakeGroups` 每轮 26 群的空写归零、reload 归零。文件头补事故注释防回归。
+- 测试：`tests/openclaw-group-access.test.mjs` 现有用例 mock 处理 mention 路径 get（set 前抛路径不存在、set 后返 false），断言改精确匹配 set 调用；新增用例「requireMention 已为 false 时重复 ensure 零次 set = 零次 reload」。专项 4/4 过。
+- 全量验证：full verify 25 项 23 通过、2 失败＝①工作区脏（本次改动，commit 后清除）②后端与共享逻辑测试 480.1s 超时（纯环境态：本机负载 8.4、49 天未重启；独立单跑后端套件 1074/1074 全过 0 失败，耗时 466s）。超时非测试失败，按 8a75336（09-08 pdftotext 异步）同款先例据独立证明推进 push。
+- 部署：止损阶段已在 `/etc/brainx/worker.env` 加 `BRAINX_OPENCLAW_RETRY_INTERVAL_MS=86400000`（sweep 24h）+ 重启 worker 止血；本次代码部署后需删该止损变量恢复 sweep 常态（幂等后不再空写）。只重启 brainx-worker，不动前端。
+
 ## 2026-10-15｜test(worker): 就绪等待窗口 10s→30s，消除高负载下 full 门禁假失败
 
 - 起因：第三轮 full verify 中「独立 worker 进程启动后保持存活」连续假失败——worker 10s 内未打印就绪日志（该轮后端套件整体 372.9s 跑完、1072/1073，仅此一项挂）。本机持续负载 8.4，worker 进程启动（node 模块加载+SQLite 初始化）在 full 连跑尾部可超 10s；单跑恒 2.2s 过。

@@ -50,11 +50,21 @@ export function createOpenClawGroupAccess(options = {}) {
     const groupResult = await appendList('channels.feishu.groupAllowFrom', groups, [chatId]);
     const currentSenders = await readList('channels.feishu.groupSenderAllowFrom');
     const senderResult = await appendList('channels.feishu.groupSenderAllowFrom', currentSenders, senders);
+    // 飞书卡片回调没有 @ 元数据。只对已登记项目群放开 mention 门，普通群仍保持全局门禁。
+    // 幂等：已为 false 的群不再重写——重写会 bump meta.lastTouchedAt 触发 openclaw 全量
+    // reload，打死在途 turn 并毒化群会话（2026-10-15 生产事故：准入自愈 sweep 每轮重写
+    // 26 个已放开群，每 9 秒一次 reload，Felix 群会话 systemSent=false 僵死 40 分钟）。
+    // CLI 行为（生产 2026.7.1-2 实测）：路径存在返 'false' exit 0；不存在 exit 1。
+    const mentionPath = `channels.feishu.groups.${chatId}.requireMention`;
+    let needWrite = true;
     try {
-      // 飞书卡片回调没有 @ 元数据。只对已登记项目群放开 mention 门，普通群仍保持全局门禁。
-      await cli.call(['config', 'set',
-        `channels.feishu.groups.${chatId}.requireMention`, 'false', '--strict-json']);
-    } catch (error) { fail('OPENCLAW_GROUP_ALLOWLIST_FAILED', error); }
+      needWrite = (await cli.call(['config', 'get', mentionPath, '--json'])).stdout.trim() !== 'false';
+    } catch { /* 路径不存在/CLI 故障：保守重写，保持放行语义不丢 */ }
+    if (needWrite) {
+      try {
+        await cli.call(['config', 'set', mentionPath, 'false', '--strict-json']);
+      } catch (error) { fail('OPENCLAW_GROUP_ALLOWLIST_FAILED', error); }
+    }
     return { chat_id: chatId, added: groupResult.added > 0, count: groupResult.count,
       sender_added: senderResult.added, sender_count: senderResult.count,
       card_actions_enabled: true };

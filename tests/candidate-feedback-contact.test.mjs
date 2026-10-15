@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { openDb, now } from '../src/db.js';
 import { runSync } from '../src/sync.js';
 import { createCandidateActionToolHandlers } from '../src/agent-gateway/tools-candidate-actions.js';
@@ -8,7 +9,7 @@ import { nextSearchExclusions, nextSupermaiSearchExclusions } from '../src/searc
 import { sendCandidatePrivateContact } from '../src/agent-gateway/candidate-private-contact.js';
 import { assertSafeAgentProjection } from '../src/agent-gateway/projection.js';
 import { rejectCandidateAction } from '../src/candidate-card-actions.js';
-import { readTtcResumeContact, extractResumeContact } from '../src/candidate-contact-resume.js';
+import { readTtcResumeContact, extractResumeContact, pdfTextInMemory } from '../src/candidate-contact-resume.js';
 import { readCandidateContactCache } from '../src/candidate-contact-cache.js';
 import { candidateDecisionCard } from '../src/candidate-decision-card.js';
 import { normalizeExcludedCandidateRefs } from '../src/search-rounds.js';
@@ -195,4 +196,23 @@ test('TTC 鉴权失败与普通拉取错误分别回执，不能泄露原始异�
   });
   assert.equal(failed.data.delivery_status, 'fetch_failed');
   assert.doesNotMatch(JSON.stringify([expired, failed]), /secret-token/);
+});
+
+// PR#78 审查追认项：pdftotext 必须走异步子进程，事件循环不得被同步阻塞。缺 pdftotext 的环境跳过。
+const pdftotextMissing = (() => { try { execFileSync('pdftotext', ['-v'], { stdio: 'ignore' }); return false; } catch (error) { return error.code === 'ENOENT'; } })();
+test('pdfTextInMemory 异步解析内联 PDF 提取号码', { skip: pdftotextMissing }, async () => {
+  const content = 'BT /F1 12 Tf 10 50 Td (13812345678) Tj ET';
+  const pdf = `%PDF-1.4
+1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
+2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj
+3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 200 100] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >> endobj
+4 0 obj << /Length ${content.length} >> stream
+${content}
+endstream endobj
+5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj
+trailer << /Root 1 0 R /Size 6 >>`;
+  const text = await pdfTextInMemory(Buffer.from(pdf, 'latin1'));
+  assert.match(text, /13812345678/);
+  assert.deepEqual(extractResumeContact(text).phone, '13812345678');
+  await assert.rejects(() => pdfTextInMemory(Buffer.from('not-a-pdf'), { timeoutMs: 10_000 }), /PDFTOTEXT_/);
 });

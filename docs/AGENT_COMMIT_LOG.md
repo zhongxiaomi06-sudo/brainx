@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-10-15｜fix(群找人): pdftotext 改异步子进程，消除网关事件循环阻塞
+
+- 起因：PR#78 审查追认项——`pdfTextInMemory` 原用 `execFileSync` 同步执行 pdftotext，单份 12s、最多三份＝最长 36s 同步阻塞整个 agent-gateway 事件循环，期间所有请求无响应。
+- 修复：改 `spawn` + Promise 异步管道（stdin 喂字节、stdout UTF-8 收集、stderr 排空不落日志）；保留 12s 超时 SIGKILL、2M 字符输出上限（超限/超时/非零退出分别以 `PDFTOTEXT_OVERFLOW/PDFTOTEXT_KILLED/PDFTOTEXT_EXIT_n` 拒绝，ENOENT 原样抛出走既有 fetch_failed 降级）。行为语义与同步版完全一致。
+- 测试：tests/candidate-feedback-contact.test.mjs 新增异步回归——内联手写 PDF 真实跑 pdftotext 提取号码 + 非 PDF 输入必须拒绝；缺 pdftotext 环境自动跳过。专项 9/9 过。
+- 全量验证：独立复跑后端套件 1072/1073，唯一失败为「worker 就绪」负载超时——10-13 已记录的同款环境态（本机负载 8.4，单跑 2.2s 通过），与本次改动无关；CI 同套件全绿。full verify 复跑记录见后续提交。
+
 ## 2026-10-15｜fix(群找人): 接通本人简历联系私发与顾问级长期排除
 
 - CONTACT：可信飞书绑定与本人 TTC 凭证双重校验；一次附件列表、最多三份 PDF 在内存解析；仅成功提取时用既有上下文表加密缓存 30 天，过期重新读取；六态回执不含电话/邮箱，私信失败不报成功。生产环境已只读确认存在 `pdftotext`，真实本人 PDF 与飞书私发仍待灰测。

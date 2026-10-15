@@ -1,5 +1,5 @@
 /** 本人 TTC 简历联系方式：只读一次附件列表，最多解析三份 PDF，文件始终在内存。 */
-import { execFileSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { listTtcResumeAttachments, downloadTtcResumePdf } from './ttcsdk/resume.js';
 
 const PHONE = /(?<!\d)(?:\+?86[-\s]?)?(1[3-9]\d{9})(?!\d)/;
@@ -10,10 +10,28 @@ export function extractResumeContact(text) {
   return { phone: body.match(PHONE)?.[1] || null, email: body.match(EMAIL)?.[0] || null };
 }
 
-export function pdfTextInMemory(bytes) {
-  return execFileSync('pdftotext', ['-layout', '-enc', 'UTF-8', '-', '-'], {
-    input: bytes, encoding: 'utf8', maxBuffer: 2 * 1024 * 1024, timeout: 12_000,
-    stdio: ['pipe', 'pipe', 'pipe'],
+// 异步子进程版：execFileSync 最长会同步阻塞事件循环 12s×3 份，整个网关期间无响应（PR#78 审查追认项）。
+export function pdfTextInMemory(bytes, { timeoutMs = 12_000, maxChars = 2_000_000 } = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn('pdftotext', ['-layout', '-enc', 'UTF-8', '-', '-'], { stdio: ['pipe', 'pipe', 'pipe'] });
+    let out = '';
+    let reason = 'PDFTOTEXT_TIMEOUT';
+    const timer = setTimeout(() => child.kill('SIGKILL'), timeoutMs);
+    const finish = (fn, value) => { clearTimeout(timer); fn(value); };
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', (chunk) => {
+      out += chunk;
+      if (out.length > maxChars) { reason = 'PDFTOTEXT_OVERFLOW'; child.kill('SIGKILL'); }
+    });
+    child.stderr.resume(); // 排空 stderr，避免背压挂起；内容不进任何日志。
+    child.on('error', (error) => finish(reject, error)); // 例如 ENOENT：生产缺 pdftotext。
+    child.on('close', (code, signal) => {
+      if (signal) return finish(reject, new Error(reason === 'PDFTOTEXT_OVERFLOW' ? reason : 'PDFTOTEXT_KILLED'));
+      if (code !== 0) return finish(reject, new Error(`PDFTOTEXT_EXIT_${code}`));
+      finish(resolve, out);
+    });
+    child.stdin.on('error', () => {}); // 子进程早退导致 EPIPE 时由 close 统一裁决。
+    child.stdin.end(bytes);
   });
 }
 

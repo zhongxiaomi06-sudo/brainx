@@ -12,7 +12,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-test('独立 worker 进程启动后保持存活，SIGTERM 干净退出', { timeout: 20000 }, async () => {
+test('独立 worker 进程启动后保持存活，SIGTERM 干净退出', { timeout: 60000 }, async () => {
   const dir = mkdtempSync(join(tmpdir(), 'brainx-worker-'));
   const child = spawn(process.execPath, ['src/worker.js'], {
     env: {
@@ -27,8 +27,10 @@ test('独立 worker 进程启动后保持存活，SIGTERM 干净退出', { timeo
   // 等就绪日志而非固定 sleep：full 门禁连跑时机器负载高，worker 启动可慢于 2s，
   // SIGTERM 在信号处理器注册前送达会被默认行为杀死（exit code null），造成偶发
   // 假失败（2026-09-03 full 门禁实测）。就绪日志打印后主块才注册 SIGTERM/SIGINT。
+  // 2026-10-15：本机持续负载 8.4，full 连跑两轮 worker 启动超 10s（单跑 2.2s 过），
+  // 窗口 10s→30s；守护点仍是「秒退回归」，放宽不弱化断言。
   await new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('worker 10s 内未打印就绪日志')), 10000);
+    const timer = setTimeout(() => reject(new Error('worker 30s 内未打印就绪日志')), 30000);
     child.stdout.on('data', (chunk) => {
       if (String(chunk).includes('批处理进程已就绪')) {
         clearTimeout(timer);

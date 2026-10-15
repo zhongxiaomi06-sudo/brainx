@@ -1,5 +1,11 @@
 # Agent Commit 记录
 
+## 2026-10-15｜build(门禁): full profile 后端测试超时 300s→480s（本机负载态实证）
+
+- 起因：连续两轮 full verify 唯一失败项均为「后端与共享逻辑测试」300s 超时截断（300.0s/300.2s），独立复跑同套件 373s 完成、1072/1073 过（唯一失败为 10-13 已记录的 worker 就绪负载环境态，单跑 2.2s 过）。本机（49 天未重启、负载 8.4）跑完套件需 ~6 分钟，300s 上限把「慢」误判为「挂」。
+- 修复：仅调 `.quality-gate/config.json` full profile 该步骤 timeoutMs 300000→480000；**ci profile 保持 300s 不动**（GitHub Actions 3 分钟跑完，CI 行为零变化）。该上限的用途是挂起检测而非墙钟预算，所有正确性检查不变。
+- 验证：JSON 合法、ci profile 数值复核未动。
+
 ## 2026-10-15｜fix(群找人): pdftotext 改异步子进程，消除网关事件循环阻塞
 
 - 起因：PR#78 审查追认项——`pdfTextInMemory` 原用 `execFileSync` 同步执行 pdftotext，单份 12s、最多三份＝最长 36s 同步阻塞整个 agent-gateway 事件循环，期间所有请求无响应。

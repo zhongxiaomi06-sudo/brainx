@@ -5,6 +5,9 @@ import { runSync } from '../src/sync.js';
 import { createServer } from '../src/server.js';
 import { signSession } from '../src/session.js';
 
+// specs/037：auto-search 默认禁用（全局开关），避免测试触发真实飞书 API
+process.env.BRAINX_AUTO_SEARCH_ENABLED = '0';
+
 const PID = 'P-ACCEPT-LAUNCH';
 
 function payload() {
@@ -67,7 +70,8 @@ test('HTTP：web 接单成功后自动拉项目群（specs/011）', async () => 
     assert.equal(response.status, 200);
     const result = await response.json();
     assert.equal(result.state, 'ACCEPTED');
-    assert.equal(result.search?.status, 'awaiting_method');
+    // specs/037：去掉 awaiting_method 等待态，建群后直接 auto_search（测试环境全局开关禁用）
+    assert.equal(result.auto_search?.status, 'disabled_global');
     assert.equal(result.project_launch?.ok, true, '拉群应随接单成功');
     assert.equal(result.project_launch.launch.status, 'READY');
     assert.equal(result.project_launch.launch.chat_id, 'oc_launch_test');

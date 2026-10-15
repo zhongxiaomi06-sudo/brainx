@@ -26,9 +26,9 @@ export async function postAcceptSideEffects(db, bus, deps, consultantId, project
   }
 
   // 建群成功 → 按 JD 自动触发第一轮找人（specs/037）
-  if (out.project_launch?.ok !== false && out.project_launch?.chat_id) {
+  if (out.project_launch?.ok !== false && out.project_launch?.launch?.chat_id) {
     try {
-      out.auto_search = await autoSearchOnLaunch(db, bus, deps, consultantId, projectId, out.project_launch);
+      out.auto_search = await autoSearchOnLaunch(db, bus, deps, consultantId, projectId, out.project_launch.launch);
     } catch (e) {
       out.auto_search = { ok: false, code: e.code || 'AUTO_SEARCH_FAILED',
         message: String(e.message).slice(0, 200) };

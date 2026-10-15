@@ -1,5 +1,25 @@
 # Agent Commit 记录
 
+## 2026-10-15｜fix(sourcing): 修复自由找人投递断裂——CLI 支持 --project-id + 存量补偿关联
+
+- 根因（审查实证）：自由找人结果 **89.7% 推不到群**（58 done 仅 6 投递）。`bin/brainx-supermai-search.mjs:65` 硬编码 `supermaiCriteriaKey(criteria)` 合成键，而 `openmai-delivery.js:57` `enqueueOpenmaiDeliveries` 用 **INNER JOIN project_launches** 匹配真实 project_id（`sourcing_tasks` 表 0 行，`COALESCE` 落到 `r.project_id`）→ 合成键匹配不上 → 不入投递队列。本次回填 7 done 56 候选人全部不投递。
+- **设计本身自洽**：`supermai-sourcing.js` 头部注释（14-16 行）明示「自由搜索使用 `supermai:<hash>`，不会命中项目群投递；项目群按钮则使用真实 project_id，完成后复用既有 worker 投递回原群」。**断电点是实现选型矛盾，非架构缺陷**：回填必须用 CLI（`startSupermaiScoutTask` 是 fire-and-forget，短命进程会死），但 CLI 丢了 projectId 参数能力。
+- 修复（3 文件）：
+  - `brainx-supermai-search.mjs`：新增 `--project-id` 参数，落库逻辑与 `supermai-sourcing.js:59` 同款（传了用真实 ID，否则合成键）；帮助文本说明两种模式语义。
+  - `brainx-auto-search-retrofill.mjs`：spawn 传真实 project_id；already_done 检查兼容真实 ID 与历史合成键；**日志区分 done/failed**（子进程退出≠搜索成功，必须查库）。
+  - `brainx-redeliver-relink.mjs`（新）：存量补偿脚本，把已落库合成键改回真实 project_id（**不重复付费，只改关联**），自动迁移僵尸占用者（running>1h 或 failed 且无 result_text）释放主键，支持 `--dry-run`。
+- **生产验证**：9 条关联修正 0 冲突 → 9/9 能 JOIN 到项目群 → 9 条入队投递 → **7 条 SENT 真实送达（有飞书 message_id `om_x100b623...`，15:29:51）**；2 条 FAILED 为 wendy demo 群占位 ID（`invalid receive_id`，预期内）。自由找人覆盖率 **10.3% → 32.5%**。
+- 部署：3 文件 scp 到 ECS + chown brainx + 实际执行补偿脚本（生产已生效，候选人已送达顾问群）。
+
+## 2026-10-15｜fix(sourcing): accept-launch.js chat_id 路径 bug——web 接单 auto-search 从未触发
+
+- 生产 bug：accept-launch.js 第 29 行条件 `out.project_launch?.chat_id` 永远 undefined——launchProject 返回 `{ ok, launch: { chat_id } }`，chat_id 嵌在 `launch` 层下，不在顶层 → auto_search 条件恒 false → **web 接单后 auto-search 从未真正触发**。
+- retrofill 脚本（bin/brainx-auto-search-retrofill.mjs）直调 autoSearchOnLaunch 传 DB 行（chat_id 在顶层）绕过了这个 bug，所以回填 7 done 验证通过，但新群接单路径始终没生效。
+- 修复：条件改 `out.project_launch?.launch?.chat_id`，传参改 `out.project_launch.launch`（getProjectLaunch 返回，chat_id 在顶层）。
+- 测试：accept-launch.test.mjs 设 `BRAINX_AUTO_SEARCH_ENABLED=0` 禁用 auto-search（避免测试调真实飞书 API），断言从 `result.search?.status==='awaiting_method'` 改成 `result.auto_search?.status==='disabled_global'`。
+- 验证：accept-launch 2/2 + project-launch/user-hooks/agent-action-tools 44/44 全过。
+- 部署：scp accept-launch.js 到 ECS + brainx 重启 + HTTP 200 + 特征串 `launch?.chat_id` 确认在盘。GitHub push e652151（unset 代理 + HTTP/1.1 + lowSpeedLimit=0）。
+
 ## 2026-10-15｜feat(sourcing): spec 037 建群后按 JD 自动触发第一轮找人（P0 实施 + 全量回填）
 
 - 背景：accept-launch.js 第 11 行原注释「标记为等待顾问明确选择 OpenMai 或 SuperMai，不暗中触发付费找人」——这是咪要打破的产品门槛。产品视角缺陷验证显示找人漏斗 56% 流失（45 READY 群中 25 个 search_status NULL 从未找人）。咪指令「建群之后按照 JD 就开始第一轮的找人，不要用户说开始找人」「除了 mia 之外的群都实现自动触发」。

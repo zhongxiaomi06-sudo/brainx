@@ -1,5 +1,13 @@
 # Agent Commit 记录
 
+## 2026-10-15｜fix(找人): 提示词约束引擎不把性别偏好转成 gender 过滤，绕开 OpenMai 参数契约 bug
+
+- 起因：韬润群 JPTLM25 自由找人（`supermai:6d32b7f08a86`）判据含「女生优先」，OpenMai 引擎（本身是 LLM agent）读判据后「组装检索条件」调私域人才接口时，把 `BasicFilter.filters.basic.gender` 组装成**数组**，而下游 TTC 人才接口 Go 结构体该字段是 **string** → `json: cannot unmarshal array into Go struct field ...gender of type string`、`retryable=false` → 零候选人。引擎自己的回执明示它在读我们的提示词决定 filter 形态（「我会按接口契约把 basic.gender 等字段形态修正后再提交」）。仓库 grep 确认零 gender/BasicFilter 代码 → 100% 引擎侧组装，我们无法改引擎源码。
+- 修复：在 `buildScoutPrompt`（supermai/criteria 模式）与 `buildPrompt`（openmai/job 模式）两处提示词加约束行——「性别等人口学偏好（如"女生优先"）仅作结果排序参考，不要转化为 BasicFilter.gender 过滤条件——会触发接口参数校验错误（retryable=false）并终止本轮检索」。引擎 LLM 读此约束即不组装 gender 过滤。语义上「优先」本就是软偏好（排序）而非硬过滤，约束同时符合用户原意。
+- 性质：这是**缓解**而非根因修复——根因是 TTC OpenMai 引擎的 filter 组装把标量字段误组装为数组（或引擎工具 schema 与下游 API 契约不一致），需 TTC 侧修引擎。本缓解把触发概率降到最低且不丢用户意图（性别仍作排序参考）。证据已固定（错误原文 + 时间 + search_key），可向 TTC 报障。
+- 测试：tests/supermai-sourcing.test.mjs + tests/openmai-task.test.mjs 23/23 过（buildScoutPrompt 格式用例检查渠道+机器块，不锁提示词原文，新增约束行不破坏）。
+- 部署：只改 src/ 提示词，重启 brainx 即可生效（OpenMai 调用在 server/gateway 进程，实际由 brainx-agent-gateway + brainx 承载；两个服务都需重启）。
+
 ## 2026-10-15｜fix(openclaw): requireMention 改幂等读改写，止血准入自愈 reload 风暴
 
 - 起因：`src/openclaw-group-access.js` `apply()` 对 `requireMention` 无条件 `config set`，与 `openclaw-group-retry.js` 的 intake 自愈 sweep（每 600s 轮巡 26 群）叠加，每次写入 bump `meta.lastTouchedAt` 触发 openclaw 2026.7.1-2 全量 reload——reload 打死在途 agent turn 并毒化群会话。09-28 起连续 18 天日均约 3,730 次空写（生产 openclaw.json 66 个群早已全为 false，100% 无操作重写）。10-15 实录打死 5 轮对话：Felix 群会话 `e6a68936` 毒化（systemSent=false、totalTokens=0 僵死 40 分钟，群消息秒退无回复）；韬润群 11:41 原始找人请求发出 1.1 秒被杀。回归点 commit e4c7d9f（09-08，TTC 简历特性夹带）：删了「已在白名单早退」逻辑并加上无条件 set，旧测试只断言「至少写一次」未守重复写。

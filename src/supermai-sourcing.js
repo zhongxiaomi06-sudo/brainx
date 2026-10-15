@@ -41,6 +41,7 @@ export function buildScoutPrompt(criteria, excludedCandidateRefs = []) {
     `[找人判据] ${String(criteria || '').trim()}`,
     `[排除 TTC 编号] ${exclusions.length ? exclusions.join('、') : '无'}`,
     exclusions.length ? '排除名单中的候选人此前已经推荐过，本轮严禁再次返回。' : '',
+    '【检索参数约束】性别等人口学偏好（如"女生优先"）仅作结果排序参考，不要转化为 BasicFilter.gender 过滤条件——性别过滤会触发私域人才接口参数校验错误（retryable=false）并终止本轮检索。',
     '每人必须给出姓名、当前公司/职位、匹配判断、推荐理由、风险或待核实项；没有证据的字段写“待核实”。',
     '如候选人来自 TTC 人才库，必须给出 https://app.ttcadvisory.com/app/talent/<candidate_ref> 详情链接；不得发送或索取简历附件。',
     '在面向人的结果末尾追加下面格式的机器块，JSON 必须合法，且不要把电话或邮箱放入机器块：',

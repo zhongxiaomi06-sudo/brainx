@@ -39,30 +39,40 @@ if (args.includes('--help') || args.includes('-h')) {
 选项:
   --consultant <id>     顾问 ID（默认 mia）
   --criteria <text>     找人判据（默认 FA 机构 + 清北 + 女生优先）
+  --project-id <PID>    真实项目 ID（传了才能投递回项目群，默认用合成键）
   --help, -h            显示帮助
 
 示例:
   node bin/brainx-supermai-search.mjs
   node bin/brainx-supermai-search.mjs --consultant felix --criteria "AI产品经理，3年经验，北京"
   node bin/brainx-supermai-search.mjs --criteria "后端工程师，Python，5年经验，优先北京"
+  node bin/brainx-supermai-search.mjs --consultant wendy --project-id JCDWDEP --criteria "..."
 
-结果落 openmai_results，project_id = supermai:<sha256(criteria)前12位>。
+结果落 openmai_results。
+project_id：传 --project-id 用真实项目 ID（**完成后 worker 能投递回原群**）；
+            否则 supermai:<sha256(criteria)前12位> 合成键（自由找人，不投递——
+            设计如此，见 supermai-sourcing.js 头部注释）。
 gender 约束已内建（buildScoutPrompt 含提示词约束行）。`);
   process.exit(0);
 }
 
 let consultant_id = 'mia';
 let criteria = '3年以内经验，清华或北大，FA机构背景（光源资本、义柏资本、义凯资本、云岫资本、IO Investment），女生优先';
+let projectIdArg = null;
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--consultant' && args[i + 1]) consultant_id = args[++i];
   else if (args[i] === '--criteria' && args[i + 1]) criteria = args[++i];
+  else if (args[i] === '--project-id' && args[i + 1]) projectIdArg = args[++i];
 }
 
 const DB_PATH = process.env.BRAINX_DB || '/opt/brainx/data/brainx.db';
 const db = openDb(DB_PATH);
 const bus = { emit: () => {} };
 
-const project_id = supermaiCriteriaKey(criteria);
+// 传 --project-id 用真实项目 ID（投递回群的前提）；否则合成键（自由找人，不投递）。
+// 与 supermai-sourcing.js:59 同款逻辑——合成键会让 enqueueOpenmaiDeliveries 的
+// INNER JOIN project_launches 匹配不上，结果推不回群（2026-10-15 审查实证）。
+const project_id = String(projectIdArg || '').trim() || supermaiCriteriaKey(criteria);
 const task_id = `sm_${uuid().slice(0, 8)}`;
 const started_at = now();
 const searchRound = 1;

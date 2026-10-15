@@ -102,13 +102,14 @@ if (dryRun) {
   process.exit(0);
 }
 
-// 子进程 spawn 函数
-function spawnSearchChild(consultantId, criteria) {
+// 子进程 spawn 函数（projectId 必传真实项目 ID，结果才能投递回群）
+function spawnSearchChild(consultantId, criteria, projectId) {
   return new Promise((resolve) => {
     const child = spawn('/usr/bin/node', [
       '/opt/brainx/bin/brainx-supermai-search.mjs',
       '--consultant', consultantId,
       '--criteria', criteria,
+      '--project-id', projectId,
     ], { cwd: '/opt/brainx', stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = '', stderr = '';
     child.stdout.on('data', d => { stdout += d; });
@@ -149,29 +150,39 @@ for (let i = 0; i < candidates.length; i++) {
     continue;
   }
 
-  // 已 done 复用（用 supermaiCriteriaKey 查，避免重复付费触发）
+  // 已 done 复用（真实 project_id 优先，兼容历史合成键记录，避免重复付费触发）
+  const realProjectId = c.project_id;
   const supermaiProjectId = supermaiCriteriaKey(criteria);
-  const existing = db.prepare(`SELECT task_id, status FROM openmai_results
-    WHERE project_id=? AND consultant_id=? AND search_round=1`).get(supermaiProjectId, c.consultant_id);
+  const q = `SELECT task_id, status FROM openmai_results
+    WHERE project_id=? AND consultant_id=? AND search_round=1`;
+  const existing = db.prepare(q).get(realProjectId, c.consultant_id)
+    || db.prepare(q).get(supermaiProjectId, c.consultant_id);
   if (existing?.status === 'done') {
-    console.log(`  SKIP already_done task=${existing.task_id} (project=${supermaiProjectId})`);
+    console.log(`  SKIP already_done task=${existing.task_id} (project=${existing.task_id ? realProjectId : supermaiProjectId})`);
     results.already_done += 1;
     continue;
   }
 
   console.log(`  criteria: ${criteria.slice(0, 200)}`);
+  console.log(`  project_id=${realProjectId}（真实，投递回群前提）`);
   console.log(`  spawn brainx-supermai-search.mjs ...`);
   const t0 = Date.now();
-  const r = await spawnSearchChild(c.consultant_id, criteria);
+  const r = await spawnSearchChild(c.consultant_id, criteria, realProjectId);
   const elapsed = Math.round((Date.now() - t0) / 1000);
-  if (r.code === 0) {
+  const m = r.stdout.match(/task_id=sm_[a-f0-9]+/);
+  // 判据真实落库结果（子进程退出≠搜索成功，必须查库）
+  const row = db.prepare(`SELECT status, length(result_text) rt_len FROM openmai_results
+    WHERE task_id=?`).get(m ? m[0].replace('task_id=', '') : '');
+  if (r.code === 0 && row?.status === 'done') {
     results.triggered += 1;
-    // 从 stdout 提取 task_id
-    const m = r.stdout.match(/task_id=sm_[a-f0-9]+/);
-    console.log(`  OK done in ${elapsed}s ${m ? m[0] : ''}`);
+    console.log(`  ✅ done in ${elapsed}s ${m ? m[0] : ''} rt_len=${row.rt_len}`);
+  } else if (r.code === 0) {
+    results.error += 1;
+    console.log(`  ❌ 子进程退出但搜索未成功: status=${row?.status || '未知'} in ${elapsed}s`);
+    if (r.stderr) console.log(`  stderr: ${r.stderr.slice(0, 300)}`);
   } else {
     results.error += 1;
-    console.log(`  ERROR code=${r.code} in ${elapsed}s`);
+    console.log(`  ❌ ERROR code=${r.code} in ${elapsed}s`);
     if (r.stderr) console.log(`  stderr: ${r.stderr.slice(0, 300)}`);
   }
 }

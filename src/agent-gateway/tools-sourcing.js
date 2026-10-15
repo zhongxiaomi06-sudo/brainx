@@ -9,6 +9,7 @@ import { currentState } from '../engagement.js';
 import { startOpenmaiTask, getOpenmaiResult } from '../openmai-task.js';
 import { supermaiCriteriaKey, startSupermaiScoutTask } from '../supermai-sourcing.js';
 import { extractOpenmaiCandidates, buildOpenmaiDeliveryCard, STALE_SEARCH_MS } from '../openmai-delivery.js';
+import { groupSafeOpenmaiText } from '../sourcing-result-card.js';
 import { nextSearchExclusions, nextSupermaiSearchExclusions } from '../search-rounds.js';
 import { registerFreeformDelivery } from '../sourcing-group-delivery.js';
 import { careerStatusMap } from '../sourcing-candidates.js';
@@ -152,14 +153,27 @@ function runningStale(cur) {
     && Date.now() - Date.parse(cur.started_at || 0) >= STALE_SEARCH_MS;
 }
 
+/** 外部引擎漏遵守排除时，读回也不让模型看到原始全文里的已排除人选。 */
+function visibleReadback(db, principal, projectId, resultText) {
+  const excluded = new Set(rejectedCandidateRefs(db, projectId, principal));
+  const candidates = extractOpenmaiCandidates(resultText)
+    .filter((candidate) => !excluded.has(candidate.candidateRef));
+  if (!excluded.size) return { candidates, resultText };
+  return { candidates, resultText: candidates.length
+    ? candidates.map((candidate, index) => `${index + 1}. ${groupSafeOpenmaiText(candidate.name, 60)} · `
+        + `${groupSafeOpenmaiText(candidate.role, 120)} · ${groupSafeOpenmaiText(candidate.city, 40)}`).join('\n')
+    : '本轮没有可安全展示的人选；已排除的人选不会再次展示。' };
+}
+
 /** 群上下文 done 读回：把标准候选人卡确定性发到本群（best-effort，失败不阻断）。
  *  幂等键按 职位×群×轮次×日 去重防刷屏；只有发卡调用成功才返回 true。
  *  specs/036：带生涯徽标（sourcing_candidates 缺表按无徽标渲染）。 */
-async function trySendOpenmaiResultCard(sendCardFn, publicBaseUrl, args, principal, row, cur, source = 'openmai') {
+async function trySendOpenmaiResultCard(db, sendCardFn, publicBaseUrl, args, principal, row, cur, source = 'openmai') {
   if (!sendCardFn || principal.chatType !== 'group' || !principal.chatId) return false;
   try {
     let careerMap = null;
-    try { careerMap = careerStatusMap(db, { searchKey: args.job_id, consultantId: principal.consultantId }); }
+    try { careerMap = careerStatusMap(db, { searchKey: args.job_id,
+      consultantId: principal.consultantId, tenantId: principal.tenantId }); }
     catch { /* best-effort 徽标 */ }
     await sendCardFn({
       target: principal.chatId,
@@ -195,10 +209,12 @@ async function openmaiSearch(db, args, principal, sendCardFn, publicBaseUrl, int
     // 群上下文 done 读回：候选人名单由标准卡片承担（代码渲染），envelope 只留引导语；
     // 私聊 / 缺 sendCardFn / 发卡失败维持原样（result_text 原样带出）。
     const cardSent = cur.status === 'done'
-      && await trySendOpenmaiResultCard(sendCardFn, publicBaseUrl, args, principal, row, cur);
+      && await trySendOpenmaiResultCard(db, sendCardFn, publicBaseUrl, args, principal, row, cur);
+    const visible = cur.status === 'done'
+      ? visibleReadback(db, principal, args.job_id, cur.result_text) : null;
     return {
       data: { job_ref: args.job_id, status: cur.status,
-              result_text: cardSent ? null : cur.result_text || null,
+              result_text: cardSent ? null : visible?.resultText || cur.result_text || null,
               ...(cardSent ? { card_delivered: true } : {}),
               started_at: cur.started_at || null, finished_at: cur.finished_at || null,
               ...(disc ? { elapsed_seconds: disc.elapsed_seconds, elapsed_minutes: disc.elapsed_minutes } : {}) },
@@ -278,7 +294,9 @@ async function supermaiScout(db, args, principal, sendCardFn, publicBaseUrl, int
   const cur = getOpenmaiResult(db, principal.consultantId, project_id) || {};
   const stale = runningStale(cur);
   if ((cur.status === 'running' && !stale) || (cur.status === 'done' && !continuing)) {
-    const candidates = cur.status === 'done' ? extractOpenmaiCandidates(cur.result_text) : [];
+    const visible = cur.status === 'done'
+      ? visibleReadback(db, principal, project_id, cur.result_text) : null;
+    const candidates = visible?.candidates || [];
     const autoDeliver = Boolean(jobId) || registerFreeformDelivery(db, principal, project_id);
     const disc = cur.status === 'running' ? pollDiscipline(cur.started_at, 'supermai', autoDeliver) : null;
     // NO_REPLY/空结果：OpenMai 对极窄判据可能零命中（返回占位符）——语义化为「未搜到」而非当成成功交付。
@@ -292,10 +310,10 @@ async function supermaiScout(db, args, principal, sendCardFn, publicBaseUrl, int
       search_round: cur.search_round || 1, freeform: true, criteria,
     };
     const cardSent = cur.status === 'done' && !noReply
-      && await trySendOpenmaiResultCard(sendCardFn, publicBaseUrl, { job_id: project_id }, principal, synthJob, cur, 'supermai');
+      && await trySendOpenmaiResultCard(db, sendCardFn, publicBaseUrl, { job_id: project_id }, principal, synthJob, cur, 'supermai');
     return {
       data: { entry: 'supermai', job_ref: jobId || null, criteria, status: cur.status,
-              result_text: cardSent ? null : (noReply ? null : cur.result_text || null),
+              result_text: cardSent ? null : (noReply ? null : visible?.resultText || null),
               candidates: cardSent ? [] : candidates,
               ...(cardSent ? { card_delivered: true } : {}),
               empty_reason: noReply ? 'NO_MATCHES_FOUND' : null,

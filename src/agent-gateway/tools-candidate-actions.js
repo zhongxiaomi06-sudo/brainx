@@ -5,13 +5,14 @@ import { listProjectCandidateFocus, projectSearchCandidate,
   setProjectCandidateFocus } from '../candidate-focus.js';
 import { jobVisibleTo, jobAccessibleFromGroup } from '../visibility.js';
 import { downloadResumePdf, extractOpenmaiCandidates } from '../openmai-delivery.js';
-import { sendPdfFile, sendTextMessage } from '../feishu-bot.js';
+import { sendPdfFile, sendTextMessage, sendInteractiveCard } from '../feishu-bot.js';
 import { getAuthorizedTtcJwt } from '../ttcsdk/auth.js';
 import { downloadTtcResumePdf, listTtcResumeAttachments } from '../ttcsdk/resume.js';
 import { createCandidateDecisionGroup } from '../candidate-decision-group.js';
 import { setCandidateSearchFeedback } from '../candidate-search-feedback.js';
 import { sendCandidatePrivateContact } from './candidate-private-contact.js';
 import { updateSourcingCareerStatus } from '../sourcing-candidates.js';
+import { sendCandidateDecisionCard } from '../candidate-decision-card.js';
 
 function fail(code) { throw Object.assign(new Error(code), { code }); }
 
@@ -145,6 +146,7 @@ export function createCandidateActionToolHandlers({
   downloadTtcResumePdfFn = downloadTtcResumePdf,
   createCandidateDecisionGroupFn = createCandidateDecisionGroup,
   sendTextMessageFn = sendTextMessage,
+  sendCardFn = sendInteractiveCard,
   addTalentFn = defaultAddTalent,
   loadCandidateContactFn,
 } = {}) {
@@ -173,9 +175,16 @@ export function createCandidateActionToolHandlers({
       }
       if (['REJECT_CANDIDATE', 'RESTORE_CANDIDATE'].includes(args.action)) {
         const row = setCandidateSearchFeedback(db, context.principal, args, discovered?.sourceTaskId);
-        return { data: row, facts: [{ candidate_ref: args.candidate_ref,
+        const cardPrincipal = jobAccessibleFromGroup(db, context.principal, args.job_id)
+          ? context.principal : { ...context.principal, chatType: 'p2p' };
+        const delivery = await sendCandidateDecisionCard(sendCardFn, cardPrincipal, {
+          name: discovered?.name || focusedCandidate?.name, status: row.status,
+          jobId: args.job_id, candidateRef: args.candidate_ref, updatedAt: row.updated_at,
+        });
+        return { data: { ...row, decision_delivery: delivery }, facts: [{ candidate_ref: args.candidate_ref,
           excluded_from_next_search: row.status === 'REJECTED' }],
-        inferences: [], recommendations: [], unknowns: [],
+        inferences: [], recommendations: [], unknowns: delivery === 'failed'
+          ? ['长期排除状态已保存，但群内小卡发送失败；请如实告知，可在历史结果重新操作。'] : [],
         evidence_refs: [`candidate_feedback:${args.job_id}:${args.candidate_ref}`] };
       }
       if (args.action === 'KEEP_FOR_REVIEW' || args.action === 'REMOVE_FROM_REVIEW') {

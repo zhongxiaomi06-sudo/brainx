@@ -1,4 +1,5 @@
 # 飞书群卡片渲染回归门禁
+2026-10-15：登记 `candidate-reject-followup`（长期排除与撤销按钮）、`candidate-restore-followup`（恢复回执）两张正式构建函数脱敏场景；`supermai-freeform-badges` 按长期排除二次过滤更新。基线须以本地截图和真实飞书点击分别复核，不能互相替代。
 
 2026-10-13：完成卡、自由条件卡、失败卡新增真实条件与轮次/排除人数说明，更新三张 darwin 基线。生产构建函数拆到 `src/sourcing-result-card.js`，旧导出兼容；本地三图已查看，未代表飞书真机验收。
 

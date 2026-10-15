@@ -9,6 +9,8 @@ import {
   splitCandidateRole, parseScoreNum, careerStatusMap,
 } from '../src/sourcing-candidates.js';
 import { assertSafeAgentProjection } from '../src/agent-gateway/projection.js';
+import { setGlobalCandidateDecision } from '../src/candidate-search-feedback.js';
+import { buildOpenmaiDeliveryCard } from '../src/sourcing-result-card.js';
 
 const MACHINE_BLOCK = (refs) => `前置说明文字
 <!-- BRAINX_CANDIDATES_V1
@@ -116,6 +118,24 @@ test('recall 工具 envelope 过群聊投影安全，不含付费搜索暗示', 
   assert.equal(empty.data.recalled, 0);
   assert.match(empty.recommendations[0].note, /brainx_supermai_scout/);
   await assert.rejects(async () => handlers.brainx_sourcing_recall({ search_key: 'bad key!' }, { principal }), /INVALID_ARGUMENT/);
+});
+
+test('长期排除可跨条件检索，卡片过滤外部引擎漏回的人选；撤销后恢复', t => {
+  const { db, settleDone } = fixture(t); settleDone();
+  setGlobalCandidateDecision(db, principal, 'PL9000000001', 'REJECTED', 'test');
+  const handlers = createSourcingRecallToolHandlers({ db });
+  const excluded = handlers.brainx_sourcing_recall({ career_status: 'rejected' }, { principal });
+  assert.deepEqual(excluded.data.items.map((r) => r.candidate_ref), ['PL9000000001']);
+  assert.equal(excluded.data.items[0].career_label, '已排除');
+  const card = buildOpenmaiDeliveryCard({ job: { project_id: 'P1', company: '测试', role: '职位' },
+    status: 'done', resultText: MACHINE_BLOCK(['PL9000000001', 'PL9000000002']),
+    publicBaseUrl: 'https://brainx.example.com',
+    careerStatusMap: careerStatusMap(db, { searchKey: 'supermai:abc123def456',
+      consultantId: 'felix', tenantId: 't1' }) });
+  assert.doesNotMatch(JSON.stringify(card), /候选人1|PL9000000001/);
+  assert.match(JSON.stringify(card), /候选人2/);
+  setGlobalCandidateDecision(db, principal, 'PL9000000001', 'RESTORED', 'test');
+  assert.equal(handlers.brainx_sourcing_recall({ career_status: 'rejected' }, { principal }).data.recalled, 0);
 });
 
 test('四动作回写 career_status：SCREEN/REJECT/RESTORE，入库后 in_pool', async t => {

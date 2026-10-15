@@ -1,4 +1,5 @@
 # BrainX 文档书
+[群找人 CONTACT / REJECT 交付与验收](2026-10-15-sourcing-contact-reject-delivery.md)：本人 TTC 简历私发、30 天快照、顾问级长期排除与原群撤销回执的实现边界和验收状态。
 找人产品要求本轮施工：[评估与逐条验收清单](2026-10-13-sourcing-delivery-plan.md)。
 结果卡本轮状态：[寻访结果卡上下文复核](frontend-reviews/2026-10-13-sourcing-result-context.md)。
 本轮发布记录：[云端寻访合并与连接状态复核](frontend-reviews/2026-10-13-cloud-sourcing-merge.md)。

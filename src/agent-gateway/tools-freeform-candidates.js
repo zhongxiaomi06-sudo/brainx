@@ -3,8 +3,10 @@ import { now, uuid } from '../db.js';
 import { extractOpenmaiCandidates } from '../openmai-result.js';
 import { defaultAddTalent } from './tools-candidate-actions.js';
 import { sendCandidatePrivateContact } from './candidate-private-contact.js';
-import { sendTextMessage } from '../feishu-bot.js';
+import { sendTextMessage, sendInteractiveCard } from '../feishu-bot.js';
 import { updateSourcingCareerStatus } from '../sourcing-candidates.js';
+import { setGlobalCandidateDecision } from '../candidate-search-feedback.js';
+import { sendCandidateDecisionCard } from '../candidate-decision-card.js';
 
 const fail = code => { throw Object.assign(new Error(code), { code }); };
 const safe = value => String(value || '').replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[邮箱隐藏]')
@@ -32,7 +34,8 @@ function authorizedCandidate(db, p, args) {
 }
 
 export function createFreeformCandidateHandlers({ db, addTalentFn = defaultAddTalent,
-  loadCandidateContactFn, sendTextMessageFn = sendTextMessage } = {}) {
+  loadCandidateContactFn, sendTextMessageFn = sendTextMessage,
+  sendCardFn = sendInteractiveCard } = {}) {
   return { brainx_freeform_candidate_action: async (args, { principal: p }) => {
     if (args.confirm !== true) fail('INVALID_ARGUMENT');
     const { candidate, taskId } = authorizedCandidate(db, p, args);
@@ -50,25 +53,34 @@ export function createFreeformCandidateHandlers({ db, addTalentFn = defaultAddTa
     }
     const status = { SCREEN: 'SCREENED', REJECT: 'REJECTED', RESTORE: 'RESTORED' }[args.action];
     if (!status) fail('INVALID_ARGUMENT');
-    markCareer(db, p, args, { SCREEN: 'screened', REJECT: 'rejected', RESTORE: 'restored' }[args.action]);
+    if (status === 'SCREENED') markCareer(db, p, args, 'screened');
     const keys = [p.tenantId, p.consultantId, args.search_key, args.candidate_ref];
     const existing = db.prepare(`SELECT status FROM freeform_candidate_decisions
       WHERE tenant_id=? AND consultant_id=? AND search_key=? AND candidate_ref=?`).get(...keys);
-    if (existing?.status !== status) {
+    if (existing?.status !== status || status !== 'SCREENED') {
       const at = now();
       db.exec('SAVEPOINT freeform_decision');
       try {
-        db.prepare(`INSERT INTO freeform_candidate_decisions VALUES (?,?,?,?,?,?,?)
-          ON CONFLICT(tenant_id,consultant_id,search_key,candidate_ref)
-          DO UPDATE SET status=excluded.status,source_task_id=excluded.source_task_id,updated_at=excluded.updated_at`)
-          .run(...keys, status, taskId, at);
-        db.prepare('INSERT INTO freeform_candidate_events VALUES (?,?,?,?,?,?,?,?)')
-          .run(uuid(), ...keys, status, taskId, at);
+        if (existing?.status !== status) {
+          db.prepare(`INSERT INTO freeform_candidate_decisions VALUES (?,?,?,?,?,?,?)
+            ON CONFLICT(tenant_id,consultant_id,search_key,candidate_ref)
+            DO UPDATE SET status=excluded.status,source_task_id=excluded.source_task_id,updated_at=excluded.updated_at`)
+            .run(...keys, status, taskId, at);
+          db.prepare('INSERT INTO freeform_candidate_events VALUES (?,?,?,?,?,?,?,?)')
+            .run(uuid(), ...keys, status, taskId, at);
+        }
+        if (status !== 'SCREENED') setGlobalCandidateDecision(db, p, args.candidate_ref, status, taskId);
         db.exec('RELEASE freeform_decision');
       } catch (error) { db.exec('ROLLBACK TO freeform_decision; RELEASE freeform_decision'); throw error; }
     }
-    return envelope({ status, already: existing?.status === status }, args,
-      status === 'SCREENED' ? ['已初筛通过并记入本次搜索的重点人选；尚未关联职位，不得声称加入了项目重点名单或已发 TTC 链接。'] : []);
+    const delivery = status === 'SCREENED' ? 'not_applicable'
+      : await sendCandidateDecisionCard(sendCardFn, p, { name: candidate.name,
+        status, searchKey: args.search_key, candidateRef: args.candidate_ref,
+        updatedAt: now() });
+    const unknowns = status === 'SCREENED'
+      ? ['已初筛通过并记入本次搜索的重点人选；尚未关联职位，不得声称加入了项目重点名单或已发 TTC 链接。']
+      : delivery === 'failed' ? ['长期排除状态已保存，但群内小卡发送失败；请如实告知。'] : [];
+    return envelope({ status, already: existing?.status === status, decision_delivery: delivery }, args, unknowns);
   } };
 }
 

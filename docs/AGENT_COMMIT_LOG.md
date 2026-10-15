@@ -1,5 +1,23 @@
 # Agent Commit 记录
 
+## 2026-10-15｜feat(sourcing): spec 037 建群后按 JD 自动触发第一轮找人（P0 实施 + 全量回填）
+
+- 背景：accept-launch.js 第 11 行原注释「标记为等待顾问明确选择 OpenMai 或 SuperMai，不暗中触发付费找人」——这是咪要打破的产品门槛。产品视角缺陷验证显示找人漏斗 56% 流失（45 READY 群中 25 个 search_status NULL 从未找人）。咪指令「建群之后按照 JD 就开始第一轮的找人，不要用户说开始找人」「除了 mia 之外的群都实现自动触发」。
+- spec 037 定稿（`specs/037-auto-search-on-launch/spec.md` ~470 行）：咪三个拍板固化——①判据固定 3-5 年工作经验（不按职位层级调整）②凭证失效 agent 私聊主动提醒 + 直接给工作台 URL（不静默跳过）③暂不设单项目每月上限（待 P1 上线后观察 1-2 月成本趋势）。
+- P0 代码（4 文件）：
+  - `src/auto-search.js`（~155 行）：`buildAutoSearchCriteria` 从 job_facts 拼判据 + `buildSearchStartCard` 即时反馈卡 + `buildCredentialExpiredCard` 含工作台 URL + `notifyCredentialExpired` 飞书 IM 私聊 + 幂等键 `notify:cred-expired:<cid>:<YYYY-MM-DD>` 防一天 spam + `autoSearchOnLaunch` 主入口（全局开关 → 跳过 mia → 项目级 auto_search_enabled → 凭证 fail-fast → 判据 → 幂等触发 startSupermaiScoutTask → 即时反馈卡）+ `listRetrofillCandidates` 查 READY search_status NULL 非 mia 群。
+  - `src/accept-launch.js`（改 25 行）：去掉 `out.search = { status: 'awaiting_method' }` 等待态，建群成功后调 `autoSearchOnLaunch`。
+  - `bin/brainx-auto-search-retrofill.mjs`（~155 行）：存量群回填脚本——头部自动加载 `/etc/brainx/openclaw.env`（飞书 IM 凭据，brainx 用户手动跑不通过 systemd）+ spawn `brainx-supermai-search.mjs` 子进程（await callOpenmaiContent 直连，绕过 fire-and-forget 短命进程坑）+ supermaiCriteriaKey 防重复付费（spawn 前查 search_round=1 done 跳过）+ 凭证失效调 notifyCredentialExpired。
+  - `migrations/0063_auto_search_enabled.sql`：`ALTER TABLE project_launches ADD COLUMN auto_search_enabled INTEGER DEFAULT 1`（ECS 已跑，45 行全 enabled=1）。
+- 全量回填结果（15 个非 mia 群，13:02–13:23 CST，约 21 分钟）：
+  - **7 done**：felix 1（sm_d6a203ec，10 候选人）+ wendy 6（sm_8885fa95/8f8a070a/53ac68d6/e75b945f/bafc5d0f/a4dd9183，共 46 候选人）= **56 候选人**。
+  - **2 failed**（均 felix，暂时性）：sm_cc8a242e 401/403 凭证失效（2s 秒退）+ sm_b3b14e3e terminated（187s）。根因＝回填脚本 #5/#6 连续 spawn 间隔仅 1s 触发 TTC 限流，#9 间隔 8 分钟后 felix 凭证恢复正常 done。**JWT 未到期不等于登录态有效**——TTC 服务端 session/acw_tc 可能在 JWT 有效期内提前失效。
+  - **4 no_jwt skip**（均 york，凭证 2026-10-13 已 EXPIRED）：私聊提醒发送成功（workflow_event_log 写入 credential.expired_notified 事件，幂等键正确，全量回填正确跳过重复提醒）。
+  - **2 already_done skip**（felix limit-3 验证结果 sm_c3c7a44c + sm_186f4523，supermaiCriteriaKey 防重复付费正确）。
+- 事件验证：7 个 done 全部有 sourcing.search_started（actor=cli:brainx-supermai-search）+ sourcing.search_finished（actor=system:worker, status=success）双事件 ✅。2 个 failed 也有双事件但 finished status=error count=0（fail-fast 正确 emit）✅。
+- 待改进：回填脚本"OK done in Xs"日志不区分 done/failed（子进程退出≠搜索成功）；同顾问连续 spawn 应加间隔避免 TTC 限流；401/403 应 catch 并跳过该顾问剩余群（当前只 fail-fast 单个）。
+- 部署：scp 4 文件到 ECS `/opt/brainx/`（src/ + bin/ + migrations/）+ migration 0063 跑通 + brainx 服务重启（active + HTTP 200）+ 全量回填 nohup 后台跑完。**GitHub push 待补**（本次仅 scp 部署，未 git commit/push）。
+
 ## 2026-10-15｜feat(tools): brainx-supermai-search.mjs 正式 SuperMai 找人 CLI 工具
 
 - 背景：`startSupermaiScoutTask` 是 fire-and-forget（`(async()=>{await callOpenmaiContent})()` 同步返回 triggered，IIFE 后台跑），设计意图由 brainx 常驻服务/worker 调用——但**短命进程（trigger 脚本）调用=IIFE 死亡=任务永远 running**（10-15 实证 sm_378a920d）。之前的 `verify-gender-fix.mjs` 直连 callOpenmaiContent 验证 gender 修复，但不落库（结果只在日志）、不防重、不投递，不能长期用。
@@ -704,6 +722,25 @@
 - 对照 0.99 会议纪要核查“荆华密算销售”搜索失败：真实库中公司与职位分别存为“荆华密算”和“销售”，前端字段拼接产生的空格导致连续中文查询无法命中。
 - “全部职位”搜索同时匹配原始字段串和去空格字段串，不改变职位事实、排序、权限或筛选；Storybook 增加跨公司/职位字段的连续搜索回归。
 - 验证：本地真实库确认 `JHTSEQJ / 荆华密算 / 销售` 存在；前端静态与适配测试 53/53；`npm run verify:quick` 16/16 通过；真实页面验证在启动本地服务后补录。
+
+## 2026-10-15｜docs(sourcing): 找人写入流程固化——验证证据+量化估计+回归测试+部署清单
+
+- 起因（用户指令）：「这个全部进行写入验证估计 然后接下来是写入流程固化路径」（承接同日 outputs/2026-10-15-precision-architecture-felix.md 三件事报告）。
+- 写入验证（ECS 实证，正确表/字段名）：
+  - sm_22d9ca0b 完整 ✅：openmai_results 字段（status=done / result_text 6459 字节 / search_brief 91 字节 / BRAINX_CANDIDATES_V1 marker 在 3912-6456 字节 / 9 候选人 JSON 合法 / first 92% last 52%）+ workflow_event_log 2 条事件（sourcing.search_started at 11:10:12 actor=agent:brainx_supermai_scout + sourcing.search_finished at 11:12:57 actor=system:worker，idem_key 含 task_id，payload 含 status:success result_count:9）。
+  - sm_1e6c6e7f 部分 ⚠️：openmai_results done 7 候选人，但 workflow_event_log 只 1 条 sourcing.search_finished（actor=system:worker），缺 search_started。根因：sm_1e6c6e7f 不是 CLI 工具触发（actor 是 system:worker 非 cli:brainx-supermai-search），是 verify-gender-fix.mjs 旧脚本/startSupermaiScoutTask 老路径触发，**不是 CLI 工具 bug**——CLI 工具第 92-99 行有 emit search_started 调用，已用 sm_09838f16 实证 actor=cli:brainx-supermai-search 写过 started。
+  - felix 8 条 failed 正确零事件 ✅：所有 om_* task_id 在 workflow_event_log.idem_key 全 0 事件。属 fail-fast 路径——job 模式 jobVisibleTo 前置校验失败（JOB_NOT_FOUND）在 emitEvent 之前 return，正确不写 sourcing 事件。
+- 数据库 schema 关键修正（之前的查询字段错误）：openmai_results 实际字段为 task_id(主键)/project_id/consultant_id/status/result_text/error/started_at/finished_at/search_brief/search_round/excluded_candidate_refs_json；DB 实际路径 `/opt/brainx/data/brainx.db`（DB_PATH=process.env.BRAINX_DB||join(ROOT,'data','brainx.db')，无 BRAINX_DB env override，不在 /var/lib/brainx/）；项目用 node:sqlite 的 DatabaseSync（Node 内置），非 better-sqlite3；事件落 `workflow_event_log` 表（idem_key 唯一索引幂等），sourcing_task_events 表存在但 0 行（设计未启用）。
+- 量化估计：链路精准度 A（9 候选人 1 完全+8 部分，gender 修复三次验证稳定）；架构健康度 A（5 历史阻塞点全修复：commit 74b6667/f94b3d3/7cd8efe + post@ 格式 + already_done 修正）；写入完整度 A-（CLI 工具+agent 群链路两事件完整，fire-and-forget 老路径漏 started）；Felix bug 修复 100% 自愈（8 条 JOB_NOT_FOUND 全在 09-18 前，之后 felix 全 done）。
+- 写入流程固化路径（3 条生产路径 + 1 套契约 + 1 套回归基线）：
+  - 路径 A（生产主）：飞书群 post @ → openclaw-brainx dispatch turn → resolveTrustedPrincipal 6 字段 → brainx_supermai_scout → startSupermaiScoutTask → INSERT running + emit search_started(actor=agent:brainx_supermai_scout) → IIFE await callOpenmaiContent(openclaw 常驻进程内完成) → settleOpenmaiTask UPDATE done + emit search_finished(actor=system:worker) → 卡片投递回群。生产证据 sm_22d9ca0b。
+  - 路径 B（验证/补漏）：`/usr/bin/node bin/brainx-supermai-search.mjs --consultant <cid> --criteria "判据"` → INSERT running + emit search_started(actor=cli:brainx-supermai-search) → await callOpenmaiContent(绕过 fire-and-forget) → assessOpenmaiCandidateBatch + looksLikeSessionPollution → settleOpenmaiTask。生产证据 sm_09838f16。
+  - 路径 C（fail-fast）：agent → brainx_openmai_search(job_id) → jobVisibleTo 前置校验失败 → INSERT failed(JOB_NOT_FOUND) → 不 emit sourcing 事件。生产证据 felix 8 条。
+  - 幂等契约：idx_wel_idem 唯一索引兜底，同 idem_key 第二次 INSERT 返回 deduplicated=true 不真插入；幂等键格式 `sourcing.started:<project_id>:<task_id>` / `sourcing.finished:<project_id>:<task_id>` / `sourcing.finished:<project_id>:cred-r<round>`(凭证失败快速失败)。
+- 回归测试 `tests/sourcing-events.test.mjs`（新，3 用例 3/3 过）：①「started + finished 两事件必发，actor/幂等键正确」断言 startSupermaiScoutTask 调用后两事件均落表且 actor 区分清楚；②「凭证失败只发 search_finished(idem_key 含 cred-r 标记)」断言 fail-closed 路径不写 started；③「幂等键去重：同 task_id 重复 emit 不产生新行」断言 idx_wel_idem 幂等兜底。防回归点：sm_1e6c6e7f 类老路径漏 search_started 事件。
+- 文档：`docs/sourcing-write-flow-2026-10-15.md`（新，写入流程固化文档，含验证证据 + 量化估计 + 3 路径固化 + 幂等契约 + 回归基线 + 部署清单 + 长期建设建议）。
+- 部署状态：CLI 工具 commit 7cd8efe 已 push + ECS /opt/brainx/bin/ 已部署；agent 群链路 src/supermai-sourcing.js 第 117 行 emit search_started 已修；gender 提示词约束 commit f94b3d3 已 push + 部署；requireMention 幂等 commit 74b6667 已 push + 部署。本次仅新增测试与文档，无源码改动。
+- 长期建议：①fire-and-forget 老路径清理——对 sm_1e6c6e7f 类只 finished 没 started 的历史记录，可在 settleOpenmaiTask 加幂等补写 search_started 兜底（标 late_emit:true）；②事件审计仪表盘——基于 30+30 条 sourcing 事件做孤儿检测（started 无 finished >5min）；③TTC 报障 gender 引擎根因（BasicFilter.filters.basic.gender 数组组装 bug，retryable=false）；④job 模式失败消息改善——agent 层在 JOB_NOT_FOUND 时给用户友好提示而非直接 fail。
 
 ## 2026-10-13｜test(e2e): BrainTex 实习生 HC 真实项目全流程——JD 完善→接单→两轮找人→群投递
 

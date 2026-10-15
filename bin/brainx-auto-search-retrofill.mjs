@@ -122,6 +122,13 @@ function spawnSearchChild(consultantId, criteria, projectId) {
 const results = { triggered: 0, already_done: 0, no_jwt: 0, no_job: 0, no_criteria: 0, error: 0, jwt_notified: [] };
 
 console.log('\n=== 开始触发（每个群约 165s）===');
+// 同一顾问连续触发间隔（毫秒）。2026-10-15 实证：felix 连续 spawn 间隔仅 1s 触发
+// TTC 限流 401/403（JWT 未到期≠登录态有效），间隔 8 分钟后恢复正常。故同顾问
+// 相邻两次之间强制等待，跨顾问（不同凭证）不等待。
+const SAME_CONSULTANT_GAP_MS = Number(process.env.RETROFILL_SAME_CONSULTANT_GAP_MS || 30_000);
+let lastConsultantId = null;
+let lastSpawnAt = 0;
+
 for (let i = 0; i < candidates.length; i++) {
   const c = candidates[i];
   console.log(`\n[${new Date().toISOString()}] #${i + 1}/${candidates.length} ${c.project_id} (${c.consultant_id})`);
@@ -134,6 +141,15 @@ for (let i = 0; i < candidates.length; i++) {
     results.no_jwt += 1;
     if (r.status === 'notified') results.jwt_notified.push(c.consultant_id);
     continue;
+  }
+
+  // 同顾问限流保护：与上一次触发间隔不足则等待（避免 TTC 401/403）
+  if (lastConsultantId === c.consultant_id && lastSpawnAt > 0) {
+    const waitMs = SAME_CONSULTANT_GAP_MS - (Date.now() - lastSpawnAt);
+    if (waitMs > 0) {
+      console.log(`  同顾问 ${c.consultant_id} 间隔保护：等待 ${Math.round(waitMs / 1000)}s`);
+      await new Promise((r) => setTimeout(r, waitMs));
+    }
   }
 
   // 判据生成
@@ -169,6 +185,8 @@ for (let i = 0; i < candidates.length; i++) {
   const t0 = Date.now();
   const r = await spawnSearchChild(c.consultant_id, criteria, realProjectId);
   const elapsed = Math.round((Date.now() - t0) / 1000);
+  lastConsultantId = c.consultant_id;
+  lastSpawnAt = Date.now();
   const m = r.stdout.match(/task_id=sm_[a-f0-9]+/);
   // 判据真实落库结果（子进程退出≠搜索成功，必须查库）
   const row = db.prepare(`SELECT status, length(result_text) rt_len FROM openmai_results

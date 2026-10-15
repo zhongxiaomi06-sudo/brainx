@@ -22,6 +22,30 @@ import { productionBaseUrl } from './brainx-deep-links.js';
 import { startSupermaiScoutTask } from './supermai-sourcing.js';
 import { getAuthorizedTtcJwt } from './ttcsdk/auth.js';
 
+/** TTC 招聘漏斗计数模式（2026-10-15 审查实证）。
+ *  job_facts.pipeline 字段 72.1%（17279/23964 行）实为 TTC 漏斗计数而非业务描述，
+ *  例如 "Interview×38 Offer×1 Onboarding×2 Recommendation×106 Sourcing×37"。
+ *  直接拼进判据会污染自然语言语义，导致引擎误判甚至零结果——
+ *  铁证：sm_bafc5d0f（Java后端，判据含 Interview×18 Offer×1 Recommendation×66）
+ *  → 0 候选人，而同批干净判据均返回 8-10 人。 */
+const PIPELINE_NOISE_RE =
+  /\b(?:Interview|Offer|Recommendation|Sourcing|Onboarding|Hired|Rejected|Shortlist|Screening)\s*×\s*\d+/gi;
+
+/** 清洗 pipeline：去掉漏斗计数片段，返回业务描述或 null（全为噪声时）。 */
+export function cleanPipeline(raw) {
+  const text = String(raw ?? '').trim();
+  if (!text || text === 'null' || text === 'NULL') return null;
+  const cleaned = text
+    .replace(PIPELINE_NOISE_RE, ' ')
+    .replace(/\s*[,，、;；]\s*/g, '，')
+    .replace(/\s+/g, ' ')
+    .replace(/^[\s，、]+|[\s，、]+$/g, '')
+    .trim();
+  // 清洗后只剩空/纯分隔符 → 判定为无有效业务描述
+  if (!cleaned || !/[\u4e00-\u9fa5A-Za-z0-9]/.test(cleaned)) return null;
+  return cleaned;
+}
+
 /** 从 job_facts 拼「按 JD 自动找人」判据。固定 3-5 年（咪拍板）。 */
 export function buildAutoSearchCriteria(job, jdText = null) {
   if (!job || (!job.role && !job.company)) return null;
@@ -31,7 +55,9 @@ export function buildAutoSearchCriteria(job, jdText = null) {
   if (job.city) parts.push(job.city);
   if (job.hc) parts.push(`${job.hc}人`);
   if (job.company) parts.push(`${job.company}背景`);
-  if (job.pipeline) parts.push(`主要做${job.pipeline}`);
+  // 只在 pipeline 含真实业务描述时才拼（漏斗计数已清洗掉）
+  const pipeline = cleanPipeline(job.pipeline);
+  if (pipeline) parts.push(`主要做${pipeline}`);
 
   if (jdText) {
     const skills = jdText.substring(0, 200).replace(/\s+/g, ' ');

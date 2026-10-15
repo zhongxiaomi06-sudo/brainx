@@ -1,5 +1,15 @@
 # Agent Commit 记录
 
+## 2026-10-15｜feat(tools): brainx-supermai-search.mjs 正式 SuperMai 找人 CLI 工具
+
+- 背景：`startSupermaiScoutTask` 是 fire-and-forget（`(async()=>{await callOpenmaiContent})()` 同步返回 triggered，IIFE 后台跑），设计意图由 brainx 常驻服务/worker 调用——但**短命进程（trigger 脚本）调用=IIFE 死亡=任务永远 running**（10-15 实证 sm_378a920d）。之前的 `verify-gender-fix.mjs` 直连 callOpenmaiContent 验证 gender 修复，但不落库（结果只在日志）、不防重、不投递，不能长期用。
+- 新工具 `bin/brainx-supermai-search.mjs`（151 行）：直连 `callOpenmaiContent`（await，不走 fire-and-forget）+ 复用全部生产函数落库（`settleOpenmaiTask`）+ 质量评估（`assessOpenmaiCandidateBatch`）+ 污染检测（`looksLikeSessionPollution`）+ 事件发送（`emitEvent` sourcing.search_started，`settleOpenmaiTask` 内部发 search_finished）+ 凭证（`getAuthorizedTtcJwt`）+ 参数化判据（`--consultant --criteria`，默认 mia + FA 女生优先）+ `--help`。
+- 事件链路（与生产一致）：INSERT running → emitEvent sourcing.search_started → await callOpenmaiContent → settleOpenmaiTask（内部 emitSearchFinished + UPDATE done/failed）。
+- 验证（ECS brainx 用户后台跑）：task_id=sm_1e6c6e7f，判据「3年以内经验，清华或北大，FA机构背景（光源/义柏/义凯/云岫/IO），女生优先」，115s 完成，status=**done**，result_text 3673 字节，7 候选人（1 完全符合+6 部分符合），gender 错误未再现。**openmai_results 可查询**（project_id=supermai:699800d13061）——落库链路验证通过，可长期使用。
+- 部署：scp 到 ECS `/opt/brainx/bin/brainx-supermai-search.mjs`，brainx 用户 cwd=/opt/brainx 跑。不读 .env（brainx 用户无权），DB_PATH 硬编码 `/opt/brainx/data/brainx.db`，OPENMAI_BASE 用代码默认值 `gateway.ttcadvisory.com`。bus.emit 空实现——脚本无前端连接，群投递由 worker/前端 bus 订阅者负责。
+- 旧脚本 `bin/verify-gender-fix.mjs` 已删（被本工具完全替代）。
+- 性质：CLI 工具不改 src/ 逻辑，只复用 exported 生产函数。startSupermaiScoutTask 的 fire-and-forget 设计坑仍在（生产链路由常驻服务调用不受影响），后续可考虑加 `runSupermaiScoutSync` 同步版本供短命进程使用。
+
 ## 2026-10-15｜fix(找人): 提示词约束引擎不把性别偏好转成 gender 过滤，绕开 OpenMai 参数契约 bug
 
 - 起因：韬润群 JPTLM25 自由找人（`supermai:6d32b7f08a86`）判据含「女生优先」，OpenMai 引擎（本身是 LLM agent）读判据后「组装检索条件」调私域人才接口时，把 `BasicFilter.filters.basic.gender` 组装成**数组**，而下游 TTC 人才接口 Go 结构体该字段是 **string** → `json: cannot unmarshal array into Go struct field ...gender of type string`、`retryable=false` → 零候选人。引擎自己的回执明示它在读我们的提示词决定 filter 形态（「我会按接口契约把 basic.gender 等字段形态修正后再提交」）。仓库 grep 确认零 gender/BasicFilter 代码 → 100% 引擎侧组装，我们无法改引擎源码。

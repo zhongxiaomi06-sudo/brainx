@@ -1,5 +1,14 @@
 # Agent Commit 记录
 
+## 2026-10-15｜fix(sourcing): 修复判据 pipeline 污染 + 同顾问限流间隔（断点完全修复）
+
+- **判据 pipeline 污染（审查 P1）**：`job_facts.pipeline` **72.1%**（17279/23964 行）实为 TTC 漏斗计数（`Interview×38 Offer×1 Recommendation×106 Sourcing×37`）而非业务描述，被 `buildAutoSearchCriteria` 当「主要做X」拼进判据，污染自然语言语义。铁证：sm_bafc5d0f（Java后端，判据含 `Interview×18 Offer×1 Recommendation×66 Sourcing×7`）→ **0 候选人**，同批干净判据均 8-10 人。
+  - 修复：`src/auto-search.js` 新增 `cleanPipeline()`，正则剥离漏斗计数（Interview/Offer/Recommendation/Sourcing/Onboarding/Hired/Rejected/Shortlist/Screening × N），清洗后无有效业务描述则不拼该段。
+  - 生产验证：真实 job_facts 12 个职位 → **12/12 判据干净、0 噪声**；重点回归 J7AKNAL 新判据「Java后端开发工程师，深圳市，1人，上海随便找个信息科技有限公司背景，3-5 年工作经验」（不再含漏斗计数）。
+- **同顾问限流间隔（审查 P2-1）**：2026-10-15 实证 felix 连续 spawn 间隔 1s 触发 TTC 限流 401/403（**JWT 未到期≠登录态有效**），间隔 8 分钟后恢复。修复：回填脚本同顾问相邻触发强制间隔（默认 30s，`RETROFILL_SAME_CONSULTANT_GAP_MS` 可调），跨顾问不等待。
+- 测试 `tests/auto-search-criteria.test.mjs`（新，6 用例）：漏斗计数全清洗返回 null、保留真实业务描述只剥离计数、空/null 处理、判据不含噪声（回归点 sm_bafc5d0f）、保留真实 pipeline、缺字段返回 null。连同 sourcing-events + accept-launch **11/11 过**。
+- 部署：ECS `src/auto-search.js` + `bin/brainx-auto-search-retrofill.mjs` 已部署 + brainx 重启 + HTTP 200。push `e652151..2cbddea`，三方同步（本地=GitHub=ECS=2cbddea，0 未推送）。
+
 ## 2026-10-15｜fix(sourcing): 修复自由找人投递断裂——CLI 支持 --project-id + 存量补偿关联
 
 - 根因（审查实证）：自由找人结果 **89.7% 推不到群**（58 done 仅 6 投递）。`bin/brainx-supermai-search.mjs:65` 硬编码 `supermaiCriteriaKey(criteria)` 合成键，而 `openmai-delivery.js:57` `enqueueOpenmaiDeliveries` 用 **INNER JOIN project_launches** 匹配真实 project_id（`sourcing_tasks` 表 0 行，`COALESCE` 落到 `r.project_id`）→ 合成键匹配不上 → 不入投递队列。本次回填 7 done 56 候选人全部不投递。

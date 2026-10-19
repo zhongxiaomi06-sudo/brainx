@@ -1,5 +1,22 @@
 # Agent Commit 记录
 
+## 2026-10-19｜fix(tests)+docs: 补 spec 037 迁移测试期望 + 版本/搜索链路/felix 实证审查
+
+- **门禁测试债修复（上一轮 4 项失败的根因）**：spec 037 首提交 739d627（10-15 22:15）新增 migration `0063_auto_search_enabled.sql` 但漏更新 `tests/framework.test.mjs` 期望清单（当时门禁未跑 full）。修复：清单补 `'0063_auto_search_enabled.sql'`（字母序位于 0062 与 0063_candidate_search_feedback 之间）+ 旧库兼容用例计数 80→81。framework 测试 21/21 过。
+- **版本结构验证**：本地=GitHub=54c5022（0 未推送）；ECS live 与本地 HEAD 六个关键文件（auto-search/supermai-sourcing/openmai-delivery/worker/accept-launch/retrofill）md5 逐一全同；server 进程（PID 3270838）启动时间 10-16 00:36:44 精确晚于 auto-search.js 写入（00:36:43.86）0.14s → cleanPipeline 修复确在内存；生产实跑 `buildAutoSearchCriteria` LIVE-OUT 实证漏斗计数已清洗。ECS git 元数据陈旧（HEAD=f94b3d3 落后 7 提交）系 scp 部署模式已知性状，文件级一致不受影响。前端 dist build（10-15 11:32）晚于最后前端提交（10-13）→ 部署含全部前端提交。
+- **felix 实证（报告 `outputs/2026-10-19-version-search-pipeline-audit.md`）**：11 群 8 DONE/2 NULL/1 FAILED。2 个 NULL（J3ZJYBB/JWH6Q57）死因为 10-15 旧代码三重缺陷叠加（同顾问 1.87s 密集触发 TTC 401/403 + 前台 SSH 120s 超时 terminated 顺杀 + 旧 CLI 合成键致投递 INNER JOIN 落空），三项修复均已在 HEAD（2cbddea 限流间隔/nohup 用法文档/fa18fbe --project-id）但**未重跑**；现行 retrofill already_done 只跳过 done → 重跑一次即可闭环（2 次计费）。JH46A56 十人核对：城市/年限 100% 命中、top2 头衔真正对口、引擎诚实度高；判据生成缺陷实证——`buildAutoSearchCriteria:57` 要求「Zettlab吾云创新背景」招 Zettlab 的人（逻辑倒置），建议新 spec 040 改行业背景推断 + IC/Lead 分层。
+- **凭证悬崖（时间敏感）**：全顾问 TTC 凭证盘点——york 已过期 147.6h（4 群卡 NULL）；mia/linda/wendy/shanon/felix 集体今日 08:53–09:09 UTC 到期；otto needs_reauth=1。到期后 autoSearchOnLaunch 正确 fail-fast+私聊提醒，但无主动扫描（建议 spec 041：每日 retrofill timer + T-48h 到期提醒）。
+- 待咪拍板：① felix 2 群凭证到期前（~17:09 CST）是否现行 retrofill 重跑；② spec 040/041 是否建档；③ specs/038/039 是否进入实施。
+
+## 2026-10-16｜docs(specs): specs/038 跨进程顶替守卫 + specs/039 criteria-file 输入（排入下一轮，spec 先行）
+
+- 背景：咪 2026-10-16 指令——P0（顶替缺陷，防重复付费）与 P3（`--criteria-file`，把今日「落文件再跑」认知落进工具）排进下一轮；按项目规矩「改行为先建 `specs/<NNN>-feature/`」，本轮只建档不动的码。
+- **stale lock 拍板（上一轮挂起项）**：`logs/agent-work.lock/owner` 为 10-15 13:15 我自己（零一）建的锁，任务「requireMention reload 风暴修复」已于 10-15 14:00 提交（74b6667）并完成部署验证——陈旧锁成立（任务完成+已提交+锁未释放）。已按「先备份后清理」备份 owner 到 `/tmp/agent-work.lock.owner.bak-20261016` 再释放，并建本轮工作锁（建档范围）。
+- **specs/038-duplicate-trigger-guard**（P0）：四个入口缺 DB running 行检查实证——`supermai-sourcing.js:27`（进程内存 Set）+69-73 行只查内存+done+60s 冷却、`openmai-task.js:45/230-234`（job 模式同款）、`brainx-supermai-search.mjs:92-99`（CLI 绕过 start*Task 自行 INSERT ON CONFLICT）、`brainx-auto-search-retrofill.mjs:172-176`（already_done 只查 done，running 行不跳过）。设计：INSERT 前查 DB running 新鲜度（<`STALE_SEARCH_MS` 60min，与 failStale/H-2 同常量）拒绝非 force；**force 不 bypass**（续搜也不得顶替在途）；retrofill 联动 `skipped_running` 计数（不 spawn 不计 error）；CLI 命中打 `ALREADY_RUNNING` exit 0。含 10 边界用例、回归风险（retrofill 198 行会把提前 exit 误记 error——必须同步识别标记）、验收标准。
+- **specs/039-criteria-file-input**（P3）：今日引号墙实证（同判据穿 ssh+su 三层 11→58 字符 5.3× 膨胀、刻意设计的 inline 对照组 2 连挂、file-run 4/4）。设计：`--criteria-file <path>` UTF-8 + CRLF 剥离（实验实证 CRLF 炸 shebang，判据文本同理会污染 hash/prompt）+ 与 `--criteria` 互斥（同存 exit 2）+ 空文件报错 + 长度上限 2000 不变 + **hash 按文本内容（file 与 inline 同判据得同 project_id，复用/续搜语义不变）**；不做 stdin（quoting 面仍在且背离「可 diff/可 review」核心价值）。含 10 边界用例 + 人肉 ssh 实证验收。
+- 审核附带结论：**P2（retrofill「OK done in Xs」不区分 done/failed）已修**——现行 `brainx-auto-search-retrofill.mjs:194-205` 有查库验证（子进程退出≠搜索成功），咪看到的旧格式日志来自 10-15 跑的未提交工作区版本（739d627 22:15 才首提交），撤项。
+- 代码未动；实施（含测试与部署）待咪过 spec 后执行。
+
 ## 2026-10-15｜fix(sourcing): 修复判据 pipeline 污染 + 同顾问限流间隔（断点完全修复）
 
 - **判据 pipeline 污染（审查 P1）**：`job_facts.pipeline` **72.1%**（17279/23964 行）实为 TTC 漏斗计数（`Interview×38 Offer×1 Recommendation×106 Sourcing×37`）而非业务描述，被 `buildAutoSearchCriteria` 当「主要做X」拼进判据，污染自然语言语义。铁证：sm_bafc5d0f（Java后端，判据含 `Interview×18 Offer×1 Recommendation×66 Sourcing×7`）→ **0 候选人**，同批干净判据均 8-10 人。

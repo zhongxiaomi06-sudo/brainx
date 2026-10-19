@@ -1,5 +1,13 @@
 # Agent Commit 记录
 
+## 2026-10-19（三）｜docs(spec): spec 040 扩展「B+C 组合」——判据编译层 + 结果校验层并入
+
+- 咪 16:43-16:47 拍板：判据质量走 B+C 组合（触发前 LLM 结构化编译 + 送达前必备项硬校验）。扩入 spec 040（未实施，直接迭代 spec 最干净），交付分三阶段独立可上线：
+  - **S1 规则底座**（原设计不变）：notes sanitize 入判据 + 招聘方语义 + 真实年限；新增验收项「接线完备性断言」——jdText 教训（参数设计了≠接线了，739d627 同提交含参数/分支/裸调三方）固化为测试纪律。
+  - **S2 判据编译层 B**（新 §6）：触发前轻量 LLM 把 JD notes + 小麦画像编译为结构化判据（hard_requirements/preferences/exclusions/years_range/city_override schema）；双重 sanitize（prompt 禁令 + 出参正则兜底）；降级回落 S1；criteria_source 追溯（llm_compiled vs rules）可统计两来源转化率差异；kill switch BRAINX_CRITERIA_LLM。关键设计：**对话原文直传不可取**（J3ZJYBB 反证：role 全文传了照样泛化，问题在信息密度与结构），B 层的本质是给自动路径装上 agent 路径的「整理层」。
+  - **S3 结果校验层 C**（新 §7）：投递前逐人对照必备项判定 pass/warn/unknown，warn 沉底+标注具体冲突条目（不默认剔除防空手而归）；卡片顶部「本批 N/10 通过校验」；**离线回放验收零成本**——用当天三个真实 result_text 回放（JWH6Q57 大厂人应沉底、J3ZJYBB 投放岗应沉底、对照组 JWZSVXQ ≥8/10 pass 验证不误伤）；顺带修 freeform hint 渲染缺口（差距报告 B1）；kill switch BRAINX_RESULT_VERIFY。
+- 归因拍板记录：搜不准全责在 BrainX 判据生成层接线缺口（引擎无责/agent 设置无责），已在当日 memory 沉淀「spec 实施验收必须含分支覆盖证明」。
+
 ## 2026-10-19（二）｜docs(specs): specs/040 判据质量 + specs/041 定时回填与凭证扫描（felix「不准确」根因修复）
 
 - **执行记录（咪 15:39 拍板）**：① felix 两 NULL 群重跑闭环——`retrofill --consultant felix`（nohup detached）→ sm_fab9e96b（J3ZJYBB）/ sm_b2582fcf（JWH6Q57）均 done → 投递 SENT attempts=1 → search_status=DONE，felix 项目面 8/11→10/11；② 凭证扫码私聊 5 位送达（york 红/felix-linda-wendy-shanon 橙，幂等 notify:cred-scan:cid:date；otto active=0 不可达跳过）。

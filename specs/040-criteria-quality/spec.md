@@ -1,8 +1,9 @@
-# specs/040-criteria-quality — 自动找人判据质量修复：JD 原文入判据 + 招聘方语义修正 + 真实年限解析
+# specs/040-criteria-quality — 自动找人判据质量修复：规则底座 + 判据编译层（B）+ 结果校验层（C）
 
-> 状态：待咪评审
-> 建档：2026-10-19（零一）
+> 状态：待咪评审（2026-10-19 16:47 咪拍板「B+C 组合」，扩入原规则版设计）
+> 建档：2026-10-19（零一）；扩展：2026-10-19（同日，B/C 并入）
 > 优先级：P1（felix 三次质量投诉的根因修复）
+> 交付分三阶段：**S1 规则底座**（§2-§5，零 LLM 成本）→ **S2 判据编译层 B**（§6，触发前 LLM 结构化判据）→ **S3 结果校验层 C**（§7，送达前必备项硬校验）。三阶段独立可上线、逐级降级兜底。
 
 ## 1. 背景：为什么 felix 表示「不准确」
 
@@ -127,9 +128,123 @@ export function parseExperienceRange(text) {
 - **hash 键变化**：`supermaiCriteriaKey(criteria)` 按判据文本 hash——判据变化 → 合成键变化 → 自由找人主键换位。检查点：038 实施后 INSERT 有 running 拦截，此风险由 038 兜底；038 未实施前，CLI 仅显式调用（无自动路径传合成键），风险可控。
 - **验收基线**：J7AKNAL 判据会从「…上海随便找个信息科技有限公司背景，3-5 年…」变化——`tests/auto-search-criteria.test.mjs` 现有用例需同步更新（「保留真实 pipeline 业务描述」用例的公司背景断言）。
 
-## 5. 验收标准
+## 5. 验收标准（S1 阶段）
 
 1. `tests/auto-search-criteria.test.mjs` 新增 ≥10 用例（上表），全过。
 2. 生产 DB 三个真实 job_facts（J3ZJYBB/JWH6Q57/JH46A56）dry-run 生成判据，人工核对：销售向 JD 判据含销售语义、3-8 年生效、无年龄/性别字样、无「背景」倒置。
 3. `npm run verify` full 通过。
 4. 部署后首个新触发群的判据卡（buildSearchStartCard 会展示判据）由咪抽查。
+5. **接线完备性断言（jdText 教训）**：测试必须证明 notes 分支真实执行（非仅函数签名存在）——用真实 notes 输入断言输出含「JD 原文要点」段。
+
+---
+
+## 6. S2 判据编译层（B）：触发前 LLM 结构化判据
+
+> 咪拍板 2026-10-19 16:47。设计原则：**agent 路径质量高的本质是「对话经过了 agent 的理解整理」——B 层给自动路径装上同一个整理层**。对话原文直传不可取（J3ZJYBB 反证：role 全文传了照样泛化，问题在信息密度与结构，不在传没传）。
+
+### 6.1 流程
+
+```
+触发（建群/回填/续搜）
+  → 输入：job_facts.notes（JD 原文 + 小麦画像块）+ job 基础字段
+  → S1 规则底座先跑（sanitize 剥歧视条件 + 年限/城市解析）——S1 结果作为 B 的输入与兜底
+  → B：轻量 LLM（DeepSeek 级）编译 → 结构化判据 JSON
+  → 拼接自然语言判据（引擎接口是文本 criteria）→ 落 search_brief（可审计）
+  → 传引擎
+```
+
+### 6.2 结构化判据 schema（B 的输出契约）
+
+```json
+{
+  "role_focus": "商务BD-广告主资源（销售向：客户开拓/谈判/回款/销售指标）",
+  "hard_requirements": ["广告行业经验", "广告主资源（品牌方/效果代理/MCN）", "忌讳仅有大厂经验缺乏落地能力"],
+  "preferences": ["互联网/科技公司广告销售经验", "AIGC 行业了解"],
+  "exclusions": ["纯 PM/纯产品视角", "采购/IP引入背景（不能替代销售）"],
+  "years_range": "3-8",
+  "city_override": "广州",
+  "city_source": "xiaomai_profile"
+}
+```
+
+- 判据文本 = role_focus + 城市（city_override 优先于 job.city，**小麦画像优先原则**）+ 年限（years_range 优先于 S1 解析值）+ hard_requirements + preferences + exclusions 拼接，总长 ≤1200 字（search_brief 2000 上限内留余量）。
+- **双重 sanitize**：LLM prompt 明确禁止输出年龄/性别/健康/婚育条件 + 出参正则兜底复检（S1 的 sanitizeJdNotes 规则复用）——LLM 约束不可信，必须出参硬校验。
+
+### 6.3 降级与开关
+
+- `BRAINX_CRITERIA_LLM=0`（默认开，kill switch）→ 直接走 S1 规则版判据。
+- LLM 调用失败/超时（10s）/输出不合 schema → 落回 S1 判据，search_brief 记 `criteria_source: 'rules'`（B 成功记 `'llm_compiled'`）——**判据来源可追溯**，事后可统计两种来源的转化率差异。
+- 成本：每次触发一次短 prompt（JD ≤500 字 + schema 指令），DeepSeek 级成本每次 < 分级。仅自动路径（建群/回填）走 B；agent 路径判据已由对话整理产生，不重复编译。
+
+### 6.4 S2 边界用例
+
+| # | 场景 | 期望 |
+|---|---|---|
+| B1 | JWH6Q57 真实 JD（3-8 年、忌讳大厂、字节 2-1） | hard_requirements 含「忌讳仅有大厂」；years_range=3-8；无「30岁以内」 |
+| B2 | J3ZJYBB 真实 JD（销售向 + 画像广州 + 画像「销售不可替代」） | role_focus 含销售向语义；city_override=广州；exclusions 含「采购/IP引入背景」 |
+| B3 | JH46A56 真实 JD（画像「不要纯 PM」「深圳优先」「无年限门槛」） | exclusions 含「纯 PM/纯产品」；city_override=深圳；years_range=null（不硬造） |
+| B4 | LLM 输出夹带「35岁以下」 | 出参正则剥除；测试断言输出不含 |
+| B5 | LLM 超时 | 落回 S1 判据，criteria_source='rules' |
+| B6 | notes 为空 | 不调 LLM，直接 S1（省一次调用） |
+| B7 | BRAINX_CRITERIA_LLM=0 | 全程无 LLM 调用 |
+| B8 | LLM 输出 JSON 解析失败 | 落回 S1，不抛错不阻塞触发 |
+| B9 | 续搜轮（round≥2） | 沿用首轮编译结果 + 追加 exclusions（不重复编译不重复付费） |
+| B10 | 画像与 city 字段冲突（广州 vs 北京/上海） | city_override=画像值，city_source='xiaomai_profile'（可追溯） |
+
+## 7. S3 结果校验层（C）：送达前 JD 必备项硬校验
+
+> 引擎今天已输出逐人 [+] [-] 标注与「条件分类」，但排序仍可能让偏移人选进前排。C 层在我们侧用 B 的结构化必备项做最后一道硬校验——**降位为主，不默认剔除**（避免空手而归；明确配置才剔除）。
+
+### 7.1 流程与位置
+
+位置：`src/openmai-delivery.js` worker 生成结果卡**之前**（结果已落库、卡片未发——校验不影响落库事实，只影响展示顺序与标注）。
+
+```
+引擎结果落库（openmai_results.result_text，BRAINX_CANDIDATES_V1 JSON）
+  → C：取 B 层结构化必备项（hard_requirements/exclusions）
+  → 本地规则 + 轻量 LLM 逐人判定：候选人 role/evaluation 是否满足每条必备项
+     → 每人 verdict: pass / warn / unknown（证据不足）
+  → 重排：pass 在前 → unknown 居中 → warn 沉底；warn 的人卡片加「⚠️ 未通过 JD 必备项：具体条目」
+  → 卡片顶部加「本批 N/10 通过 JD 必备项校验」
+  → 投递（正常 SENT 链路不变）
+```
+
+### 7.2 校验判定规则
+
+- 每条 hard_requirement 对每个候选人：**pass**（evaluation/role 明确支持）/ **warn**（明确冲突，如「忌讳大厂」vs「字节 5 年」）/ **unknown**（证据不足）。
+- 任何一条 warn → 该候选人整体 warn（沉底 + 标注具体冲突条目）。
+- 全 pass 或全 unknown 为主 → 保持引擎原序（不误伤对照组式的高质量批次）。
+- **离线回放验收（零成本）**：用今天三个真实 result_text 回放 C 层——
+  - JWH6Q57：10 个大厂人应在「忌讳仅有大厂」条目下多数 warn 沉底（胥欣/姜灿等字节阿里百度背景）；
+  - J3ZJYBB：6 个投放优化岗应在「广告主资源/销售向」条目下 warn；谷歌广告销售/大客户商务经理应 pass 置顶；
+  - JWZSVXQ（对照组）：10 人应基本 pass——**验证不误伤是 C 的核心验收项**。
+- LLM 判定成本：每批一次调用（10 人 × ≤5 条必备项的结构化判定），短任务。失败降级：不校验、原序投递、卡片标注「校验未执行」。
+
+### 7.3 S3 边界用例
+
+| # | 场景 | 期望 |
+|---|---|---|
+| C1 | JWH6Q57 回放 | 大厂背景者 warn 沉底；顶部 N/10 计数正确 |
+| C2 | J3ZJYBB 回放 | 投放岗 warn；谷歌销售/商务经理 pass 置顶 |
+| C3 | JWZSVXQ 回放 | ≥8/10 pass，排序基本不变（不误伤） |
+| C4 | hard_requirements 为空（B 未产出） | 跳过校验，原序投递 |
+| C5 | 全员 warn（极端批次） | 沉底顺序仍输出，不剔除、不空手而归；卡片顶部如实标 0/10 |
+| C6 | BRAINX_RESULT_VERIFY=0 | 跳过校验 |
+| C7 | 校验 LLM 失败 | 原序投递 + 「校验未执行」标注，投递链路不受阻 |
+| C8 | needs_input/failed 任务 | 不进 C 层（只校验 done 且有候选人的批次） |
+| C9 | 续搜轮结果 | 同样过 C 层（exclusions 已由引擎执行，C 只管必备项） |
+| C10 | warn 的人被顾问手动初筛通过 | 顾问操作不受 C 层限制（C 只影响展示，不写死决策） |
+
+### 7.4 与 A2/B1 旧缺口的关系
+
+C 层卡片标注复用 sourcing-result-card 的现有结构（warn 标注类似现有 [-] 风险行），freeform 群的 hint 渲染缺口（差距报告 B1）顺带在本次修复——freeform 结果卡也渲染 continueSearchHint。
+
+## 8. 分阶段验收汇总
+
+| 阶段 | 交付物 | 验收 |
+|---|---|---|
+| S1 规则底座 | sanitizeJdNotes/parseExperienceRange/招聘方语义 + 测试 | §5 五项 |
+| S2 编译层 B | src/criteria-compile.js（新）+ kill switch + criteria_source 追溯 | §6.4 十项 + 三个真实 JD 编译输出人工核对 |
+| S3 校验层 C | src/result-verify.js（新）+ 卡片重排标注 + 回放测试 | §7.3 十项 + 三案例离线回放（含对照组不误伤） |
+
+上线序：S1 → S2 → S3，每阶段独立可回滚（kill switch 分别为 BRAINX_CRITERIA_LLM / BRAINX_RESULT_VERIFY，S1 无开关属纯修正）。

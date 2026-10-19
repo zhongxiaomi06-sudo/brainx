@@ -16,7 +16,8 @@
 import { spawn } from 'node:child_process';
 import { readFileSync, existsSync } from 'node:fs';
 import { openDb, now } from '../src/db.js';
-import { buildAutoSearchCriteria, listRetrofillCandidates, notifyCredentialExpired } from '../src/auto-search.js';
+import { listRetrofillCandidates, notifyCredentialExpired } from '../src/auto-search.js';
+import { compileSearchCriteria } from '../src/criteria-compile.js';
 import { supermaiCriteriaKey } from '../src/supermai-sourcing.js';
 import { getAuthorizedTtcJwt } from '../src/ttcsdk/auth.js';
 
@@ -152,14 +153,15 @@ for (let i = 0; i < candidates.length; i++) {
     }
   }
 
-  // 判据生成
+  // 判据生成（specs/040：S1 规则底座 + S2 LLM 编译层，降级链见 criteria-compile.js）
   const job = db.prepare('SELECT * FROM job_facts WHERE project_id=?').get(c.project_id);
   if (!job) {
     console.log(`  SKIP no_job`);
     results.no_job += 1;
     continue;
   }
-  const criteria = buildAutoSearchCriteria(job);
+  const compiledOut = await compileSearchCriteria(db, job, { projectId: c.project_id, round: 1 });
+  const criteria = compiledOut.criteria;
   if (!criteria) {
     console.log(`  SKIP no_criteria`);
     results.no_criteria += 1;
@@ -179,7 +181,7 @@ for (let i = 0; i < candidates.length; i++) {
     continue;
   }
 
-  console.log(`  criteria: ${criteria.slice(0, 200)}`);
+  console.log(`  criteria(${compiledOut.criteria_source}): ${criteria.slice(0, 200)}`);
   console.log(`  project_id=${realProjectId}（真实，投递回群前提）`);
   console.log(`  spawn brainx-supermai-search.mjs ...`);
   const t0 = Date.now();

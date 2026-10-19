@@ -1,5 +1,14 @@
 # Agent Commit 记录
 
+## 2026-10-19（四）｜feat(sourcing): spec 040 三阶段全量实施——S1 规则底座 + S2 判据编译层 + S3 结果校验层
+
+- 咪 16:50 指令「进行完全更改上线验证」，一次性实施 spec 040 全部三阶段（62 用例全过）：
+  - **S1 规则底座（`src/auto-search.js`）**：① `sanitizeJdNotes()` 剥年龄/性别歧视性条件 + CRLF 规整 + 截 500 字；② `parseExperienceRange()` 解析 JD 显式年限（数字环 lookaround 防「2024-2025年」误匹配）；③ `jobNotesText()` 三级取值 `job.notes → raw_json.notes/requirements → jdText`（接线缺口闭合：jdText 分支生产从未执行过，notes 权威列自动入场）；④ company 改「（招聘方：X）」不再拼「X背景」（倒置语义）；⑤ 年限优先 JD 真实区间，兜底仍 3-5 年。调用方零改动（两处都是 SELECT *）。
+  - **S2 判据编译层（`src/criteria-compile.js` 新）**：触发前 chatJson（temperature=0，timeout 10s）把 sanitize 后的 JD+小麦画像编译为结构化判据（role_focus/hard_requirements/preferences/exclusions/years_range/city_override/city_source schema）；**双重 sanitize**——prompt 禁令 + 出参每条正则复检（LLM 约束不可信）；降级链永不阻塞触发：kill switch `BRAINX_CRITERIA_LLM=0` / LLM 未配置 / notes 空 / 失败超时不合 schema → 全部落回 S1；产物记 `workflow_event_log`（event_type='criteria.compiled'，idem_key 按 project+round 幂等，criteria_source='llm_compiled'|'rules' 可追溯）；`buildCriteriaText()` 拼自然语言判据 ≤1200 字（小麦画像 city_override 优先于 city 字段）。接线：`autoSearchOnLaunch` + retrofill 均改走 `compileSearchCriteria`。
+  - **S3 结果校验层（`src/result-verify.js` 新 + 卡片改造）**：投递 worker 生成卡片前，done 批次用 B 层必备项（hard+exclusions，≤8 条）逐人 LLM 判定 pass/warn/unknown（覆盖不足半数按 llm_failed 处理）；**warn 沉底不剔除**——`sourcing-result-card.js` 按 pass→unknown→warn 稳定重排，warn 行标注「⚠️ 未通过 JD 必备项：条目」，卡片顶部「N/M 通过」计数；`BRAINX_RESULT_VERIFY=0` kill switch；C 层永不抛错（llm_failed/error → 原序投递 + 「校验未执行」标注；无判据/未配置 LLM 静默跳过避免噪声）。顺带修 freeform 结果卡 continueSearchHint 渲染缺口（差距报告 B1）。
+  - 测试：`tests/auto-search-criteria.test.mjs`（19，含 S1 十二边界用例 + 接线完备性断言）、`tests/criteria-compile.test.mjs`（12，B1-B10）、`tests/result-verify.test.mjs`（12，C1-C10 含三案例回放：JWH6Q57 大厂沉底/J3ZJYBB 投放岗沉底真销售置顶/JWZSVXQ 对照组全 pass 不误伤）；openmai-delivery 回归全过。
+  - **生产 LLM 未配置（已知阻塞）**：ECS `/etc/brainx/openclaw.env` 无 BRAINX_LLM_* 三要素——B/C 层以降级模式上线（S1 立即生效，B/C 自动走规则回退/静默跳过），配置 key 后立即生效无需再部署。
+
 ## 2026-10-19（三）｜docs(spec): spec 040 扩展「B+C 组合」——判据编译层 + 结果校验层并入
 
 - 咪 16:43-16:47 拍板：判据质量走 B+C 组合（触发前 LLM 结构化编译 + 送达前必备项硬校验）。扩入 spec 040（未实施，直接迭代 spec 最干净），交付分三阶段独立可上线：

@@ -8,7 +8,8 @@
  *      bin/brainx-auto-search-retrofill.mjs 对存量 READY 群回填触发。
  *
  * 关键设计：
- * 1. 判据固定「3-5 年经验」（咪拍板不按职位层级调整）
+ * 1. 判据底座（specs/040 S1）：JD 原文（notes/raw_json.notes）经 sanitize 剥歧视条件后
+ *    入判据；年限优先取 JD 显式区间，解析不出才兜底「3-5 年」（咪 2026-10-15 拍板默认）
  * 2. 凭证失效 agent 私聊主动提醒 + 直接给工作台 URL（咪拍板 §4.4.1）
  * 3. 不设单项目每月上限（咪拍板只靠 kill switch 软控 §4.4.2）
  * 4. 跳过 consultant_id='mia'（咪拍板除 mia 外都触发）
@@ -21,6 +22,7 @@ import { sendInteractiveCard } from './feishu-bot.js';
 import { productionBaseUrl } from './brainx-deep-links.js';
 import { startSupermaiScoutTask } from './supermai-sourcing.js';
 import { getAuthorizedTtcJwt } from './ttcsdk/auth.js';
+import { compileSearchCriteria } from './criteria-compile.js';
 
 /** TTC 招聘漏斗计数模式（2026-10-15 审查实证）。
  *  job_facts.pipeline 字段 72.1%（17279/23964 行）实为 TTC 漏斗计数而非业务描述，
@@ -46,7 +48,50 @@ export function cleanPipeline(raw) {
   return cleaned;
 }
 
-/** 从 job_facts 拼「按 JD 自动找人」判据。固定 3-5 年（咪拍板）。 */
+/** JD 原文取值（specs/040 S1）：job.notes 权威列优先，raw_json.notes/requirements 兜底。
+ *  两个调用方（autoSearchOnLaunch / retrofill）都是 SELECT *，raw_json 天然在场。 */
+export function jobNotesText(job) {
+  if (job?.notes && String(job.notes).trim()) return job.notes;
+  try {
+    const raw = JSON.parse(job?.raw_json || '{}');
+    for (const key of ['notes', 'requirements']) {
+      if (typeof raw?.[key] === 'string' && raw[key].trim()) return raw[key];
+    }
+  } catch { /* raw_json 损坏不阻塞判据生成 */ }
+  return null;
+}
+
+/** JD 原文净化（specs/040 S1）：剥年龄/性别等歧视性或不可执行条件 + 规整空白，截前 500 字。
+ *  S2 编译层出参与 S3 校验复用同一函数（双重 sanitize 的出参侧）。 */
+export function sanitizeJdNotes(raw) {
+  if (!raw) return null;
+  let t = String(raw).replace(/\r\n/g, '\n');
+  // 年龄类：年龄限制：XX / 30岁以内 / 35 岁以下（分段吃掉后续短语避免留残句）
+  t = t.replace(/年龄限制[：:]?[^\n。；;]*[。；;\n]?/g, '');
+  t = t.replace(/\d{2}\s*岁以[内下][^\n。；;,，]*[。；;\n,，]?/g, '');
+  // 性别类（f94b3d3 先例：引擎已约束不转 gender 过滤，判据侧同步不供给）
+  t = t.replace(/(女|男)生?优先[^\n。；;,，]*[。；;\n,，]?/g, '');
+  t = t.replace(/限(女|男)性[^\n。；;,，]*[。；;\n,，]?/g, '');
+  // 压缩空白，截前 500 字（旧 jdText 分支 200 字太短：J3ZJYBB 职责列表 200 字只到一半）
+  t = t.replace(/[ \t]+/g, ' ').replace(/\n{2,}/g, '\n').trim();
+  return t ? t.slice(0, 500) : null;
+}
+
+/** 解析显式年限区间（specs/040 S1）：「3-8年」「3-8 年工作经验」「5 年以上」
+ *  → '3-8 年' / '5 年以上'；解析不出返回 null（调用方兜底 3-5 年）。
+ *  (?<!\d)/(?!\d) 防止在「2024-2025年」这类长数字串里误匹配。 */
+export function parseExperienceRange(text) {
+  if (!text) return null;
+  const s = String(text);
+  const m = s.match(/(?<!\d)(\d{1,2})\s*[-–~至]\s*(\d{1,2})\s*年(?!\d)/);
+  if (m) return `${m[1]}-${m[2]} 年`;
+  const m2 = s.match(/(?<!\d)(\d{1,2})\s*年以上/);
+  if (m2) return `${m2[1]} 年以上`;
+  return null;
+}
+
+/** 从 job_facts 拼「按 JD 自动找人」判据（specs/040 S1 规则底座）。
+ *  JD 原文要点 + 真实年限区间优先；无 notes 时兜底固定 3-5 年（咪拍板）。 */
 export function buildAutoSearchCriteria(job, jdText = null) {
   if (!job || (!job.role && !job.company)) return null;
 
@@ -54,18 +99,21 @@ export function buildAutoSearchCriteria(job, jdText = null) {
   if (job.role) parts.push(job.role);
   if (job.city) parts.push(job.city);
   if (job.hc) parts.push(`${job.hc}人`);
-  if (job.company) parts.push(`${job.company}背景`);
+  // specs/040【改 1】：不再拼「X背景」（给 X 公司的岗位找 X 背景的人＝语义倒置），
+  // 改括号标注招聘方。铁证：JH46A56 案 0/10 命中「Zettlab 背景」。
+  if (job.company) parts.push(`（招聘方：${job.company}）`);
   // 只在 pipeline 含真实业务描述时才拼（漏斗计数已清洗掉）
   const pipeline = cleanPipeline(job.pipeline);
   if (pipeline) parts.push(`主要做${pipeline}`);
 
-  if (jdText) {
-    const skills = jdText.substring(0, 200).replace(/\s+/g, ' ');
-    parts.push(`技能要求：${skills}`);
-  }
+  // specs/040【改 3】：JD 原文入判据。job.notes/raw_json.notes 优先于外部 jdText
+  //（库内权威列比对话文本可信）；此前 jdText 分支在生产从未执行过（接线缺口）。
+  const notes = sanitizeJdNotes(jobNotesText(job)) || sanitizeJdNotes(jdText);
+  if (notes) parts.push(`JD 原文要点：${notes}`);
 
-  // 咪 2026-10-15 拍板：固定 3-5 年（不按职位层级调整）
-  parts.push('3-5 年工作经验');
+  // specs/040【改 4】：JD 含显式年限区间时用真实值，否则保留 3-5 年兜底（咪拍板默认）
+  const years = parseExperienceRange(notes) || '3-5 年';
+  parts.push(`${years}工作经验`);
 
   return parts.join('，');
 }
@@ -165,12 +213,13 @@ export async function autoSearchOnLaunch(db, bus, deps, consultantId, projectId,
     return { status: 'no_jwt', reason: 'TTC 凭证失效，已私聊提醒顾问更新凭证', consultantId };
   }
 
-  // 4. 判据生成（咪拍板固定 3-5 年）
+  // 4. 判据生成（specs/040：S1 规则底座 + S2 LLM 编译层；降级链见 criteria-compile.js）
   const job = db.prepare('SELECT * FROM job_facts WHERE project_id=?').get(projectId);
   if (!job) {
     return { status: 'no_job', reason: 'job_facts 无此职位', projectId };
   }
-  const criteria = buildAutoSearchCriteria(job);
+  const compiledOut = await compileSearchCriteria(db, job, { projectId, round: 1 });
+  const criteria = compiledOut.criteria;
   if (!criteria) {
     return { status: 'no_criteria', reason: 'job_facts 缺字段无法生成判据', projectId };
   }

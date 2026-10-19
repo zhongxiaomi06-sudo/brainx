@@ -19,7 +19,7 @@ export function groupSafeOpenmaiText(value, max = 6500) {
 }
 
 export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publicBaseUrl,
-  source = 'openmai', careerStatusMap = null }) {
+  source = 'openmai', careerStatusMap = null, verification = null }) {
   // freeform = SuperMai 自由找人模式（无职位）：判据摘要替代 company/role，不放 deep link。
   // 项目模式 job.freeform 不传，行为不变（AGENTS.md §2 最小实现：复用同一函数）。
   const freeform = job?.freeform === true;
@@ -32,6 +32,11 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
   const parsedCandidates = success ? extractOpenmaiCandidates(resultText) : [];
   // 外部引擎未必完全遵守排除提示，发卡前仍须按本人决策做最后一道过滤。
   const candidates = parsedCandidates.filter((item) => careerStatusMap?.[item.candidateRef] !== 'rejected');
+  // specs/040 S3：校验结果重排（pass 在前 → unknown → warn 沉底），warn 不剔除只沉底标注
+  const verdictMap = verification && !verification.skipped && verification.verdicts ? verification.verdicts : null;
+  const rankedCandidates = verdictMap
+    ? [...candidates].sort((a, b) => verifyRank(verdictMap, a) - verifyRank(verdictMap, b))
+    : candidates;
   const searchRound = Math.max(1, Number(job.search_round || 1));
   // 2026-09-16 用户拍板：首轮才写「首轮」，其他轮次用「续搜」，不写「第 N 轮」。
   const roundWord = searchRound > 1 ? '续搜' : '首轮';
@@ -60,7 +65,7 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
         : noMatches ? '本轮未搜到匹配候选人。请确认可放宽的条件后重新发起；本次不会自动重跑。'
           : groupSafeOpenmaiText(resultText)}`)
     : `${headline}\n\n本轮候选人搜索失败：${groupSafeOpenmaiText(error, 500)}\n\n请修复连接后在工作台重试。`;
-  const rows = candidates.length ? candidateFocusRows(job, candidates, source, careerStatusMap) : [];
+  const rows = candidates.length ? candidateFocusRows(job, rankedCandidates, source, careerStatusMap, verdictMap) : [];
   return {
     config: { wide_screen_mode: true },
     header: { template: complete ? 'green' : success ? 'orange' : 'red', title: { tag: 'plain_text',
@@ -71,13 +76,16 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
       { tag: 'markdown', content },
       { tag: 'note', elements: [{ tag: 'plain_text', content:
         `${roundWord} · ${excludedCount === '未记录' ? '排除人数未记录' : `已排除 ${excludedCount} 人`}\n本轮条件：${brief ? groupSafeOpenmaiText(brief, 240) : '按职位事实；本轮未记录补充条件'}` }] },
+      // specs/040 S3：校验计数 / 校验未执行标注（仅 llm_failed/error 显式提示，其余静默跳过）
+      ...verifyNoteElements(verification, verdictMap, candidates.length),
       // 说明收成一行小灰字 note：按钮与候选人随行后不再需要长段教学。
       ...(candidates.length ? [focusIntroNote(freeform, source)] : []),
       ...rows,
       ...(noMatches ? relaxedSearchElements(job, source) : []),
       // freeform 操作列统一「暂不支持」，不再逐条提示编号/链接问题（2026-10-09）。
-      ...(freeform ? [] : candidateQualityNotes(candidates)),
-      ...(candidates.length ? [continueSearchActions(job), ...(!freeform ? [continueSearchHint()] : [])] : []),
+      ...(freeform ? [] : candidateQualityNotes(rankedCandidates)),
+      // specs/040 §7.4（B1 缺口顺带修）：freeform 结果卡同样渲染继续找人提示
+      ...(candidates.length ? [continueSearchActions(job), continueSearchHint()] : []),
       // 失败 / 空结果卡只有这一个动作 → 右对齐收口（F4）。
       // freeform 无真实职位 → target 为 null → 不渲染「打开工作台」按钮，避免伪造链接（2026-09-16）。
       ...(!success || !candidates.length ? (target ? [alignSoloAction({ tag: 'action', actions: [{ tag: 'button', type: 'primary',
@@ -89,20 +97,43 @@ export function buildOpenmaiDeliveryCard({ job, status, resultText, error, publi
 
 /** 候选人每人一行：姓名直接打开 TTC，右侧只保留初筛通过与加入 reloop。
  *  三列权重 3/5/3，动作按钮纵向排列，确保四字姓名和两个动作都不被截断。
- *  careerStatusMap（specs/036）：{candidate_ref → career_status}，有终态时在匹配行前加徽标。 */
+ *  careerStatusMap（specs/036）：{candidate_ref → career_status}，有终态时在匹配行前加徽标。
+ *  verdictMap（specs/040 S3）：{candidate_ref → {verdict, failed[]}}，warn 行加 ⚠️ 必备项标注。 */
 const CAREER_BADGE = { screened: '已初筛', in_pool: '已入库', rejected: '已排除', restored: '已恢复' };
+const VERIFY_RANK = { pass: 0, unknown: 1, warn: 2 };
 
-function candidateFocusRows(job, candidates, source, careerStatusMap = null) {
+function verifyRank(verdictMap, candidate) {
+  return VERIFY_RANK[verdictMap?.[candidate.candidateRef]?.verdict] ?? 1;
+}
+
+/** specs/040 S3 卡片顶部校验行：执行了 → N/M 计数；llm_failed/error → 校验未执行标注。 */
+function verifyNoteElements(verification, verdictMap, total) {
+  if (verdictMap && verification) {
+    return [{ tag: 'note', elements: [{ tag: 'plain_text', content:
+      `JD 必备项校验：${verification.passCount}/${total} 通过；未通过者已沉底并标注 ⚠️ 具体冲突条目` }] }];
+  }
+  if (verification && ['llm_failed', 'error'].includes(verification.skipped)) {
+    return [{ tag: 'note', elements: [{ tag: 'plain_text', content:
+      '⚠️ 本批未完成 JD 必备项校验（校验服务异常），请顾问自行核对必备项' }] }];
+  }
+  return [];
+}
+
+function candidateFocusRows(job, candidates, source, careerStatusMap = null, verdictMap = null) {
   const freeform = job?.freeform === true;
   return [
     { tag: 'column_set', flex_mode: 'none', background_style: 'grey',
       columns: [tableCell('候选人', 3), tableCell('匹配与背景 · 核心匹配', 5), tableCell('操作', 3)] },
     ...candidates.map((candidate, index) => {
       const badge = CAREER_BADGE[careerStatusMap?.[candidate.candidateRef] || ''] || '';
+      const warn = verdictMap?.[candidate.candidateRef];
       const info = [
         `${badge ? `〔${badge}〕` : ''}**匹配度 ${groupSafeOpenmaiText(candidate.score, 20)}** · ${groupSafeOpenmaiText(candidate.role, 120)}`,
         backgroundText(candidate),
         groupSafeOpenmaiText(candidate.evaluation, 300),
+        // specs/040 S3：warn 沉底不剔除，行内标注具体冲突必备项
+        ...(warn?.verdict === 'warn' && warn.failed?.length
+          ? [`⚠️ 未通过 JD 必备项：${warn.failed.join('；').slice(0, 200)}`] : []),
       ].filter(Boolean).join('\n');
       const url = ttcTalentUrl(candidate) || (source === 'supermai' ? candidate.profileUrl : null);
       const name = groupSafeOpenmaiText(candidate.name, 12);

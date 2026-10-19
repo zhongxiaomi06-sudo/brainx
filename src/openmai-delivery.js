@@ -5,6 +5,7 @@ import { sendInteractiveCard } from './feishu-bot.js';
 import { assessOpenmaiCandidateBatch, extractOpenmaiCandidates } from './openmai-result.js';
 import { emitEvent } from './hub/emit.js';
 import { buildOpenmaiDeliveryCard } from './sourcing-result-card.js';
+import { verifyOpenmaiBatch } from './result-verify.js';
 import { deliverFreeformResultsOnce } from './sourcing-group-delivery.js';
 import { deliverJudgmentNoticesOnce } from './judgment-extract/notices.js';
 export { buildOpenmaiDeliveryCard, groupSafeOpenmaiText, screenCandidateAction,
@@ -215,11 +216,20 @@ export async function deliverOpenmaiResultsOnce(db, dependencies = {}) {
     db.prepare(`UPDATE openmai_deliveries SET delivery_status='SENDING', attempts=attempts+1,
       updated_at=? WHERE delivery_id=?`).run(at, row.delivery_id);
     try {
+      // specs/040 S3：done 批次送达前校验（B 层结构化必备项逐人判定，重排+标注）。
+      // verifyOpenmaiBatch 永不抛错；无结构化判据/未配置 LLM 时静默跳过，不影响投递。
+      let verification = null;
+      if (row.result_status === 'done') {
+        verification = await verifyOpenmaiBatch(db,
+          { projectId: row.project_id, resultText: row.result_text },
+          { chatJson: dependencies.chatJson, isLlmConfigured: dependencies.isLlmConfigured });
+      }
       const output = await send({
         target: row.chat_id,
         card: buildOpenmaiDeliveryCard({ job: row, status: row.result_status,
           resultText: row.result_text, error: row.error, publicBaseUrl: dependencies.publicBaseUrl,
-          source: String(row.task_id || '').startsWith('sm_') ? 'supermai' : 'openmai' }),
+          source: String(row.task_id || '').startsWith('sm_') ? 'supermai' : 'openmai',
+          verification }),
         idempotencyKey: row.delivery_id,
       });
       db.prepare(`UPDATE openmai_deliveries SET delivery_status='SENT', message_id=?, last_error=NULL,

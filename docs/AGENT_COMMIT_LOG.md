@@ -1,5 +1,12 @@
 # Agent Commit 记录
 
+## 2026-10-19（二）｜docs(specs): specs/040 判据质量 + specs/041 定时回填与凭证扫描（felix「不准确」根因修复）
+
+- **执行记录（咪 15:39 拍板）**：① felix 两 NULL 群重跑闭环——`retrofill --consultant felix`（nohup detached）→ sm_fab9e96b（J3ZJYBB）/ sm_b2582fcf（JWH6Q57）均 done → 投递 SENT attempts=1 → search_status=DONE，felix 项目面 8/11→10/11；② 凭证扫码私聊 5 位送达（york 红/felix-linda-wendy-shanon 橙，幂等 notify:cred-scan:cid:date；otto active=0 不可达跳过）。
+- **specs/040-criteria-quality（P1）**：felix 三次质量投诉的根因修复。决定性实证——`job_facts.raw_json.notes` 含完整 JD 原文（J3ZJYBB「开拓广告主客户/商务谈判/回款/销售指标」=销售向；JWH6Q57「3-8年…忌讳仅有大厂经历」），但 `buildAutoSearchCriteria(job)` 从未传 jdText（auto-search.js:62-65 分支生产从未执行）→ 判据只有 role+city+hc+company+3-5年 → 引擎按关键词推大厂/投放岗 → felix 眼里「不合适」。同日对比：agent 路径人工判据（JWZSVXQ round5）98% 级质量，证明问题全在判据供给不在引擎。设计四改：notes 经 sanitize（剥年龄/性别歧视性条件）截 500 字入判据、company 改「（招聘方：X）」不再拼「X背景」（倒置语义，引擎今日两次自行补偿不能依赖）、notes 显式年限区间（如 3-8 年）解析覆盖固定 3-5 兜底（咪拍板默认保留）、12 边界用例 + J7AKNAL 判据基线同步。
+- **specs/041-retrofill-timer-credential-scan（P1）**：york 过期 6 天无人发现 + 今日 6 顾问同日到期的产品化。组件 A `src/credential-scan.js`：扫 ttc_tokens，已过期（红）/T-48h（橙）私聊扫码提醒，幂等按日，跳过 mia/active=0/open_id null（otto 案）；组件 B：`brainx-cred-scan.timer`（03:20）+ `brainx-auto-search-retrofill.timer`（03:40）双 timer，Persistent 补跑。**依赖序：038 先行，retrofill timer 后上**（每日自动 spawn 放大跨进程顶替 hazard，038 拦截是前置）；credential-scan timer 无依赖可先行。10 边界用例。
+- specs/038/039/040/041 全部待咪评审后实施。
+
 ## 2026-10-19｜fix(tests)+docs: 补 spec 037 迁移测试期望 + 版本/搜索链路/felix 实证审查
 
 - **门禁测试债修复（上一轮 4 项失败的根因）**：spec 037 首提交 739d627（10-15 22:15）新增 migration `0063_auto_search_enabled.sql` 但漏更新 `tests/framework.test.mjs` 期望清单（当时门禁未跑 full）。修复：清单补 `'0063_auto_search_enabled.sql'`（字母序位于 0062 与 0063_candidate_search_feedback 之间）+ 旧库兼容用例计数 80→81。framework 测试 21/21 过。

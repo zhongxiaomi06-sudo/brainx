@@ -175,3 +175,40 @@ test('S1-13 jobNotesText：notes 列空时从 raw_json.notes/requirements 兜底
   const job3 = { role: 'R', city: 'C', company: 'X', raw_json: 'not-json' };
   assert.equal(jobNotesText(job3), null, 'raw_json 损坏不抛错');
 });
+
+// S1-14（2026-10-21 链路回放盲区攻击）：生产 179 行「95后/90后」漏剥 + 3 个变体盲区
+test('S1-14 年龄/性别变体盲区全剥除（生产回放实证）', () => {
+  // token 级剥离：剥歧视词、保留后续业务信息（J1L0502 实例）
+  const a = sanitizeJdNotes('95后  对标公司 可靠性经验');
+  assert.ok(!a.includes('95后'), '95后 token 必须剥');
+  assert.ok(a.includes('对标公司'), '后续业务信息必须保留');
+  assert.ok(a.includes('可靠性经验'), '可靠性经验保留');
+  // 90后优先
+  assert.ok(!sanitizeJdNotes('90后优先，本科以上').includes('90后'));
+  // 不超过N岁（吃后续短语避免残句）
+  assert.ok(!sanitizeJdNotes('岗位职责若干。不超过35岁。其他待定。').includes('35岁'));
+  // 只要男/女的、男性为佳 token 级
+  assert.ok(!sanitizeJdNotes('岗位职责若干。只要男的。其他待定。').includes('只要男'));
+  assert.ok(!sanitizeJdNotes('岗位职责若干。男性为佳。其他待定。').includes('男性为佳'));
+});
+
+// S1-15 误伤防护：时间表述与年限不得被年龄正则误剥
+test('S1-15 年龄正则不误伤时间/年限表述', () => {
+  // 「最多不超过5年」是年限表述（无「岁」），不得剥
+  const a = sanitizeJdNotes('经验要求：1-3年，最多不超过5年，c端产品经验');
+  assert.ok(a.includes('最多不超过5年'), '年限表述不误剥');
+  // 「2010年后」「10年后」是时间表述，不得剥
+  assert.ok(sanitizeJdNotes('2010年后成立的团队，做基础设施').includes('2010年后'));
+  assert.ok(sanitizeJdNotes('预计10年后回本的项目').includes('10年后'));
+  // 年限解析不受新增正则影响
+  assert.equal(parseExperienceRange(sanitizeJdNotes('3-8年经验，95后')), '3-8 年', '剥95后不影响年限解析');
+});
+
+// S1-16 判据组装端到端：含盲区表述的生产型 JD
+test('S1-16 含95后/只要男的的 JD 端到端判据无歧视残留', () => {
+  const c = buildAutoSearchCriteria({ role: '可靠性工程师', city: '上海市', company: '某公司',
+    notes: '95后 对标公司 可靠性经验，只要男的，3-8年经验' });
+  assert.ok(!c.includes('95后') && !c.includes('只要男'), '判据无歧视残留');
+  assert.ok(c.includes('对标公司') && c.includes('可靠性经验'), '业务信息保留');
+  assert.ok(c.includes('3-8 年工作经验'), '年限正常传导');
+});

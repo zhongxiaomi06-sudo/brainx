@@ -69,9 +69,16 @@ export function sanitizeJdNotes(raw) {
   // 年龄类：年龄限制：XX / 30岁以内 / 35 岁以下（分段吃掉后续短语避免留残句）
   t = t.replace(/年龄限制[：:]?[^\n。；;]*[。；;\n]?/g, '');
   t = t.replace(/\d{2}\s*岁以[内下][^\n。；;,，]*[。；;\n,，]?/g, '');
+  // 年龄类补充（2026-10-21 生产回放实证：95后/90后 179 行漏剥，如 J1L0502「95后 对标公司」）。
+  // token 级剥离只吃歧视词本身，不吃后续短语——「95后 对标公司 可靠性经验」须保留业务信息。
+  // (?<![\d年]) 排除「2010年后/10年后」类时间表述误伤。
+  t = t.replace(/(?<![\d年])(?:[89]\d|00)后(?:优先)?\s*/g, '');
+  t = t.replace(/不?超过\s*\d{1,2}\s*岁[^\n。；;,，]*[。；;\n,，]?/g, '');
   // 性别类（f94b3d3 先例：引擎已约束不转 gender 过滤，判据侧同步不供给）
   t = t.replace(/(女|男)生?优先[^\n。；;,，]*[。；;\n,，]?/g, '');
   t = t.replace(/限(女|男)性[^\n。；;,，]*[。；;\n,，]?/g, '');
+  t = t.replace(/只要(女|男)(性|的)?\s*/g, '');
+  t = t.replace(/(女|男)性?为佳\s*/g, '');
   // 压缩空白，截前 500 字（旧 jdText 分支 200 字太短：J3ZJYBB 职责列表 200 字只到一半）
   t = t.replace(/[ \t]+/g, ' ').replace(/\n{2,}/g, '\n').trim();
   return t ? t.slice(0, 500) : null;
@@ -232,10 +239,17 @@ export async function autoSearchOnLaunch(db, bus, deps, consultantId, projectId,
     return { status: 'already_done', task_id: existing.task_id, projectId, consultantId };
   }
 
-  // 6. 触发 SuperMai 找人（fire-and-forget OK：常驻 brainx 服务进程内 IIFE 不死）
-  const out = startSupermaiScoutTask(db, bus, consultantId, criteria, {
-    projectId, autoSearch: true, round: 1,
-  });
+  // 6. 触发 SuperMai 找人（fire-and-forget OK：常驻 brainx 服务进程内 IIFE 不死）。
+  //    try/catch 防御（2026-10-21 审查）：effectiveSearchBrief 拼接超长会 throw
+  //    SEARCH_BRIEF_TOO_LONG——判据环节异常不得炸掉接单链路（建群已成功，不能回滚）。
+  let out;
+  try {
+    out = startSupermaiScoutTask(db, bus, consultantId, criteria, {
+      projectId, autoSearch: true, round: 1,
+    });
+  } catch (e) {
+    return { status: 'trigger_error', reason: String(e?.message || e).slice(0, 200), projectId, consultantId };
+  }
 
   if (out.status === 'triggered') {
     // 7. 即时反馈卡（候选结果由 openmai-delivery worker 投递回群）

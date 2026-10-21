@@ -4070,3 +4070,12 @@
 - 文档：`docs/standards/CARD_TYPOGRAPHY.md` 重写为 7 条硬规则 + §2.1「不用 emoji」替换表 + 孤行收口与表格列数做法；`docs/2026-09-12-feishu-card-render-gate.md` 补 Range 判据、近似误差自省与第三轮处置表；`docs/frontend-reviews/2026-09-12-feishu-card-buttons-audit.md` 补 F1–F8 处置表、五维状态与「仍未确认」清单；`docs/README.md` 索引同步 6 → 7 条规则。
 - 门禁结论：`npm run verify`（full）**23/25**。内容类 23 项全绿（ESLint / TS / 后端 694 / 前端测试 / Storybook 测试 / 前端构建 / Storybook 构建 / 浏览器 e2e / 卡片渲染 / 烟雾 / 秘密扫描 / 行数 / 依赖审计）。失败 2 项均为 Git 状态类，且**全部由同工作区另一 Agent 未提交的删除引起**（`.agents/skills/speckit-*`×10、`.codebuddy/commands/speckit.*`×10、`.specify/integrations/*.manifest.json`×2）：①「工作区与操作状态（非干净）」②「完整检出（缺 22 个被跟踪文件）」。按 AGENTS.md §3.4 未触碰他人改动；这两项在 CI 的全新检出上不复现，故以 CI 为准。
 - 另：发现并还原了一个**被误删的已跟踪源文件** `frontend/btex-frontend/build/sites-vite-plugin.ts`（`vite.config.ts:3` 直接 import，缺失会让前端构建失败）。用 `git checkout HEAD --` 原样恢复，未改动任何他人提交内容。
+
+## 2026-10-21 解析链路完整性回放 + S1 歧视条件盲区修复（spec 040 S1 补丁）
+
+- 背景：咪指令「测试完整性，每一句话的解析传导的链路是否正确，接入的代码哪里错误了」。以生产最近 25 条 job_facts 为样本，回放 spec 040 全链（取值→净化→年限→漏斗清洗→判据组装→S2 编译/S3 回读），并做盲区攻击测试。
+- 回放结果：主链 25/25 干净（notes 取值全走权威列、判据组装无丢字段、S2 mock 编译与 S3 readCompiledCriteria 回读 20/20 字段一致、年限变体 6/6 正确）。
+- **真实缺陷（生产实证）**：`sanitizeJdNotes` 漏剥「95后/90后」——生产 job_facts.notes 有 **179 行**含该表述（例 J1L0502「95后 对标公司 可靠性经验」），直接污染判据文本。另有 3 个盲区正则盖不住（生产暂 0 命中）：「不超过N岁」「只要男/女的」「男性为佳」。
+- 修复 `src/auto-search.js#sanitizeJdNotes`：新增 4 组正则。关键设计——**token 级剥离**（只吃歧视词本身、不吃后续短语），保住「95后 对标公司 可靠性经验」里的业务信息；`(?<![\d年])(?:[89]\d|00)后` 排除「2010年后/10年后」时间表述误伤。S2 出参净化复用同函数自动生效。
+- 休眠地雷（记录未修行为）：`effectiveSearchBrief` 拼接「权威条件+本轮判据」超 2000 字会 throw SEARCH_BRIEF_TOO_LONG，且原 `autoSearchOnLaunch` 无 try/catch 会炸接单链路。当前 `project_search_briefs` 0 行未触发。防御修复：`autoSearchOnLaunch` step 6 包 try/catch，判据环节异常返回 `trigger_error` 不再炸链（建群成功不可回滚）。
+- 测试：`tests/auto-search-criteria.test.mjs` 新增 S1-14（盲区全剥）/S1-15（误伤防护：年限/时间表述）/S1-16（端到端无歧视残留）共 3 用例，22/22 过；S2/S3 套件 24/24 过；回放脚本 `tests/replay-chain-1021.mjs` 重跑 0 问题。

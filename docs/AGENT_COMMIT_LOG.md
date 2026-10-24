@@ -1,5 +1,13 @@
 # Agent Commit 记录
 
+## 2026-10-24｜test(e2e): StepFun 恢复 + 全链路生产复验（对话/投递/回流/调度/备份/工作台）
+
+- 起因（用户指令）：「现在已经换成stepfun，你验证其他的链路」。
+- 过程：kimi/k3 个人 token 如约到期（401 实测）→ 按用户完成的 StepFun 修复把 primary 切回 `stepfun/step-3.5-flash`、fallback `step-3.7-flash`（kimi provider 保留备用），重启 openclaw-brainx。
+- 对话复测：Mia @机器人 → StepFun 全部 200 → 群内真实回复 + 内部短名单卡（四动作按钮）。
+- 其余链路扫描（全绿）：五服务 active；僵尸 running 0；lark_messages 回流实时（分钟级）；consumer_failures 0；推送在跑（PROJECT_REMINDER 今日 13 条 / STAGE_REMINDER / SYNC_ALERT）；备份 03:18 落盘；白名单自愈近 1 小时 0 失败；工作台 API/前端 200；七个 timer（backup/oss-sync/feedback-rollup/talent-match/retention×2/shadow-daily）全部按期触发。
+- 结论：生产当前整体健康，无待修断点；个人 token 已不在主链路（stepfun 为主，kimi 仅备用 provider 未启用）。
+
 ## 2026-10-24｜test(e2e): 切换 kimi/k3 后群对话全链路实测通过（StepFun 403 实名阻断的替代验证）
 
 - 起因（用户指令）：「用新模型进行完整的验证」。10-13 实测发现 StepFun 两个模型均 403（free plan 要求实名认证），agent 收到消息但无法回复。

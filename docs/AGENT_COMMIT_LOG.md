@@ -1,5 +1,13 @@
 # Agent Commit 记录
 
+## 2026-10-24｜test(e2e): 切换 kimi/k3 后群对话全链路实测通过（StepFun 403 实名阻断的替代验证）
+
+- 起因（用户指令）：「用新模型进行完整的验证」。10-13 实测发现 StepFun 两个模型均 403（free plan 要求实名认证），agent 收到消息但无法回复。
+- 处理：本机 Kimi OAuth 凭证（用户本人账号）实测 `api.kimi.com/coding/v1` OpenAI 兼容调用通过 → 服务器 `openclaw.json` 新增 provider kimi（baseUrl/apiKey/models 按 stepfun 同款结构），`agents.defaults.model.primary=kimi/k3`、fallbacks 清空；`openclaw.json.bak-kimi-20261024` 备份；重启 openclaw-brainx。
+- 实测（Mia 本人飞书账号 lark-cli user 身份 @机器人）：模型调用全部 200（SSE 多轮）→ agent 实调 `brainx_candidate_shortlist` + 新工具 `brainx_sourcing_recall`（均 SUCCEEDED）→ 群内两条真实回复：进展说明文本（含"初筛通过/加入reloop/继续找人"引导）+ 内部短名单卡（2 名脱敏候选人、四动作按钮含「不合适」二次确认与「查联系方式」）。
+- 结论：飞书群→openclaw→agent-gateway→工具→回复/卡片的完整对话链路在 kimi/k3 下生产跑通。
+- **临时性提醒**：当前生产用的是个人 OAuth token（expires_at≈2026-10-25），到期即断——必须尽快换正式 API key（Moonshot 开放平台）或完成 StepFun 实名认证；不建议长期把个人凭证留在生产配置。
+
 ## 2026-10-19（六）｜docs(spec): specs/042「推得准」反馈环 + 原生入口对比验证（咪 19:53 方向收束）
 
 - 咪拍板：聚焦「推得准」单一问题；产品成功与否的对比基准 = 顾问直接用 SuperMai/OpenMai 原生入口。PM 体检（19:41）列的 P0 采纳/闭环问题中，与「推得准」直接相关的只有反馈缺失——本 spec 即其修复。
